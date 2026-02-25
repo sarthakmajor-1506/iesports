@@ -5,45 +5,18 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Dashboard() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, steamLinked } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/");
-    }
-  }, [user, loading, router]);
-
-  if (loading) {
-    return <p style={{ padding: 40, color: "#fff", background: "#0a0a0a", minHeight: "100vh" }}>Loading...</p>;
-  }
-
-  if (!user) {
-    return null;
-  }
+    if (!loading && !user) router.push("/");
+    else if (!loading && user && !steamLinked) router.push("/connect-steam");
+    else if (!loading && user && steamLinked) router.push("/dota2");
+  }, [user, loading, steamLinked, router]);
 
   return (
-    <main style={{ padding: 40, background: "#0a0a0a", color: "#fff", minHeight: "100vh" }}>
-      <h1 style={{ fontSize: 28, fontWeight: "bold" }}>Dashboard</h1>
-      <p style={{ marginTop: 10, color: "#999" }}>Logged in as: {user.phoneNumber}</p>
-      <button
-        onClick={async () => {
-          await logout();
-          window.location.href = "/";
-        }}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          background: "#dc2626",
-          color: "#fff",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-          fontWeight: "bold",
-        }}
-      >
-        Logout
-      </button>
-    </main>
+    <div style={{ minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <p style={{ color: "#555" }}>Loading...</p>
+    </div>
   );
 }
