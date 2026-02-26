@@ -1,6 +1,6 @@
 // /lib/soloScoring.ts
 
-import { SoloMatchScore } from "./types-addition";
+import { SoloMatchScore } from "./types";
 
 export function scoreMatch(match: any): SoloMatchScore {
   const win = match.radiant_win === (match.player_slot < 128);
