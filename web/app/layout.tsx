@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import DiscordFAB from "./components/DiscordFAB";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,8 +28,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
-        <DiscordFAB />
+        <Suspense fallback={null}>
+          <AuthProvider>{children}</AuthProvider>
+          <DiscordFAB />
+        </Suspense>
       </body>
     </html>
   );
