@@ -3,7 +3,7 @@
 import { useAuth } from "../../../context/AuthContext";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { doc, onSnapshot, collection, getDocs, orderBy, query } from "firebase/firestore";
+import { doc, onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Navbar from "../../../components/Navbar";
 import { SoloTournament, SoloPlayer } from "@/lib/types";
@@ -30,7 +30,6 @@ export default function SoloTournamentPage() {
     if (!loading && user && !steamLinked) router.push("/connect-steam");
   }, [user, loading, steamLinked]);
 
-  // Load tournament
   useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(doc(db, "soloTournaments", id), (snap) => {
@@ -40,7 +39,6 @@ export default function SoloTournamentPage() {
     return () => unsub();
   }, [id]);
 
-  // Load leaderboard
   useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(
@@ -59,7 +57,6 @@ export default function SoloTournamentPage() {
     return () => unsub();
   }, [id, user]);
 
-  // Countdown
   useEffect(() => {
     if (!tournament) return;
     const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline));
@@ -68,7 +65,6 @@ export default function SoloTournamentPage() {
     return () => clearInterval(i);
   }, [tournament]);
 
-  // Auto-refresh my score when I visit
   useEffect(() => {
     if (!user || !id || !isRegistered) return;
     const refresh = async () => {
@@ -79,7 +75,7 @@ export default function SoloTournamentPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tournamentId: id, uid: user.uid }),
         });
-      } catch (e) {}
+      } catch {}
       setRefreshing(false);
     };
     refresh();
@@ -105,269 +101,603 @@ export default function SoloTournamentPage() {
     }
   };
 
+  const handleRefresh = async () => {
+    if (!user || refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetch("/api/solo/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
+      });
+    } catch {}
+    setRefreshing(false);
+  };
+
+  // ── Loading / not found ────────────────────────────────────────────────────
   if (loading || tLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#555" }}>Loading...</p>
+      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#bbb", fontSize: 14 }}>Loading…</p>
       </div>
     );
   }
 
   if (!tournament) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#555" }}>Tournament not found.</p>
+      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#bbb", fontSize: 14 }}>Tournament not found.</p>
       </div>
     );
   }
 
-  const isEnded = tournament.status === "ended";
+  const isEnded    = tournament.status === "ended";
   const isUpcoming = tournament.status === "upcoming";
-  const regClosed = countdown === "Registration Closed";
+  const isActive   = tournament.status === "active";
+  const regClosed  = countdown === "Registration Closed";
   const canRegister = !isEnded && !regClosed && !isRegistered;
-  const slotsLeft = tournament.totalSlots - tournament.slotsBooked;
+  const slotsLeft  = tournament.totalSlots - tournament.slotsBooked;
+  const myRank     = user ? players.findIndex((p) => p.uid === user.uid) + 1 : 0;
 
-  // Find my rank
-  const myRank = user ? players.findIndex((p) => p.uid === user.uid) + 1 : 0;
-
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
-      <Navbar />
+    <>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-      {/* Hero */}
-      <div style={{
-        background: "linear-gradient(135deg, #0f0f0f, #111)",
-        borderBottom: "1px solid #1a1a1a", padding: "32px 40px",
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, #f97316, #22c55e, #3b82f6)" }} />
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 24 }}>
-          <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
-              <button onClick={() => router.push("/dota2")} style={{
-                background: "transparent", border: "1px solid #1a1a1a", borderRadius: 6,
-                color: "#555", fontSize: 12, padding: "4px 10px", cursor: "pointer",
-              }}>← Back</button>
-              <span style={{
-                background: isEnded ? "#1a1a1a" : "#16a34a15",
-                color: isEnded ? "#444" : "#22c55e",
-                padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-              }}>
-                {isEnded ? "Ended" : isUpcoming ? "Upcoming" : "🟢 Active"}
-              </span>
-              <span style={{ background: "#111", color: "#555", padding: "3px 10px", borderRadius: 20, fontSize: 10 }}>
-                {tournament.type === "paid" ? "⭐ PRO" : "FREE"}
-              </span>
+        .st-page {
+          min-height: 100vh;
+          background: #F8F7F4;
+          color: #111;
+          font-family: var(--font-geist-sans), system-ui, sans-serif;
+        }
+
+        /* ── Hero ── */
+        .st-hero {
+          background: #fff;
+          border-bottom: 1px solid #E5E3DF;
+          padding: 28px 40px 28px;
+        }
+        .st-hero-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 24px;
+        }
+
+        /* Back + badges row */
+        .st-hero-top {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .st-back-btn {
+          background: #F8F7F4;
+          border: 1px solid #E5E3DF;
+          border-radius: 100px;
+          color: #555;
+          font-size: 0.78rem;
+          font-weight: 600;
+          padding: 5px 14px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: all 0.15s;
+        }
+        .st-back-btn:hover { background: #F2F1EE; color: #111; }
+
+        .st-badge {
+          font-size: 0.65rem;
+          font-weight: 800;
+          padding: 4px 11px;
+          border-radius: 100px;
+          letter-spacing: 0.04em;
+        }
+        .st-badge.active   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .st-badge.ended    { background: #F2F1EE; color: #888;    border: 1px solid #E5E3DF; }
+        .st-badge.upcoming { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+        .st-badge.free     { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+        .st-badge.pro      { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+
+        .st-hero-title {
+          font-size: 1.8rem;
+          font-weight: 900;
+          color: #111;
+          letter-spacing: -0.02em;
+          margin-bottom: 6px;
+        }
+        .st-hero-sub {
+          font-size: 0.84rem;
+          color: #888;
+          line-height: 1.5;
+        }
+
+        /* Countdown chips */
+        .st-countdown {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 14px;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 100px;
+          padding: 7px 16px;
+          font-size: 0.82rem;
+        }
+        .st-countdown span.label { color: #888; }
+        .st-countdown span.time  { color: #16a34a; font-weight: 700; }
+
+        .st-reg-closed {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 14px;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 100px;
+          padding: 7px 16px;
+          font-size: 0.82rem;
+          color: #ea580c;
+          font-weight: 600;
+        }
+
+        /* Right panel */
+        .st-hero-right {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 12px;
+          min-width: 200px;
+        }
+        .st-prize-block { text-align: right; }
+        .st-prize-label {
+          font-size: 0.65rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+          margin-bottom: 4px;
+        }
+        .st-prize-amount {
+          font-size: 2rem;
+          font-weight: 900;
+          color: #F05A28;
+          line-height: 1;
+        }
+        .st-slots-text {
+          font-size: 0.75rem;
+          color: #aaa;
+          margin-top: 4px;
+        }
+
+        /* My score card */
+        .st-my-score {
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 12px;
+          padding: 14px 18px;
+          text-align: right;
+          width: 100%;
+        }
+        .st-my-score-label {
+          font-size: 0.65rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #86efac;
+          margin-bottom: 4px;
+        }
+        .st-my-score-num {
+          font-size: 2rem;
+          font-weight: 900;
+          color: #16a34a;
+          line-height: 1;
+        }
+        .st-my-score-meta {
+          font-size: 0.75rem;
+          color: #86efac;
+          margin-top: 4px;
+        }
+
+        /* Register / registered buttons */
+        .st-register-btn {
+          width: 100%;
+          padding: 12px 0;
+          background: #F05A28;
+          border: none;
+          border-radius: 100px;
+          color: #fff;
+          font-weight: 700;
+          font-size: 0.9rem;
+          cursor: pointer;
+          font-family: inherit;
+          transition: all 0.15s;
+          box-shadow: 0 3px 14px rgba(240,90,40,0.3);
+        }
+        .st-register-btn:hover:not(:disabled) { background: #D44A1A; }
+        .st-register-btn:disabled { opacity: 0.6; cursor: default; }
+
+        .st-registered-pill {
+          width: 100%;
+          padding: 11px 0;
+          text-align: center;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 100px;
+          color: #16a34a;
+          font-weight: 700;
+          font-size: 0.88rem;
+        }
+        .st-error { font-size: 0.8rem; color: #dc2626; text-align: right; }
+
+        /* ── Smurf warning ── */
+        .st-smurf-wrap {
+          max-width: 1100px;
+          margin: 20px auto 0;
+          padding: 0 40px;
+        }
+        .st-smurf-banner {
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 12px;
+          padding: 12px 18px;
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+        }
+        .st-smurf-text {
+          font-size: 0.8rem;
+          color: #92400e;
+          line-height: 1.6;
+        }
+        .st-smurf-text strong { color: #ea580c; }
+
+        /* ── Leaderboard ── */
+        .st-lb-wrap {
+          max-width: 1100px;
+          margin: 20px auto 48px;
+          padding: 0 40px;
+        }
+        .st-lb-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 14px;
+        }
+        .st-lb-title {
+          font-size: 0.68rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+        }
+        .st-refresh-btn {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 100px;
+          color: #555;
+          font-size: 0.78rem;
+          font-weight: 600;
+          padding: 5px 14px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: all 0.15s;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .st-refresh-btn:hover:not(:disabled) { background: #F2F1EE; color: #111; }
+        .st-refresh-btn:disabled { opacity: 0.5; cursor: default; }
+
+        /* Empty state */
+        .st-empty {
+          text-align: center;
+          padding: 60px 0;
+          color: #bbb;
+        }
+        .st-empty-emoji { font-size: 44px; margin-bottom: 16px; }
+        .st-empty-text  { font-size: 0.9rem; }
+
+        /* Table */
+        .st-table {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .st-table-head {
+          display: grid;
+          grid-template-columns: 56px 1fr 110px 110px 100px;
+          padding: 10px 20px;
+          border-bottom: 1px solid #F2F1EE;
+          background: #F8F7F4;
+        }
+        .st-table-head span {
+          font-size: 0.62rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+        }
+        .st-table-row {
+          display: grid;
+          grid-template-columns: 56px 1fr 110px 110px 100px;
+          padding: 12px 20px;
+          border-bottom: 1px solid #F8F7F4;
+          align-items: center;
+          transition: background 0.12s;
+        }
+        .st-table-row:last-child { border-bottom: none; }
+        .st-table-row:hover { background: #F8F7F4; }
+        .st-table-row.me {
+          background: #f0fdf4;
+          border-left: 3px solid #22c55e;
+        }
+        .st-table-row.me:hover { background: #dcfce7; }
+
+        /* Rank cell */
+        .st-rank-cell {
+          display: flex;
+          align-items: center;
+          font-size: 0.88rem;
+          font-weight: 700;
+        }
+        .st-rank-1 { color: #d97706; }
+        .st-rank-2 { color: #6b7280; }
+        .st-rank-3 { color: #b45309; }
+        .st-rank-n { color: #bbb; }
+
+        /* Player cell */
+        .st-player-cell {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .st-player-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 2px solid #E5E3DF;
+          flex-shrink: 0;
+        }
+        .st-player-avatar.me { border-color: #22c55e; }
+        .st-player-name {
+          font-size: 0.88rem;
+          font-weight: 600;
+          color: #111;
+        }
+        .st-player-name.me { color: #16a34a; }
+        .st-player-you {
+          font-size: 0.7rem;
+          color: #16a34a;
+          font-weight: 500;
+          margin-left: 4px;
+        }
+        .st-disq {
+          font-size: 0.72rem;
+          color: #dc2626;
+          margin-top: 2px;
+        }
+
+        /* Score cell */
+        .st-score-cell {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #111;
+        }
+        .st-score-zero { color: #ddd; font-weight: 400; font-size: 0.85rem; }
+
+        /* Meta cells */
+        .st-meta-cell {
+          font-size: 0.88rem;
+          color: #555;
+          font-weight: 500;
+        }
+        .st-top-match-val { color: #F05A28; font-weight: 700; }
+        .st-top-match-empty { color: #ddd; }
+
+        @media (max-width: 700px) {
+          .st-hero { padding: 20px; }
+          .st-smurf-wrap, .st-lb-wrap { padding: 0 16px; }
+          .st-table-head,
+          .st-table-row { grid-template-columns: 48px 1fr 80px 80px; }
+          .st-table-head span:last-child,
+          .st-table-row > *:last-child { display: none; }
+        }
+      `}</style>
+
+      <div className="st-page">
+        <Navbar />
+
+        {/* ── Hero ─────────────────────────────────────────────────────────── */}
+        <div className="st-hero">
+          <div className="st-hero-inner">
+
+            {/* Left */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="st-hero-top">
+                <button className="st-back-btn" onClick={() => router.push("/dota2")}>
+                  ← Back
+                </button>
+                <span className={`st-badge ${isEnded ? "ended" : isUpcoming ? "upcoming" : "active"}`}>
+                  {isEnded ? "Ended" : isUpcoming ? "Upcoming" : "🟢 Active"}
+                </span>
+                <span className={`st-badge ${tournament.type === "paid" ? "pro" : "free"}`}>
+                  {tournament.type === "paid" ? "⭐ PRO" : "FREE"}
+                </span>
+              </div>
+
+              <h1 className="st-hero-title">{tournament.name}</h1>
+              <p className="st-hero-sub">
+                Play your normal ranked games — your top 3 match scores count toward the leaderboard.
+              </p>
+
+              {/* Countdown */}
+              {isActive && !regClosed && (
+                <div className="st-countdown">
+                  <span>⏱️</span>
+                  <span className="label">Registration ends in</span>
+                  <span className="time">{countdown}</span>
+                </div>
+              )}
+              {isActive && regClosed && (
+                <div className="st-reg-closed">
+                  🔒 Registration closed — Tournament ends Sunday
+                </div>
+              )}
             </div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>{tournament.name}</h1>
-            <p style={{ color: "#555", fontSize: 14 }}>Play your normal ranked games — top 3 match scores count toward leaderboard.</p>
 
-            {/* Countdown */}
-            {tournament.status === "active" && !regClosed && (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                marginTop: 14, background: "#0f1a0f", border: "1px solid #14532d",
-                borderRadius: 8, padding: "8px 14px",
-              }}>
-                <span>⏱️</span>
-                <span style={{ color: "#555", fontSize: 13 }}>Tournament started —</span>
-                <span style={{ color: "#22c55e", fontWeight: 700, fontSize: 13 }}>Registration ends in {countdown}</span>
+            {/* Right */}
+            <div className="st-hero-right">
+              <div className="st-prize-block">
+                <div className="st-prize-label">Prize Pool</div>
+                <div className="st-prize-amount">{tournament.prizePool}</div>
+                <div className="st-slots-text">{slotsLeft} / {tournament.totalSlots} slots left</div>
               </div>
-            )}
-            {regClosed && tournament.status === "active" && (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                marginTop: 14, background: "#1a0f00", border: "1px solid #7c2d12",
-                borderRadius: 8, padding: "8px 14px",
-              }}>
-                <span style={{ color: "#f97316", fontSize: 13, fontWeight: 700 }}>🔒 Registration closed — Tournament ends Sunday</span>
-              </div>
-            )}
+
+              {/* My score */}
+              {isRegistered && myScore && (
+                <div className="st-my-score">
+                  <div className="st-my-score-label">My Score</div>
+                  <div className="st-my-score-num">{myScore.cachedScore}</div>
+                  <div className="st-my-score-meta">
+                    Rank #{myRank} · {myScore.matchesPlayed} matches
+                    {refreshing && <span style={{ marginLeft: 6, opacity: 0.6 }}>↻ updating…</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Register */}
+              {canRegister && (
+                <button
+                  className="st-register-btn"
+                  onClick={handleRegister}
+                  disabled={registering}
+                >
+                  {registering ? "Registering…" : "Register Free →"}
+                </button>
+              )}
+              {isRegistered && (
+                <div className="st-registered-pill">✓ Registered</div>
+              )}
+              {error && <p className="st-error">{error}</p>}
+            </div>
           </div>
+        </div>
 
-          {/* Right: Prize + Register */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 14, minWidth: 200 }}>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ color: "#333", fontSize: 10, letterSpacing: 1 }}>PRIZE POOL</p>
-              <p style={{ fontSize: 32, fontWeight: 800, color: "#f97316" }}>{tournament.prizePool}</p>
-              <p style={{ color: "#444", fontSize: 12, marginTop: 4 }}>{slotsLeft} / {tournament.totalSlots} slots left</p>
-            </div>
+        {/* ── Smurf warning ─────────────────────────────────────────────────── */}
+        <div className="st-smurf-wrap">
+          <div className="st-smurf-banner">
+            <span style={{ fontSize: 15, flexShrink: 0 }}>🤖</span>
+            <p className="st-smurf-text">
+              <strong>AI Smurf Monitor Active — </strong>
+              Our system analyses your recent match history. Abnormal performance compared to your rank history will result in disqualification and prize forfeiture.
+            </p>
+          </div>
+        </div>
 
-            {/* My score card if registered */}
-            {isRegistered && myScore && (
-              <div style={{
-                background: "#0f1a0f", border: "1px solid #16a34a40",
-                borderRadius: 10, padding: "12px 16px", textAlign: "right", width: "100%",
-              }}>
-                <p style={{ color: "#444", fontSize: 10, letterSpacing: 1 }}>MY SCORE</p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#22c55e" }}>{myScore.cachedScore}</p>
-                <p style={{ color: "#444", fontSize: 12 }}>
-                  Rank #{myRank} · {myScore.matchesPlayed} matches played
-                  {refreshing && <span style={{ color: "#555", marginLeft: 8 }}>↻ updating...</span>}
-                </p>
-              </div>
-            )}
-
-            {/* Register button */}
-            {canRegister && (
-              <button onClick={handleRegister} disabled={registering} style={{
-                width: "100%", padding: "12px 28px",
-                background: registering ? "#b45309" : "linear-gradient(135deg, #f97316, #ea580c)",
-                border: "none", borderRadius: 10, color: "#fff",
-                fontWeight: 700, fontSize: 14, cursor: registering ? "default" : "pointer",
-              }}>
-                {registering ? "Registering..." : "Register Free →"}
+        {/* ── Leaderboard ───────────────────────────────────────────────────── */}
+        <div className="st-lb-wrap">
+          <div className="st-lb-header">
+            <span className="st-lb-title">Leaderboard — {players.length} Players</span>
+            {isRegistered && (
+              <button
+                className="st-refresh-btn"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                {refreshing ? "↻ Refreshing…" : "↻ Refresh My Score"}
               </button>
             )}
-            {isRegistered && (
-              <div style={{
-                width: "100%", padding: "12px 0", textAlign: "center",
-                background: "#14532d", border: "1px solid #16a34a40",
-                borderRadius: 10, color: "#22c55e", fontWeight: 700, fontSize: 14,
-              }}>✓ Registered</div>
-            )}
-            {error && <p style={{ color: "#ef4444", fontSize: 13 }}>{error}</p>}
           </div>
-        </div>
-      </div>
 
-      {/* Smurf warning */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 40px 0" }}>
-        <div style={{
-          background: "#1a0f00", border: "1px solid #7c2d12",
-          borderRadius: 10, padding: "12px 18px",
-          display: "flex", gap: 10, alignItems: "flex-start",
-        }}>
-          <span style={{ fontSize: 16 }}>🤖</span>
-          <p style={{ color: "#78350f", fontSize: 13, lineHeight: 1.6 }}>
-            <span style={{ color: "#f97316", fontWeight: 700 }}>AI Smurf Monitor Active — </span>
-            Our system analyses your recent match history. Abnormal performance patterns compared to your rank history will result in disqualification and prize forfeiture.
-          </p>
-        </div>
-      </div>
-
-      {/* Leaderboard */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 40px 40px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: 1.5 }}>
-            LEADERBOARD — {players.length} PLAYERS
-          </p>
-          {isRegistered && (
-            <button
-              onClick={async () => {
-                if (!user) return;
-                setRefreshing(true);
-                await fetch("/api/solo/refresh", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ tournamentId: id, uid: user.uid }),
-                });
-                setRefreshing(false);
-              }}
-              disabled={refreshing}
-              style={{
-                padding: "6px 14px", background: "transparent",
-                border: "1px solid #1a1a1a", borderRadius: 6,
-                color: refreshing ? "#333" : "#555", fontSize: 12,
-                cursor: refreshing ? "default" : "pointer",
-              }}
-            >
-              {refreshing ? "↻ Refreshing..." : "↻ Refresh My Score"}
-            </button>
-          )}
-        </div>
-
-        {players.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <p style={{ fontSize: 40 }}>🏆</p>
-            <p style={{ color: "#444", marginTop: 16, fontSize: 15 }}>No players yet. Be the first to register!</p>
-          </div>
-        ) : (
-          <div style={{ background: "#0a0a0a", border: "1px solid #141414", borderRadius: 12, overflow: "hidden" }}>
-            {/* Table header */}
-            <div style={{
-              display: "grid", gridTemplateColumns: "60px 1fr 120px 120px 100px",
-              padding: "12px 20px", borderBottom: "1px solid #141414",
-            }}>
-              {["RANK", "PLAYER", "SCORE", "MATCHES", "TOP MATCH"].map((h) => (
-                <p key={h} style={{ color: "#333", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>{h}</p>
-              ))}
+          {players.length === 0 ? (
+            <div className="st-empty">
+              <div className="st-empty-emoji">🏆</div>
+              <p className="st-empty-text">No players yet. Be the first to register!</p>
             </div>
+          ) : (
+            <div className="st-table">
+              {/* Header */}
+              <div className="st-table-head">
+                <span>Rank</span>
+                <span>Player</span>
+                <span>Score</span>
+                <span>Matches</span>
+                <span>Top Match</span>
+              </div>
 
-            {/* Rows */}
-            {players.map((p, i) => {
-              const rank = i + 1;
-              const isMe = user?.uid === p.uid;
-              const rankColor = rank === 1 ? "#f59e0b" : rank === 2 ? "#9ca3af" : rank === 3 ? "#b45309" : "#444";
-              const rankEmoji = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
-              const topMatchScore = p.cachedTopMatches?.[0]?.score || 0;
+              {/* Rows */}
+              {players.map((p, i) => {
+                const rank = i + 1;
+                const isMe = user?.uid === p.uid;
+                const topMatchScore = p.cachedTopMatches?.[0]?.score || 0;
 
-              return (
-                <div
-                  key={p.uid}
-                  style={{
-                    display: "grid", gridTemplateColumns: "60px 1fr 120px 120px 100px",
-                    padding: "14px 20px",
-                    borderBottom: "1px solid #0f0f0f",
-                    background: isMe ? "#0f1a0f" : "transparent",
-                    transition: "background 0.15s",
-                  }}
-                  onMouseEnter={e => !isMe && (e.currentTarget.style.background = "#0d0d0d")}
-                  onMouseLeave={e => !isMe && (e.currentTarget.style.background = "transparent")}
-                >
-                  {/* Rank */}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    {rankEmoji ? (
-                      <span style={{ fontSize: 18 }}>{rankEmoji}</span>
-                    ) : (
-                      <span style={{ color: rankColor, fontWeight: 700, fontSize: 14 }}>#{rank}</span>
-                    )}
-                  </div>
+                const rankEl = rank === 1 ? (
+                  <span style={{ fontSize: 18 }}>🥇</span>
+                ) : rank === 2 ? (
+                  <span style={{ fontSize: 18 }}>🥈</span>
+                ) : rank === 3 ? (
+                  <span style={{ fontSize: 18 }}>🥉</span>
+                ) : (
+                  <span className="st-rank-n">#{rank}</span>
+                );
 
-                  {/* Player */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <img
-                      src={p.steamAvatar || ""}
-                      alt=""
-                      style={{ width: 32, height: 32, borderRadius: "50%", border: isMe ? "2px solid #22c55e" : "2px solid #1a1a1a" }}
-                    />
+                return (
+                  <div
+                    key={p.uid}
+                    className={`st-table-row${isMe ? " me" : ""}`}
+                  >
+                    {/* Rank */}
+                    <div className="st-rank-cell">{rankEl}</div>
+
+                    {/* Player */}
+                    <div className="st-player-cell">
+                      <img
+                        src={p.steamAvatar || ""}
+                        alt=""
+                        className={`st-player-avatar${isMe ? " me" : ""}`}
+                      />
+                      <div>
+                        <div className={`st-player-name${isMe ? " me" : ""}`}>
+                          {p.steamName}
+                          {isMe && <span className="st-player-you">(you)</span>}
+                        </div>
+                        {p.disqualified && (
+                          <div className="st-disq">⚠️ Disqualified</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Score */}
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: isMe ? 700 : 500, color: isMe ? "#22c55e" : "#fff" }}>
-                        {p.steamName} {isMe && <span style={{ fontSize: 11, color: "#22c55e" }}>(you)</span>}
-                      </p>
-                      {p.disqualified && (
-                        <p style={{ fontSize: 11, color: "#ef4444" }}>⚠️ Disqualified</p>
+                      {p.cachedScore > 0 ? (
+                        <span className="st-score-cell">{p.cachedScore}</span>
+                      ) : (
+                        <span className="st-score-zero">—</span>
+                      )}
+                    </div>
+
+                    {/* Matches */}
+                    <div className="st-meta-cell">{p.matchesPlayed}</div>
+
+                    {/* Top match */}
+                    <div>
+                      {topMatchScore > 0 ? (
+                        <span className="st-top-match-val">{topMatchScore}</span>
+                      ) : (
+                        <span className="st-top-match-empty">—</span>
                       )}
                     </div>
                   </div>
-
-                  {/* Score */}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: p.cachedScore > 0 ? "#fff" : "#333" }}>
-                      {p.cachedScore}
-                    </span>
-                    {p.cachedScore === 0 && (
-                      <span style={{ color: "#333", fontSize: 11, marginLeft: 6 }}>no matches</span>
-                    )}
-                  </div>
-
-                  {/* Matches */}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ color: "#555", fontSize: 14 }}>{p.matchesPlayed}</span>
-                  </div>
-
-                  {/* Top match */}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ color: topMatchScore > 0 ? "#f97316" : "#333", fontSize: 14, fontWeight: topMatchScore > 0 ? 700 : 400 }}>
-                      {topMatchScore > 0 ? topMatchScore : "—"}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

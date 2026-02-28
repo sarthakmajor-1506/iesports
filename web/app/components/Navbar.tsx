@@ -5,12 +5,13 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Image from "next/image";
 
 const games = [
-  { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#f97316", glow: "rgba(249,115,22,0.3)",  icon: "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png", active: true },
-  { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.3)",   icon: "https://upload.wikimedia.org/wikipedia/commons/f/fc/Valorant_logo_-_pink_color_version.svg",          active: false },
-  { id: "cs2",      name: "CS2",      path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.3)",   icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/CS2_Logo.svg/800px-CS2_Logo.svg.png",       active: false },
-  { id: "cod",      name: "COD",      path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.3)",   icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Call_of_Duty_logo.svg/800px-Call_of_Duty_logo.svg.png", active: false },
+  { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#F05A28", glow: "rgba(240,90,40,0.2)",  icon: "/dota2logo.png", active: true },
+  { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.2)",  icon: "/valorantlogo.png",          active: false },
+  { id: "cs2",      name: "CS:Go",      path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/csgologo.png",       active: false },
+  { id: "cod",      name: "COD",      path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg", active: false },
 ];
 
 const DiscordIcon = ({ size = 16, color = "currentColor" }) => (
@@ -62,104 +63,388 @@ export default function Navbar() {
   };
 
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 100, background: "#050505", borderBottom: "1px solid #1a1a1a" }}>
+    <>
+      <style>{`
+        .ie-navbar {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          background: rgba(255, 255, 255, 0.97);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid #E5E3DF;
+          font-family: var(--font-geist-sans), system-ui, sans-serif;
+        }
 
-      {/* Top colour strip */}
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${activeGame.color}, transparent)`, transition: "background 0.3s" }} />
+        /* Active game accent line */
+        .ie-nav-accent {
+          height: 3px;
+          transition: background 0.3s;
+        }
 
-      {/* Main row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 40px", height: 68, borderBottom: "1px solid #111" }}>
+        /* Main row */
+        .ie-nav-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 32px;
+          height: 60px;
+          gap: 16px;
+        }
 
-        {/* Logo */}
-        <div onClick={() => router.push("/dashboard")} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-          <div style={{ width: 42, height: 42, background: "linear-gradient(135deg, #f97316, #c2410c)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: "#fff", boxShadow: "0 0 24px rgba(249,115,22,0.5)" }}>IE</div>
-          <div>
-            <p style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.5, background: "linear-gradient(90deg, #fff, #aaa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Indian Esports</p>
-            <p style={{ fontSize: 9, color: "#444", letterSpacing: 3, fontWeight: 700, marginTop: 1 }}>COMPETITIVE GAMING</p>
+        /* Logo */
+        .ie-nav-logo {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          text-decoration: none;
+          flex-shrink: 0;
+        }
+        .ie-nav-logo-name {
+          font-size: 1.05rem;
+          font-weight: 800;
+          color: #111;
+          line-height: 1;
+        }
+        .ie-nav-logo-name span { color: #F05A28; }
+        .ie-nav-logo-sub {
+          font-size: 0.6rem;
+          color: #bbb;
+          letter-spacing: 0.14em;
+          font-weight: 700;
+          text-transform: uppercase;
+          margin-top: 2px;
+        }
+
+        /* Game tabs */
+        .ie-nav-tabs {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+        }
+        .ie-nav-tab {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 16px;
+          border-radius: 9px;
+          border: 1px solid transparent;
+          background: transparent;
+          cursor: pointer;
+          font-size: 0.84rem;
+          font-weight: 600;
+          color: #888;
+          transition: all 0.15s;
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .ie-nav-tab:hover {
+          background: #F2F1EE;
+          color: #111;
+          border-color: #E5E3DF;
+        }
+        .ie-nav-tab.active {
+          color: #111;
+          font-weight: 700;
+        }
+        .ie-nav-tab img {
+          width: 20px;
+          height: 20px;
+          object-fit: contain;
+          border-radius: 4px;
+          transition: filter 0.15s;
+        }
+        .ie-soon-badge {
+          font-size: 0.58rem;
+          color: #bbb;
+          background: #F2F1EE;
+          border: 1px solid #E5E3DF;
+          padding: 1px 6px;
+          border-radius: 20px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+        }
+
+        /* Right side */
+        .ie-nav-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        /* Steam badge */
+        .ie-steam-badge {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: #F8F7F4;
+          border: 1px solid #E5E3DF;
+          border-radius: 100px;
+          padding: 5px 12px 5px 8px;
+        }
+        .ie-steam-badge img.avatar {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          border: 2px solid #22c55e;
+        }
+        .ie-steam-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #333;
+        }
+        .ie-verified-badge {
+          font-size: 0.65rem;
+          color: #16a34a;
+          font-weight: 800;
+          background: #dcfce7;
+          padding: 2px 7px;
+          border-radius: 20px;
+          border: 1px solid #bbf7d0;
+        }
+
+        /* Discord badge / button */
+        .ie-discord-badge {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: #eef0ff;
+          border: 1px solid #c7d0ff;
+          border-radius: 100px;
+          padding: 5px 12px 5px 10px;
+        }
+        .ie-discord-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #4f5fc0;
+        }
+        .ie-discord-verified {
+          font-size: 0.65rem;
+          color: #4f5fc0;
+          font-weight: 800;
+          background: #e0e4ff;
+          padding: 2px 7px;
+          border-radius: 20px;
+          border: 1px solid #c7d0ff;
+        }
+        .ie-discord-btn {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 6px 14px;
+          background: #eef0ff;
+          border: 1px solid #c7d0ff;
+          border-radius: 100px;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 0.8rem;
+          color: #4f5fc0;
+          transition: all 0.15s;
+          font-family: inherit;
+        }
+        .ie-discord-btn:hover {
+          background: #e0e4ff;
+          border-color: #a5b0f0;
+        }
+
+        /* User pill */
+        .ie-user-pill {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 6px 14px;
+          background: #F8F7F4;
+          border: 1px solid #E5E3DF;
+          border-radius: 100px;
+          color: #555;
+          font-size: 0.8rem;
+          font-weight: 600;
+        }
+        .ie-user-avatar {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #E5E3DF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+        }
+
+        /* Logout button */
+        .ie-logout-btn {
+          padding: 7px 16px;
+          background: #fff1f0;
+          color: #dc2626;
+          border: 1px solid #fecaca;
+          border-radius: 100px;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 0.9rem;
+          font-family: inherit;
+          transition: all 0.15s;
+        }
+        .ie-logout-btn:hover {
+          background: #fee2e2;
+          border-color: #fca5a5;
+        }
+
+        /* Private profile warning */
+        .ie-private-warning {
+          background: #fffbeb;
+          border-bottom: 1px solid #fde68a;
+          padding: 7px 32px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .ie-private-warning p {
+          color: #92400e;
+          font-size: 0.78rem;
+          margin: 0;
+          line-height: 1.5;
+        }
+        .ie-private-warning strong {
+          color: #b45309;
+          font-weight: 700;
+        }
+        .ie-private-warning code {
+          background: #fef3c7;
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-family: inherit;
+          font-weight: 600;
+          color: #92400e;
+          font-size: 0.75rem;
+        }
+
+        @media (max-width: 1024px) {
+          .ie-nav-row { padding: 0 20px; gap: 10px; }
+          .ie-nav-tab { padding: 6px 10px; font-size: 0.78rem; }
+          .ie-nav-tab span.label { display: none; }
+        }
+        @media (max-width: 768px) {
+          .ie-nav-tabs { display: none; }
+          .ie-nav-row { padding: 0 16px; }
+        }
+      `}</style>
+
+      <nav className="ie-navbar">
+        {/* Active game colour accent line */}
+        <div
+          className="ie-nav-accent"
+          style={{ background: `linear-gradient(90deg, ${activeGame.color} 0%, ${activeGame.color}33 60%, transparent 100%)` }}
+        />
+
+        {/* Main row */}
+        <div className="ie-nav-row">
+
+          {/* ── Logo ── */}
+          <div className="ie-nav-logo" onClick={() => router.push("/dashboard")}>
+            <Image
+              src="/ielogo.png"
+              alt="Indian Esports"
+              width={36}
+              height={36}
+              style={{ borderRadius: 8, boxShadow: "0 2px 10px rgba(240,90,40,0.25)" }}
+            />
+            <div>
+              <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
+              <div className="ie-nav-logo-sub">Competitive Gaming</div>
+            </div>
           </div>
-        </div>
 
-        {/* Game Tabs */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {games.map((g) => {
-            const isActive = activeGame?.id === g.id;
-            return (
-              <button
-                key={g.id}
-                onClick={() => router.push(g.path)}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 24px", background: isActive ? `${g.color}18` : "transparent", border: isActive ? `1px solid ${g.color}40` : "1px solid transparent", borderRadius: 10, color: isActive ? "#fff" : "#555", cursor: "pointer", fontSize: 14, fontWeight: isActive ? 700 : 500, transition: "all 0.15s", boxShadow: isActive ? `0 0 20px ${g.glow}` : "none" }}
-                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "#0f0f0f"; e.currentTarget.style.color = "#aaa"; e.currentTarget.style.border = "1px solid #222"; } }}
-                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#555"; e.currentTarget.style.border = "1px solid transparent"; } }}
-              >
-                <img src={g.icon} alt={g.name} style={{ width: 24, height: 24, objectFit: "contain", borderRadius: 4, filter: isActive ? "none" : "grayscale(100%) brightness(40%)", transition: "filter 0.15s" }} />
-                <span>{g.name}</span>
-                {!g.active && <span style={{ fontSize: 9, color: "#444", background: "#111", border: "1px solid #1a1a1a", padding: "1px 7px", borderRadius: 20, fontWeight: 600 }}>Soon</span>}
+          {/* ── Game tabs ── */}
+          <div className="ie-nav-tabs">
+            {games.map((g) => {
+              const isActive = activeGame?.id === g.id;
+              return (
+                <button
+                  key={g.id}
+                  className={`ie-nav-tab${isActive ? " active" : ""}`}
+                  onClick={() => router.push(g.path)}
+                  style={isActive ? {
+                    background: `${g.color}12`,
+                    border: `1px solid ${g.color}35`,
+                    color: g.color,
+                    boxShadow: `0 2px 12px ${g.glow}`,
+                  } : {}}
+                >
+                  <img
+                    src={g.icon}
+                    alt={g.name}
+                    style={{ filter: isActive ? "none" : "grayscale(100%) brightness(60%)" }}
+                  />
+                  <span className="label">{g.name}</span>
+                  {!g.active && <span className="ie-soon-badge">Soon</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Right side ── */}
+          <div className="ie-nav-right">
+
+            {/* Steam badge */}
+            {steamData?.steamId && (
+              <div className="ie-steam-badge">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
+                  alt="Steam"
+                  style={{ width: 26, height: 26, opacity: 0.7 }}
+                />
+                <img
+                  className="avatar"
+                  src={steamData.steamAvatar}
+                  alt="avatar"
+                />
+                <span className="ie-steam-name">{steamData.steamName}</span>
+                <span className="ie-verified-badge">✓ Linked</span>
+              </div>
+            )}
+
+            {/* Discord */}
+            {discordLinked ? (
+              <div className="ie-discord-badge">
+                <DiscordIcon size={26} color="#5865F2" />
+                <span className="ie-discord-name">{discordUsername}</span>
+                <span className="ie-discord-verified">✓ Linked</span>
+              </div>
+            ) : (
+              <button className="ie-discord-btn" onClick={handleDiscordConnect}>
+                <DiscordIcon size={26} color="currentColor" />
+                Connect Discord
               </button>
-            );
-          })}
-        </div>
+            )}
 
-        {/* Right side */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-
-          {/* Steam badge */}
-          {steamData?.steamId && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0a", border: "1px solid #1e3a2a", borderRadius: 10, padding: "7px 14px" }}>
-              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" style={{ width: 15, height: 15, opacity: 0.7 }} />
-              <img src={steamData.steamAvatar} alt="avatar" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e40" }} />
-              <span style={{ color: "#bbb", fontSize: 13, fontWeight: 600 }}>{steamData.steamName}</span>
-              <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 800, background: "#16a34a20", padding: "2px 8px", borderRadius: 20 }}>✓ Linked</span>
+            {/* User phone pill */}
+            <div className="ie-user-pill">
+              <div className="ie-user-avatar">👤</div>
+              {user?.phoneNumber}
             </div>
-          )}
 
-          {/* Discord — connected badge or connect button */}
-          {discordLinked ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5865F215", border: "1px solid #5865F240", borderRadius: 8, padding: "7px 14px" }}>
-              <DiscordIcon size={16} color="#8a9bff" />
-              <span style={{ color: "#8a9bff", fontSize: 13, fontWeight: 600 }}>{discordUsername}</span>
-              <span style={{ fontSize: 10, color: "#8a9bff", fontWeight: 800, background: "#5865F220", padding: "2px 8px", borderRadius: 20 }}>✓ Linked</span>
-            </div>
-          ) : (
-            <button
-              onClick={handleDiscordConnect}
-              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", background: "#5865F220", border: "1px solid #5865F240", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#8a9bff", transition: "all 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#5865F230"; e.currentTarget.style.borderColor = "#5865F280"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#5865F220"; e.currentTarget.style.borderColor = "#5865F240"; }}
-            >
-              <DiscordIcon size={18} color="currentColor" />
-              Connect Discord
+            {/* Logout */}
+            <button className="ie-logout-btn" onClick={async () => { await logout(); }}>
+              Logout
             </button>
-          )}
-
-          {/* Phone number pill */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, color: "#888", fontSize: 13 }}>
-            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#161616", border: "1px solid #2a2a2a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>👤</div>
-            {user?.phoneNumber}
           </div>
-
-          {/* Logout */}
-          <button
-            onClick={async () => { await logout(); }}
-            style={{ padding: "8px 18px", background: "#150a0a", color: "#ef4444", border: "1px solid #3a1212", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13 }}
-            onMouseEnter={e => e.currentTarget.style.background = "#1f0a0a"}
-            onMouseLeave={e => e.currentTarget.style.background = "#150a0a"}
-          >
-            Logout
-          </button>
         </div>
-      </div>
 
-      {/* Private profile warning */}
-      {steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (
-        <div style={{ background: "#1a1200", borderBottom: "1px solid #854d0e", padding: "8px 40px", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14 }}>⚠️</span>
-          <p style={{ color: "#92400e", fontSize: 12, margin: 0 }}>
-            <span style={{ color: "#fbbf24", fontWeight: 700 }}>Your Dota 2 profile is private.</span>
-            {" "}Enable <span style={{ color: "#fbbf24", fontWeight: 600 }}>Expose Public Match Data</span> in Dota 2 → Settings → Social, then play one match. Changes take up to 24 hours to reflect.
-          </p>
-        </div>
-      )}
-    </div>
+        {/* Private profile warning */}
+        {steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (
+          <div className="ie-private-warning">
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <p>
+              <strong>Your Dota 2 profile is private.</strong>{" "}
+              Enable <code>Expose Public Match Data</code> in Dota 2 → Settings → Social.
+              Play one match or changes can take up max 24 hours to reflect.
+            </p>
+          </div>
+        )}
+      </nav>
+    </>
   );
 }
 

@@ -15,6 +15,23 @@ type WeekGroup = {
   paid: SoloTournament | null;
 };
 
+const HOW_IT_WORKS = [
+  { icon: "🎮", title: "Connect & Join",   desc: "Link Steam once. Register for any weekly tournament.",          color: "#F05A28" },
+  { icon: "⚔️", title: "Play Your Games",  desc: "Just play normal ranked Dota 2. No custom lobbies needed.",    color: "#16a34a" },
+  { icon: "📊", title: "Auto Tracked",     desc: "We pull your match stats via OpenDota. Top 3 scores count.",   color: "#2563eb" },
+  { icon: "🏆", title: "Get Rewarded",     desc: "Top players win prizes paid via UPI within 48 hours.",         color: "#7c3aed" },
+];
+
+const SCORING = [
+  { label: "Kill",    value: "+3",  neg: false },
+  { label: "Assist",  value: "+1",  neg: false },
+  { label: "Death",   value: "-2",  neg: true  },
+  { label: "10 LH",  value: "+1",  neg: false },
+  { label: "50 GPM",  value: "+1",  neg: false },
+  { label: "50 XPM",  value: "+1",  neg: false },
+  { label: "Win",     value: "+20", neg: false },
+];
+
 export default function SoloTournaments() {
   const { user } = useAuth();
   const router = useRouter();
@@ -70,341 +87,677 @@ export default function SoloTournaments() {
     return () => clearInterval(interval);
   }, [weeks]);
 
-  const weekTagLabel: Record<string, string> = { last: "Last Week", current: "This Week", next: "Next Week" };
-  const weekTagColor: Record<string, string> = { last: "#444", current: "#22c55e", next: "#3b82f6" };
-
-  const howItWorks = [
-    { icon: "🎮", title: "Connect & Join", desc: "Link Steam once. Register for any weekly tournament.", color: "#f97316" },
-    { icon: "⚔️", title: "Play Your Games", desc: "Just play normal ranked Dota 2. No custom lobbies.", color: "#22c55e" },
-    { icon: "📊", title: "Auto Tracked", desc: "We pull your match stats via OpenDota. Top 3 scores count.", color: "#3b82f6" },
-    { icon: "🏆", title: "Get Rewarded", desc: "Top players win prizes paid via UPI within 48 hours.", color: "#a855f7" },
-  ];
+  const weekTagConfig = {
+    last:    { label: "Last Week",  bg: "#F2F1EE", color: "#888",    border: "#E5E3DF" },
+    current: { label: "This Week",  bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" },
+    next:    { label: "Next Week",  bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
+  };
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "30px" }}>
+    <>
+      <style>{`
+        .st-wrap {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 20px 30px 48px;
+        }
 
-      {/* Compact top section */}
-      <div style={{
-        background: "#0a0a0a", border: "1px solid #141414",
-        borderRadius: 14, padding: "20px 24px", marginBottom: 28,
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f97316, #22c55e, #3b82f6, #a855f7)" }} />
+        /* ── Info panel ── */
+        .st-info-panel {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 16px;
+          overflow: hidden;
+          margin-bottom: 28px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        .st-info-accent {
+          height: 3px;
+          background: linear-gradient(90deg, #F05A28, #16a34a, #2563eb, #7c3aed);
+        }
+        .st-info-body {
+          padding: 20px 24px;
+        }
+        .st-info-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+        .st-info-label {
+          font-size: 0.65rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #F05A28;
+          margin-bottom: 4px;
+        }
+        .st-info-title {
+          font-size: 1.25rem;
+          font-weight: 900;
+          color: #111;
+          letter-spacing: -0.02em;
+          margin-bottom: 3px;
+        }
+        .st-info-sub {
+          font-size: 0.78rem;
+          color: #888;
+        }
 
-        {/* Title row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <p style={{ color: "#f97316", fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>SOLO TOURNAMENTS</p>
-            <h2 style={{ fontSize: 20, fontWeight: 800, marginTop: 4 }}>Play. Score. Win.</h2>
-            <p style={{ color: "#555", fontSize: 12, marginTop: 3 }}>Top 3 match scores count · Weekly prizes · UPI payouts</p>
-          </div>
-          <div style={{
-            background: "#1a0f00", border: "1px solid #7c2d12",
-            borderRadius: 8, padding: "8px 12px", maxWidth: 300,
-          }}>
-            <p style={{ color: "#f97316", fontSize: 11, fontWeight: 800, marginBottom: 3 }}>🤖 AI Smurf Monitor Active</p>
-            <p style={{ color: "#78350f", fontSize: 11, lineHeight: 1.5 }}>
-              Abnormal performance vs rank history = <span style={{ color: "#f97316", fontWeight: 700 }}>disqualification & prize forfeiture</span>.
-            </p>
-          </div>
-        </div>
+        /* Smurf banner */
+        .st-smurf {
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 10px;
+          padding: 10px 14px;
+          max-width: 300px;
+        }
+        .st-smurf-title {
+          font-size: 0.72rem;
+          font-weight: 800;
+          color: #ea580c;
+          margin-bottom: 4px;
+        }
+        .st-smurf-desc {
+          font-size: 0.72rem;
+          color: #92400e;
+          line-height: 1.5;
+        }
+        .st-smurf-desc strong { color: #ea580c; }
 
-        {/* 4 how-it-works cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-          {howItWorks.map((item) => (
-            <div key={item.title} style={{
-              background: "#050505", border: "1px solid #141414",
-              borderRadius: 10, padding: "14px",
-              borderTop: `2px solid ${item.color}`,
-            }}>
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
-              <p style={{ color: "#fff", fontSize: 12, fontWeight: 700, marginTop: 8, marginBottom: 4 }}>{item.title}</p>
-              <p style={{ color: "#444", fontSize: 11, lineHeight: 1.5 }}>{item.desc}</p>
-            </div>
-          ))}
-        </div>
+        /* How it works grid */
+        .st-hiw-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+        @media (max-width: 700px) { .st-hiw-grid { grid-template-columns: 1fr 1fr; } }
+        .st-hiw-card {
+          background: #F8F7F4;
+          border: 1px solid #E5E3DF;
+          border-radius: 10px;
+          padding: 14px;
+          border-top-width: 2px;
+        }
+        .st-hiw-icon { font-size: 1.2rem; margin-bottom: 8px; display: block; }
+        .st-hiw-name {
+          font-size: 0.78rem;
+          font-weight: 800;
+          color: #111;
+          margin-bottom: 4px;
+        }
+        .st-hiw-desc {
+          font-size: 0.7rem;
+          color: #888;
+          line-height: 1.5;
+        }
 
-        {/* Compact scoring strip */}
-        <div style={{ display: "flex", background: "#050505", border: "1px solid #141414", borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ padding: "8px 14px", borderRight: "1px solid #141414", display: "flex", alignItems: "center" }}>
-            <p style={{ color: "#444", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>SCORING</p>
-          </div>
-          {[
-            { label: "Kill", value: "+3", neg: false },
-            { label: "Assist", value: "+1", neg: false },
-            { label: "Death", value: "-2", neg: true },
-            { label: "10 LH", value: "+1", neg: false },
-            { label: "50 GPM", value: "+1", neg: false },
-            { label: "50 XPM", value: "+1", neg: false },
-            { label: "Win", value: "+20", neg: false },
-          ].map((item) => (
-            <div key={item.label} style={{
-              padding: "8px 14px", borderRight: "1px solid #141414",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-            }}>
-              <p style={{ color: item.neg ? "#ef4444" : "#22c55e", fontSize: 12, fontWeight: 800 }}>{item.value}</p>
-              <p style={{ color: "#444", fontSize: 10 }}>{item.label}</p>
-            </div>
-          ))}
-          <div style={{ padding: "8px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-            <p style={{ color: "#f97316", fontSize: 12, fontWeight: 800 }}>Top 3</p>
-            <p style={{ color: "#444", fontSize: 10 }}>matches</p>
-          </div>
-        </div>
-      </div>
+        /* Scoring strip */
+        .st-scoring {
+          display: flex;
+          background: #F8F7F4;
+          border: 1px solid #E5E3DF;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .st-scoring-label {
+          padding: 8px 14px;
+          border-right: 1px solid #E5E3DF;
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+        }
+        .st-scoring-label span {
+          font-size: 0.6rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+        }
+        .st-scoring-item {
+          padding: 8px 14px;
+          border-right: 1px solid #E5E3DF;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          flex-shrink: 0;
+        }
+        .st-scoring-item:last-child { border-right: none; }
+        .st-scoring-val {
+          font-size: 0.78rem;
+          font-weight: 800;
+        }
+        .st-scoring-val.pos { color: #16a34a; }
+        .st-scoring-val.neg { color: #dc2626; }
+        .st-scoring-val.special { color: #F05A28; }
+        .st-scoring-key {
+          font-size: 0.65rem;
+          color: #aaa;
+        }
 
-      {/* Coming soon modal */}
-      {comingSoonId && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }} onClick={() => setComingSoonId(null)}>
-          <div style={{
-            background: "#0e0e0e", border: "1px solid #2d1b69",
-            borderRadius: 16, padding: 32, maxWidth: 380, textAlign: "center",
-          }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ fontSize: 44 }}>⭐</p>
-            <h3 style={{ fontSize: 20, fontWeight: 800, marginTop: 12, color: "#a855f7" }}>Pro Tournament</h3>
-            <p style={{ color: "#555", fontSize: 14, marginTop: 10, lineHeight: 1.7 }}>
-              Paid tournaments with ₹10,000 prize pool are coming soon. Payment gateway integration is in progress.
-            </p>
-            <p style={{ color: "#444", fontSize: 13, marginTop: 8 }}>Entry fee: ₹199 · Slots: 50 · Payout via UPI</p>
-            <button onClick={() => setComingSoonId(null)} style={{
-              marginTop: 20, padding: "10px 24px",
-              background: "linear-gradient(135deg, #a855f7, #7c3aed)",
-              border: "none", borderRadius: 8, color: "#fff",
-              fontWeight: 700, fontSize: 14, cursor: "pointer",
-            }}>Got it</button>
-          </div>
-        </div>
-      )}
+        /* ── Week section ── */
+        .st-week-label-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .st-week-tag {
+          font-size: 0.7rem;
+          font-weight: 800;
+          padding: 4px 12px;
+          border-radius: 100px;
+          border: 1px solid;
+        }
+        .st-week-date {
+          font-size: 0.8rem;
+          color: #888;
+          font-weight: 500;
+        }
 
-      {/* Week sections */}
-      {weeks.map((week) => (
-        <div key={week.label} style={{ marginBottom: 36 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-            <span style={{
-              background: weekTagColor[week.weekTag] + "20",
-              color: weekTagColor[week.weekTag],
-              border: `1px solid ${weekTagColor[week.weekTag]}40`,
-              padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-            }}>{weekTagLabel[week.weekTag]}</span>
-            <span style={{ color: "#444", fontSize: 13 }}>{week.label}</span>
-          </div>
+        /* Tournament cards grid */
+        .st-cards-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        @media (max-width: 640px) { .st-cards-grid { grid-template-columns: 1fr; } }
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            {[week.free, week.paid].map((t) => {
-              if (!t) return null;
+        /* Individual card */
+        .st-card {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 14px;
+          overflow: hidden;
+          position: relative;
+          transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          cursor: pointer;
+        }
+        .st-card:hover {
+          box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+          transform: translateY(-2px);
+        }
+        .st-card.completed { opacity: 0.65; }
+        .st-card.registered { border-color: #bbf7d0; background: #fafffe; }
+        .st-card.paid-card  { border-color: #e9d5ff; background: #fdfaff; }
 
-              const now = Date.now();
-              const endTime = new Date(t.weekEnd).getTime();
-              const regDeadline = new Date(t.registrationDeadline).getTime();
-              const isPaid = t.type === "paid";
-              const isRegistered = registeredIds.has(t.id);
-              const slotsLeft = t.totalSlots - t.slotsBooked;
-              const pct = Math.round((t.slotsBooked / t.totalSlots) * 100);
-              const timeLeft = countdown[t.id] || "";
+        .st-card-accent { height: 3px; width: 100%; }
 
-              // --- Core status logic ---
-              // Completed: status is ended OR end_time has passed
-              const isCompleted = t.status === "ended" || now > endTime + 86400000;
-              // Current week
-              const isCurrent = !isCompleted && t.status === "active";
-              // Upcoming
-              const isUpcoming = !isCompleted && !isCurrent;
-              // Registration open: upcoming always open, current open until deadline
-              const isRegOpen = isUpcoming || (isCurrent && now <= regDeadline);
+        .st-card-body { padding: 18px 20px 20px; }
 
-              // Badge
-              const badge = isCompleted
-                ? { label: "Completed", bg: "#1a1a1a", color: "#444" }
-                : isCurrent
-                ? { label: "🟢 Live", bg: "#16a34a15", color: "#22c55e" }
-                : { label: "Upcoming", bg: "#1e3a5f20", color: "#3b82f6" };
+        /* Card header */
+        .st-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 12px;
+        }
+        .st-card-badges {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 7px;
+        }
+        .st-badge-pill {
+          font-size: 0.62rem;
+          font-weight: 800;
+          padding: 3px 9px;
+          border-radius: 100px;
+          border: 1px solid;
+        }
+        .st-badge-free     { background: #fff7ed; color: #ea580c; border-color: #fed7aa; }
+        .st-badge-pro      { background: #faf5ff; color: #7c3aed; border-color: #e9d5ff; }
+        .st-badge-live     { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+        .st-badge-upcoming { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+        .st-badge-ended    { background: #F2F1EE; color: #888;    border-color: #E5E3DF; }
+        .st-badge-reg      { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
 
-              return (
-                <div
-                  key={t.id}
-                  style={{
-                    background: "#0a0a0a",
-                    border: `1px solid ${isRegistered ? "#16a34a40" : isPaid ? "#2d1b69" : "#141414"}`,
-                    borderRadius: 12, padding: "22px 24px",
-                    opacity: isCompleted ? 0.7 : 1,
-                    position: "relative", overflow: "hidden",
-                    transition: "border-color 0.2s", cursor: "pointer",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = isRegistered ? "#16a34a80" : isPaid ? "#7c3aed60" : "#f97316")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = isRegistered ? "#16a34a40" : isPaid ? "#2d1b69" : "#141414")}
-                >
-                  {/* Top accent */}
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, right: 0, height: 2,
-                    background: isPaid ? "linear-gradient(90deg, #a855f7, #7c3aed)" : "linear-gradient(90deg, #f97316, #ea580c)",
-                  }} />
+        .st-card-name {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #111;
+        }
 
-                  {/* Header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                    <div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
-                        {/* Type badge */}
-                        <span style={{
-                          background: isPaid ? "#4c1d9520" : "#16a34a15",
-                          color: isPaid ? "#a855f7" : "#22c55e",
-                          border: `1px solid ${isPaid ? "#7c3aed40" : "#16a34a40"}`,
-                          padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-                        }}>{isPaid ? "⭐ PRO" : "FREE"}</span>
-                        {/* Status badge */}
-                        <span style={{
-                          background: badge.bg, color: badge.color,
-                          padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-                        }}>{badge.label}</span>
-                        {/* Registered badge */}
-                        {isRegistered && (
-                          <span style={{
-                            background: "#14532d", color: "#22c55e",
-                            border: "1px solid #16a34a40",
-                            padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-                          }}>✓ Registered</span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{t.name}</p>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <p style={{ color: "#333", fontSize: 10, letterSpacing: 1 }}>PRIZE POOL</p>
-                      <p style={{ fontSize: 22, fontWeight: 800, color: isPaid ? "#a855f7" : "#f97316" }}>{t.prizePool}</p>
-                    </div>
-                  </div>
+        .st-prize-col { text-align: right; flex-shrink: 0; }
+        .st-prize-lbl {
+          font-size: 0.6rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+          margin-bottom: 3px;
+        }
+        .st-prize-val {
+          font-size: 1.35rem;
+          font-weight: 900;
+          line-height: 1;
+        }
+        .st-prize-val.free-prize { color: #F05A28; }
+        .st-prize-val.pro-prize  { color: #7c3aed; }
 
-                  {/* Stats */}
-                  <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
-                    {[
-                      { label: "ENTRY", value: t.entry },
-                      { label: "SLOTS LEFT", value: `${slotsLeft} / ${t.totalSlots}` },
-                      { label: "FORMAT", value: "Top 3 matches" },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <p style={{ color: "#333", fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>{item.label}</p>
-                        <p style={{ color: "#666", fontSize: 13, fontWeight: 600, marginTop: 2 }}>{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
+        /* Stats row */
+        .st-stats-row {
+          display: flex;
+          gap: 18px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+        .st-stat-item { }
+        .st-stat-key {
+          font-size: 0.6rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #bbb;
+          margin-bottom: 2px;
+        }
+        .st-stat-val {
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: #444;
+        }
 
-                  {/* Slots bar */}
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ width: "100%", height: 3, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", borderRadius: 2, background: pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e" }} />
-                    </div>
-                  </div>
+        /* Slot bar */
+        .st-slot-bar {
+          height: 3px;
+          background: #F2F1EE;
+          border-radius: 2px;
+          overflow: hidden;
+          margin-bottom: 12px;
+        }
+        .st-slot-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
 
-                  {/* Countdown — only for current week with reg open */}
-                  {isCurrent && isRegOpen && timeLeft && (
-                    <div style={{
-                      background: "#0f1a0f", border: "1px solid #14532d",
-                      borderRadius: 8, padding: "7px 12px", marginBottom: 14,
-                      display: "flex", alignItems: "center", gap: 8,
-                    }}>
-                      <span>⏱️</span>
-                      <span style={{ color: "#555", fontSize: 12 }}>Registration ends in</span>
-                      <span style={{ color: "#22c55e", fontSize: 12, fontWeight: 700 }}>{timeLeft}</span>
-                    </div>
-                  )}
+        /* Countdown chip */
+        .st-countdown-chip {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 8px;
+          padding: 7px 12px;
+          margin-bottom: 12px;
+          font-size: 0.76rem;
+        }
+        .st-countdown-chip .time { color: #16a34a; font-weight: 700; }
+        .st-countdown-chip .label { color: #888; }
 
-                  {/* === BUTTON LOGIC === */}
+        /* Buttons */
+        .st-btn {
+          width: 100%;
+          padding: 10px 0;
+          border-radius: 100px;
+          border: none;
+          font-size: 0.82rem;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+          transition: all 0.15s;
+          text-align: center;
+        }
+        .st-btn-primary {
+          background: #F05A28;
+          color: #fff;
+          box-shadow: 0 2px 10px rgba(240,90,40,0.25);
+        }
+        .st-btn-primary:hover { background: #D44A1A; }
+        .st-btn-pro {
+          background: #faf5ff;
+          color: #7c3aed;
+          border: 1px solid #e9d5ff !important;
+          box-shadow: 0 2px 8px rgba(124,58,237,0.12);
+        }
+        .st-btn-pro:hover { background: #f3e8ff; }
+        .st-btn-ghost {
+          background: transparent;
+          color: #888;
+          border: 1px solid #E5E3DF !important;
+        }
+        .st-btn-ghost:hover { background: #F8F7F4; color: #555; }
+        .st-btn-ghost-green {
+          background: transparent;
+          color: #16a34a;
+          border: 1px solid #bbf7d0 !important;
+        }
+        .st-btn-ghost-green:hover { background: #f0fdf4; }
 
-                  {/* 1. COMPLETED */}
-                  {isCompleted && (
-                    <button
-                      onClick={() => router.push(`/tournament/solo/${t.id}`)}
-                      style={{
-                        width: "100%", padding: "10px 0",
-                        background: "#111", border: "1px solid #1a1a1a",
-                        borderRadius: 8, color: "#555", fontSize: 13,
-                        fontWeight: 700, cursor: "pointer",
-                      }}
-                    >View Leaderboard</button>
-                  )}
+        .st-reg-closed-pill {
+          width: 100%;
+          padding: 10px 0;
+          text-align: center;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 100px;
+          color: #ea580c;
+          font-size: 0.82rem;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+        .st-registered-pill {
+          width: 100%;
+          padding: 10px 0;
+          text-align: center;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 100px;
+          color: #16a34a;
+          font-size: 0.82rem;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
 
-                  {/* 2. CURRENT — reg open, not registered */}
-                  {isCurrent && isRegOpen && !isRegistered && (
-                    <button
-                      onClick={() => {
-                        if (isPaid) { setComingSoonId(t.id); return; }
-                        router.push(`/tournament/solo/${t.id}`);
-                      }}
-                      style={{
-                        width: "100%", padding: "10px 0",
-                        background: isPaid ? "linear-gradient(135deg, #4c1d95, #2d1b69)" : "linear-gradient(135deg, #f97316, #ea580c)",
-                        border: isPaid ? "1px solid #7c3aed40" : "none",
-                        borderRadius: 8, color: isPaid ? "#a855f7" : "#fff",
-                        fontSize: 13, fontWeight: 700, cursor: "pointer",
-                      }}
-                    >{isPaid ? "⭐ Join Pro Tournament →" : "Register Free →"}</button>
-                  )}
+        /* ── Pro coming soon modal ── */
+        .st-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 200;
+          background: rgba(0,0,0,0.4);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .st-modal {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 20px;
+          padding: 36px 32px;
+          max-width: 360px;
+          width: 90%;
+          text-align: center;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        .st-modal-emoji { font-size: 44px; margin-bottom: 14px; display: block; }
+        .st-modal-title {
+          font-size: 1.3rem;
+          font-weight: 900;
+          color: #7c3aed;
+          margin-bottom: 10px;
+        }
+        .st-modal-desc {
+          font-size: 0.85rem;
+          color: #666;
+          line-height: 1.7;
+          margin-bottom: 6px;
+        }
+        .st-modal-meta {
+          font-size: 0.78rem;
+          color: #aaa;
+          margin-bottom: 22px;
+        }
+        .st-modal-btn {
+          padding: 11px 28px;
+          background: #7c3aed;
+          border: none;
+          border-radius: 100px;
+          color: #fff;
+          font-weight: 700;
+          font-size: 0.88rem;
+          cursor: pointer;
+          font-family: inherit;
+          transition: background 0.15s;
+        }
+        .st-modal-btn:hover { background: #6d28d9; }
+      `}</style>
 
-                  {/* 3. CURRENT — reg closed, not registered */}
-                  {isCurrent && !isRegOpen && !isRegistered && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{
-                        width: "100%", padding: "10px 0", textAlign: "center",
-                        background: "#1a0f00", border: "1px solid #7c2d12",
-                        borderRadius: 8, color: "#f97316", fontSize: 13, fontWeight: 700,
-                      }}>🔒 Registration Closed</div>
-                      <button
-                        onClick={() => router.push(`/tournament/solo/${t.id}`)}
-                        style={{
-                          width: "100%", padding: "8px 0",
-                          background: "transparent", border: "1px solid #1a1a1a",
-                          borderRadius: 8, color: "#444", fontSize: 12,
-                          fontWeight: 600, cursor: "pointer",
-                        }}
-                      >View Leaderboard</button>
-                    </div>
-                  )}
+      <div className="st-wrap">
 
-                  {/* 4. CURRENT or UPCOMING — registered */}
-                  {(isCurrent || isUpcoming) && isRegistered && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{
-                        width: "100%", padding: "10px 0", textAlign: "center",
-                        background: "#14532d", border: "1px solid #16a34a40",
-                        borderRadius: 8, color: "#22c55e", fontSize: 13, fontWeight: 700,
-                      }}>✓ Registered</div>
-                      <button
-                        onClick={() => router.push(`/tournament/solo/${t.id}`)}
-                        style={{
-                          width: "100%", padding: "8px 0",
-                          background: "transparent", border: "1px solid #16a34a30",
-                          borderRadius: 8, color: "#22c55e", fontSize: 12,
-                          fontWeight: 600, cursor: "pointer",
-                        }}
-                      >View My Score →</button>
-                    </div>
-                  )}
+        {/* ── Info panel ─────────────────────────────────────────────────────── */}
+        <div className="st-info-panel">
+          <div className="st-info-accent" />
+          <div className="st-info-body">
 
-                  {/* 5. UPCOMING — not registered */}
-                  {isUpcoming && !isRegistered && (
-                    <button
-                      onClick={() => {
-                        if (isPaid) { setComingSoonId(t.id); return; }
-                        router.push(`/tournament/solo/${t.id}`);
-                      }}
-                      style={{
-                        width: "100%", padding: "10px 0",
-                        background: isPaid ? "linear-gradient(135deg, #4c1d95, #2d1b69)" : "linear-gradient(135deg, #f97316, #ea580c)",
-                        border: isPaid ? "1px solid #7c3aed40" : "none",
-                        borderRadius: 8, color: isPaid ? "#a855f7" : "#fff",
-                        fontSize: 13, fontWeight: 700, cursor: "pointer",
-                      }}
-                    >{isPaid ? "⭐ Join Pro Tournament →" : "Register Free →"}</button>
-                  )}
-
+            {/* Title + smurf warning */}
+            <div className="st-info-top">
+              <div>
+                <div className="st-info-label">Solo Tournaments</div>
+                <div className="st-info-title">Play. Score. Win.</div>
+                <div className="st-info-sub">Top 3 match scores count · Weekly prizes · UPI payouts</div>
+              </div>
+              <div className="st-smurf">
+                <div className="st-smurf-title">🤖 AI Smurf Monitor Active</div>
+                <div className="st-smurf-desc">
+                  Abnormal performance vs rank history = <strong>disqualification & prize forfeiture</strong>.
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* How it works */}
+            <div className="st-hiw-grid">
+              {HOW_IT_WORKS.map((item) => (
+                <div
+                  key={item.title}
+                  className="st-hiw-card"
+                  style={{ borderTopColor: item.color }}
+                >
+                  <span className="st-hiw-icon">{item.icon}</span>
+                  <div className="st-hiw-name">{item.title}</div>
+                  <div className="st-hiw-desc">{item.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Scoring strip */}
+            <div className="st-scoring">
+              <div className="st-scoring-label"><span>Scoring</span></div>
+              {SCORING.map((s) => (
+                <div className="st-scoring-item" key={s.label}>
+                  <span className={`st-scoring-val ${s.neg ? "neg" : "pos"}`}>{s.value}</span>
+                  <span className="st-scoring-key">{s.label}</span>
+                </div>
+              ))}
+              <div className="st-scoring-item">
+                <span className="st-scoring-val special">Top 3</span>
+                <span className="st-scoring-key">matches</span>
+              </div>
+            </div>
+
           </div>
         </div>
-      ))}
-    </div>
+
+        {/* ── Week sections ───────────────────────────────────────────────────── */}
+        {weeks.map((week) => {
+          const cfg = weekTagConfig[week.weekTag];
+          return (
+            <div key={week.label} style={{ marginBottom: 32 }}>
+
+              {/* Week label */}
+              <div className="st-week-label-row">
+                <span
+                  className="st-week-tag"
+                  style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}
+                >
+                  {cfg.label}
+                </span>
+                <span className="st-week-date">{week.label}</span>
+              </div>
+
+              {/* Cards */}
+              <div className="st-cards-grid">
+                {[week.free, week.paid].map((t) => {
+                  if (!t) return null;
+
+                  const now = Date.now();
+                  const endTime = new Date(t.weekEnd).getTime();
+                  const regDeadline = new Date(t.registrationDeadline).getTime();
+                  const isPaid = t.type === "paid";
+                  const isRegistered = registeredIds.has(t.id);
+                  const slotsLeft = t.totalSlots - t.slotsBooked;
+                  const pct = Math.round((t.slotsBooked / t.totalSlots) * 100);
+                  const timeLeft = countdown[t.id] || "";
+
+                  const isCompleted = t.status === "ended" || now > endTime + 86400000;
+                  const isCurrent   = !isCompleted && t.status === "active";
+                  const isUpcoming  = !isCompleted && !isCurrent;
+                  const isRegOpen   = isUpcoming || (isCurrent && now <= regDeadline);
+
+                  const fillColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e";
+                  const accentBg  = isPaid
+                    ? "linear-gradient(90deg, #a855f7, #7c3aed)"
+                    : "linear-gradient(90deg, #F05A28, #ea580c)";
+
+                  let cardClass = "st-card";
+                  if (isCompleted) cardClass += " completed";
+                  else if (isRegistered) cardClass += " registered";
+                  else if (isPaid) cardClass += " paid-card";
+
+                  return (
+                    <div key={t.id} className={cardClass}>
+                      <div className="st-card-accent" style={{ background: accentBg }} />
+                      <div className="st-card-body">
+
+                        {/* Header */}
+                        <div className="st-card-header">
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="st-card-badges">
+                              <span className={`st-badge-pill ${isPaid ? "st-badge-pro" : "st-badge-free"}`}>
+                                {isPaid ? "⭐ PRO" : "FREE"}
+                              </span>
+                              {isCompleted ? (
+                                <span className="st-badge-pill st-badge-ended">Ended</span>
+                              ) : isCurrent ? (
+                                <span className="st-badge-pill st-badge-live">🟢 Live</span>
+                              ) : (
+                                <span className="st-badge-pill st-badge-upcoming">Upcoming</span>
+                              )}
+                              {isRegistered && !isCompleted && (
+                                <span className="st-badge-pill st-badge-reg">✓ Registered</span>
+                              )}
+                            </div>
+                            <div className="st-card-name">{t.name}</div>
+                          </div>
+                          <div className="st-prize-col" style={{ marginLeft: 12 }}>
+                            <div className="st-prize-lbl">Prize Pool</div>
+                            <div className={`st-prize-val ${isPaid ? "pro-prize" : "free-prize"}`}>
+                              {t.prizePool}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="st-stats-row">
+                          {[
+                            { key: "Entry",      val: t.entry },
+                            { key: "Slots Left", val: `${slotsLeft} / ${t.totalSlots}` },
+                            { key: "Format",     val: "Top 3 matches" },
+                          ].map((s) => (
+                            <div className="st-stat-item" key={s.key}>
+                              <div className="st-stat-key">{s.key}</div>
+                              <div className="st-stat-val">{s.val}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Slot bar */}
+                        <div className="st-slot-bar">
+                          <div className="st-slot-fill" style={{ width: `${pct}%`, background: fillColor }} />
+                        </div>
+
+                        {/* Countdown */}
+                        {isCurrent && isRegOpen && timeLeft && (
+                          <div className="st-countdown-chip">
+                            <span>⏱️</span>
+                            <span className="label">Registration ends in</span>
+                            <span className="time">{timeLeft}</span>
+                          </div>
+                        )}
+
+                        {/* ── Button logic ── */}
+
+                        {/* 1. Completed */}
+                        {isCompleted && (
+                          <button
+                            className="st-btn st-btn-ghost"
+                            onClick={() => router.push(`/tournament/solo/${t.id}`)}
+                          >
+                            View Leaderboard
+                          </button>
+                        )}
+
+                        {/* 2. Current, reg open, not registered */}
+                        {isCurrent && isRegOpen && !isRegistered && (
+                          <button
+                            className={`st-btn ${isPaid ? "st-btn-pro" : "st-btn-primary"}`}
+                            onClick={() => {
+                              if (isPaid) { setComingSoonId(t.id); return; }
+                              router.push(`/tournament/solo/${t.id}`);
+                            }}
+                          >
+                            {isPaid ? "⭐ Join Pro Tournament →" : "Register Free →"}
+                          </button>
+                        )}
+
+                        {/* 3. Current, reg closed, not registered */}
+                        {isCurrent && !isRegOpen && !isRegistered && (
+                          <>
+                            <div className="st-reg-closed-pill">🔒 Registration Closed</div>
+                            <button
+                              className="st-btn st-btn-ghost"
+                              onClick={() => router.push(`/tournament/solo/${t.id}`)}
+                            >
+                              View Leaderboard
+                            </button>
+                          </>
+                        )}
+
+                        {/* 4. Current or upcoming, registered */}
+                        {(isCurrent || isUpcoming) && isRegistered && (
+                          <>
+                            <div className="st-registered-pill">✓ Registered</div>
+                            <button
+                              className="st-btn st-btn-ghost-green"
+                              onClick={() => router.push(`/tournament/solo/${t.id}`)}
+                            >
+                              View My Score →
+                            </button>
+                          </>
+                        )}
+
+                        {/* 5. Upcoming, not registered */}
+                        {isUpcoming && !isRegistered && (
+                          <button
+                            className={`st-btn ${isPaid ? "st-btn-pro" : "st-btn-primary"}`}
+                            onClick={() => {
+                              if (isPaid) { setComingSoonId(t.id); return; }
+                              router.push(`/tournament/solo/${t.id}`);
+                            }}
+                          >
+                            {isPaid ? "⭐ Join Pro Tournament →" : "Register Free →"}
+                          </button>
+                        )}
+
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ── Pro coming soon modal ───────────────────────────────────────────── */}
+        {comingSoonId && (
+          <div className="st-modal-overlay" onClick={() => setComingSoonId(null)}>
+            <div className="st-modal" onClick={(e) => e.stopPropagation()}>
+              <span className="st-modal-emoji">⭐</span>
+              <div className="st-modal-title">Pro Tournament</div>
+              <p className="st-modal-desc">
+                Paid tournaments with ₹10,000 prize pool are coming soon. Payment gateway integration is in progress.
+              </p>
+              <p className="st-modal-meta">Entry fee: ₹199 · Slots: 50 · Payout via UPI</p>
+              <button className="st-modal-btn" onClick={() => setComingSoonId(null)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
   );
 }

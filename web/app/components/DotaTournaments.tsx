@@ -7,13 +7,6 @@ import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Tournament } from "@/lib/types";
 
-const DOTA_IMAGES = [
-  "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/axe.png",
-  "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/invoker.png",
-  "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/pudge.png",
-  "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/juggernaut.png",
-];
-
 export default function DotaTournaments() {
   const { user } = useAuth();
   const router = useRouter();
@@ -40,7 +33,6 @@ export default function DotaTournaments() {
     return () => unsub();
   }, []);
 
-  // Check which tournaments the user is registered in
   useEffect(() => {
     if (!user) return;
     const checkRegistrations = async () => {
@@ -50,139 +42,409 @@ export default function DotaTournaments() {
     };
     checkRegistrations();
 
-    // Re-check when user returns to tab
     window.addEventListener("focus", checkRegistrations);
     return () => window.removeEventListener("focus", checkRegistrations);
   }, [user]);
-   
+
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "30px" }}>
+    <>
+      <style>{`
+        .dt-wrap {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 20px 30px 48px;
+        }
 
-      {/* Hero */}
-      <div style={{ background: "linear-gradient(135deg, #0f0f0f, #111)", border: "1px solid #1a1a1a", borderRadius: 14, padding: "30px 36px", position: "relative", overflow: "hidden", marginBottom: 28 }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f97316, #22c55e, #3b82f6)" }}></div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <p style={{ color: "#f97316", fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>DOTA 2 TOURNAMENTS</p>
-            <h1 style={{ fontSize: 26, fontWeight: 800, marginTop: 6 }}>Compete. Win. Rise.</h1>
-            <p style={{ color: "#555", fontSize: 14, marginTop: 6 }}>Steam-verified • Rank-locked brackets • Fast UPI payouts</p>
+        /* ── Stats row ── */
+        .dt-stats {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+        .dt-stat-pill {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 100px;
+          padding: 6px 16px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .dt-stat-num {
+          font-size: 1rem;
+          font-weight: 800;
+          color: #111;
+        }
+        .dt-stat-num.orange { color: #F05A28; }
+        .dt-stat-num.green  { color: #16a34a; }
+        .dt-stat-num.blue   { color: #2563eb; }
+        .dt-stat-label {
+          font-size: 0.75rem;
+          color: #888;
+          font-weight: 500;
+        }
+        .dt-stat-divider {
+          width: 1px;
+          height: 16px;
+          background: #E5E3DF;
+        }
+
+        /* ── Section label ── */
+        .dt-section-label {
+          font-size: 0.68rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #bbb;
+          margin-bottom: 10px;
+          margin-top: 6px;
+        }
+
+        /* ── Tournament card — compact ── */
+        .dt-card {
+          background: #fff;
+          border: 1px solid #E5E3DF;
+          border-radius: 12px;
+          overflow: hidden;
+          display: flex;
+          align-items: stretch;
+          cursor: pointer;
+          transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          margin-bottom: 10px;
+        }
+        .dt-card:hover {
+          box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+          transform: translateY(-1px);
+          border-color: #d0ceca;
+        }
+        .dt-card.ended {
+          opacity: 0.6;
+        }
+        .dt-card.registered {
+          border-color: #bbf7d0;
+          background: #f0fdf4;
+        }
+
+        /* Left accent bar */
+        .dt-card-accent {
+          width: 4px;
+          flex-shrink: 0;
+        }
+
+        /* Card body */
+        .dt-card-body {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          padding: 14px 18px;
+        }
+
+        /* Game icon area */
+        .dt-card-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          overflow: hidden;
+          flex-shrink: 0;
+          background: #F2F1EE;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .dt-card-icon img {
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
+        }
+
+        /* Main info */
+        .dt-card-info { flex: 1; min-width: 0; }
+        .dt-card-name {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #111;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-bottom: 4px;
+        }
+        .dt-card-meta {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+        .dt-meta-item { display: flex; flex-direction: column; }
+        .dt-meta-key {
+          font-size: 0.6rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #bbb;
+        }
+        .dt-meta-val {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #444;
+        }
+        .dt-meta-val.prize { color: #F05A28; }
+        .dt-meta-val.green { color: #16a34a; }
+
+        /* Status badge */
+        .dt-status-badge {
+          font-size: 0.65rem;
+          font-weight: 800;
+          padding: 3px 10px;
+          border-radius: 100px;
+          white-space: nowrap;
+        }
+        .dt-status-badge.upcoming  { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+        .dt-status-badge.ongoing   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .dt-status-badge.ended     { background: #F2F1EE; color: #bbb;    border: 1px solid #E5E3DF; }
+        .dt-status-badge.registered { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+        /* Slot bar area */
+        .dt-slots-wrap {
+          min-width: 120px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+        .dt-slots-text {
+          font-size: 0.72rem;
+          color: #888;
+          text-align: right;
+        }
+        .dt-slots-text strong { color: #111; font-weight: 800; }
+        .dt-slots-bar {
+          height: 4px;
+          background: #F2F1EE;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .dt-slots-fill {
+          height: 100%;
+          border-radius: 2px;
+          transition: width 0.5s;
+        }
+
+        /* CTA button */
+        .dt-cta-btn {
+          padding: 8px 18px;
+          border-radius: 100px;
+          border: none;
+          font-size: 0.8rem;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+          transition: all 0.15s;
+          min-width: 120px;
+          text-align: center;
+        }
+        .dt-cta-btn.primary {
+          background: #F05A28;
+          color: #fff;
+          box-shadow: 0 2px 10px rgba(240,90,40,0.25);
+        }
+        .dt-cta-btn.primary:hover { background: #D44A1A; }
+        .dt-cta-btn.registered-btn {
+          background: #f0fdf4;
+          color: #16a34a;
+          border: 1px solid #bbf7d0;
+        }
+        .dt-cta-btn.ended-btn {
+          background: #F8F7F4;
+          color: #888;
+          border: 1px solid #E5E3DF;
+          cursor: default;
+        }
+
+        /* Empty state */
+        .dt-empty {
+          text-align: center;
+          padding: 60px 0;
+          color: #bbb;
+          font-size: 0.9rem;
+        }
+      `}</style>
+
+      <div className="dt-wrap">
+
+        {/* ── Stats pills ── */}
+        <div className="dt-stats">
+          <div className="dt-stat-pill">
+            <span className="dt-stat-num orange">{tournaments.filter(t => t.status !== "ended").length}</span>
+            <span className="dt-stat-divider" />
+            <span className="dt-stat-label">Upcoming</span>
           </div>
-          <div style={{ display: "flex", gap: 24 }}>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 24, fontWeight: 800, color: "#f97316" }}>{tournaments.filter(t => t.status !== "ended").length}</p>
-              <p style={{ color: "#555", fontSize: 11 }}>Upcoming</p>
+          <div className="dt-stat-pill">
+            <span className="dt-stat-num green">₹1.2L</span>
+            <span className="dt-stat-divider" />
+            <span className="dt-stat-label">Total Prize Pool</span>
+          </div>
+          <div className="dt-stat-pill">
+            <span className="dt-stat-num blue">{totalSlotsRemaining}</span>
+            <span className="dt-stat-divider" />
+            <span className="dt-stat-label">Slots Open</span>
+          </div>
+        </div>
+
+        {/* ── Tournament list ── */}
+        {tournaments.length === 0 ? (
+          <div className="dt-empty">No tournaments found. Check back soon!</div>
+        ) : (
+          <>
+            {/* Past */}
+            {tournaments.filter(t => t.status === "ended").length > 0 && (
+              <>
+                <div className="dt-section-label">Past</div>
+                {tournaments.filter(t => t.status === "ended").map(t => (
+                  <TournamentCard
+                    key={t.id}
+                    t={t}
+                    isRegistered={registeredIds.has(t.id)}
+                    onNavigate={() => router.push(`/tournament/${t.id}`)}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Upcoming / Ongoing */}
+            {tournaments.filter(t => t.status !== "ended").length > 0 && (
+              <>
+                <div className="dt-section-label" style={{ marginTop: 16 }}>Upcoming</div>
+                {tournaments.filter(t => t.status !== "ended").map(t => (
+                  <TournamentCard
+                    key={t.id}
+                    t={t}
+                    isRegistered={registeredIds.has(t.id)}
+                    onNavigate={() => router.push(`/tournament/${t.id}`)}
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TournamentCard({
+  t,
+  isRegistered,
+  onNavigate,
+}: {
+  t: Tournament;
+  isRegistered: boolean;
+  onNavigate: () => void;
+}) {
+  const isEnded = t.status === "ended";
+  const isOngoing = t.status === "ongoing";
+  const pct = Math.round((t.slotsBooked / t.totalSlots) * 100);
+  const slotsLeft = t.totalSlots - t.slotsBooked;
+
+  const accentColor = isEnded
+    ? "#E5E3DF"
+    : isRegistered
+    ? "#22c55e"
+    : isOngoing
+    ? "#16a34a"
+    : "#F05A28";
+
+  const fillColor = isEnded
+    ? "#E5E3DF"
+    : pct > 80
+    ? "#ef4444"
+    : pct > 50
+    ? "#f59e0b"
+    : "#22c55e";
+
+  return (
+    <div
+      className={`dt-card${isEnded ? " ended" : ""}${isRegistered && !isEnded ? " registered" : ""}`}
+      onClick={onNavigate}
+    >
+      {/* Accent bar */}
+      <div className="dt-card-accent" style={{ background: accentColor }} />
+
+      <div className="dt-card-body">
+        {/* Game icon */}
+        <div className="dt-card-icon">
+          <img
+            src="https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png"
+            alt="Dota 2"
+          />
+        </div>
+
+        {/* Main info */}
+        <div className="dt-card-info">
+          <div className="dt-card-name">{t.name}</div>
+          <div className="dt-card-meta">
+            <div className="dt-meta-item">
+              <span className="dt-meta-key">Prize</span>
+              <span className="dt-meta-val prize">{t.prizePool}</span>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 24, fontWeight: 800, color: "#22c55e" }}>₹1.2L</p>
-              <p style={{ color: "#555", fontSize: 11 }}>Prize Pool</p>
+            <div className="dt-meta-item">
+              <span className="dt-meta-key">Entry</span>
+              <span className="dt-meta-val">{t.entry}</span>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 24, fontWeight: 800, color: "#3b82f6" }}>{totalSlotsRemaining}</p>
-              <p style={{ color: "#555", fontSize: 11 }}>Slots Open</p>
+            <div className="dt-meta-item">
+              <span className="dt-meta-key">Format</span>
+              <span className="dt-meta-val">5v5</span>
+            </div>
+            <div className="dt-meta-item">
+              <span className="dt-meta-key">Starts</span>
+              <span className="dt-meta-val">{t.startDate}</span>
+            </div>
+            <div className="dt-meta-item">
+              <span className="dt-meta-key">Deadline</span>
+              <span className="dt-meta-val">{t.registrationDeadline}</span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Tournament Cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {tournaments.map((t, i) => {
-          const pct = Math.round((t.slotsBooked / t.totalSlots) * 100);
-          const isEnded = t.status === "ended";
-          const slotsLeft = t.totalSlots - t.slotsBooked;
-          const isRegistered = registeredIds.has(t.id);
+        {/* Status badge */}
+        <div>
+          {isRegistered && !isEnded ? (
+            <span className="dt-status-badge registered">✓ Registered</span>
+          ) : isOngoing ? (
+            <span className="dt-status-badge ongoing">🟢 Live</span>
+          ) : isEnded ? (
+            <span className="dt-status-badge ended">Ended</span>
+          ) : (
+            <span className="dt-status-badge upcoming">Upcoming</span>
+          )}
+        </div>
 
-          return (
+        {/* Slots */}
+        <div className="dt-slots-wrap">
+          <div className="dt-slots-text">
+            <strong>{slotsLeft}</strong> / {t.totalSlots} slots
+          </div>
+          <div className="dt-slots-bar">
             <div
-              key={t.id}
-              onClick={() => router.push(`/tournament/${t.id}`)}
-              style={{
-                background: "#0a0a0a",
-                border: `1px solid ${isEnded ? "#111" : isRegistered ? "#16a34a40" : "#141414"}`,
-                borderRadius: 12, overflow: "hidden", display: "flex",
-                alignItems: "stretch", cursor: "pointer", opacity: isEnded ? 0.6 : 1,
-                transition: "border-color 0.2s",
-              }}
-              onMouseEnter={e => !isEnded && (e.currentTarget.style.borderColor = isRegistered ? "#16a34a80" : "#f97316")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = isEnded ? "#111" : isRegistered ? "#16a34a40" : "#141414")}
-            >
-              {/* Image */}
-              <div style={{ width: 130, flexShrink: 0, background: "#0d0d0d", position: "relative" }}>
-                <img src={DOTA_IMAGES[i % DOTA_IMAGES.length]} alt="hero" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: isEnded ? 0.4 : 0.7 }} />
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent, #0a0a0a)" }}></div>
-              </div>
+              className="dt-slots-fill"
+              style={{ width: `${pct}%`, background: fillColor }}
+            />
+          </div>
+        </div>
 
-              {/* Content */}
-              <div style={{ flex: 1, padding: "20px 24px", display: "flex", alignItems: "center", gap: 24 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <h3 style={{ fontSize: 17, fontWeight: 700, color: isEnded ? "#555" : "#fff" }}>{t.name}</h3>
-                    <span style={{
-                      background: isEnded ? "#1a1a1a" : t.status === "ongoing" ? "#1e3a5f" : "#16a34a15",
-                      color: isEnded ? "#444" : t.status === "ongoing" ? "#3b82f6" : "#22c55e",
-                      padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-                    }}>
-                      {isEnded ? "Ended" : t.status === "ongoing" ? "🔴 Live" : "Upcoming"}
-                    </span>
-                    <span style={{ background: "#1a1a1a", color: "#555", padding: "3px 10px", borderRadius: 20, fontSize: 10 }}>{t.month}</span>
-                    {/* Registered badge */}
-                    {isRegistered && !isEnded && (
-                      <span style={{
-                        background: "#14532d", color: "#22c55e",
-                        padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-                        border: "1px solid #16a34a40",
-                      }}>✓ Registered</span>
-                    )}
-                  </div>
-                  <p style={{ color: "#444", fontSize: 13, marginTop: 6 }}>{t.desc}</p>
-                  <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
-                    {[
-                      { label: "PRIZE", value: t.prizePool, color: isEnded ? "#555" : "#f97316" },
-                      { label: "STARTS", value: t.startDate },
-                      { label: "DEADLINE", value: t.registrationDeadline },
-                      { label: "ENTRY", value: t.entry },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <p style={{ color: "#333", fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>{item.label}</p>
-                        <p style={{ color: item.color || "#666", fontSize: 13, fontWeight: 700, marginTop: 2 }}>{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Slots + Button */}
-                <div style={{ minWidth: 140, display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" }}>
-                  <div style={{ width: "100%", textAlign: "right" }}>
-                    <p style={{ color: "#555", fontSize: 11, marginBottom: 4 }}>
-                      <span style={{ color: isEnded ? "#444" : "#f97316", fontWeight: 700 }}>{slotsLeft}</span>
-                      <span style={{ color: "#333" }}> / {t.totalSlots} slots left</span>
-                    </p>
-                    <div style={{ width: "100%", height: 4, background: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: isEnded ? "#222" : pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e", borderRadius: 2 }}></div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${t.id}`); }}
-                    disabled={isEnded}
-                    style={{
-                      padding: "9px 18px", width: "100%",
-                      background: isEnded ? "#111" : isRegistered ? "#14532d" : "linear-gradient(135deg, #f97316, #ea580c)",
-                      color: isEnded ? "#333" : isRegistered ? "#22c55e" : "#fff",
-                      fontWeight: 700, fontSize: 12,
-                      border: isEnded ? "1px solid #1a1a1a" : isRegistered ? "1px solid #16a34a40" : "none",
-                      borderRadius: 8,
-                      cursor: isEnded ? "default" : "pointer",
-                    }}
-                  >
-                    {isEnded ? "View Results" : isRegistered ? "✓ Registered" : "View & Register →"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {/* CTA */}
+        <button
+          className={`dt-cta-btn ${isEnded ? "ended-btn" : isRegistered ? "registered-btn" : "primary"}`}
+          onClick={(e) => { e.stopPropagation(); onNavigate(); }}
+          disabled={isEnded}
+        >
+          {isEnded ? "View Results" : isRegistered ? "✓ Registered" : "Register →"}
+        </button>
       </div>
     </div>
   );
