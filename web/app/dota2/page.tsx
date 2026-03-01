@@ -163,7 +163,7 @@ export default function Dota2() {
             loop
             playsInline
             preload="auto"
-            aria-hidden="true"
+            aria-hidden="true"          
           />
           <div className="d2-hero-overlay" />
           <div className="d2-hero-content">

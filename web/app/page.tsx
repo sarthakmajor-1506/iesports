@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import {
   doc, setDoc,
   collection, query, where, getDocs,
@@ -11,23 +11,12 @@ import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type ModalStep = "phone" | "otp";
 
 interface Tournament {
-  id: string;
-  name: string;
-  game: string;
-  month: string;
-  status: string;
-  prizePool: string;
-  entry: string;
-  startDate: string;
-  endDate: string;
-  registrationDeadline: string;
-  totalSlots: number;
-  slotsBooked: number;
-  desc: string;
+  id: string; name: string; game: string; month: string; status: string;
+  prizePool: string; entry: string; startDate: string; endDate: string;
+  registrationDeadline: string; totalSlots: number; slotsBooked: number; desc: string;
 }
 
 const COUNTRIES = [
@@ -40,34 +29,13 @@ const COUNTRIES = [
 ];
 
 const HOW_IT_WORKS = [
-  {
-    icon: "🔗",
-    title: "Connect & Join",
-    desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.",
-    color: "#3b82f6",
-  },
-  {
-    icon: "⚔️",
-    title: "5v5 and Solo Mode",
-    desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.",
-    color: "#f97316",
-  },
-  {
-    icon: "📊",
-    title: "Automated Results",
-    desc: "We track your match results automatically. Just play your game as usual, no manual reporting.",
-    color: "#8b5cf6",
-  },
-  {
-    icon: "🏆",
-    title: "Get Rewarded",
-    desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.",
-    color: "#22c55e",
-  },
+  { icon: "🔗", title: "Connect & Join",      desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
+  { icon: "⚔️", title: "5v5 and Solo Mode",   desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
+  { icon: "📊", title: "Automated Results",   desc: "We track your match results automatically. Just play your game as usual, no manual reporting.", color: "#8b5cf6" },
+  { icon: "🏆", title: "Get Rewarded",        desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
 ];
 
 export default function Home() {
-  // ── Auth ─────────────────────────────────────────────────────────────────────
   const [phone, setPhone]             = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [otp, setOtp]                 = useState(["","","","","",""]);
@@ -76,126 +44,138 @@ export default function Home() {
   const [modalStep, setModalStep]     = useState<ModalStep>("phone");
   const [modalOpen, setModalOpen]     = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-
-  // ── Tournament ───────────────────────────────────────────────────────────────
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | null>(null);
   const [tournamentLoading, setTournamentLoading]   = useState(true);
-
-  // ── Active nav section ───────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState("");
 
-  // ── Refs ─────────────────────────────────────────────────────────────────────
-  const otpRefs    = useRef<(HTMLInputElement | null)[]>([]);
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const phoneRef   = useRef<HTMLInputElement>(null);
-  const videoRef   = useRef<HTMLVideoElement>(null);
+  const otpRefs       = useRef<(HTMLInputElement | null)[]>([]);
+  const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phoneRef      = useRef<HTMLInputElement>(null);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const recaptchaRef  = useRef<RecaptchaVerifier | null>(null);
+  const confirmResRef = useRef<ConfirmationResult | null>(null);
 
   const { user } = useAuth();
   const router   = useRouter();
   useEffect(() => { if (user) router.push("/dashboard"); }, [user, router]);
 
-  // ── Fetch tournament ─────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchTournament = async () => {
       try {
-        const q = query(
-          collection(db, "tournaments"),
-          where("status", "==", "upcoming")
-        );
+        const q = query(collection(db, "tournaments"), where("status", "==", "upcoming"));
         const snap = await getDocs(q);
         if (!snap.empty) {
           const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
           all.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
           setFeaturedTournament(all[0]);
         }
-      } catch (e) {
-        console.error("Tournament fetch error:", e);
-      } finally {
-        setTournamentLoading(false);
-      }
+      } catch (e) { console.error("Tournament fetch error:", e); }
+      finally { setTournamentLoading(false); }
     };
     fetchTournament();
   }, []);
 
-  // ── Scroll-spy for nav highlight ─────────────────────────────────────────────
   useEffect(() => {
     const sections = ["games", "how-it-works", "tournament"];
     const obs = new IntersectionObserver(
-      entries => {
-        entries.forEach(e => {
-          if (e.isIntersecting) setActiveSection(e.target.id);
-        });
-      },
+      entries => entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id); }),
       { rootMargin: "-40% 0px -55% 0px" }
     );
-    sections.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) obs.observe(el);
-    });
+    sections.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
     return () => obs.disconnect();
   }, []);
 
-  // ── Fade-up observer — FIXED: lower threshold + rootMargin so all cards trigger ──
   useEffect(() => {
     const obs = new IntersectionObserver(
-      entries => entries.forEach(e => {
-        if (e.isIntersecting) e.target.classList.add("visible");
-      }),
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
       { threshold: 0.05, rootMargin: "0px 0px -20px 0px" }
     );
     document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
     return () => obs.disconnect();
   }, []);
 
-  // ── Video autoplay ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.play().catch(() => {});
-    }
+    if (videoRef.current) { videoRef.current.muted = true; videoRef.current.play().catch(() => {}); }
   }, []);
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") closeModal(); };
+    document.addEventListener("keydown", fn);
+    return () => document.removeEventListener("keydown", fn);
+  }, []);
+
+  // ── reCAPTCHA ────────────────────────────────────────────────────────────────
+  // Wipes the rendered widget completely from the DOM so Firebase can re-render fresh
+  const clearRecaptcha = () => {
+    try { recaptchaRef.current?.clear(); } catch (_) {}
+    recaptchaRef.current = null;
+    const el = document.getElementById("recaptcha-container");
+    if (el) el.innerHTML = "";
+  };
+
+  // Only creates a new verifier if the container is truly empty
+  const initRecaptcha = () => {
+    const container = document.getElementById("recaptcha-container");
+    if (recaptchaRef.current || (container && container.childElementCount > 0)) return;
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+      callback: () => {},
+      "expired-callback": () => { clearRecaptcha(); },
+    });
+  };
 
   // ── Modal ────────────────────────────────────────────────────────────────────
   const openModal = () => {
     setModalOpen(true); setModalStep("phone"); setError("");
     setTimeout(() => phoneRef.current?.focus(), 300);
   };
+
   const closeModal = () => {
     setModalOpen(false); setError(""); setPhone(""); setOtp(["","","","","",""]);
     setModalStep("phone");
-    if (timerRef.current) clearInterval(timerRef.current); setResendTimer(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    setResendTimer(0);
+    clearRecaptcha();
+    confirmResRef.current = null;
   };
 
-  // ── Firebase OTP ─────────────────────────────────────────────────────────────
-  const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(
-        auth, "recaptcha-container", { size: "invisible" }
-      );
-      (window as any).recaptchaVerifier.render();
-    }
+  // Back button: clear recaptcha so next Send OTP works cleanly
+  const goBack = () => {
+    setModalStep("phone");
+    setError("");
+    setOtp(["","","","","",""]);
+    clearRecaptcha();
+    confirmResRef.current = null;
   };
 
+  // ── OTP ──────────────────────────────────────────────────────────────────────
   const sendOtp = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 8) { setError("Please enter a valid phone number."); return; }
     try {
       setLoading(true); setError("");
-      setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, (window as any).recaptchaVerifier);
-      (window as any).confirmationResult = result;
+      initRecaptcha();
+      const result = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current!);
+      confirmResRef.current = result;
       setModalStep("otp"); startResendTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 150);
     } catch (e: any) {
-      setError(e.message || "Error sending OTP."); (window as any).recaptchaVerifier = null;
+      clearRecaptcha();
+      const msg = e.message || "";
+      if (msg.includes("already been rendered") || msg.includes("reCAPTCHA")) {
+        setError("Something went wrong. Please reload the page and try again.");
+      } else {
+        setError(msg || "Error sending OTP. Please try again.");
+      }
     } finally { setLoading(false); }
   };
 
   const verifyOtpStr = async (s: string) => {
     if (s.length < 6) { setError("Please enter the complete 6-digit OTP."); return; }
+    if (!confirmResRef.current) { setError("Session expired. Go back and request a new OTP."); return; }
     try {
       setLoading(true); setError("");
-      const result = await (window as any).confirmationResult.confirm(s);
+      const result = await confirmResRef.current.confirm(s);
       const u = result.user;
       await setDoc(doc(db, "users", u.uid), { phone: u.phoneNumber, createdAt: new Date() }, { merge: true });
     } catch { setError("Invalid OTP. Please try again."); }
@@ -225,90 +205,74 @@ export default function Home() {
       setResendTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; });
     }, 1000);
   };
+
   const resendOtp = async () => {
     if (resendTimer > 0) return;
-    (window as any).recaptchaVerifier = null;
-    setOtp(["","","","","",""]); setError(""); await sendOtp();
+    clearRecaptcha();
+    confirmResRef.current = null;
+    setOtp(["","","","","",""]); setError("");
+    await sendOtp();
   };
 
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") closeModal(); };
-    document.addEventListener("keydown", fn);
-    return () => document.removeEventListener("keydown", fn);
-  }, []);
-
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
 
-  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-          --orange:#F05A28; --orange-dark:#D44A1A;
-          --off-white:#F8F7F4; --surface2:#F2F1EE;
-          --text-primary:#111; --text-secondary:#555; --text-muted:#888;
-          --border:#E5E3DF; --radius:14px; --radius-sm:8px;
-          --shadow:0 2px 16px rgba(0,0,0,.08); --shadow-lg:0 8px 40px rgba(0,0,0,.16);
+          --orange: #F05A28; --orange-dark: #D44A1A;
+          --off-white: #F8F7F4; --surface2: #F2F1EE;
+          --text-primary: #111; --text-secondary: #555; --text-muted: #888;
+          --border: #E5E3DF; --radius: 14px; --radius-sm: 8px;
+          --shadow: 0 2px 16px rgba(0,0,0,.08); --shadow-lg: 0 8px 40px rgba(0,0,0,.16);
         }
-        html { scroll-behavior:smooth; }
-        body { font-family:var(--font-geist-sans),system-ui,sans-serif; background:#fff; color:var(--text-primary); overflow-x:hidden; }
+        html { scroll-behavior: smooth; }
+        body { font-family: var(--font-geist-sans),system-ui,sans-serif; background:#fff; color:var(--text-primary); overflow-x:hidden; }
 
         /* ── Navbar ── */
-        .ie-nav {
-          position:sticky; top:0; z-index:100;
-          background:rgba(255,255,255,.96);
-          backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-          border-bottom:1px solid var(--border);
-          padding:0 20px; height:52px;
-          display:grid;
-          grid-template-columns:auto 1fr auto;
-          align-items:center; gap:20px;
-        }
+        .ie-nav { position:sticky; top:0; z-index:100; background:rgba(255,255,255,.96); backdrop-filter:blur(14px); border-bottom:1px solid var(--border); padding:0 20px; height:52px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; }
         .ie-nav-brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .ie-nav-name { font-size:1.05rem; font-weight:800; color:var(--text-primary); line-height:1; }
         .ie-nav-name span { color:var(--orange); }
-        .ie-nav-links { display:flex; align-items:center; gap:4px; justify-content:flex-start; }
-        .ie-nav-link {
-          color:var(--text-secondary); font-size:.84rem; font-weight:600;
-          padding:6px 12px; border-radius:7px;
-          transition:background .15s,color .15s; cursor:pointer; border:none; background:none; font-family:inherit; white-space:nowrap;
-        }
+        .ie-nav-links { display:flex; align-items:center; gap:4px; }
+        .ie-nav-link { color:var(--text-secondary); font-size:.84rem; font-weight:600; padding:6px 12px; border-radius:7px; cursor:pointer; border:none; background:none; font-family:inherit; white-space:nowrap; transition:background .15s,color .15s; }
         .ie-nav-link:hover { background:var(--surface2); color:var(--text-primary); }
         .ie-nav-link.active { color:var(--orange); background:rgba(240,90,40,.08); }
-        .ie-btn-login {
-          background:var(--orange); color:#fff; border:none; border-radius:100px;
-          padding:8px 20px; font-size:.84rem; font-weight:700;
-          cursor:pointer; font-family:inherit; min-height:36px;
-          transition:background .2s, transform .1s; justify-self:end;
-        }
+        .ie-btn-login { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:8px 20px; font-size:.84rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:36px; transition:background .2s,transform .1s; justify-self:end; }
         .ie-btn-login:hover { background:var(--orange-dark); }
         .ie-btn-login:active { transform:scale(.97); }
         @media (max-width:640px) { .ie-nav-links { display:none; } .ie-nav { padding:0 16px; grid-template-columns:auto auto; } }
 
-        /* ── Hero — 25% smaller ── */
+        /* ── Hero ── */
+        /* position:relative + overflow:hidden is the container */
+        /* video is position:absolute so it NEVER causes layout shift */
         .ie-hero {
-          position:relative; overflow:hidden;
-          padding:30px 20px 33px;
-          min-height:38svh;
-          display:flex; flex-direction:column; align-items:center; justify-content:center;
-          text-align:center;
+          position: relative;
+          overflow: hidden;
+          width: 100%;
+          min-height: 580px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 80px 20px 60px;
         }
         .ie-hero-video {
-          position:absolute; inset:0; width:100%; height:100%;
-          object-fit:cover; z-index:0;
-          pointer-events:none;
+          position: absolute;   /* key: taken out of flow, cannot push content */
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;    /* fills box, crops edges — no black bars */
+          object-position: center;
+          z-index: 0;
+          pointer-events: none;
+          display: block;       /* removes inline-block gap */
         }
-        .ie-hero-overlay {
-          position:absolute; inset:0; z-index:1;
-          background:linear-gradient(to bottom,
-            rgba(0,0,0,.72) 0%,
-            rgba(0,0,0,.58) 50%,
-            rgba(0,0,0,.80) 100%);
-        }
+        .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom, rgba(0,0,0,.72) 0%, rgba(0,0,0,.52) 45%, rgba(0,0,0,.82) 100%); }
         .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(240,90,40,.22) 0%,transparent 70%); pointer-events:none; z-index:2; }
         .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; }
         .ie-hero-logo { margin-bottom:12px; display:flex; justify-content:center; }
@@ -319,30 +283,30 @@ export default function Home() {
         .ie-hero h1 .accent { color:var(--orange); }
         .ie-hero-sub { font-size:clamp(.82rem,1.8vw,.95rem); color:rgba(255,255,255,.64); line-height:1.7; max-width:520px; margin:0 auto 20px; }
         .ie-hero-cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-        .ie-btn-primary { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:44px; transition:background .2s,transform .1s; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 22px rgba(240,90,40,.45); }
+        .ie-btn-primary { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:44px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 22px rgba(240,90,40,.45); transition:background .2s,transform .1s; }
         .ie-btn-primary:hover { background:var(--orange-dark); }
         .ie-btn-primary:active { transform:scale(.97); }
-        .ie-btn-secondary { background:rgba(255,255,255,.1); color:#fff; border:1.5px solid rgba(255,255,255,.3); border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:600; cursor:pointer; font-family:inherit; min-height:44px; transition:background .2s,border-color .2s; display:inline-flex; align-items:center; gap:8px; text-decoration:none; backdrop-filter:blur(4px); }
+        .ie-btn-secondary { background:rgba(255,255,255,.1); color:#fff; border:1.5px solid rgba(255,255,255,.3); border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:600; cursor:pointer; font-family:inherit; min-height:44px; display:inline-flex; align-items:center; gap:8px; text-decoration:none; backdrop-filter:blur(4px); transition:background .2s,border-color .2s; }
         .ie-btn-secondary:hover { border-color:rgba(255,255,255,.6); background:rgba(255,255,255,.16); }
-        .ie-hero-stats { position:relative; z-index:3; display:flex; justify-content:center; gap:28px; margin-top:24px; flex-wrap:wrap; }
+        .ie-hero-stats { position:relative; z-index:3; display:flex; justify-content:center; gap:28px; margin-top:40px; flex-wrap:wrap; }
         .ie-stat { text-align:center; }
         .ie-stat-num { font-size:1.45rem; font-weight:900; color:#fff; display:block; }
         .ie-stat-num span { color:var(--orange); }
         .ie-stat-label { font-size:.65rem; color:rgba(255,255,255,.44); text-transform:uppercase; letter-spacing:.08em; }
         @media (max-width:480px) {
-          .ie-hero { min-height:75svh; padding:30px 18px 30px; }
+          .ie-hero { min-height:100svh; padding:60px 18px 50px; }
           .ie-hero-cta { flex-direction:column; align-items:stretch; }
-          .ie-btn-primary,.ie-btn-secondary { width:100%; justify-content:center; }
-          .ie-hero-stats { gap:16px; margin-top:20px; }
+          .ie-btn-primary, .ie-btn-secondary { width:100%; justify-content:center; }
+          .ie-hero-stats { gap:16px; margin-top:28px; }
         }
 
         /* ── Trust ── */
-        .ie-trust { background:var(--surface2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:20px 20px; }
+        .ie-trust { background:var(--surface2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:20px; }
         .ie-trust-items { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:22px; max-width:900px; margin:0 auto; }
         .ie-trust-item { display:flex; align-items:center; gap:8px; }
         .ie-trust-text { font-size:.83rem; font-weight:600; color:var(--text-secondary); }
 
-        /* ── Section commons ── */
+        /* ── Sections ── */
         .ie-section { padding:72px 20px; }
         .ie-section-light { background:var(--off-white); }
         .ie-section-white { background:#fff; }
@@ -352,13 +316,12 @@ export default function Home() {
         .ie-section-header { margin-bottom:44px; }
         .ie-container { max-width:1120px; margin:0 auto; }
 
-        /* ── Game cards ── */
+        /* ── Games ── */
         .ie-games-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
         @media (max-width:900px) { .ie-games-grid { grid-template-columns:repeat(2,1fr); } }
         @media (max-width:480px) { .ie-games-grid { grid-template-columns:1fr; } }
         .ie-game-card { border-radius:var(--radius); overflow:hidden; position:relative; aspect-ratio:3/4; cursor:pointer; transition:transform .25s; box-shadow:var(--shadow); }
         .ie-game-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-lg); }
-        .ie-game-card:active { transform:scale(.98); }
         .ie-game-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,.92) 0%,rgba(0,0,0,.08) 55%,transparent 100%); }
         .ie-game-info { position:absolute; bottom:0; left:0; right:0; padding:20px 16px 18px; }
         .ie-game-tag { display:inline-block; background:var(--orange); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border-radius:4px; margin-bottom:6px; }
@@ -367,28 +330,13 @@ export default function Home() {
         .ie-game-card-img { transition:transform .45s; }
         .ie-game-card:hover .ie-game-card-img { transform:scale(1.05); }
 
-        /* ── How It Works — FIXED: always visible, no delay stagger ── */
-        .ie-hiw-grid {
-          display:grid;
-          grid-template-columns:repeat(4,1fr);
-          gap:20px;
-        }
+        /* ── How It Works ── */
+        .ie-hiw-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
         @media (max-width:900px) { .ie-hiw-grid { grid-template-columns:repeat(2,1fr); } }
         @media (max-width:480px) { .ie-hiw-grid { grid-template-columns:1fr; } }
-        .ie-hiw-card {
-          background:#fff; border-radius:20px;
-          overflow:hidden; display:flex; flex-direction:column;
-          box-shadow:0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
-          transition:transform .2s, box-shadow .2s;
-          border:1px solid var(--border);
-          /* Always visible — never rely on fade-up observer for grid children */
-          opacity:1 !important; transform:none !important;
-        }
+        .ie-hiw-card { background:#fff; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06); border:1px solid var(--border); transition:transform .2s,box-shadow .2s; opacity:1 !important; transform:none !important; }
         .ie-hiw-card:hover { transform:translateY(-4px) !important; box-shadow:0 8px 32px rgba(0,0,0,.1); }
-        .ie-hiw-img-wrap {
-          height:160px; display:flex; align-items:center; justify-content:center;
-          position:relative; overflow:hidden;
-        }
+        .ie-hiw-img-wrap { height:160px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .ie-hiw-icon-big { font-size:3.5rem; z-index:1; filter:drop-shadow(0 4px 12px rgba(0,0,0,.2)); }
         .ie-hiw-body { padding:22px 20px 24px; flex:1; }
         .ie-hiw-title { font-size:1.05rem; font-weight:800; color:var(--text-primary); margin-bottom:10px; }
@@ -427,7 +375,7 @@ export default function Home() {
         .ie-footer-copy { font-size:.77rem; color:rgba(255,255,255,.22); }
 
         /* ── Modal ── */
-        .ie-modal-overlay { position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.65); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
+        .ie-modal-overlay { position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.65); backdrop-filter:blur(4px); display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
         @media (min-width:600px) { .ie-modal-overlay { align-items:center; } }
         .ie-modal-overlay.open { opacity:1; pointer-events:all; }
         .ie-modal { background:#fff; border-radius:20px 20px 0 0; padding:36px 28px 44px; width:100%; max-width:420px; transform:translateY(40px); transition:transform .3s cubic-bezier(.34,1.56,.64,1); position:relative; }
@@ -460,8 +408,6 @@ export default function Home() {
         .ie-resend-btn:disabled { color:var(--text-muted); cursor:default; }
         .ie-terms { font-size:.75rem; color:var(--text-muted); text-align:center; margin-top:16px; line-height:1.5; }
         .ie-terms a { color:var(--orange); text-decoration:none; }
-
-        /* ── Animations ── */
         .fade-up { opacity:0; transform:translateY(24px); transition:opacity .5s,transform .5s; }
         .fade-up.visible { opacity:1; transform:none; }
       `}</style>
@@ -472,37 +418,30 @@ export default function Home() {
           <Image src="/ielogo.png" alt="Indian Esports" width={38} height={38} priority style={{ borderRadius: 7 }} />
           <span className="ie-nav-name">Indian <span>Esports</span></span>
         </a>
-
         <div className="ie-nav-links">
           {[
             { label: "Games",        id: "games"        },
             { label: "How it Works", id: "how-it-works" },
             { label: "Tournament",   id: "tournament"   },
           ].map(({ label, id }) => (
-            <button
-              key={id}
-              className={`ie-nav-link${activeSection === id ? " active" : ""}`}
-              onClick={() => scrollTo(id)}
-            >
+            <button key={id} className={`ie-nav-link${activeSection === id ? " active" : ""}`} onClick={() => scrollTo(id)}>
               {label}
             </button>
           ))}
         </div>
-
         <button className="ie-btn-login" onClick={openModal}>Login</button>
       </nav>
 
-      {/* ─── HERO — 25% smaller ─────────────────────────────────────────────────── */}
+      {/* ─── HERO ─────────────────────────────────────────────────────────────────
+          Video is position:absolute — it cannot push content down.
+          The section's own padding/min-height defines the hero size.         ── */}
       <section className="ie-hero" id="home">
         <video
           ref={videoRef}
           className="ie-hero-video"
           src="/Dota2teaser.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
+          autoPlay muted loop playsInline preload="auto"
+          poster="/dota2-poster.jpg"
           aria-hidden="true"
         />
         <div className="ie-hero-overlay" />
@@ -510,33 +449,12 @@ export default function Home() {
 
         <div className="ie-hero-content">
           <div className="ie-hero-logo">
-            <Image
-              src="/ielogo.png"
-              alt="Indian Esports"
-              width={144}
-              height={144}
-              priority
-              style={{
-                borderRadius: 22,
-                filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))",
-              }}
-            />
+            <Image src="/ielogo.png" alt="Indian Esports" width={144} height={144} priority
+              style={{ borderRadius: 22, filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))" }} />
           </div>
-
-          <div className="ie-hero-badge">
-            <span className="ie-pulse" />
-            Now Live – May Championship 2026
-          </div>
-
-          <h1>
-            Compete on<br />
-            <span className="accent">Indian Esports</span>
-          </h1>
-
-          <p className="ie-hero-sub">
-            Play what you love. Compete in your rank bracket in totally free community events. Win with skills.
-          </p>
-
+          <div className="ie-hero-badge"><span className="ie-pulse" /> Now Live – May Championship 2026</div>
+          <h1>Compete on<br /><span className="accent">Indian Esports</span></h1>
+          <p className="ie-hero-sub">Play what you love. Compete in your rank bracket in totally free community events. Win with skills.</p>
           <div className="ie-hero-cta">
             <button className="ie-btn-primary" onClick={openModal}>
               <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -568,25 +486,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── TRUST STRIP ────────────────────────────────────────────────────────── */}
+      {/* ─── TRUST ──────────────────────────────────────────────────────────────── */}
       <div className="ie-trust">
         <div className="ie-trust-items">
           {[
             { icon: "🛡️", text: "Verified & Safe Platform" },
             { icon: "💸", text: "Instant UPI Payouts"      },
             { icon: "🏆", text: "Skill-Based Brackets"     },
-            { icon: "📱", text: "100% Free Entry"     },
+            { icon: "📱", text: "100% Free Entry"          },
             { icon: "🇮🇳", text: "Made for India"           },
           ].map(t => (
             <div className="ie-trust-item" key={t.text}>
-              <span>{t.icon}</span>
-              <span className="ie-trust-text">{t.text}</span>
+              <span>{t.icon}</span><span className="ie-trust-text">{t.text}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ─── AVAILABLE GAMES ────────────────────────────────────────────────────── */}
+      {/* ─── GAMES ──────────────────────────────────────────────────────────────── */}
       <section className="ie-section ie-section-white" id="games">
         <div className="ie-container">
           <div className="ie-section-header fade-up">
@@ -601,13 +518,9 @@ export default function Home() {
               { name: "Call of Duty", tag: "Coming Soon", src: "/codimage1.jpg",      soon: true,  delay: "0.20s" },
             ].map(g => (
               <div className="ie-game-card fade-up" key={g.name} style={{ transitionDelay: g.delay }}>
-                <Image
-                  className="ie-game-card-img"
-                  src={g.src} alt={g.name} fill
+                <Image className="ie-game-card-img" src={g.src} alt={g.name} fill
                   sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw"
-                  style={{ objectFit: "cover" }}
-                  loading="lazy"
-                />
+                  style={{ objectFit: "cover" }} loading="lazy" />
                 <div className="ie-game-overlay" />
                 <div className="ie-game-info">
                   <span className={`ie-game-tag${g.soon ? " soon" : ""}`}>{g.tag}</span>
@@ -619,40 +532,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── HOW IT WORKS — all 4 cards always visible ──────────────────────────── */}
+      {/* ─── HOW IT WORKS ───────────────────────────────────────────────────────── */}
       <section className="ie-section ie-section-light" id="how-it-works">
         <div className="ie-container">
           <div className="ie-section-header fade-up" style={{ textAlign: "center" }}>
             <h2 className="ie-section-title">How It <span className="accent">Works</span></h2>
-            <p className="ie-section-sub" style={{ margin: "8px auto 0" }}>
-              From signup to prize money in 4 simple steps.
-            </p>
+            <p className="ie-section-sub" style={{ margin: "8px auto 0" }}>From signup to prize money in 4 simple steps.</p>
           </div>
-
-          {/* No fade-up on the grid or cards — opacity forced to 1 via CSS */}
           <div className="ie-hiw-grid">
             {HOW_IT_WORKS.map((item, i) => (
               <div className="ie-hiw-card" key={item.title}>
-                <div
-                  className="ie-hiw-img-wrap"
-                  style={{ background: `linear-gradient(135deg, ${item.color}22 0%, ${item.color}44 100%)` }}
-                >
-                  <svg
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.15 }}
-                    viewBox="0 0 300 160" preserveAspectRatio="xMidYMid slice"
-                  >
+                <div className="ie-hiw-img-wrap" style={{ background: `linear-gradient(135deg, ${item.color}22 0%, ${item.color}44 100%)` }}>
+                  <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.15 }} viewBox="0 0 300 160" preserveAspectRatio="xMidYMid slice">
                     <circle cx="240" cy="-20" r="100" fill={item.color} />
                     <circle cx="60" cy="180" r="80" fill={item.color} />
                     <circle cx="150" cy="80" r="50" fill={item.color} />
                   </svg>
                   <span className="ie-hiw-icon-big">{item.icon}</span>
-                  <span style={{
-                    position: "absolute", top: 12, left: 14,
-                    background: item.color, color: "#fff",
-                    fontSize: ".7rem", fontWeight: 800,
-                    padding: "3px 9px", borderRadius: 100,
-                    letterSpacing: ".04em",
-                  }}>
+                  <span style={{ position:"absolute", top:12, left:14, background:item.color, color:"#fff", fontSize:".7rem", fontWeight:800, padding:"3px 9px", borderRadius:100, letterSpacing:".04em" }}>
                     STEP {i + 1}
                   </span>
                 </div>
@@ -666,30 +563,21 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── FEATURED TOURNAMENT ────────────────────────────────────────────────── */}
+      {/* ─── TOURNAMENT ─────────────────────────────────────────────────────────── */}
       <section className="ie-section ie-section-white" id="tournament">
         <div className="ie-container">
           <div className="ie-section-header fade-up">
             <h2 className="ie-section-title">Featured <span className="accent">Tournament</span></h2>
           </div>
-
           {tournamentLoading ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)", fontSize: ".95rem" }}>
-              Loading tournament…
-            </div>
+            <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>Loading tournament…</div>
           ) : featuredTournament ? (
             <div className="ie-tourn-wrap fade-up">
               <div className="ie-tourn-glow" />
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div className="ie-tourn-badge">
-                  <span className="ie-pulse" /> Registrations Open
-                </div>
+              <div style={{ position:"relative", zIndex:1 }}>
+                <div className="ie-tourn-badge"><span className="ie-pulse" /> Registrations Open</div>
                 <h3 className="ie-tourn-title">
-                  {(() => {
-                    const words = featuredTournament.name.split(" ");
-                    const last  = words.pop();
-                    return <>{words.join(" ")}<br /><span className="accent">{last}</span></>;
-                  })()}
+                  {(() => { const words = featuredTournament.name.split(" "); const last = words.pop(); return <>{words.join(" ")}<br /><span className="accent">{last}</span></>; })()}
                 </h3>
                 <div className="ie-tourn-meta">
                   {[
@@ -707,28 +595,20 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-
               <div className="ie-tourn-right">
                 <div className="ie-slots">
                   <div className="ie-slots-num">{slotsLeft}</div>
                   <div className="ie-slots-label">slots left of {featuredTournament.totalSlots}</div>
                   <div className="ie-slots-bar">
-                    <div className="ie-slots-fill" style={{
-                      width: `${slotPct}%`,
-                      background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)",
-                    }} />
+                    <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
                   </div>
                 </div>
                 <button className="ie-btn-register" onClick={openModal}>Register Now →</button>
-                <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">
-                  View full details & rules →
-                </a>
+                <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)", fontSize: ".95rem" }}>
-              No upcoming tournaments right now. Check back soon!
-            </div>
+            <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>No upcoming tournaments right now. Check back soon!</div>
           )}
         </div>
       </section>
@@ -749,10 +629,10 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* ─── RECAPTCHA ───────────────────────────────────────────────────────────── */}
+      {/* reCAPTCHA — always mounted, always outside modal */}
       <div id="recaptcha-container" />
 
-      {/* ─── LOGIN MODAL ────────────────────────────────────────────────────────── */}
+      {/* ─── MODAL ──────────────────────────────────────────────────────────────── */}
       <div
         className={`ie-modal-overlay${modalOpen ? " open" : ""}`}
         onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
@@ -789,7 +669,19 @@ export default function Home() {
                   />
                 </div>
               </div>
-              <p className="ie-error">{error}</p>
+              {error.includes("reload") ? (
+                <p className="ie-error">
+                  Something went wrong.{" "}
+                  <span
+                    onClick={() => window.location.reload()}
+                    style={{ textDecoration: "underline", cursor: "pointer", color: "#dc2626" }}
+                  >
+                    Tap here to reload
+                  </span>{" "}and try again.
+                </p>
+              ) : (
+                <p className="ie-error">{error}</p>
+              )}
               <button className="ie-btn-submit" onClick={sendOtp} disabled={loading}>
                 {loading ? "Sending OTP…" : "Send OTP →"}
               </button>
@@ -799,7 +691,7 @@ export default function Home() {
 
           {modalStep === "otp" && (
             <>
-              <button className="ie-back-btn" onClick={() => { setModalStep("phone"); setError(""); }}>← Back</button>
+              <button className="ie-back-btn" onClick={goBack}>← Back</button>
               <div className="ie-modal-title">Enter OTP</div>
               <div className="ie-modal-sub">6-digit code sent to {countryCode} {phone}</div>
               <div style={{ marginBottom: 8 }}>
@@ -822,7 +714,7 @@ export default function Home() {
               </button>
               <div className="ie-resend-row">
                 <button className="ie-resend-btn" onClick={resendOtp} disabled={resendTimer > 0}>Resend OTP</button>
-                {resendTimer > 0 && <span style={{ fontSize: ".83rem", color: "var(--text-muted)" }}>Resend in {resendTimer}s</span>}
+                {resendTimer > 0 && <span style={{ fontSize:".83rem", color:"var(--text-muted)" }}>Resend in {resendTimer}s</span>}
               </div>
             </>
           )}
