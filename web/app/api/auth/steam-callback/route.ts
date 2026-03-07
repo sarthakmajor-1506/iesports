@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import openid from "openid";
 import axios from "axios";
-import { adminDb } from "@/lib/firebaseAdmin";
+import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
 export async function GET(req: NextRequest) {
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
   const returnUrl = `${realm}/api/auth/steam-callback`;
-
-  const firebaseUid = req.cookies.get("firebase_uid")?.value;
-  if (!firebaseUid) {
-    return NextResponse.json({ error: "No Firebase UID in cookie" }, { status: 400 });
-  }
 
   const relyingParty = new openid.RelyingParty(returnUrl, realm, true, true, []);
 
   return new Promise<NextResponse>((resolve) => {
     relyingParty.verifyAssertion(req.url, async (err, result) => {
       if (err || !result?.authenticated) {
-        resolve(NextResponse.json({ error: "Verification failed" }, { status: 401 }));
+        console.error("❌ OpenID verification failed:", err);
+        resolve(NextResponse.json({ error: "Verification failed", detail: String(err) }, { status: 401 }));
         return;
       }
 
@@ -29,51 +25,73 @@ export async function GET(req: NextRequest) {
         return;
       }
 
+      console.log("✅ Steam ID verified:", steamId);
+
       try {
-        // Check 1: Steam ID not already linked to another user
-        const steamQuery = await adminDb.collection("users")
-          .where("steamId", "==", steamId).get();
-        if (!steamQuery.empty) {
-          const existing = steamQuery.docs[0];
-          if (existing.id !== firebaseUid) {
-            const res = NextResponse.redirect(`${realm}/dashboard?steam=already_taken`);
-            res.cookies.delete("firebase_uid");
-            resolve(res);
-            return;
-          }
-        }
-
-        // Check 2: User doesn't already have a different Steam ID
-        const userDoc = await adminDb.collection("users").doc(firebaseUid).get();
-        if (userDoc.exists) {
-          const existingData = userDoc.data();
-          if (existingData?.steamId && existingData.steamId !== steamId) {
-            const res = NextResponse.redirect(`${realm}/dashboard?steam=already_linked`);
-            res.cookies.delete("firebase_uid");
-            resolve(res);
-            return;
-          }
-        }
-
-        // Fetch Steam profile
+        // Step 1: Fetch Steam profile
+        console.log("🔍 Fetching Steam profile...");
         const steamRes = await axios.get(
           `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${process.env.STEAM_API_KEY}&steamids=${steamId}`
         );
         const profile = steamRes.data.response.players[0];
+        console.log("✅ Steam profile:", profile?.personaname);
 
-        // Save to Firestore
-        await adminDb.collection("users").doc(firebaseUid).update({
-          steamId,
-          steamName: profile.personaname,
-          steamAvatar: profile.avatarfull,
-          steamLinkedAt: new Date(),
-        });
+        // Step 2: Check Firestore for existing user
+        console.log("🔍 Checking Firestore for existing user...");
+        const existingQuery = await adminDb.collection("users")
+          .where("steamId", "==", steamId).limit(1).get();
 
-        const res = NextResponse.redirect(`${realm}/connect-steam?steam=linked`);
-        res.cookies.delete("firebase_uid");
-        resolve(res);
-      } catch (e) {
-        resolve(NextResponse.json({ error: "Failed to save Steam data" }, { status: 500 }));
+        let firebaseUid: string;
+
+        if (!existingQuery.empty) {
+          firebaseUid = existingQuery.docs[0].id;
+          console.log("✅ Existing user found:", firebaseUid);
+          await adminDb.collection("users").doc(firebaseUid).update({
+            steamName: profile.personaname,
+            steamAvatar: profile.avatarfull,
+          });
+        } else {
+          console.log("🆕 New user, creating Firebase Auth entry...");
+          const firebaseUser = await adminAuth.createUser({
+            uid: `steam_${steamId}`,
+            displayName: profile.personaname,
+            photoURL: profile.avatarfull,
+          }).catch(async (createErr) => {
+            console.log("⚠️ createUser failed (may already exist):", createErr.message);
+            return adminAuth.getUser(`steam_${steamId}`);
+          });
+
+          firebaseUid = firebaseUser.uid;
+          console.log("✅ Firebase UID:", firebaseUid);
+
+          await adminDb.collection("users").doc(firebaseUid).set({
+            steamId,
+            steamName: profile.personaname,
+            steamAvatar: profile.avatarfull,
+            steamLinkedAt: new Date(),
+            createdAt: new Date(),
+            phone: null,
+            dotaRankTier: null,
+            dotaBracket: null,
+            dotaMMR: null,
+            smurfRiskScore: 0,
+          });
+          console.log("✅ Firestore doc created");
+        }
+
+        // Step 3: Create custom token
+        console.log("🔑 Creating custom token...");
+        const customToken = await adminAuth.createCustomToken(firebaseUid);
+        console.log("✅ Custom token created, redirecting...");
+
+        resolve(NextResponse.redirect(`${realm}/auth/steam-success?token=${customToken}`));
+      } catch (e: any) {
+        console.error("❌ Steam callback error:", e.message);
+        console.error("❌ Full error:", JSON.stringify(e, Object.getOwnPropertyNames(e)));
+        resolve(NextResponse.json({
+          error: "Failed to complete Steam login",
+          detail: e.message,
+        }, { status: 500 }));
       }
     });
   });

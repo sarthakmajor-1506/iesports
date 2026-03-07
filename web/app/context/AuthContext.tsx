@@ -6,7 +6,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 
-type DoताProfile = {
+type DotaProfile = {
   dotaRankTier: number | null;
   dotaBracket: string | null;
   dotaMMR: number | null;
@@ -17,7 +17,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   steamLinked: boolean;
-  dotaProfile: DoताProfile | null;
+  dotaProfile: DotaProfile | null;
   logout: () => Promise<void>;
 };
 
@@ -29,8 +29,9 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
-// Pages that don't need auth
-const PUBLIC_PATHS = ["/", "/login"];
+// Pages that don't need auth — /auth/steam-success MUST be here
+// so AuthContext doesn't redirect away before signInWithCustomToken completes
+const PUBLIC_PATHS = ["/", "/login", "/auth/steam-success"];
 
 // Pages that need auth but not Steam
 const STEAM_EXEMPT_PATHS = ["/connect-steam"];
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [steamLinked, setSteamLinked] = useState(false);
-  const [dotaProfile, setDotaProfile] = useState<DoताProfile | null>(null);
+  const [dotaProfile, setDotaProfile] = useState<DotaProfile | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -48,13 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
 
       if (u) {
-        // Check Steam status + fetch dota profile from Firestore
         const snap = await getDoc(doc(db, "users", u.uid));
         const data = snap.data();
         const hasSteam = !!data?.steamId;
         setSteamLinked(hasSteam);
 
-        // Store dota profile data
         setDotaProfile({
           dotaRankTier: data?.dotaRankTier ?? null,
           dotaBracket: data?.dotaBracket ?? null,
@@ -62,18 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           smurfRiskScore: data?.smurfRiskScore ?? null,
         });
 
-        // Redirect logic
         if (!PUBLIC_PATHS.includes(pathname)) {
-          if (!hasSteam && !STEAM_EXEMPT_PATHS.includes(pathname)) {
-            router.push("/connect-steam");
-          } else if (hasSteam && STEAM_EXEMPT_PATHS.includes(pathname)) {
+          if (hasSteam && STEAM_EXEMPT_PATHS.includes(pathname)) {
             router.push("/dashboard");
           }
         }
       } else {
         setSteamLinked(false);
         setDotaProfile(null);
-        // Not logged in — redirect to login if on protected page
         if (!PUBLIC_PATHS.includes(pathname)) {
           router.push("/");
         }

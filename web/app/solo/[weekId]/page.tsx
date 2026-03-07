@@ -1,11 +1,11 @@
 "use client";
 
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { doc, onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import Navbar from "../../../components/Navbar";
+import Navbar from "../../components/Navbar";
 import { SoloTournament, SoloPlayer } from "@/lib/types";
 import { getTimeUntilDeadline } from "@/lib/soloTournaments";
 import { PRIZE_DISTRIBUTION, getPrizeForRank } from "@/lib/soloScoring";

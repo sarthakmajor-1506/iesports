@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Navbar } from "../../components/Navbar";
 import RegisterModal from "../../components/RegisterModal";
 
 const TABS = ["Overview", "Rules", "Matches", "Participants", "Streams"] as const;
@@ -35,269 +36,358 @@ export default function TournamentPage() {
     });
     return () => unsub();
   }, [id]);
-  
+
   useEffect(() => {
     if (!user) return;
     const checkReg = async () => {
       const snap = await getDoc(doc(db, "users", user.uid));
       const data = snap.data();
-      const registered = data?.registeredTournaments || [];
-      setIsRegistered(registered.includes(id));
+      setIsRegistered((data?.registeredTournaments || []).includes(id));
     };
     checkReg();
     window.addEventListener("focus", checkReg);
     return () => window.removeEventListener("focus", checkReg);
   }, [user, id]);
 
-
   if (loading || tLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#555" }}>Loading...</p>
+      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, border: "3px solid #E5E3DF", borderTopColor: "#F05A28", borderRadius: "50%", animation: "tp-spin 0.8s linear infinite" }} />
+          <span style={{ color: "#bbb", fontSize: "0.85rem" }}>Loading tournament…</span>
+        </div>
+        <style>{`@keyframes tp-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (!tournament) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#555" }}>Tournament not found.</p>
+      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, fontFamily: "system-ui, sans-serif" }}>
+        <span style={{ fontSize: 40 }}>🎮</span>
+        <p style={{ color: "#888", fontSize: "1rem", fontWeight: 600 }}>Tournament not found.</p>
+        <button onClick={() => router.push("/dota2")} style={{ background: "#F05A28", color: "#fff", border: "none", borderRadius: 100, padding: "10px 24px", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}>
+          ← Back to Tournaments
+        </button>
       </div>
     );
   }
 
   const isEnded = tournament.status === "ended";
+  const isOngoing = tournament.status === "ongoing";
   const slotsLeft = tournament.totalSlots - tournament.slotsBooked;
   const pct = Math.round((tournament.slotsBooked / tournament.totalSlots) * 100);
+  const fillColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e";
+
+  const statusBadge = isEnded
+    ? { label: "Ended",    bg: "#F2F1EE", color: "#999",    border: "#E5E3DF" }
+    : isOngoing
+    ? { label: "🟢 Live",  bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" }
+    : { label: "Upcoming", bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050505", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+    <>
+      <style>{`
+        @keyframes tp-spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
+        .tp-page { min-height: 100vh; background: #F8F7F4; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #111; }
 
-      {/* TOP BAR */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 16,
-        padding: "12px 30px", borderBottom: "1px solid #141414", background: "#080808",
-        position: "sticky", top: 0, zIndex: 10,
-      }}>
-        <button onClick={() => router.push("/dashboard")} style={{
-          background: "transparent", border: "1px solid #1a1a1a", borderRadius: 6,
-          color: "#555", fontSize: 13, padding: "6px 12px", cursor: "pointer",
-        }}>← Back</button>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 28, height: 28, background: "linear-gradient(135deg, #f97316, #ea580c)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 12, color: "#fff" }}>IE</div>
-          <span style={{ fontSize: 16, fontWeight: 800, background: "linear-gradient(90deg, #f97316, #fb923c)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Indian Esports</span>
-        </div>
-      </div>
+        /* Hero */
+        .tp-hero { background: #fff; border-bottom: 1px solid #E5E3DF; }
+        .tp-hero-inner { max-width: 1100px; margin: 0 auto; padding: 28px 30px 24px; }
+        .tp-breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+        .tp-back-btn { display: flex; align-items: center; gap: 6px; background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 100px; padding: 6px 14px; color: #555; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .tp-back-btn:hover { background: #F2F1EE; color: #111; }
+        .tp-breadcrumb-sep { color: #ddd; font-size: 0.8rem; }
+        .tp-breadcrumb-cur { color: #bbb; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 
-      {/* HERO BANNER */}
-      <div style={{
-        background: "linear-gradient(135deg, #0f0f0f, #111)",
-        borderBottom: "1px solid #1a1a1a", padding: "36px 40px",
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, #f97316, #22c55e, #3b82f6)" }}></div>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 24 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{
-                background: isEnded ? "#1a1a1a" : tournament.status === "ongoing" ? "#1e3a5f" : "#16a34a15",
-                color: isEnded ? "#444" : tournament.status === "ongoing" ? "#3b82f6" : "#22c55e",
-                padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-              }}>
-                {isEnded ? "Ended" : tournament.status === "ongoing" ? "🔴 Live" : "Upcoming"}
-              </span>
-              <span style={{ color: "#444", fontSize: 12 }}>{tournament.month}</span>
+        .tp-hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: start; }
+        @media (max-width: 700px) { .tp-hero-grid { grid-template-columns: 1fr; } }
+
+        .tp-hero-badges { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .tp-status-badge { font-size: 0.68rem; font-weight: 800; padding: 4px 12px; border-radius: 100px; }
+        .tp-game-badge { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: #888; background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 100px; padding: 3px 10px; }
+        .tp-game-badge img { width: 14px; height: 14px; object-fit: contain; }
+
+        .tp-hero-title { font-size: 1.6rem; font-weight: 900; color: #111; margin-bottom: 6px; line-height: 1.2; }
+        .tp-hero-desc { color: #888; font-size: 0.88rem; margin-bottom: 20px; line-height: 1.5; }
+
+        .tp-meta-row { display: flex; gap: 0; flex-wrap: wrap; }
+        .tp-meta-item { display: flex; flex-direction: column; padding: 0 20px 0 0; margin-right: 20px; border-right: 1px solid #E5E3DF; }
+        .tp-meta-item:last-child { border-right: none; }
+        .tp-meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; margin-bottom: 3px; }
+        .tp-meta-val { font-size: 0.85rem; font-weight: 700; color: #333; }
+
+        /* Right panel */
+        .tp-panel { background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 14px; padding: 20px; min-width: 220px; display: flex; flex-direction: column; gap: 16px; }
+        .tp-prize-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; margin-bottom: 4px; }
+        .tp-prize-amount { font-size: 2rem; font-weight: 900; color: #F05A28; line-height: 1; }
+        .tp-slots-text { font-size: 0.75rem; color: #888; display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .tp-slots-text strong { color: #111; font-weight: 800; }
+        .tp-slots-bar { height: 5px; background: #E5E3DF; border-radius: 3px; overflow: hidden; }
+        .tp-slots-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .tp-reg-btn { width: 100%; padding: 13px; background: #F05A28; color: #fff; border: none; border-radius: 100px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: background 0.15s; box-shadow: 0 2px 12px rgba(240,90,40,0.25); }
+        .tp-reg-btn:hover { background: #D44A1A; }
+        .tp-reg-done { width: 100%; padding: 13px; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 100px; font-size: 0.9rem; font-weight: 800; text-align: center; }
+
+        /* Bracket pills */
+        .tp-brackets { max-width: 1100px; margin: 0 auto; padding: 16px 30px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        @media (max-width: 800px) { .tp-brackets { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 500px) { .tp-brackets { grid-template-columns: 1fr 1fr; } }
+        .tp-bracket-card { background: #fff; border: 1px solid #E5E3DF; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .tp-bracket-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .tp-bracket-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .tp-bracket-name { font-size: 0.72rem; font-weight: 700; color: #666; }
+        .tp-bracket-slots { font-size: 1.1rem; font-weight: 800; color: #111; }
+        .tp-bracket-slots span { color: #bbb; font-size: 0.75rem; font-weight: 400; }
+        .tp-bracket-bar { height: 3px; background: #F2F1EE; border-radius: 2px; overflow: hidden; margin-top: 6px; }
+
+        /* Tabs */
+        .tp-tabs-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 30px 0; }
+        .tp-tabs { display: flex; gap: 0; border-bottom: 1px solid #E5E3DF; margin-bottom: 24px; overflow-x: auto; }
+        .tp-tab { padding: 10px 18px; background: transparent; border: none; font-size: 0.86rem; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
+        .tp-tab.active { color: #F05A28; border-bottom-color: #F05A28; font-weight: 800; }
+        .tp-tab:hover:not(.active) { color: #444; }
+
+        /* Tab content */
+        .tp-tab-content { padding-bottom: 48px; }
+
+        /* Cards */
+        .tp-card { background: #fff; border: 1px solid #E5E3DF; border-radius: 12px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .tp-card-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #bbb; margin-bottom: 16px; display: block; }
+        .tp-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-row:last-child { border-bottom: none; }
+        .tp-row-key { font-size: 0.84rem; color: #888; }
+        .tp-row-val { font-size: 0.84rem; font-weight: 700; color: #333; }
+
+        /* Prize rows */
+        .tp-prize-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-prize-row:last-child { border-bottom: none; }
+        .tp-prize-place { font-size: 0.9rem; color: #444; }
+        .tp-prize-val { font-size: 0.95rem; font-weight: 800; }
+
+        /* Rules */
+        .tp-rule { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-rule:last-child { border-bottom: none; }
+        .tp-rule-num { color: #F05A28; font-weight: 800; font-size: 0.85rem; min-width: 22px; }
+        .tp-rule-text { color: #555; font-size: 0.85rem; line-height: 1.6; }
+
+        /* Empty state */
+        .tp-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 0; gap: 10px; }
+        .tp-empty-icon { font-size: 2.5rem; }
+        .tp-empty-title { font-size: 1rem; font-weight: 800; color: #333; }
+        .tp-empty-sub { font-size: 0.82rem; color: #aaa; }
+      `}</style>
+
+      <div className="tp-page">
+        <Navbar />
+
+        {/* ── HERO ── */}
+        <div className="tp-hero">
+          <div className="tp-hero-inner">
+
+            {/* Breadcrumb */}
+            <div className="tp-breadcrumb">
+              <button className="tp-back-btn" onClick={() => router.push("/dota2")}>← Tournaments</button>
+              <span className="tp-breadcrumb-sep">›</span>
+              <span className="tp-breadcrumb-cur">{tournament.name}</span>
             </div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>{tournament.name}</h1>
-            <p style={{ color: "#555", fontSize: 14 }}>{tournament.desc}</p>
-            <div style={{ display: "flex", gap: 20, marginTop: 16, flexWrap: "wrap" }}>
-              {[
-                { label: "START DATE", value: tournament.startDate },
-                { label: "END DATE", value: tournament.endDate },
-                { label: "REG. DEADLINE", value: tournament.registrationDeadline },
-                { label: "ENTRY", value: tournament.entry },
-              ].map((item) => (
-                <div key={item.label}>
-                  <p style={{ color: "#333", fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>{item.label}</p>
-                  <p style={{ color: "#aaa", fontSize: 13, fontWeight: 700, marginTop: 2 }}>{item.value}</p>
+
+            <div className="tp-hero-grid">
+              {/* Left */}
+              <div>
+                <div className="tp-hero-badges">
+                  <span className="tp-status-badge" style={{ background: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}` }}>
+                    {statusBadge.label}
+                  </span>
+                  {isRegistered && !isEnded && (
+                    <span className="tp-status-badge" style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>✓ Registered</span>
+                  )}
+                  <span className="tp-game-badge">
+                    <img src="https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png" alt="Dota 2" />
+                    Dota 2
+                  </span>
+                  {tournament.month && (
+                    <span style={{ fontSize: "0.72rem", color: "#bbb", fontWeight: 600 }}>{tournament.month}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Prize + Slots + Register */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 16, minWidth: 200 }}>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ color: "#333", fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>PRIZE POOL</p>
-              <p style={{ fontSize: 32, fontWeight: 800, color: "#f97316", marginTop: 2 }}>{tournament.prizePool}</p>
-            </div>
-            <div style={{ width: "100%", textAlign: "right" }}>
-              <p style={{ color: "#555", fontSize: 11, marginBottom: 6 }}>
-                <span style={{ color: "#f97316", fontWeight: 700 }}>{slotsLeft}</span>
-                <span style={{ color: "#333" }}> / {tournament.totalSlots} slots left</span>
-              </p>
-              <div style={{ width: "100%", height: 6, background: "#1a1a1a", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e", borderRadius: 3 }}></div>
+                <h1 className="tp-hero-title">{tournament.name}</h1>
+                {tournament.desc && <p className="tp-hero-desc">{tournament.desc}</p>}
+
+                <div className="tp-meta-row">
+                  {[
+                    { key: "Start Date",    val: tournament.startDate },
+                    { key: "End Date",      val: tournament.endDate },
+                    { key: "Reg. Deadline", val: tournament.registrationDeadline },
+                    { key: "Entry",         val: tournament.entry },
+                  ].map(item => (
+                    <div key={item.key} className="tp-meta-item">
+                      <span className="tp-meta-key">{item.key}</span>
+                      <span className="tp-meta-val">{item.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right panel */}
+              <div className="tp-panel">
+                <div>
+                  <div className="tp-prize-label">Prize Pool</div>
+                  <div className="tp-prize-amount">{tournament.prizePool}</div>
+                </div>
+
+                <div>
+                  <div className="tp-slots-text">
+                    <span><strong>{slotsLeft}</strong> slots left</span>
+                    <span>{tournament.slotsBooked} / {tournament.totalSlots} filled</span>
+                  </div>
+                  <div className="tp-slots-bar">
+                    <div className="tp-slots-fill" style={{ width: `${pct}%`, background: fillColor }} />
+                  </div>
+                </div>
+
+                {!isEnded && (
+                  isRegistered ? (
+                    <div className="tp-reg-done">✓ You're Registered</div>
+                  ) : (
+                    <button className="tp-reg-btn" onClick={() => {
+                      if (!steamLinked) window.location.href = `/api/auth/steam?uid=${user?.uid}`;
+                      else setShowRegister(true);
+                    }}>
+                      Register for Free →
+                    </button>
+                  )
+                )}
               </div>
             </div>
-            {!isEnded && (
-              isRegistered ? (
-                <div style={{
-                  padding: "12px 28px", width: "100%", textAlign: "center",
-                  background: "#14532d", border: "1px solid #16a34a40",
-                  borderRadius: 10, color: "#22c55e", fontWeight: 700, fontSize: 14,
-                }}>
-                  ✓ Registered
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (!steamLinked) {
-                      window.location.href = `/api/auth/steam?uid=${user?.uid}`;
-                    } else {
-                      setShowRegister(true);
-                    }
-                  }}
-                  style={{
-                    padding: "12px 28px",
-                    background: "linear-gradient(135deg, #f97316, #ea580c)",
-                    border: "none", borderRadius: 10, color: "#fff",
-                    fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    width: "100%", textAlign: "center",
-                  }}
-                >
-                  Register for Free →
-                </button>
-              )
-            )}
           </div>
         </div>
-      </div>
 
-      {/* BRACKET SLOTS */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 40px 0" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
-          {tournament.brackets && Object.entries(tournament.brackets).map(([key, val]: any) => {
-            const bPct = Math.round((val.slotsBooked / val.slotsTotal) * 100);
-            const labels: Record<string, { name: string; color: string }> = {
-              herald_guardian:  { name: "Herald – Guardian", color: "#6b7280" },
-              crusader_archon:  { name: "Crusader – Archon", color: "#3b82f6" },
-              legend_ancient:   { name: "Legend – Ancient",  color: "#a855f7" },
-              divine_immortal:  { name: "Divine – Immortal", color: "#f59e0b" },
-            };
-            const b = labels[key];
-            return (
-              <div key={key} style={{ background: "#0a0a0a", border: "1px solid #141414", borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: b.color }}></div>
-                  <p style={{ color: "#888", fontSize: 12, fontWeight: 600 }}>{b.name}</p>
+        {/* ── BRACKET PILLS ── */}
+        {tournament.brackets && (
+          <div className="tp-brackets">
+            {Object.entries(tournament.brackets).map(([key, val]: any) => {
+              const labels: Record<string, { name: string; color: string }> = {
+                herald_guardian:  { name: "Herald – Guardian", color: "#6b7280" },
+                crusader_archon:  { name: "Crusader – Archon", color: "#3b82f6" },
+                legend_ancient:   { name: "Legend – Ancient",  color: "#a855f7" },
+                divine_immortal:  { name: "Divine – Immortal", color: "#f59e0b" },
+              };
+              const b = labels[key] || { name: key, color: "#F05A28" };
+              const bPct = Math.round((val.slotsBooked / val.slotsTotal) * 100);
+              return (
+                <div key={key} className="tp-bracket-card">
+                  <div className="tp-bracket-header">
+                    <div className="tp-bracket-dot" style={{ background: b.color }} />
+                    <span className="tp-bracket-name">{b.name}</span>
+                  </div>
+                  <div className="tp-bracket-slots">
+                    {val.slotsTotal - val.slotsBooked}<span> / {val.slotsTotal} left</span>
+                  </div>
+                  <div className="tp-bracket-bar">
+                    <div style={{ height: "100%", width: `${bPct}%`, background: b.color, borderRadius: 2 }} />
+                  </div>
                 </div>
-                <p style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{val.slotsTotal - val.slotsBooked}<span style={{ color: "#333", fontSize: 12, fontWeight: 400 }}> / {val.slotsTotal}</span></p>
-                <div style={{ width: "100%", height: 3, background: "#1a1a1a", borderRadius: 2, overflow: "hidden", marginTop: 8 }}>
-                  <div style={{ width: `${bPct}%`, height: "100%", background: b.color, borderRadius: 2 }}></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* TABS */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 40px" }}>
-        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid #141414", marginBottom: 28 }}>
-          {TABS.map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{
-              padding: "10px 20px", background: "transparent", border: "none",
-              color: activeTab === tab ? "#fff" : "#444",
-              fontWeight: activeTab === tab ? 700 : 400,
-              fontSize: 14, cursor: "pointer",
-              borderBottom: activeTab === tab ? "2px solid #f97316" : "2px solid transparent",
-              marginBottom: -1,
-            }}>{tab}</button>
-          ))}
-        </div>
-
-        {/* OVERVIEW TAB */}
-        {activeTab === "Overview" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            <div style={{ background: "#0a0a0a", border: "1px solid #141414", borderRadius: 12, padding: 24 }}>
-              <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginBottom: 16 }}>TOURNAMENT FORMAT</p>
-              {[
-                { label: "Game", value: "Dota 2" },
-                { label: "Format", value: "5v5 Single Elimination" },
-                { label: "Brackets", value: "4 rank-based brackets" },
-                { label: "Min Players", value: "40 to run tournament" },
-                { label: "Team Size", value: "5 players per team" },
-              ].map((item) => (
-                <div key={item.label} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #111" }}>
-                  <span style={{ color: "#555", fontSize: 13 }}>{item.label}</span>
-                  <span style={{ color: "#aaa", fontSize: 13, fontWeight: 600 }}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: "#0a0a0a", border: "1px solid #141414", borderRadius: 12, padding: 24 }}>
-              <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginBottom: 16 }}>PRIZE DISTRIBUTION</p>
-              {[
-                { place: "🥇 1st Place", prize: "50%", color: "#f59e0b" },
-                { place: "🥈 2nd Place", prize: "30%", color: "#9ca3af" },
-                { place: "🥉 3rd Place", prize: "20%", color: "#b45309" },
-              ].map((item) => (
-                <div key={item.place} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #111" }}>
-                  <span style={{ color: "#aaa", fontSize: 14 }}>{item.place}</span>
-                  <span style={{ color: item.color, fontSize: 15, fontWeight: 700 }}>{item.prize} of {tournament.prizePool}</span>
-                </div>
-              ))}
-              <p style={{ color: "#333", fontSize: 11, marginTop: 14 }}>Prizes paid via UPI within 48 hours of tournament end.</p>
-            </div>
+              );
+            })}
           </div>
         )}
 
-        {/* RULES TAB */}
-        {activeTab === "Rules" && (
-          <div style={{ background: "#0a0a0a", border: "1px solid #141414", borderRadius: 12, padding: 28, maxWidth: 700 }}>
-            <p style={{ color: "#444", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginBottom: 20 }}>TOURNAMENT RULES</p>
-            {(tournament.rules || []).map((rule: string, i: number) => (
-              <div key={i} style={{ display: "flex", gap: 14, padding: "12px 0", borderBottom: "1px solid #111" }}>
-                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 14, minWidth: 24 }}>{i + 1}.</span>
-                <span style={{ color: "#aaa", fontSize: 14, lineHeight: 1.6 }}>{rule}</span>
-              </div>
+        {/* ── TABS ── */}
+        <div className="tp-tabs-wrap">
+          <div className="tp-tabs">
+            {TABS.map(tab => (
+              <button key={tab} className={`tp-tab${activeTab === tab ? " active" : ""}`} onClick={() => setActiveTab(tab)}>
+                {tab}
+              </button>
             ))}
           </div>
-        )}
 
-        {/* MATCHES TAB */}
-        {activeTab === "Matches" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-            <p style={{ fontSize: 40 }}>🗓️</p>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginTop: 16 }}>Matches Not Started</h3>
-            <p style={{ color: "#444", fontSize: 14, marginTop: 8 }}>Match schedule will be published after registration closes.</p>
-          </div>
-        )}
+          <div className="tp-tab-content">
 
-        {/* PARTICIPANTS TAB */}
-        {activeTab === "Participants" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-            <p style={{ fontSize: 40 }}>👥</p>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginTop: 16 }}>
-              {tournament.slotsBooked} Players Registered
-            </h3>
-            <p style={{ color: "#444", fontSize: 14, marginTop: 8 }}>
-              Full participant list will be visible after registration closes.
-            </p>
-          </div>
-        )}
+            {/* OVERVIEW */}
+            {activeTab === "Overview" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="tp-card">
+                  <span className="tp-card-label">Tournament Format</span>
+                  {[
+                    { key: "Game",        val: "Dota 2" },
+                    { key: "Format",      val: "5v5 Single Elimination" },
+                    { key: "Brackets",    val: "4 rank-based brackets" },
+                    { key: "Min Players", val: "40 to run tournament" },
+                    { key: "Team Size",   val: "5 players per team" },
+                  ].map(item => (
+                    <div key={item.key} className="tp-row">
+                      <span className="tp-row-key">{item.key}</span>
+                      <span className="tp-row-val">{item.val}</span>
+                    </div>
+                  ))}
+                </div>
 
-        {/* STREAMS TAB */}
-        {activeTab === "Streams" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-            <p style={{ fontSize: 40 }}>📺</p>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginTop: 16 }}>No Streams Yet</h3>
-            <p style={{ color: "#444", fontSize: 14, marginTop: 8 }}>Stream links will be added closer to the tournament date.</p>
+                <div className="tp-card">
+                  <span className="tp-card-label">Prize Distribution</span>
+                  {[
+                    { place: "🥇 1st Place", prize: "50%", color: "#f59e0b" },
+                    { place: "🥈 2nd Place", prize: "30%", color: "#6b7280" },
+                    { place: "🥉 3rd Place", prize: "20%", color: "#b45309" },
+                  ].map(item => (
+                    <div key={item.place} className="tp-prize-row">
+                      <span className="tp-prize-place">{item.place}</span>
+                      <span className="tp-prize-val" style={{ color: item.color }}>{item.prize} of {tournament.prizePool}</span>
+                    </div>
+                  ))}
+                  <p style={{ color: "#bbb", fontSize: "0.75rem", marginTop: 14, lineHeight: 1.5 }}>
+                    Prizes paid via UPI within 48 hours of tournament end.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* RULES */}
+            {activeTab === "Rules" && (
+              <div className="tp-card" style={{ maxWidth: 680 }}>
+                <span className="tp-card-label">Tournament Rules</span>
+                {(tournament.rules || []).map((rule: string, i: number) => (
+                  <div key={i} className="tp-rule">
+                    <span className="tp-rule-num">{i + 1}.</span>
+                    <span className="tp-rule-text">{rule}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* MATCHES */}
+            {activeTab === "Matches" && (
+              <div className="tp-empty">
+                <span className="tp-empty-icon">🗓️</span>
+                <span className="tp-empty-title">Matches Not Started</span>
+                <span className="tp-empty-sub">Schedule will be published after registration closes.</span>
+              </div>
+            )}
+
+            {/* PARTICIPANTS */}
+            {activeTab === "Participants" && (
+              <div className="tp-empty">
+                <span className="tp-empty-icon">👥</span>
+                <span className="tp-empty-title">{tournament.slotsBooked} Players Registered</span>
+                <span className="tp-empty-sub">Full participant list visible after registration closes.</span>
+              </div>
+            )}
+
+            {/* STREAMS */}
+            {activeTab === "Streams" && (
+              <div className="tp-empty">
+                <span className="tp-empty-icon">📺</span>
+                <span className="tp-empty-title">No Streams Yet</span>
+                <span className="tp-empty-sub">Stream links will be added closer to the tournament date.</span>
+              </div>
+            )}
+
           </div>
-        )}
+        </div>
       </div>
 
-      {/* REGISTER MODAL */}
       {showRegister && user && (
         <RegisterModal
           tournament={tournament}
@@ -306,7 +396,7 @@ export default function TournamentPage() {
           onClose={() => setShowRegister(false)}
           onSuccess={() => setIsRegistered(true)}
         />
-      )}      
-    </div>
+      )}
+    </>
   );
 }

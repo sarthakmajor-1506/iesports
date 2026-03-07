@@ -1,135 +1,112 @@
+// /scripts/seedSoloTournaments.ts
+// Run with: npx tsx scripts/seedSoloTournaments.ts
+
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import * as dotenv from "dotenv";
+import { getWeekDates, formatWeekLabel } from "../lib/soloTournaments";
+
+// ── IST-aware week ID ─────────────────────────────────────────────────────────
+function getWeekIdIST(date: Date): string {
+  const ist = new Date(date.getTime() + 330 * 60 * 1000);
+  const day  = ist.getUTCDay();
+  const diff = ist.getUTCDate() - day + (day === 0 ? -6 : 1);
+  ist.setUTCDate(diff);
+  const thursday = new Date(ist);
+  thursday.setUTCDate(ist.getUTCDate() - (ist.getUTCDay() + 6) % 7 + 3);
+  const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
+  const weekNo = 1 + Math.round(
+    ((thursday.getTime() - firstThursday.getTime()) / 86400000
+      - 3 + (firstThursday.getUTCDay() + 6) % 7) / 7
+  );
+  return `${ist.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function getThreeWeeksIST() {
+  const now  = new Date();
+  const last = getWeekIdIST(new Date(now.getTime() - 7 * 86400000));
+  const current = getWeekIdIST(now);
+  const next = getWeekIdIST(new Date(now.getTime() + 7 * 86400000));
+  return { last, current, next };
+}
 
 dotenv.config({ path: ".env.local" });
 
 if (!getApps().length) {
   initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId:   process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     }),
   });
 }
 
-const brackets = {
-  herald_guardian:  { slotsTotal: 40, slotsBooked: 0 },
-  crusader_archon:  { slotsTotal: 40, slotsBooked: 0 },
-  legend_ancient:   { slotsTotal: 40, slotsBooked: 0 },
-  divine_immortal:  { slotsTotal: 40, slotsBooked: 0 },
-};
-
-const tournaments = [
-  {
-    name: "Dota 2 April Invitational",
-    game: "dota2",
-    month: "April 2026",
-    status: "ended",
-    prizePool: "₹25,000",
-    entry: "Free",
-    startDate: "Apr 26, 2026",
-    endDate: "Apr 27, 2026",
-    registrationDeadline: "Apr 23, 2026",
-    totalSlots: 160,
-    slotsBooked: 160,
-    brackets,
-    desc: "Our first ever Dota 2 tournament. All ranks welcome.",
-    rules: [
-      "All players must have Steam account linked",
-      "Teams of 5 players each",
-      "Rank verified at time of registration",
-      "No switching accounts during tournament",
-      "Match results must be screenshot and submitted",
-    ],
-  },
-  {
-    name: "Dota 2 May Championship",
-    game: "dota2",
-    month: "May 2026",
-    status: "upcoming",
-    prizePool: "₹40,000",
-    entry: "Free",
-    startDate: "May 31, 2026",
-    endDate: "Jun 1, 2026",
-    registrationDeadline: "May 28, 2026",
-    totalSlots: 160,
-    slotsBooked: 0,
-    brackets,
-    desc: "Monthly championship. Rank-locked brackets. Fast UPI payouts.",
-    rules: [
-      "All players must have Steam account linked",
-      "Teams of 5 players each",
-      "Rank verified at time of registration",
-      "No switching accounts during tournament",
-      "Match results must be screenshot and submitted",
-    ],
-  },
-  {
-    name: "Dota 2 June Showdown",
-    game: "dota2",
-    month: "June 2026",
-    status: "upcoming",
-    prizePool: "₹40,000",
-    entry: "Free",
-    startDate: "Jun 28, 2026",
-    endDate: "Jun 29, 2026",
-    registrationDeadline: "Jun 25, 2026",
-    totalSlots: 160,
-    slotsBooked: 0,
-    brackets,
-    desc: "Monthly championship. Steam-verified. Prize via UPI.",
-    rules: [
-      "All players must have Steam account linked",
-      "Teams of 5 players each",
-      "Rank verified at time of registration",
-      "No switching accounts during tournament",
-      "Match results must be screenshot and submitted",
-    ],
-  },
-  {
-    name: "Dota 2 July Cup",
-    game: "dota2",
-    month: "July 2026",
-    status: "upcoming",
-    prizePool: "₹40,000",
-    entry: "Free",
-    startDate: "Jul 26, 2026",
-    endDate: "Jul 27, 2026",
-    registrationDeadline: "Jul 23, 2026",
-    totalSlots: 160,
-    slotsBooked: 0,
-    brackets,
-    desc: "Monthly championship. Rank-locked brackets. Fast UPI payouts.",
-    rules: [
-      "All players must have Steam account linked",
-      "Teams of 5 players each",
-      "Rank verified at time of registration",
-      "No switching accounts during tournament",
-      "Match results must be screenshot and submitted",
-    ],
-  },
-];
-
 async function seed() {
   const db = getFirestore();
+  const { last, current, next } = getThreeWeeksIST();
 
-  // Delete existing tournaments first
-  const existing = await db.collection("tournaments").get();
-  for (const d of existing.docs) {
-    await d.ref.delete();
-    console.log(`Deleted: ${d.data().name}`);
+  const weekStatuses: Record<string, "ended" | "active" | "upcoming"> = {
+    [last]:    "ended",
+    [current]: "active",
+    [next]:    "upcoming",
+  };
+
+  for (const weekId of [last, current, next]) {
+    const { weekStart, weekEnd, registrationDeadline } = getWeekDates(weekId);
+    const status = weekStatuses[weekId];
+    const label  = formatWeekLabel(weekId);
+
+    // ── Tournament window ────────────────────────────────────────────────────
+    // Registration opens: Monday 00:00 IST = weekStart
+    // Registration closes: Wednesday 23:59 IST = registrationDeadline
+    // Tournament starts:  Monday 00:00 IST = weekStart  (matches from start count)
+    // Tournament ends:    Sunday  23:59 IST = weekEnd
+
+    const startTimeUnix = Math.floor(weekStart.getTime() / 1000);        // unix seconds
+    const endTimeUnix   = Math.floor(weekEnd.getTime() / 1000);          // unix seconds
+    const regDeadlineUnix = Math.floor(registrationDeadline.getTime() / 1000);
+    const createdAtUnix   = Math.floor(Date.now() / 1000);
+
+    const freeId = `${weekId}-free`;
+
+    await db.collection("soloTournaments").doc(freeId).set({
+      weekId,
+      name:   `Weekly Solo — ${label}`,
+      type:   "free",
+      game:   "dota2",
+      status,
+
+      // Prize
+      prizePool: "₹2,500",
+      entry:     "Free",
+      entryFee:  0,
+
+      // Slots
+      totalSlots:  50,
+      slotsBooked: 0,
+
+      // ── Timestamps stored as BOTH ISO strings AND unix seconds ──────────
+      // ISO strings kept for backwards compat with existing UI code
+      weekStart:            weekStart.toISOString(),
+      weekEnd:              weekEnd.toISOString(),
+      registrationDeadline: registrationDeadline.toISOString(),
+      createdAt:            new Date().toISOString(),
+
+      // Unix seconds — used by scoring engine & schedule display
+      startTime:            startTimeUnix,      // tournament window open (= weekStart)
+      endTime:              endTimeUnix,         // tournament window close (= weekEnd)
+      registrationDeadlineUnix: regDeadlineUnix,
+      createdAtUnix,
+    }, { merge: true }); // merge:true so re-seeding doesn't wipe player subcollection refs
+
+    console.log(`✅ Seeded free: ${freeId}`);
+    console.log(`   📅 ${weekStart.toISOString()} → ${weekEnd.toISOString()}`);
+    console.log(`   ⏱️  startTime=${startTimeUnix}  endTime=${endTimeUnix}`);
   }
 
-  // Add new ones
-  for (const t of tournaments) {
-    await db.collection("tournaments").add(t);
-    console.log(`Added: ${t.name}`);
-  }
-
-  console.log("Done!");
+  console.log("\n✅ Done — 3 free solo tournaments seeded (last / current / next week)");
   process.exit(0);
 }
 
-seed();
+seed().catch(console.error);

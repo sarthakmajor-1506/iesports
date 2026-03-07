@@ -1,17 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { auth, db } from "@/lib/firebase";
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
-import {
-  doc, setDoc,
-  collection, query, where, getDocs,
-} from "firebase/firestore";
+import { useEffect, useRef, useState } from "react";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-
-type ModalStep = "phone" | "otp";
 
 interface Tournament {
   id: string; name: string; game: string; month: string; status: string;
@@ -19,79 +13,45 @@ interface Tournament {
   registrationDeadline: string; totalSlots: number; slotsBooked: number; desc: string;
 }
 
-const COUNTRIES = [
-  { flag: "🇮🇳", code: "+91"  },
-  { flag: "🇺🇸", code: "+1"   },
-  { flag: "🇬🇧", code: "+44"  },
-  { flag: "🇦🇪", code: "+971" },
-  { flag: "🇸🇬", code: "+65"  },
-  { flag: "🇦🇺", code: "+61"  },
+const HOW_IT_WORKS = [
+  { icon: "🔗", title: "Connect & Join",    desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
+  { icon: "⚔️", title: "5v5 and Solo Mode", desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
+  { icon: "📊", title: "Automated Results", desc: "We track your match results automatically. Just play your game as usual, no manual reporting.", color: "#8b5cf6" },
+  { icon: "🏆", title: "Get Rewarded",      desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
 ];
 
-const HOW_IT_WORKS = [
-  { icon: "🔗", title: "Connect & Join",      desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
-  { icon: "⚔️", title: "5v5 and Solo Mode",   desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
-  { icon: "📊", title: "Automated Results",   desc: "We track your match results automatically. Just play your game as usual, no manual reporting.", color: "#8b5cf6" },
-  { icon: "🏆", title: "Get Rewarded",        desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
-];
+const SteamIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 496 512" fill="white">
+    <path d="M496 256c0 137-111.2 248-248.4 248C113.4 504 17.5 409.5 5.2 289.2L116.4 336c.5 28.4 23.7 51.3 52.2 51.3 2.9 0 5.7-.2 8.5-.7l51.4 73.3c-.6 5.1-.9 10.2-.9 15.4 0 57.4 46.7 104 104 104s104-46.6 104-104-46.7-104-104-104c-3.7 0-7.4.2-11 .6l-72.1-51.8c.3-2.8.5-5.6.5-8.4 0-17.4-4.9-33.7-13.4-47.5l117.6-47.2C381.6 132.9 416 96.4 416 51.3c0-57.4-46.7-104-104-104-57.4 0-104 46.6-104 104 0 8.4 1 16.5 2.8 24.4L106.8 128C88.7 95 52.9 72.9 11.7 72.9c-6.4 0-12.6.5-18.7 1.4L22.6 209.8c-.3 3.7-.6 7.5-.6 11.3C22 279.5 68.1 328 126 332.8l37.7 25.6c0 1.2-.1 2.5-.1 3.7 0 28.8 23.4 52.3 52.3 52.3s52.3-23.4 52.3-52.3-23.4-52.3-52.3-52.3c-4.2 0-8.2.5-12.1 1.4L138.8 256h357.2z"/>
+  </svg>
+);
 
 export default function Home() {
-  const [phone, setPhone]             = useState("");
-  const [countryCode, setCountryCode] = useState("+91");
-  const [otp, setOtp]                 = useState(["","","","","",""]);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
-  const [modalStep, setModalStep]     = useState<ModalStep>("phone");
-  const [modalOpen, setModalOpen]     = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  const [activeSection,      setActiveSection]      = useState("home");
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | null>(null);
-  const [tournamentLoading, setTournamentLoading]   = useState(true);
-  const [activeSection, setActiveSection] = useState("");
-
-  const otpRefs       = useRef<(HTMLInputElement | null)[]>([]);
-  const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const phoneRef      = useRef<HTMLInputElement>(null);
-  const videoRef      = useRef<HTMLVideoElement>(null);
-  const recaptchaRef  = useRef<RecaptchaVerifier | null>(null);
-  const confirmResRef = useRef<ConfirmationResult | null>(null);
-
-  const { user } = useAuth();
-  const router   = useRouter();
-  useEffect(() => { if (user) router.push("/dashboard"); }, [user, router]);
+  const [tournamentLoading,  setTournamentLoading]  = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const fetchTournament = async () => {
+    if (!loading && user) router.replace("/dota2");
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    const fetch = async () => {
       try {
         const q = query(collection(db, "tournaments"), where("status", "==", "upcoming"));
         const snap = await getDocs(q);
         if (!snap.empty) {
-          const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
-          all.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-          setFeaturedTournament(all[0]);
+          const d = snap.docs[0];
+          setFeaturedTournament({ id: d.id, ...d.data() } as Tournament);
         }
-      } catch (e) { console.error("Tournament fetch error:", e); }
+      } catch (e) { console.error(e); }
       finally { setTournamentLoading(false); }
     };
-    fetchTournament();
-  }, []);
-
-  useEffect(() => {
-    const sections = ["games", "how-it-works", "tournament"];
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id); }),
-      { rootMargin: "-40% 0px -55% 0px" }
-    );
-    sections.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
-    return () => obs.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
-      { threshold: 0.05, rootMargin: "0px 0px -20px 0px" }
-    );
-    document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
-    return () => obs.disconnect();
+    fetch();
   }, []);
 
   useEffect(() => {
@@ -99,180 +59,54 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") closeModal(); };
-    document.addEventListener("keydown", fn);
-    return () => document.removeEventListener("keydown", fn);
+    const sections = ["home", "games", "how-it-works", "tournament"];
+    const observer = new IntersectionObserver(
+      entries => { entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id); }); },
+      { threshold: 0.3 }
+    );
+    sections.forEach(id => { const el = document.getElementById(id); if (el) observer.observe(el); });
+    return () => observer.disconnect();
   }, []);
 
-  // ── reCAPTCHA ────────────────────────────────────────────────────────────────
-  // Wipes the rendered widget completely from the DOM so Firebase can re-render fresh
-  const clearRecaptcha = () => {
-    try { recaptchaRef.current?.clear(); } catch (_) {}
-    recaptchaRef.current = null;
-    const el = document.getElementById("recaptcha-container");
-    if (el) el.innerHTML = "";
-  };
-
-  // Only creates a new verifier if the container is truly empty
-  const initRecaptcha = () => {
-    const container = document.getElementById("recaptcha-container");
-    if (recaptchaRef.current || (container && container.childElementCount > 0)) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
-      size: "invisible",
-      callback: () => {},
-      "expired-callback": () => { clearRecaptcha(); },
-    });
-  };
-
-  // ── Modal ────────────────────────────────────────────────────────────────────
-  const openModal = () => {
-    setModalOpen(true); setModalStep("phone"); setError("");
-    setTimeout(() => phoneRef.current?.focus(), 300);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false); setError(""); setPhone(""); setOtp(["","","","","",""]);
-    setModalStep("phone");
-    if (timerRef.current) clearInterval(timerRef.current);
-    setResendTimer(0);
-    clearRecaptcha();
-    confirmResRef.current = null;
-  };
-
-  // Back button: clear recaptcha so next Send OTP works cleanly
-  const goBack = () => {
-    setModalStep("phone");
-    setError("");
-    setOtp(["","","","","",""]);
-    clearRecaptcha();
-    confirmResRef.current = null;
-  };
-
-  // ── OTP ──────────────────────────────────────────────────────────────────────
-  const sendOtp = async () => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 8) { setError("Please enter a valid phone number."); return; }
-    try {
-      setLoading(true); setError("");
-      initRecaptcha();
-      const result = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current!);
-      confirmResRef.current = result;
-      setModalStep("otp"); startResendTimer();
-      setTimeout(() => otpRefs.current[0]?.focus(), 150);
-    } catch (e: any) {
-      clearRecaptcha();
-      const msg = e.message || "";
-      if (msg.includes("already been rendered") || msg.includes("reCAPTCHA")) {
-        setError("Something went wrong. Please reload the page and try again.");
-      } else {
-        setError(msg || "Error sending OTP. Please try again.");
-      }
-    } finally { setLoading(false); }
-  };
-
-  const verifyOtpStr = async (s: string) => {
-    if (s.length < 6) { setError("Please enter the complete 6-digit OTP."); return; }
-    if (!confirmResRef.current) { setError("Session expired. Go back and request a new OTP."); return; }
-    try {
-      setLoading(true); setError("");
-      const result = await confirmResRef.current.confirm(s);
-      const u = result.user;
-      await setDoc(doc(db, "users", u.uid), { phone: u.phoneNumber, createdAt: new Date() }, { merge: true });
-    } catch { setError("Invalid OTP. Please try again."); }
-    finally { setLoading(false); }
-  };
-
-  const verifyOtp = () => verifyOtpStr(otp.join(""));
-
-  const handleOtpChange = (i: number, val: string) => {
-    const d = val.replace(/\D/g, "").slice(-1);
-    const n = [...otp]; n[i] = d; setOtp(n);
-    if (d && i < 5) otpRefs.current[i + 1]?.focus();
-    if (n.every(x => x) && d) setTimeout(() => verifyOtpStr(n.join("")), 100);
-  };
-  const handleOtpKeyDown = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus();
-  };
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (p.length === 6) { setOtp(p.split("")); e.preventDefault(); setTimeout(() => otpRefs.current[5]?.focus(), 50); }
-  };
-
-  const startResendTimer = () => {
-    setResendTimer(30);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setResendTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; });
-    }, 1000);
-  };
-
-  const resendOtp = async () => {
-    if (resendTimer > 0) return;
-    clearRecaptcha();
-    confirmResRef.current = null;
-    setOtp(["","","","","",""]); setError("");
-    await sendOtp();
-  };
-
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  const loginWithSteam = () => { window.location.href = "/api/auth/steam"; };
+
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
+
+  if (loading) return null;
 
   return (
     <>
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         :root {
-          --orange: #F05A28; --orange-dark: #D44A1A;
-          --off-white: #F8F7F4; --surface2: #F2F1EE;
-          --text-primary: #111; --text-secondary: #555; --text-muted: #888;
-          --border: #E5E3DF; --radius: 14px; --radius-sm: 8px;
-          --shadow: 0 2px 16px rgba(0,0,0,.08); --shadow-lg: 0 8px 40px rgba(0,0,0,.16);
+          --orange:#F05A28; --orange-dark:#D44A1A;
+          --text-primary:#111; --text-secondary:#555; --text-muted:#999;
+          --border:#E5E3DF; --surface2:#F2F1EE; --off-white:#F8F7F4;
+          --radius:16px; --radius-sm:10px;
+          --shadow:0 2px 16px rgba(0,0,0,.07); --shadow-lg:0 8px 32px rgba(0,0,0,.12);
         }
-        html { scroll-behavior: smooth; }
-        body { font-family: var(--font-geist-sans),system-ui,sans-serif; background:#fff; color:var(--text-primary); overflow-x:hidden; }
+        html { scroll-behavior:smooth; }
+        body { background:var(--off-white); color:var(--text-primary); font-family:var(--font-geist-sans),system-ui,sans-serif; }
+        .accent { color:var(--orange); }
 
-        /* ── Navbar ── */
-        .ie-nav { position:sticky; top:0; z-index:100; background:rgba(255,255,255,.96); backdrop-filter:blur(14px); border-bottom:1px solid var(--border); padding:0 20px; height:52px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; }
+        /* Navbar */
+        .ie-nav { position:sticky; top:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:0 28px; height:60px; background:rgba(248,247,244,.96); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
         .ie-nav-brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
-        .ie-nav-name { font-size:1.05rem; font-weight:800; color:var(--text-primary); line-height:1; }
+        .ie-nav-name { font-size:1rem; font-weight:800; color:var(--text-primary); }
         .ie-nav-name span { color:var(--orange); }
-        .ie-nav-links { display:flex; align-items:center; gap:4px; }
-        .ie-nav-link { color:var(--text-secondary); font-size:.84rem; font-weight:600; padding:6px 12px; border-radius:7px; cursor:pointer; border:none; background:none; font-family:inherit; white-space:nowrap; transition:background .15s,color .15s; }
-        .ie-nav-link:hover { background:var(--surface2); color:var(--text-primary); }
-        .ie-nav-link.active { color:var(--orange); background:rgba(240,90,40,.08); }
-        .ie-btn-login { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:8px 20px; font-size:.84rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:36px; transition:background .2s,transform .1s; justify-self:end; }
-        .ie-btn-login:hover { background:var(--orange-dark); }
-        .ie-btn-login:active { transform:scale(.97); }
-        @media (max-width:640px) { .ie-nav-links { display:none; } .ie-nav { padding:0 16px; grid-template-columns:auto auto; } }
+        .ie-nav-links { display:flex; gap:4px; }
+        .ie-nav-link { background:none; border:none; padding:6px 14px; border-radius:8px; font-size:.85rem; font-weight:600; color:var(--text-secondary); cursor:pointer; font-family:inherit; transition:all .15s; }
+        .ie-nav-link:hover,.ie-nav-link.active { background:var(--surface2); color:var(--text-primary); }
+        .ie-btn-steam { display:flex; align-items:center; gap:8px; background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:8px 18px; font-size:.85rem; font-weight:700; cursor:pointer; font-family:inherit; transition:opacity .2s; white-space:nowrap; }
+        .ie-btn-steam:hover { opacity:.85; }
+        @media (max-width:600px) { .ie-nav-links { display:none; } }
 
-        /* ── Hero ── */
-        /* position:relative + overflow:hidden is the container */
-        /* video is position:absolute so it NEVER causes layout shift */
-        .ie-hero {
-          position: relative;
-          overflow: hidden;
-          width: 100%;
-          min-height: 580px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          padding: 80px 20px 60px;
-        }
-        .ie-hero-video {
-          position: absolute;   /* key: taken out of flow, cannot push content */
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;    /* fills box, crops edges — no black bars */
-          object-position: center;
-          z-index: 0;
-          pointer-events: none;
-          display: block;       /* removes inline-block gap */
-        }
-        .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom, rgba(0,0,0,.72) 0%, rgba(0,0,0,.52) 45%, rgba(0,0,0,.82) 100%); }
+        /* Hero */
+        .ie-hero { position:relative; overflow:hidden; width:100%; min-height:580px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:80px 20px 60px; }
+        .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:block; }
+        .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.72) 0%,rgba(0,0,0,.52) 45%,rgba(0,0,0,.82) 100%); }
         .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(240,90,40,.22) 0%,transparent 70%); pointer-events:none; z-index:2; }
         .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; }
         .ie-hero-logo { margin-bottom:12px; display:flex; justify-content:center; }
@@ -283,8 +117,8 @@ export default function Home() {
         .ie-hero h1 .accent { color:var(--orange); }
         .ie-hero-sub { font-size:clamp(.82rem,1.8vw,.95rem); color:rgba(255,255,255,.64); line-height:1.7; max-width:520px; margin:0 auto 20px; }
         .ie-hero-cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-        .ie-btn-primary { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:44px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 22px rgba(240,90,40,.45); transition:background .2s,transform .1s; }
-        .ie-btn-primary:hover { background:var(--orange-dark); }
+        .ie-btn-primary { background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:13px 28px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:50px; display:inline-flex; align-items:center; gap:10px; box-shadow:0 4px 22px rgba(27,40,56,.5); transition:opacity .2s,transform .1s; }
+        .ie-btn-primary:hover { opacity:.88; }
         .ie-btn-primary:active { transform:scale(.97); }
         .ie-btn-secondary { background:rgba(255,255,255,.1); color:#fff; border:1.5px solid rgba(255,255,255,.3); border-radius:100px; padding:11px 24px; font-size:.9rem; font-weight:600; cursor:pointer; font-family:inherit; min-height:44px; display:inline-flex; align-items:center; gap:8px; text-decoration:none; backdrop-filter:blur(4px); transition:background .2s,border-color .2s; }
         .ie-btn-secondary:hover { border-color:rgba(255,255,255,.6); background:rgba(255,255,255,.16); }
@@ -293,20 +127,15 @@ export default function Home() {
         .ie-stat-num { font-size:1.45rem; font-weight:900; color:#fff; display:block; }
         .ie-stat-num span { color:var(--orange); }
         .ie-stat-label { font-size:.65rem; color:rgba(255,255,255,.44); text-transform:uppercase; letter-spacing:.08em; }
-        @media (max-width:480px) {
-          .ie-hero { min-height:100svh; padding:60px 18px 50px; }
-          .ie-hero-cta { flex-direction:column; align-items:stretch; }
-          .ie-btn-primary, .ie-btn-secondary { width:100%; justify-content:center; }
-          .ie-hero-stats { gap:16px; margin-top:28px; }
-        }
+        @media (max-width:480px) { .ie-hero { min-height:100svh; padding:60px 18px 50px; } .ie-hero-cta { flex-direction:column; align-items:stretch; } .ie-btn-primary,.ie-btn-secondary { width:100%; justify-content:center; } .ie-hero-stats { gap:16px; margin-top:28px; } }
 
-        /* ── Trust ── */
+        /* Trust */
         .ie-trust { background:var(--surface2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:20px; }
         .ie-trust-items { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:22px; max-width:900px; margin:0 auto; }
         .ie-trust-item { display:flex; align-items:center; gap:8px; }
         .ie-trust-text { font-size:.83rem; font-weight:600; color:var(--text-secondary); }
 
-        /* ── Sections ── */
+        /* Sections */
         .ie-section { padding:72px 20px; }
         .ie-section-light { background:var(--off-white); }
         .ie-section-white { background:#fff; }
@@ -316,7 +145,7 @@ export default function Home() {
         .ie-section-header { margin-bottom:44px; }
         .ie-container { max-width:1120px; margin:0 auto; }
 
-        /* ── Games ── */
+        /* Games */
         .ie-games-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
         @media (max-width:900px) { .ie-games-grid { grid-template-columns:repeat(2,1fr); } }
         @media (max-width:480px) { .ie-games-grid { grid-template-columns:1fr; } }
@@ -330,42 +159,37 @@ export default function Home() {
         .ie-game-card-img { transition:transform .45s; }
         .ie-game-card:hover .ie-game-card-img { transform:scale(1.05); }
 
-        /* ── How It Works ── */
+        /* How It Works */
         .ie-hiw-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
         @media (max-width:900px) { .ie-hiw-grid { grid-template-columns:repeat(2,1fr); } }
         @media (max-width:480px) { .ie-hiw-grid { grid-template-columns:1fr; } }
-        .ie-hiw-card { background:#fff; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06); border:1px solid var(--border); transition:transform .2s,box-shadow .2s; opacity:1 !important; transform:none !important; }
-        .ie-hiw-card:hover { transform:translateY(-4px) !important; box-shadow:0 8px 32px rgba(0,0,0,.1); }
-        .ie-hiw-img-wrap { height:160px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
-        .ie-hiw-icon-big { font-size:3.5rem; z-index:1; filter:drop-shadow(0 4px 12px rgba(0,0,0,.2)); }
-        .ie-hiw-body { padding:22px 20px 24px; flex:1; }
-        .ie-hiw-title { font-size:1.05rem; font-weight:800; color:var(--text-primary); margin-bottom:10px; }
-        .ie-hiw-desc { font-size:.87rem; color:var(--text-secondary); line-height:1.68; }
+        .ie-hiw-card { background:#fff; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; box-shadow:var(--shadow); border:1px solid var(--border); }
+        .ie-hiw-img-wrap { position:relative; height:130px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        .ie-hiw-icon-big { font-size:2.8rem; position:relative; z-index:1; }
+        .ie-hiw-body { padding:18px 18px 22px; }
+        .ie-hiw-title { font-size:1rem; font-weight:800; color:var(--text-primary); margin-bottom:6px; }
+        .ie-hiw-desc { font-size:.83rem; color:var(--text-secondary); line-height:1.6; }
 
-        /* ── Tournament ── */
-        .ie-tourn-wrap { background:#111; border-radius:20px; overflow:hidden; position:relative; padding:48px 44px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap; }
-        .ie-tourn-glow { position:absolute; right:-60px; top:50%; transform:translateY(-50%); width:380px; height:380px; background:radial-gradient(circle,rgba(240,90,40,.22) 0%,transparent 70%); pointer-events:none; }
-        .ie-tourn-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(240,90,40,.2); border:1px solid rgba(240,90,40,.4); color:#ff7043; font-size:.72rem; font-weight:700; padding:4px 12px; border-radius:100px; margin-bottom:16px; text-transform:uppercase; letter-spacing:.07em; }
-        .ie-tourn-title { font-size:clamp(1.8rem,4.5vw,3rem); font-weight:900; color:#fff; line-height:1.05; margin-bottom:20px; }
-        .ie-tourn-title .accent { color:var(--orange); }
-        .ie-tourn-meta { display:flex; flex-wrap:wrap; gap:24px; margin-bottom:32px; }
-        .ie-meta-label { font-size:.7rem; color:rgba(255,255,255,.38); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
-        .ie-meta-value { font-size:1.08rem; font-weight:700; color:#fff; }
-        .ie-meta-value.prize { color:var(--orange); }
-        .ie-tourn-right { position:relative; z-index:1; min-width:220px; }
-        .ie-slots { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:var(--radius); padding:20px 24px; margin-bottom:14px; text-align:center; }
+        /* Tournament */
+        .ie-tourn-wrap { background:linear-gradient(135deg,#0d1117 0%,#161b22 50%,#0d1117 100%); border-radius:24px; padding:44px; display:flex; align-items:flex-start; gap:32px; box-shadow:0 16px 48px rgba(0,0,0,.18); }
+        .ie-tourn-left { flex:1; }
+        .ie-tourn-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(240,90,40,.15); border:1px solid rgba(240,90,40,.3); color:var(--orange); font-size:.68rem; font-weight:700; padding:4px 12px; border-radius:100px; margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em; }
+        .ie-tourn-title { font-size:clamp(1.3rem,3.5vw,2rem); font-weight:900; color:#fff; line-height:1.1; margin-bottom:8px; }
+        .ie-tourn-desc { font-size:.87rem; color:rgba(255,255,255,.48); line-height:1.6; margin-bottom:24px; max-width:480px; }
+        .ie-tourn-meta { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+        .ie-tourn-chip { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); border-radius:100px; padding:6px 14px; font-size:.78rem; color:rgba(255,255,255,.7); display:flex; align-items:center; gap:6px; }
+        .ie-tourn-right { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:28px 24px; min-width:220px; display:flex; flex-direction:column; align-items:center; gap:4px; }
         .ie-slots-num { font-size:2.6rem; font-weight:900; color:var(--orange); line-height:1; }
         .ie-slots-label { font-size:.78rem; color:rgba(255,255,255,.45); margin-top:4px; }
-        .ie-slots-bar { height:5px; border-radius:3px; background:rgba(255,255,255,.1); overflow:hidden; margin-top:12px; }
+        .ie-slots-bar { height:5px; border-radius:3px; background:rgba(255,255,255,.1); overflow:hidden; margin-top:12px; width:100%; margin-bottom:16px; }
         .ie-slots-fill { height:100%; border-radius:3px; transition:width .6s; }
-        .ie-btn-register { background:var(--orange); color:#fff; border:none; border-radius:100px; padding:15px 36px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:52px; width:100%; transition:background .2s,transform .1s; box-shadow:0 4px 20px rgba(240,90,40,.4); }
-        .ie-btn-register:hover { background:var(--orange-dark); }
-        .ie-btn-register:active { transform:scale(.97); }
+        .ie-btn-register { background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:15px 36px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:52px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; transition:opacity .2s; }
+        .ie-btn-register:hover { opacity:.88; }
         .ie-tourn-detail-link { display:block; text-align:center; margin-top:10px; font-size:.82rem; color:rgba(255,255,255,.38); text-decoration:none; transition:color .2s; }
         .ie-tourn-detail-link:hover { color:rgba(255,255,255,.7); }
         @media (max-width:700px) { .ie-tourn-wrap { padding:36px 24px; flex-direction:column; } .ie-tourn-right { width:100%; } }
 
-        /* ── Footer ── */
+        /* Footer */
         .ie-footer { background:#111; color:rgba(255,255,255,.45); padding:40px 20px; text-align:center; }
         .ie-footer-brand { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:16px; }
         .ie-footer-name { font-size:1.1rem; font-weight:800; color:#fff; }
@@ -373,46 +197,9 @@ export default function Home() {
         .ie-footer-links a { color:rgba(255,255,255,.42); font-size:.84rem; text-decoration:none; transition:color .2s; }
         .ie-footer-links a:hover { color:var(--orange); }
         .ie-footer-copy { font-size:.77rem; color:rgba(255,255,255,.22); }
-
-        /* ── Modal ── */
-        .ie-modal-overlay { position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.65); backdrop-filter:blur(4px); display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
-        @media (min-width:600px) { .ie-modal-overlay { align-items:center; } }
-        .ie-modal-overlay.open { opacity:1; pointer-events:all; }
-        .ie-modal { background:#fff; border-radius:20px 20px 0 0; padding:36px 28px 44px; width:100%; max-width:420px; transform:translateY(40px); transition:transform .3s cubic-bezier(.34,1.56,.64,1); position:relative; }
-        @media (min-width:600px) { .ie-modal { border-radius:20px; } }
-        .ie-modal-overlay.open .ie-modal { transform:translateY(0); }
-        .ie-modal-close { position:absolute; top:14px; right:16px; background:var(--surface2); border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1rem; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; }
-        .ie-modal-close:hover { background:var(--border); }
-        .ie-step-dots { display:flex; gap:6px; margin-bottom:24px; }
-        .ie-step-dot { height:4px; flex:1; border-radius:2px; background:var(--border); transition:background .3s; }
-        .ie-step-dot.active { background:var(--orange); }
-        .ie-modal-logo { display:flex; align-items:center; gap:8px; margin-bottom:22px; }
-        .ie-modal-logo-name { font-size:1.08rem; font-weight:800; }
-        .ie-modal-title { font-size:1.6rem; font-weight:900; margin-bottom:6px; }
-        .ie-modal-sub { font-size:.88rem; color:var(--text-secondary); margin-bottom:28px; }
-        .ie-form-label { font-size:.82rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block; }
-        .ie-form-row { display:flex; gap:10px; }
-        .ie-country-select { flex:0 0 100px; padding:12px 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:.9rem; background:var(--off-white); color:var(--text-primary); cursor:pointer; }
-        .ie-phone-input { flex:1; padding:12px 14px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:.95rem; background:#fff; color:var(--text-primary); outline:none; transition:border-color .2s; }
-        .ie-phone-input:focus { border-color:var(--orange); }
-        .ie-btn-submit { width:100%; background:var(--orange); color:#fff; border:none; border-radius:100px; padding:15px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:52px; transition:background .2s,opacity .2s; margin-top:8px; }
-        .ie-btn-submit:hover { background:var(--orange-dark); }
-        .ie-btn-submit:disabled { opacity:.6; cursor:not-allowed; }
-        .ie-otp-fields { display:flex; gap:8px; justify-content:space-between; margin-bottom:4px; }
-        .ie-otp-input { width:44px; height:52px; text-align:center; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:1.3rem; font-weight:700; font-family:inherit; background:var(--off-white); color:var(--text-primary); outline:none; transition:border-color .2s; }
-        .ie-otp-input:focus { border-color:var(--orange); }
-        .ie-error { font-size:.82rem; color:#dc2626; margin-top:8px; min-height:20px; }
-        .ie-back-btn { background:none; border:none; color:var(--orange); font-size:.88rem; font-weight:600; cursor:pointer; padding:0; font-family:inherit; display:flex; align-items:center; gap:4px; margin-bottom:20px; }
-        .ie-resend-row { display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
-        .ie-resend-btn { background:none; border:none; color:var(--orange); font-size:.83rem; font-weight:600; cursor:pointer; font-family:inherit; }
-        .ie-resend-btn:disabled { color:var(--text-muted); cursor:default; }
-        .ie-terms { font-size:.75rem; color:var(--text-muted); text-align:center; margin-top:16px; line-height:1.5; }
-        .ie-terms a { color:var(--orange); text-decoration:none; }
-        .fade-up { opacity:0; transform:translateY(24px); transition:opacity .5s,transform .5s; }
-        .fade-up.visible { opacity:1; transform:none; }
       `}</style>
 
-      {/* ─── NAVBAR ─────────────────────────────────────────────────────────────── */}
+      {/* NAVBAR */}
       <nav className="ie-nav">
         <a className="ie-nav-brand" href="#">
           <Image src="/ielogo.png" alt="Indian Esports" width={38} height={38} priority style={{ borderRadius: 7 }} />
@@ -429,48 +216,35 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <button className="ie-btn-login" onClick={openModal}>Login</button>
+        <button className="ie-btn-steam" onClick={loginWithSteam}>
+          <SteamIcon size={16} />
+          Sign in with Steam
+        </button>
       </nav>
 
-      {/* ─── HERO ─────────────────────────────────────────────────────────────────
-          Video is position:absolute — it cannot push content down.
-          The section's own padding/min-height defines the hero size.         ── */}
+      {/* HERO */}
       <section className="ie-hero" id="home">
-        <video
-          ref={videoRef}
-          className="ie-hero-video"
-          src="/Dota2teaser.mp4"
-          autoPlay muted loop playsInline preload="auto"
-          poster="/dota2-poster.jpg"
-          aria-hidden="true"
-        />
+        <video ref={videoRef} className="ie-hero-video" src="/Dota2teaser.mp4" autoPlay muted loop playsInline preload="auto" poster="/dota2-poster.jpg" aria-hidden="true" />
         <div className="ie-hero-overlay" />
         <div className="ie-hero-glow" />
-
         <div className="ie-hero-content">
           <div className="ie-hero-logo">
-            <Image src="/ielogo.png" alt="Indian Esports" width={144} height={144} priority
-              style={{ borderRadius: 22, filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))" }} />
+            <Image src="/ielogo.png" alt="Indian Esports" width={144} height={144} priority style={{ borderRadius: 22, filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))" }} />
           </div>
           <div className="ie-hero-badge"><span className="ie-pulse" /> Now Live – May Championship 2026</div>
           <h1>Compete on<br /><span className="accent">Indian Esports</span></h1>
           <p className="ie-hero-sub">Play what you love. Compete in your rank bracket in totally free community events. Win with skills.</p>
           <div className="ie-hero-cta">
-            <button className="ie-btn-primary" onClick={openModal}>
-              <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Start Playing Now
+            <button className="ie-btn-primary" onClick={loginWithSteam}>
+              <SteamIcon size={20} />
+              Sign in with Steam
             </button>
             <a href="#how-it-works" className="ie-btn-secondary">
               Learn More
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
             </a>
           </div>
         </div>
-
         <div className="ie-hero-stats">
           {[
             { num: "₹1L", suffix: "+", label: "Prize Pool"   },
@@ -486,7 +260,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── TRUST ──────────────────────────────────────────────────────────────── */}
+      {/* TRUST */}
       <div className="ie-trust">
         <div className="ie-trust-items">
           {[
@@ -496,31 +270,27 @@ export default function Home() {
             { icon: "📱", text: "100% Free Entry"          },
             { icon: "🇮🇳", text: "Made for India"           },
           ].map(t => (
-            <div className="ie-trust-item" key={t.text}>
-              <span>{t.icon}</span><span className="ie-trust-text">{t.text}</span>
-            </div>
+            <div className="ie-trust-item" key={t.text}><span>{t.icon}</span><span className="ie-trust-text">{t.text}</span></div>
           ))}
         </div>
       </div>
 
-      {/* ─── GAMES ──────────────────────────────────────────────────────────────── */}
+      {/* GAMES */}
       <section className="ie-section ie-section-white" id="games">
         <div className="ie-container">
-          <div className="ie-section-header fade-up">
+          <div className="ie-section-header">
             <h2 className="ie-section-title">Available <span className="accent">Games</span></h2>
             <p className="ie-section-sub">Pick your game and compete against players in your skill tier.</p>
           </div>
           <div className="ie-games-grid">
             {[
-              { name: "Dota 2",       tag: "Live Now",    src: "/dota2image3.jpeg",   soon: false, delay: "0.05s" },
-              { name: "Valorant",     tag: "Coming Soon", src: "/valorantimage1.jpg", soon: true,  delay: "0.10s" },
-              { name: "CS:GO",        tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true,  delay: "0.15s" },
-              { name: "Call of Duty", tag: "Coming Soon", src: "/codimage1.jpg",      soon: true,  delay: "0.20s" },
+              { name: "Dota 2",       tag: "Live Now",    src: "/dota2image3.jpeg",   soon: false },
+              { name: "Valorant",     tag: "Coming Soon", src: "/valorantimage1.jpg", soon: true  },
+              { name: "CS:GO",        tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true  },
+              { name: "Call of Duty", tag: "Coming Soon", src: "/codimage1.jpg",      soon: true  },
             ].map(g => (
-              <div className="ie-game-card fade-up" key={g.name} style={{ transitionDelay: g.delay }}>
-                <Image className="ie-game-card-img" src={g.src} alt={g.name} fill
-                  sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw"
-                  style={{ objectFit: "cover" }} loading="lazy" />
+              <div className="ie-game-card" key={g.name}>
+                <Image className="ie-game-card-img" src={g.src} alt={g.name} fill sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw" style={{ objectFit: "cover" }} loading="lazy" />
                 <div className="ie-game-overlay" />
                 <div className="ie-game-info">
                   <span className={`ie-game-tag${g.soon ? " soon" : ""}`}>{g.tag}</span>
@@ -532,10 +302,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── HOW IT WORKS ───────────────────────────────────────────────────────── */}
+      {/* HOW IT WORKS */}
       <section className="ie-section ie-section-light" id="how-it-works">
         <div className="ie-container">
-          <div className="ie-section-header fade-up" style={{ textAlign: "center" }}>
+          <div className="ie-section-header" style={{ textAlign: "center" }}>
             <h2 className="ie-section-title">How It <span className="accent">Works</span></h2>
             <p className="ie-section-sub" style={{ margin: "8px auto 0" }}>From signup to prize money in 4 simple steps.</p>
           </div>
@@ -549,9 +319,7 @@ export default function Home() {
                     <circle cx="150" cy="80" r="50" fill={item.color} />
                   </svg>
                   <span className="ie-hiw-icon-big">{item.icon}</span>
-                  <span style={{ position:"absolute", top:12, left:14, background:item.color, color:"#fff", fontSize:".7rem", fontWeight:800, padding:"3px 9px", borderRadius:100, letterSpacing:".04em" }}>
-                    STEP {i + 1}
-                  </span>
+                  <span style={{ position:"absolute", top:12, left:14, background:item.color, color:"#fff", fontSize:".7rem", fontWeight:800, padding:"3px 9px", borderRadius:100, letterSpacing:".04em" }}>STEP {i + 1}</span>
                 </div>
                 <div className="ie-hiw-body">
                   <div className="ie-hiw-title">{item.title}</div>
@@ -563,47 +331,40 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── TOURNAMENT ─────────────────────────────────────────────────────────── */}
+      {/* TOURNAMENT */}
       <section className="ie-section ie-section-white" id="tournament">
         <div className="ie-container">
-          <div className="ie-section-header fade-up">
+          <div className="ie-section-header">
             <h2 className="ie-section-title">Featured <span className="accent">Tournament</span></h2>
           </div>
           {tournamentLoading ? (
             <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>Loading tournament…</div>
           ) : featuredTournament ? (
-            <div className="ie-tourn-wrap fade-up">
-              <div className="ie-tourn-glow" />
-              <div style={{ position:"relative", zIndex:1 }}>
-                <div className="ie-tourn-badge"><span className="ie-pulse" /> Registrations Open</div>
-                <h3 className="ie-tourn-title">
-                  {(() => { const words = featuredTournament.name.split(" "); const last = words.pop(); return <>{words.join(" ")}<br /><span className="accent">{last}</span></>; })()}
-                </h3>
+            <div className="ie-tourn-wrap">
+              <div className="ie-tourn-left">
+                <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
+                <div className="ie-tourn-title">{featuredTournament.name}</div>
+                <div className="ie-tourn-desc">{featuredTournament.desc}</div>
                 <div className="ie-tourn-meta">
                   {[
-                    { label: "Game",          value: "Dota 2",                                prize: false },
-                    { label: "Prize Pool",    value: featuredTournament.prizePool,            prize: true  },
-                    { label: "Entry",         value: featuredTournament.entry,                prize: false },
-                    { label: "Format",        value: "5v5",                                   prize: false },
-                    { label: "Start Date",    value: featuredTournament.startDate,            prize: false },
-                    { label: "Reg. Deadline", value: featuredTournament.registrationDeadline, prize: false },
-                  ].map(m => (
-                    <div key={m.label}>
-                      <div className="ie-meta-label">{m.label}</div>
-                      <div className={`ie-meta-value${m.prize ? " prize" : ""}`}>{m.value}</div>
-                    </div>
+                    { icon: "🎮", label: featuredTournament.game },
+                    { icon: "🏆", label: featuredTournament.prizePool },
+                    { icon: "🎟️", label: featuredTournament.entry },
+                    { icon: "📅", label: featuredTournament.startDate },
+                  ].map(c => (
+                    <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
                   ))}
                 </div>
               </div>
               <div className="ie-tourn-right">
-                <div className="ie-slots">
-                  <div className="ie-slots-num">{slotsLeft}</div>
-                  <div className="ie-slots-label">slots left of {featuredTournament.totalSlots}</div>
-                  <div className="ie-slots-bar">
-                    <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
-                  </div>
+                <div className="ie-slots-num">{slotsLeft}</div>
+                <div className="ie-slots-label">slots remaining</div>
+                <div className="ie-slots-bar">
+                  <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
                 </div>
-                <button className="ie-btn-register" onClick={openModal}>Register Now →</button>
+                <button className="ie-btn-register" onClick={loginWithSteam}>
+                  <SteamIcon size={18} /> Sign in with Steam to Register
+                </button>
                 <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
               </div>
             </div>
@@ -613,7 +374,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── FOOTER ─────────────────────────────────────────────────────────────── */}
+      {/* FOOTER */}
       <footer className="ie-footer">
         <div className="ie-container">
           <div className="ie-footer-brand">
@@ -628,98 +389,6 @@ export default function Home() {
           <div className="ie-footer-copy">© 2026 Indian Esports. All rights reserved.</div>
         </div>
       </footer>
-
-      {/* reCAPTCHA — always mounted, always outside modal */}
-      <div id="recaptcha-container" />
-
-      {/* ─── MODAL ──────────────────────────────────────────────────────────────── */}
-      <div
-        className={`ie-modal-overlay${modalOpen ? " open" : ""}`}
-        onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
-        role="dialog" aria-modal="true" aria-label="Login"
-      >
-        <div className="ie-modal">
-          <button className="ie-modal-close" onClick={closeModal} aria-label="Close">✕</button>
-          <div className="ie-step-dots">
-            <div className={`ie-step-dot${modalStep === "phone" || modalStep === "otp" ? " active" : ""}`} />
-            <div className={`ie-step-dot${modalStep === "otp" ? " active" : ""}`} />
-          </div>
-
-          {modalStep === "phone" && (
-            <>
-              <div className="ie-modal-logo">
-                <Image src="/ielogo.png" alt="Logo" width={32} height={32} style={{ borderRadius: 6 }} />
-                <span className="ie-modal-logo-name">Indian Esports</span>
-              </div>
-              <div className="ie-modal-title">Welcome 👋</div>
-              <div className="ie-modal-sub">Enter your phone number to continue.</div>
-              <div style={{ marginBottom: 16 }}>
-                <label className="ie-form-label">Phone Number</label>
-                <div className="ie-form-row">
-                  <select className="ie-country-select" value={countryCode} onChange={e => setCountryCode(e.target.value)}>
-                    {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
-                  </select>
-                  <input
-                    ref={phoneRef} className="ie-phone-input"
-                    type="tel" inputMode="numeric" placeholder="9876543210"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g,"").slice(0,10))}
-                    onKeyDown={e => { if (e.key === "Enter") sendOtp(); }}
-                    maxLength={10} autoComplete="tel"
-                  />
-                </div>
-              </div>
-              {error.includes("reload") ? (
-                <p className="ie-error">
-                  Something went wrong.{" "}
-                  <span
-                    onClick={() => window.location.reload()}
-                    style={{ textDecoration: "underline", cursor: "pointer", color: "#dc2626" }}
-                  >
-                    Tap here to reload
-                  </span>{" "}and try again.
-                </p>
-              ) : (
-                <p className="ie-error">{error}</p>
-              )}
-              <button className="ie-btn-submit" onClick={sendOtp} disabled={loading}>
-                {loading ? "Sending OTP…" : "Send OTP →"}
-              </button>
-              <p className="ie-terms">By continuing you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
-            </>
-          )}
-
-          {modalStep === "otp" && (
-            <>
-              <button className="ie-back-btn" onClick={goBack}>← Back</button>
-              <div className="ie-modal-title">Enter OTP</div>
-              <div className="ie-modal-sub">6-digit code sent to {countryCode} {phone}</div>
-              <div style={{ marginBottom: 8 }}>
-                <label className="ie-form-label">Verification Code</label>
-                <div className="ie-otp-fields" onPaste={handleOtpPaste}>
-                  {otp.map((digit, i) => (
-                    <input
-                      key={i} ref={el => { otpRefs.current[i] = el; }}
-                      className="ie-otp-input" type="tel" inputMode="numeric" maxLength={1}
-                      value={digit}
-                      onChange={e => handleOtpChange(i, e.target.value)}
-                      onKeyDown={e => handleOtpKeyDown(i, e)}
-                    />
-                  ))}
-                </div>
-              </div>
-              <p className="ie-error">{error}</p>
-              <button className="ie-btn-submit" onClick={verifyOtp} disabled={loading}>
-                {loading ? "Verifying…" : "Verify & Login ✓"}
-              </button>
-              <div className="ie-resend-row">
-                <button className="ie-resend-btn" onClick={resendOtp} disabled={resendTimer > 0}>Resend OTP</button>
-                {resendTimer > 0 && <span style={{ fontSize:".83rem", color:"var(--text-muted)" }}>Resend in {resendTimer}s</span>}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
     </>
   );
 }
