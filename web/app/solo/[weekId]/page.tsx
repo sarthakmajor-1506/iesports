@@ -484,15 +484,25 @@ function SoloPageInner() {
     return () => clearInterval(i);
   }, [tournament]);
 
-  useEffect(() => {
-    if (!user || !id || !isRegistered) return;
-    (async () => {
-      setRefreshing(true);
-      try { await fetch("/api/solo/refresh", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ tournamentId:id, uid:user.uid }) }); }
-      catch {}
-      setRefreshing(false);
-    })();
-  }, [isRegistered]);
+
+  // Auto-refresh on page load when registered
+useEffect(() => {
+  if (!user || !id || !isRegistered) return;
+  let cancelled = false;
+  (async () => {
+    setRefreshing(true);
+    try {
+      await fetch("/api/solo/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
+      });
+    } catch {}
+    if (!cancelled) setRefreshing(false);
+  })();
+  return () => { cancelled = true; };
+}, [user?.uid, id, isRegistered]);
+
 
   const handleRegister = async () => {
     if (!user) return;
@@ -530,11 +540,15 @@ function SoloPageInner() {
     </div>
   );
 
-  const isEnded     = tournament.status === "ended";
-  const isUpcoming  = tournament.status === "upcoming";
-  const regClosed   = countdown === "Registration Closed";
+  const nowDate     = new Date();
+  const weekEnd     = new Date(tournament.weekEnd);
+  const deadline    = new Date(tournament.registrationDeadline);
+  const weekStart   = new Date(tournament.weekStart);
+  const isEnded     = nowDate > weekEnd;
+  const isUpcoming  = nowDate < weekStart;
+  const regClosed   = nowDate > deadline;
   const canRegister = !isEnded && !regClosed && !isRegistered;
-  const slotsLeft   = tournament.totalSlots - tournament.slotsBooked;
+  const slotsLeft   = tournament.totalSlots - (tournament.slotsBooked || 0);
   const myRank      = user ? players.findIndex(p => p.uid === user.uid) + 1 : 0;
   const prizePool   = tournament.prizePool as string;
 

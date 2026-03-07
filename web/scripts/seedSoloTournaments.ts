@@ -1,34 +1,40 @@
 // /scripts/seedSoloTournaments.ts
 // Run with: npx tsx scripts/seedSoloTournaments.ts
+// Safe to re-run — uses merge:true (won't wipe slotsBooked or player data)
+// Also fixes stale statuses on ALL existing tournaments
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import * as dotenv from "dotenv";
 import { getWeekDates, formatWeekLabel } from "../lib/soloTournaments";
 
-// Timezone-safe week ID calculation for IST (UTC+5:30)
 function getWeekIdIST(date: Date): string {
-  // Add IST offset: 5.5 hours = 330 minutes
   const ist = new Date(date.getTime() + 330 * 60 * 1000);
   const day = ist.getUTCDay();
   const diff = ist.getUTCDate() - day + (day === 0 ? -6 : 1);
   ist.setUTCDate(diff);
-  const year = ist.getUTCFullYear();
   const thursday = new Date(ist);
   thursday.setUTCDate(ist.getUTCDate() - (ist.getUTCDay() + 6) % 7 + 3);
   const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
   const weekNo = 1 + Math.round(((thursday.getTime() - firstThursday.getTime()) / 86400000 - 3 + (firstThursday.getUTCDay() + 6) % 7) / 7);
-  return `${year}-W${String(weekNo).padStart(2, "0")}`;
+  return `${ist.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
 function getThreeWeeksIST(): { last: string; current: string; next: string } {
   const now = new Date();
-  const current = getWeekIdIST(now);
-  const lastDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const last = getWeekIdIST(lastDate);
-  const nextDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const next = getWeekIdIST(nextDate);
-  return { last, current, next };
+  return {
+    last:    getWeekIdIST(new Date(now.getTime() - 7 * 86400000)),
+    current: getWeekIdIST(now),
+    next:    getWeekIdIST(new Date(now.getTime() + 7 * 86400000)),
+  };
+}
+
+// Derive status from dates, not hardcoded
+function getStatusFromDates(weekStart: Date, weekEnd: Date): "upcoming" | "active" | "ended" {
+  const now = new Date();
+  if (now < weekStart) return "upcoming";
+  if (now > weekEnd) return "ended";
+  return "active";
 }
 
 dotenv.config({ path: ".env.local" });
@@ -47,18 +53,13 @@ async function seed() {
   const db = getFirestore();
   const { last, current, next } = getThreeWeeksIST();
 
-  const weekStatuses: Record<string, "ended" | "active" | "upcoming"> = {
-    [last]: "ended",
-    [current]: "active",
-    [next]: "upcoming",
-  };
+  console.log(`📅 Last: ${last}  |  Current: ${current}  |  Next: ${next}\n`);
 
   for (const weekId of [last, current, next]) {
     const { weekStart, weekEnd, registrationDeadline } = getWeekDates(weekId);
-    const status = weekStatuses[weekId];
+    const status = getStatusFromDates(weekStart, weekEnd);
     const label = formatWeekLabel(weekId);
 
-    // Free tournament
     const freeId = `${weekId}-free`;
     await db.collection("soloTournaments").doc(freeId).set({
       weekId,
@@ -70,36 +71,46 @@ async function seed() {
       entry: "Free",
       entryFee: 0,
       totalSlots: 50,
-      slotsBooked: 0,
+      // slotsBooked intentionally NOT set here — merge:true preserves existing value
       weekStart: weekStart.toISOString(),
       weekEnd: weekEnd.toISOString(),
       registrationDeadline: registrationDeadline.toISOString(),
       createdAt: new Date().toISOString(),
-    });
-    console.log(`✅ Seeded free: ${freeId}`);
-
-    // Paid tournament
-    const paidId = `${weekId}-paid`;
-    await db.collection("soloTournaments").doc(paidId).set({
-      weekId,
-      name: `Weekly Solo Pro — ${label}`,
-      type: "paid",
-      game: "dota2",
-      status,
-      prizePool: "₹10,000",
-      entry: "₹199",
-      entryFee: 199,
-      totalSlots: 50,
-      slotsBooked: 0,
-      weekStart: weekStart.toISOString(),
-      weekEnd: weekEnd.toISOString(),
-      registrationDeadline: registrationDeadline.toISOString(),
-      createdAt: new Date().toISOString(),
-    });
-    console.log(`✅ Seeded paid: ${paidId}`);
+      startTime: Math.floor(weekStart.getTime() / 1000),
+      endTime: Math.floor(weekEnd.getTime() / 1000),
+      registrationDeadlineUnix: Math.floor(registrationDeadline.getTime() / 1000),
+      createdAtUnix: Math.floor(Date.now() / 1000),
+    }, { merge: true });
+    console.log(`✅ ${freeId} → ${status}`);
+    console.log(`   ${weekStart.toISOString()} → ${weekEnd.toISOString()}`);
   }
 
-  console.log("\nDone! 6 solo tournaments seeded (3 weeks × 2 types)");
+  // ── Fix stale statuses on ALL existing tournaments ────────────────────
+  console.log("\n🔄 Checking all tournament statuses...");
+  const allDocs = await db.collection("soloTournaments").get();
+  const batch = db.batch();
+  let fixed = 0;
+
+  for (const d of allDocs.docs) {
+    const data = d.data();
+    const ws = new Date(data.weekStart);
+    const we = new Date(data.weekEnd);
+    const correct = getStatusFromDates(ws, we);
+    if (data.status !== correct) {
+      batch.update(d.ref, { status: correct });
+      console.log(`   ${d.id}: ${data.status} → ${correct}`);
+      fixed++;
+    }
+  }
+
+  if (fixed > 0) {
+    await batch.commit();
+    console.log(`✅ Fixed ${fixed} stale statuses`);
+  } else {
+    console.log(`✅ All statuses correct`);
+  }
+
+  console.log("\n🎯 Done!");
   process.exit(0);
 }
 

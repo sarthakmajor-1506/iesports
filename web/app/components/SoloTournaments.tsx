@@ -48,7 +48,7 @@ export default function SoloTournaments() {
     const q = query(
       collection(db, "soloTournaments"),
       where("game", "==", "dota2"),
-      where("type", "==", "free"),   // free only — no paid cards
+      where("type", "==", "free"),
     );
     const unsub = onSnapshot(q, (snap) => {
       const all: Record<string, SoloTournament> = {};
@@ -391,20 +391,21 @@ export default function SoloTournaments() {
           const t   = week.free;
           if (!t) return null;
 
-          const now         = Date.now();
-          const endTime     = new Date(t.weekEnd).getTime();
-          const regDeadline = new Date(t.registrationDeadline).getTime();
+          // Date-based status — ignore static status field
+          const nowMs        = Date.now();
+          const tWeekStart   = new Date(t.weekStart).getTime();
+          const tWeekEnd     = new Date(t.weekEnd).getTime();
+          const regDeadline  = new Date(t.registrationDeadline).getTime();
 
-          const isCompleted = t.status === "ended" || now > endTime + 86400000;
-          const isCurrent   = !isCompleted && t.status === "active";
-          const isUpcoming  = !isCompleted && !isCurrent;
-          const isRegOpen   = isUpcoming || (isCurrent && now <= regDeadline);
+          const isCompleted  = nowMs > tWeekEnd;
+          const isCurrent    = nowMs >= tWeekStart && nowMs <= tWeekEnd;
+          const isUpcoming   = nowMs < tWeekStart;
+          const isRegOpen    = nowMs <= regDeadline && !isCompleted;
           const isRegistered = registeredIds.has(t.id);
 
-          const slotsLeft = t.totalSlots - t.slotsBooked;
+          const slotsLeft = t.totalSlots - (t.slotsBooked || 0);
           const timeLeft  = countdown[t.id] || "";
 
-          // Start / end dates for display
           const startLabel = new Date(t.weekStart).toLocaleDateString("en-IN", {
             day: "numeric", month: "short", year: "numeric",
           });
@@ -463,12 +464,19 @@ export default function SoloTournaments() {
                     </div>
                   </div>
 
-                  {/* Countdown chip — only when reg is open */}
-                  {isCurrent && isRegOpen && timeLeft && (
+                  {/* Countdown chip — only when reg open AND not registered */}
+                  {(isCurrent || isUpcoming) && isRegOpen && !isRegistered && timeLeft && timeLeft !== "Registration Closed" && (
                     <div className="st-countdown-chip">
                       <span>⏱️</span>
                       <span className="label">Reg closes in</span>
                       <span className="time">{timeLeft}</span>
+                    </div>
+                  )}
+                  {/* Registered chip */}
+                  {isRegistered && !isCompleted && (
+                    <div className="st-countdown-chip" style={{ background:"#f0fdf4", borderColor:"#bbf7d0" }}>
+                      <span>✓</span>
+                      <span className="label" style={{ color:"#16a34a" }}>Registered</span>
                     </div>
                   )}
 
@@ -485,8 +493,8 @@ export default function SoloTournaments() {
                       </button>
                     )}
 
-                    {/* Active, reg open, not registered */}
-                    {isCurrent && isRegOpen && !isRegistered && (
+                    {/* Active or upcoming, reg open, not registered */}
+                    {(isCurrent || isUpcoming) && isRegOpen && !isRegistered && (
                       <button
                         className="st-btn st-btn-primary"
                         onClick={() => router.push(`/solo/${t.id}`)}
@@ -512,16 +520,6 @@ export default function SoloTournaments() {
                         onClick={() => router.push(`/solo/${t.id}?tab=leaderboard`)}
                       >
                         View My Score →
-                      </button>
-                    )}
-
-                    {/* Upcoming, not registered */}
-                    {isUpcoming && !isRegistered && (
-                      <button
-                        className="st-btn st-btn-primary"
-                        onClick={() => router.push(`/solo/${t.id}`)}
-                      >
-                        Register Free →
                       </button>
                     )}
 
