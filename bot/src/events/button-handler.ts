@@ -1,0 +1,249 @@
+import {
+  ButtonInteraction,
+  PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+  TextChannel,
+} from "discord.js";
+import {
+  getQueue,
+  addPlayerToQueue,
+  removePlayerFromQueue,
+  findUserByDiscordId,
+  steamIdToSteam32,
+  updateQueue,
+  getLobby,
+  updateLobby,
+  QueuePlayer,
+} from "../services/firebase";
+import { getDotaBot } from "../services/dota-gc";
+import { cleanupVoiceChannels } from "../services/match-orchestrator";
+import { queueEmbed } from "../utils/embeds";
+import { queueButtons } from "../utils/buttons";
+
+export async function handleButton(interaction: ButtonInteraction): Promise<void> {
+  const [action, id] = interaction.customId.split(":");
+
+  switch (action) {
+    case "queue_join": await handleQueueJoin(interaction, id); break;
+    case "queue_leave": await handleQueueLeave(interaction, id); break;
+    case "create_queue": await handleCreateQueue(interaction); break;
+    case "lobby_start": await handleLobbyStart(interaction, id); break;
+    case "lobby_shuffle": await handleLobbyShuffle(interaction, id); break;
+    case "lobby_flip": await handleLobbyFlip(interaction, id); break;
+    case "lobby_invite": await handleLobbyInviteAll(interaction, id); break;
+    case "lobby_inviteme": await handleInviteMe(interaction, id); break;
+    case "lobby_movevc": await handleMoveToVC(interaction, id); break;
+    case "lobby_destroy": await handleLobbyDestroy(interaction, id); break;
+    case "lobby_leave": await handleLobbyLeave(interaction, id); break;
+    case "lobby_restart": await handleBotRestart(interaction); break;
+    case "result_radiant":
+    case "result_dire":
+      await handleManualResult(interaction, id, action === "result_radiant" ? "radiant" : "dire"); break;
+    default:
+      await interaction.reply({ content: "Unknown action.", ephemeral: true });
+  }
+}
+
+// ─── Queue Join ──────────────────────────────────────────────
+
+async function handleQueueJoin(interaction: ButtonInteraction, queueId: string): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+  const webUser = await findUserByDiscordId(interaction.user.id);
+
+  const player: QueuePlayer = {
+    discordId: interaction.user.id,
+    username: interaction.user.username,
+    steamId: webUser?.steamId || null,
+    steam32Id: webUser?.steamId ? steamIdToSteam32(webUser.steamId) : null,
+    steamName: webUser?.steamName || null,
+    joinedAt: new Date().toISOString(),
+  };
+
+  const result = await addPlayerToQueue(queueId, player);
+  if (!result.success) { await interaction.editReply(`❌ ${result.error}`); return; }
+
+  await interaction.editReply(
+    `✅ You're #${result.position} in the queue!${!webUser?.steamId ? "\n⚠️ Link Steam at **iesports.in** to get auto-invited." : ""}`
+  );
+
+  await refreshQueueEmbed(interaction, queueId);
+
+  // NOTE: No auto-start on queue full anymore.
+  // Match starts based on scheduledTime via cron in index.ts.
+  // If you want a "queue full" notification, add it here:
+  const queue = await getQueue(queueId);
+  if (queue && queue.players.length >= queue.maxPlayers) {
+    const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+    if (queueChannelId) {
+      try {
+        const ch = (await interaction.client.channels.fetch(queueChannelId)) as TextChannel;
+        await ch.send(`🎉 **Queue is FULL!** ${queue.players.length}/${queue.maxPlayers} players. Match will start at the scheduled time.`);
+      } catch {}
+    }
+  }
+}
+
+// ─── Queue Leave ─────────────────────────────────────────────
+
+async function handleQueueLeave(interaction: ButtonInteraction, queueId: string): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+  const removed = await removePlayerFromQueue(queueId, interaction.user.id);
+  await interaction.editReply(removed ? "👋 You left the queue." : "You weren't in the queue.");
+  await refreshQueueEmbed(interaction, queueId);
+}
+
+// ─── Create Queue (admin only) ──────────────────────────────
+
+async function handleCreateQueue(interaction: ButtonInteraction): Promise<void> {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.reply({ content: "❌ Only admins can create queues.", ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId("create_queue_modal")
+    .setTitle("Create Game Queue");
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("queue_name")
+        .setLabel("Queue Name")
+        .setPlaceholder("e.g. 9 PM LOBBY, WAGER LOBBY")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("queue_type")
+        .setLabel("Type (free / wager / sponsored)")
+        .setPlaceholder("free")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("queue_fee")
+        .setLabel("Entry Fee (₹, 0 for free)")
+        .setPlaceholder("0")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("queue_time")
+        .setLabel("Scheduled Time IST (e.g. 9:00 PM, 21:00)")
+        .setPlaceholder("9:00 PM")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    )
+  );
+
+  await interaction.showModal(modal);
+}
+
+// ─── Lobby Controls (admin only) ─────────────────────────────
+
+function isAdmin(interaction: ButtonInteraction): boolean {
+  return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+}
+
+async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.deferReply({ ephemeral: true });
+  try {
+    const bot = getDotaBot();
+    if (bot.isReady()) { bot.startGame(); await updateLobby(lobbyId, { status: "active" }); await interaction.editReply("▶️ Game started!"); }
+    else { await interaction.editReply("❌ Dota bot not connected."); }
+  } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
+}
+
+async function handleLobbyShuffle(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  try { getDotaBot().shuffleTeams(); await interaction.reply({ content: "🔀 Teams shuffled!", ephemeral: true }); }
+  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+}
+
+async function handleLobbyFlip(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  try { getDotaBot().flipTeams(); await interaction.reply({ content: "🔄 Teams flipped!", ephemeral: true }); }
+  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+}
+
+async function handleLobbyInviteAll(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.deferReply({ ephemeral: true });
+  const lobby = await getLobby(lobbyId);
+  if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
+  const all = [...lobby.radiant, ...lobby.dire, ...lobby.spectators];
+  const ids = all.map((p) => p.steam32Id).filter((id): id is string => !!id);
+  const bot = getDotaBot();
+  if (bot.isReady()) { bot.inviteAll(ids); await interaction.editReply(`📨 Invited ${ids.length} players.`); }
+  else { await interaction.editReply("❌ Dota bot not connected."); }
+}
+
+async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+  const webUser = await findUserByDiscordId(interaction.user.id);
+  if (!webUser || !webUser.steamId) { await interaction.editReply("❌ Link your Steam at **iesports.in** first."); return; }
+  const bot = getDotaBot();
+  if (bot.isReady()) { bot.invitePlayer(steamIdToSteam32(webUser.steamId)); await interaction.editReply("✅ Invite sent! Check Dota 2."); }
+  else { const lobby = await getLobby(lobbyId); await interaction.editReply(`Bot offline. Join manually:\nLobby: \`${lobby?.lobbyName}\`\nPassword: \`${lobby?.password}\``); }
+}
+
+async function handleMoveToVC(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.reply({ content: "🔊 Voice channels are auto-created when the match starts and teams are assigned in-game.", ephemeral: true });
+}
+
+async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.deferReply({ ephemeral: true });
+  try {
+    const bot = getDotaBot(); if (bot.isReady()) bot.destroyLobby();
+    await updateLobby(lobbyId, { status: "cancelled" });
+    await cleanupVoiceChannels(interaction.client);
+    await interaction.editReply("💥 Lobby destroyed and cleaned up.");
+  } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
+}
+
+async function handleLobbyLeave(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  try { getDotaBot().leaveLobby(); await interaction.reply({ content: "🚪 Bot left the lobby.", ephemeral: true }); }
+  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+}
+
+async function handleBotRestart(interaction: ButtonInteraction): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.reply({ content: "🔄 Reconnecting Dota bot...", ephemeral: true });
+  try { const bot = getDotaBot(); bot.disconnect(); await bot.connect(); await interaction.editReply("✅ Dota bot reconnected!"); }
+  catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
+}
+
+async function handleManualResult(interaction: ButtonInteraction, lobbyId: string, winner: "radiant" | "dire"): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.deferReply();
+  await updateLobby(lobbyId, { status: "completed", winner, completedAt: new Date().toISOString() });
+  const lobby = await getLobby(lobbyId);
+  if (lobby) await updateQueue(lobby.queueId, { status: "completed" });
+  await interaction.editReply(`✅ **${winner === "radiant" ? "🟢 Radiant" : "🔴 Dire"}** wins!`);
+  await cleanupVoiceChannels(interaction.client);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+
+async function refreshQueueEmbed(interaction: ButtonInteraction, queueId: string): Promise<void> {
+  const queue = await getQueue(queueId);
+  if (!queue || !queue.messageId) return;
+  try {
+    const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+    const ch = queueChannelId
+      ? ((await interaction.client.channels.fetch(queueChannelId)) as TextChannel)
+      : (interaction.channel as TextChannel);
+    const msg = await ch.messages.fetch(queue.messageId);
+    await msg.edit({ embeds: [queueEmbed(queue)], components: [queueButtons(queueId)] });
+  } catch {}
+}
