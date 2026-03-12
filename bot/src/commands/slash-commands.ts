@@ -8,6 +8,7 @@ import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue, getDb } 
 import { fetchMatchResult, requestMatchParse } from "../services/opendota";
 import { matchResultEmbed } from "../utils/embeds";
 import { cleanupVoiceChannels } from "../services/match-orchestrator";
+import type { QuerySnapshot, DocumentData } from "firebase-admin/firestore";
 
 // ─── /linksteam ──────────────────────────────────────────────
 
@@ -32,7 +33,6 @@ export async function linksteamExecute(interaction: ChatInputCommandInteraction)
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    // Fetch Steam name via Steam Web API
     let steamName = "Unknown";
     const steamApiKey = process.env.STEAM_API_KEY;
     if (steamApiKey) {
@@ -45,8 +45,7 @@ export async function linksteamExecute(interaction: ChatInputCommandInteraction)
       } catch { /* use fallback */ }
     }
 
-    // Update or create user record in Firestore
-    const snap = await getDb()
+    const snap: QuerySnapshot<DocumentData> = await getDb()
       .collection("users")
       .where("discordId", "==", interaction.user.id)
       .limit(1)
