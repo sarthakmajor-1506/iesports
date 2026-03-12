@@ -8,7 +8,6 @@ import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue } from ".
 import { fetchMatchResult, requestMatchParse } from "../services/opendota";
 import { matchResultEmbed } from "../utils/embeds";
 import { cleanupVoiceChannels } from "../services/match-orchestrator";
-import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue, getDb } from "../services/firebase";
 
 // ─── /linksteam ──────────────────────────────────────────────
 
