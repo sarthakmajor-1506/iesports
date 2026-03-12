@@ -56,20 +56,25 @@ export type UserProfile = {
 
 export type SoloTournament = {
   id: string;
-  weekId: string;           // e.g. "2026-W09"
+  weekId: string;
   name: string;
   type: SoloTournamentType;
   game: string;
   status: "upcoming" | "active" | "ended";
   prizePool: string;
-  entry: string;            // "Free" or "₹199"
-  entryFee: number;         // 0 or 199
-  totalSlots: number;       // 50
+  entry: string;
+  entryFee: number;
+  totalSlots: number;
   slotsBooked: number;
-  weekStart: string;        // ISO string — Monday 00:00
-  weekEnd: string;          // ISO string — Sunday 23:59
-  registrationDeadline: string; // ISO string — Saturday 23:59
+  weekStart: string;
+  weekEnd: string;
+  registrationDeadline: string;
   createdAt: string;
+  // Add these 4 lines:
+  createdAtUnix?: number;
+  startTime?: number;
+  registrationDeadlineUnix?: number;
+  endTime?: number;
 };
 
 export type SoloPlayer = {
