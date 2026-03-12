@@ -75,6 +75,9 @@ export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Prom
 
 // ── PHASE 2: Match time — create Dota lobby + invite ─────────
 
+// ── PHASE 2: Match time — create Dota lobby + invite ─────────
+// REPLACE the entire startMatchLobby function in match-orchestrator.ts with this.
+
 export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<string | null> {
   const guildId = process.env.DISCORD_GUILD_ID!;
   const lobbyChannelId = process.env.LOBBY_CONTROL_CHANNEL_ID;
@@ -83,31 +86,47 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   await updateQueue(queue.id, { status: "in_progress" });
 
   const allPlayers: MatchPlayer[] = queue.players.map((p) => ({
-    discordId: p.discordId, username: p.username, steamId: p.steamId, steam32Id: p.steam32Id, steamName: p.steamName,
+    discordId: p.discordId, username: p.username, steamId: p.steamId,
+    steam32Id: p.steam32Id, steamName: p.steamName,
   }));
 
   const lobbyName = process.env.DEFAULT_LOBBY_NAME || "IEsports Lobby";
   const password = String(Math.floor(100 + Math.random() * 900));
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
-  let gcLobbyId: string | null = null;
 
-  try {
-    const bot = getDotaBot();
-    if (bot.isReady()) {
+  // ── Step 1: Create GC Lobby ─────────────────────────────────
+  let gcLobbyId: string | null = null;
+  let lobbyCreated = false;
+
+  const bot = getDotaBot();
+  console.log(`[Match] bot.isReady() = ${bot.isReady()}`);
+
+  if (bot.isReady()) {
+    try {
+      console.log(`[Match] Creating Dota lobby...`);
       const result = await bot.createLobby(lobbyName, password, gameMode, region);
       gcLobbyId = result.lobbyId;
-      console.log(`[Match] Dota lobby created: ${gcLobbyId}`);
-    } else { console.log("[Match] Dota bot not ready — manual lobby needed"); }
-  } catch (err: any) { console.error("[Match] Lobby creation failed:", err.message); }
+      lobbyCreated = true;
+      console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);
+    } catch (err: any) {
+      console.error(`[Match] ❌ Lobby creation failed: ${err.message}`);
+      console.error(`[Match]    Players will need to join manually.`);
+    }
+  } else {
+    console.log(`[Match] ⚠️  Bot not ready — skipping GC lobby creation (manual mode)`);
+  }
 
+  // ── Step 2: Save to Firestore ────────────────────────────────
   const firestoreLobbyId = await saveLobby({
     queueId: queue.id, gcLobbyId, lobbyName, password, gameMode, serverRegion: region,
     radiant: [], dire: [], spectators: allPlayers,
     status: "waiting", dotaMatchId: null, winner: null, mvp: null,
     duration: null, playerStats: null, createdAt: new Date().toISOString(), completedAt: null,
   });
+  console.log(`[Match] ✅ Firestore lobby saved: ${firestoreLobbyId}`);
 
+  // ── Step 3: Post lobby embed to Discord ─────────────────────
   if (lobbyChannelId) {
     try {
       const ch = (await client.channels.fetch(lobbyChannelId)) as TextChannel;
@@ -119,39 +138,63 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     } catch (err: any) { console.error("[Match] Lobby embed error:", err.message); }
   }
 
-  try {
-    const bot = getDotaBot();
-    if (bot.isReady()) {
-      const ids = allPlayers.map((p) => p.steam32Id).filter((id): id is string => !!id);
-      bot.inviteAll(ids);
-      console.log(`[Match] Invited ${ids.length} players`);
+  // ── Step 4: Invite players — ONLY if lobby was created ──────
+  // ✅ BUG FIX: Previously invites fired unconditionally even with no lobby.
+  // Now: only invite via GC if lobby actually exists.
+  // Always send DM + #queue message as fallback regardless.
+  if (lobbyCreated && bot.isReady()) {
+    try {
+      const ids = allPlayers.map(p => p.steam32Id).filter((id): id is string => !!id);
+      console.log(`[Match] Sending GC invites to ${ids.length} players...`);
+      // ✅ await inviteAll — it's async with staggered delays
+      await bot.inviteAll(ids);
+    } catch (err: any) {
+      console.error("[Match] GC invite error:", err.message);
     }
-  } catch (err: any) { console.error("[Match] Invite error:", err.message); }
+  } else {
+    console.log(`[Match] Skipping GC invites (lobbyCreated=${lobbyCreated}, botReady=${bot.isReady()})`);
+  }
 
+  // ── Step 5: DM every player with lobby details ───────────────
+  // This fires always — even in manual mode — so players always know the lobby info
   for (const player of allPlayers) {
     try {
       const member = await guild.members.fetch(player.discordId);
+      const modeMsg = lobbyCreated
+        ? `A Dota 2 invite has been sent to your Steam account.\nIf you don't see it, join manually:`
+        : `Please join the lobby manually:`;
       await member.send(
-        `**IEsports Match Starting NOW!**\nLobby: \`${lobbyName}\`\nPassword: \`${password}\`\n` +
-        `Server: ${region} | Mode: ${gameMode}\n\nOpen Dota 2 → Play → Custom Lobby → Find Lobby\n` +
-        `Teams will be decided in the lobby.`
+        `🎮 **IEsports Match Starting!**\n\n` +
+        `${modeMsg}\n` +
+        `Lobby: \`${lobbyName}\`\nPassword: \`${password}\`\n` +
+        `Server: ${region} | Mode: ${gameMode}\n\n` +
+        `Open Dota 2 → Play → Custom Lobbies → Search for lobby name`
       );
     } catch { /* DMs closed */ }
   }
 
+  // ── Step 6: Announce in #queue channel ──────────────────────
   const queueChannelId = process.env.QUEUE_CHANNEL_ID;
   if (queueChannelId) {
     try {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
-      await ch.send(`🏟️ **Lobby Created!**\nName: \`${lobbyName}\`\nPassword: \`${password}\`\nServer: ${region} | Mode: ${gameMode}\n\nJoin in Dota 2 now! Teams decided in-game.`);
-    } catch { /* */ }
+      const statusMsg = lobbyCreated
+        ? `✅ Lobby created! Steam invites sent.`
+        : `⚠️ Bot lobby unavailable — join manually using the details below.`;
+      await ch.send(
+        `🏟️ **Match Started!**\n${statusMsg}\n` +
+        `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
+        `Server: ${region} | Mode: ${gameMode}`
+      );
+    } catch (err: any) { console.error("[Match] Queue announce error:", err.message); }
   }
 
   monitorLobbyForTeams(client, firestoreLobbyId, queue, allPlayers);
 
   await saveDailyRecord(todayKey(), {
     date: todayKey(), queueId: queue.id, lobbyId: firestoreLobbyId,
-    playerCount: allPlayers.length, type: queue.type, entryFee: queue.entryFee, createdAt: new Date().toISOString(),
+    playerCount: allPlayers.length, type: queue.type, entryFee: queue.entryFee,
+    createdAt: new Date().toISOString(),
   });
 
   return firestoreLobbyId;

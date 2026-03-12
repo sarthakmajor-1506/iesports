@@ -11,6 +11,7 @@
   "dependencies": {
     "axios": "^1.7.9",
     "discord.js": "^14.16.3",
+    "dota2": "^7.0.3",
     "dotenv": "^16.4.7",
     "firebase-admin": "^13.6.1",
     "node-cron": "^3.0.3",

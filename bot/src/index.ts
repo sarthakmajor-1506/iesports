@@ -128,12 +128,14 @@ client.once(Events.ClientReady, async (readyClient) => {
   // At T-10min: sends warning + creates waiting room.
   // At T-0: creates lobby + invites everyone.
 
-  const warningsSent = new Set<string>();  // track which queues got warned
-  const lobbiesStarted = new Set<string>(); // track which queues got started
+  const warningsSent = new Set<string>();
+  const lobbiesStarted = new Set<string>();
 
   cron.schedule("* * * * *", async () => {
     try {
       const now = Date.now();
+      // ✅ BUG FIX: Query for BOTH "open" queues AND double-check against in-memory set.
+      // The Firestore status update inside startMatchLobby is async and can race.
       const snap = await getDb()
         .collection("botQueues")
         .where("status", "==", "open")
@@ -143,21 +145,34 @@ client.once(Events.ClientReady, async (readyClient) => {
         const queue = { ...doc.data(), id: doc.id } as any;
         if (!queue.scheduledTime) continue;
 
+        // ✅ BUG FIX: Skip if already handled this session (guards against
+        // the race window between cron firing and Firestore status updating)
+        if (lobbiesStarted.has(queue.id)) continue;
+        if (warningsSent.has(queue.id) && lobbiesStarted.has(queue.id)) continue;
+
         const matchTime = new Date(queue.scheduledTime).getTime();
         const minsUntil = (matchTime - now) / 60000;
 
-        // 10 min warning (between 9-11 min before)
+        // 10-min warning
         if (minsUntil <= 10 && minsUntil > 9 && !warningsSent.has(queue.id)) {
           warningsSent.add(queue.id);
           console.log(`[Cron] Sending 10-min warning for: ${queue.name}`);
           await sendPreMatchWarning(client, queue);
         }
 
-        // Match time (between -1 and 1 min of scheduled time)
-        if (minsUntil <= 0 && minsUntil > -1 && !lobbiesStarted.has(queue.id)) {
+        // Match time — only fire once, immediately mark in memory before awaiting
+        if (minsUntil <= 0 && minsUntil > -2) {
+          // ✅ Add to set BEFORE awaiting startMatchLobby to prevent double-fire
+          // if cron ticks again while startMatchLobby is still running (it can take 30s)
           lobbiesStarted.add(queue.id);
-          console.log(`[Cron] Starting match for: ${queue.name}`);
-          await startMatchLobby(client, queue);
+          console.log(`[Cron] ✅ Starting match for: ${queue.name} (${queue.id})`);
+          try {
+            await startMatchLobby(client, queue);
+          } catch (err: any) {
+            console.error(`[Cron] startMatchLobby error: ${err.message}`);
+            // Remove from set so it can retry next minute if it hard-failed
+            lobbiesStarted.delete(queue.id);
+          }
         }
       }
     } catch (err: any) {

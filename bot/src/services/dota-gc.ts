@@ -1,44 +1,70 @@
 import SteamUser from "steam-user";
-import * as protobuf from "protobufjs";
-import * as path from "path";
 import EventEmitter from "events";
-
-// ─── Dota 2 GC Message IDs ──────────────────────────────────
-// From: https://github.com/SteamDatabase/Protobufs/blob/master/dota2/dota_gcmessages_msgid.proto
 
 const DOTA2_APP_ID = 570;
 
 const EGCBaseClientMsg = {
-  k_EMsgGCClientHello: 4006,
+  k_EMsgGCClientHello:   4006,
   k_EMsgGCClientWelcome: 4004,
 };
 
 const EDOTAGCMsg = {
-  k_EMsgGCPracticeLobbyCreate: 7038,
-  k_EMsgGCPracticeLobbyResponse: 7055,
-  k_EMsgGCPracticeLobbyJoinBroadcastChannel: 7149,
-  k_EMsgGCPracticeLobbyLeave: 7040,
-  k_EMsgGCPracticeLobbyLaunch: 7041,
-  k_EMsgGCPracticeLobbySetDetails: 7046,
-  k_EMsgGCPracticeLobbyKick: 7047,
-  k_EMsgGCInviteToLobby: 7048,
-  k_EMsgGCBalancedShuffleLobby: 7049,
-  k_EMsgGCFlipLobbyTeams: 7320,
-  k_EMsgDestroyLobbyRequest: 8097,
-  k_EMsgDestroyLobbyResponse: 8098,
-  k_EMsgGCPracticeLobbyListResponse: 7042,
-  k_EMsgLobbyUpdateBroadcastChannelInfo: 7367,
+  k_EMsgGCPracticeLobbyCreate:         7038,
+  k_EMsgGCPracticeLobbySetDetails:     7046,
+  k_EMsgGCPracticeLobbySetTeamSlot:    7047,
+  k_EMsgGCPracticeLobbyLeave:          7040,
+  k_EMsgGCPracticeLobbyLaunch:         7041,
+  k_EMsgGCPracticeLobbyKick:           7081,
+  k_EMsgGCPracticeLobbyKickFromTeam:   8047,  // kick self from team → moves to unassigned
+  k_EMsgGCBalancedShuffleLobby:        7049,
+  k_EMsgGCFlipLobbyTeams:              7320,
+  k_EMsgDestroyLobbyRequest:           8097,
 };
 
-// Dota 2 server regions
-const REGIONS: Record<string, number> = {
-  India: 8, SEA: 9, Singapore: 9,
+// Base GC messages (not Dota2-specific)
+const EGCBaseMsg = {
+  k_EMsgGCInviteToLobby: 4512,  // CMsgInviteToLobby { fixed64 steam_id=1, uint32 client_version=2 }
+};
+
+// DOTA_GC_TEAM enum
+const DOTA_GC_TEAM = {
+  GOOD_GUYS:   0,  // Radiant
+  BAD_GUYS:    1,  // Dire
+  BROADCASTER: 2,
+  SPECTATOR:   3,
+  PLAYER_POOL: 4,  // Unassigned ← where bot should sit
+  NOTEAM:      5,
+};
+
+// ── Verified field numbers from steam-resources protobufs ─────────────────────
+// Source: node_modules/steam/node_modules/steam-resources/protobufs/dota2/
+//         dota_gcmessages_client_match_management.proto
+//
+// CMsgPracticeLobbySetDetails:
+//   field 2  = game_name (string)
+//   field 4  = server_region (uint32)
+//   field 5  = game_mode (uint32)
+//   field 10 = allow_cheats (bool)
+//   field 11 = fill_with_bots (bool)
+//   field 13 = allow_spectating (bool)
+//   field 15 = pass_key (string)
+//   field 33 = visibility (uint32) — 0=public, 1=friends, 2=unlisted
+//
+// CMsgPracticeLobbyCreate:
+//   field 1 = search_key (string)
+//   field 5 = pass_key (string)
+//   field 6 = client_version (uint32)
+//   field 7 = lobby_details (CMsgPracticeLobbySetDetails)
+
+export const REGIONS: Record<string, number> = {
+  India: 16, SEA: 5, Singapore: 5,
   "US West": 1, "US East": 2, Europe: 3,
-  Russia: 6, "South Africa": 7, Dubai: 12,
+  Korea: 4, Dubai: 6, Australia: 7,
+  Stockholm: 8, Austria: 9, Brazil: 10,
+  "South Africa": 11, Chile: 14, Peru: 15, Japan: 19,
 };
 
-// Game modes
-const GAME_MODES: Record<string, number> = {
+export const GAME_MODES: Record<string, number> = {
   AP: 1, CM: 2, RD: 3, SD: 4, AR: 5, CD: 16,
 };
 
@@ -49,348 +75,308 @@ export interface SteamLobbyResult {
 
 class DotaBot extends EventEmitter {
   private client: SteamUser;
-  private ready: boolean = false;
-  private gcReady: boolean = false;
+  private ready = false;
+  private gcReady = false;
+  private gcVersion = 0;
   private helloInterval: NodeJS.Timeout | null = null;
+  private ownershipTicket: Buffer | null = null;
+  private waitingForLobby = false;
+  private pendingTimers: NodeJS.Timeout[] = [];
 
   constructor() {
     super();
-    this.client = new SteamUser();
+    this.client = new SteamUser({ enablePicsCache: true, changelistUpdateInterval: 0 } as any);
   }
 
   async connect(): Promise<void> {
     const username = process.env.STEAM_ACCOUNT_NAME;
     const password = process.env.STEAM_PASSWORD;
-
-    if (!username || !password) {
-      throw new Error("STEAM_ACCOUNT_NAME and STEAM_PASSWORD required");
-    }
+    if (!username || !password) throw new Error("STEAM_ACCOUNT_NAME / STEAM_PASSWORD missing");
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.stopHello();
-        reject(new Error("Steam/Dota GC connection timed out (60s)"));
-      }, 60000);
+        reject(new Error("GC connection timed out (90s)"));
+      }, 90000);
 
       this.client.logOn({ accountName: username, password });
 
       this.client.on("loggedOn", () => {
-        console.log("[Steam] Logged in. Launching Dota 2...");
-        this.client.gamesPlayed([DOTA2_APP_ID]);
-
-        // Send GC Hello repeatedly until we get a Welcome
-        this.startHello();
+        console.log(`[Steam] ✅ Logged in as ${username}`);
+        this.ready = true;
+        (this.client as any).getAppOwnershipTicket(DOTA2_APP_ID, (_: any, t: any) => {
+          if (Buffer.isBuffer(t) && t.length > 0) {
+            this.ownershipTicket = t;
+            console.log(`[Steam] ✅ Ticket cached (${t.length}b)`);
+          }
+        });
       });
 
-      // Listen for GC messages
+      (this.client as any).on("appOwnershipCached", () => {
+        console.log("[Steam] ✅ Launching Dota 2...");
+        this.client.gamesPlayed([DOTA2_APP_ID]);
+        setTimeout(() => this.startHello(), 1000);
+      });
+
       this.client.on("receivedFromGC", (appId: number, msgType: number, payload: Buffer) => {
         if (appId !== DOTA2_APP_ID) return;
+        if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType))
+          console.log(`[GC] ← ${msgType} (${payload.length}b)`);
 
-        // GC Welcome = we're connected
         if (msgType === EGCBaseClientMsg.k_EMsgGCClientWelcome) {
+          // field 1 = version (varint), tag = 0x08
+          if (payload.length > 1 && payload[0] === 0x08) {
+            let val = 0, shift = 0, i = 1;
+            while (i < payload.length) {
+              const b = payload[i++];
+              val |= (b & 0x7f) << shift;
+              if (!(b & 0x80)) break;
+              shift += 7;
+            }
+            this.gcVersion = val;
+          }
           this.gcReady = true;
-          this.ready = true;
           this.stopHello();
           clearTimeout(timeout);
-          console.log("[Dota2] Connected to Game Coordinator!");
-          this.emit("gcReady");
+          console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
           resolve();
         }
 
-        // Lobby response
-        if (msgType === EDOTAGCMsg.k_EMsgGCPracticeLobbyResponse) {
-          this.emit("lobbyResponse", payload);
-        }
-
-        // Lobby update / list
-        if (msgType === EDOTAGCMsg.k_EMsgGCPracticeLobbyListResponse) {
-          this.emit("lobbyListResponse", payload);
+        // Ownership challenge after PracticeLobbyCreate
+        if (msgType === 24 && payload.length < 1000 && this.gcReady) {
+          const ticket = this.ownershipTicket || Buffer.alloc(0);
+          const resp = Buffer.concat([
+            this.vi(1, 1),
+            this.vi(2, DOTA2_APP_ID),
+            this.bytes(3, ticket),
+          ]);
+          this.client.sendToGC(DOTA2_APP_ID, 25, {}, resp);
+          console.log("[GC] → Ticket response sent");
+          if (this.waitingForLobby) this.emit("lobbyCreated");
         }
       });
 
       this.client.on("error", (err: Error) => {
         clearTimeout(timeout);
         this.stopHello();
-        console.error("[Steam] Error:", err.message);
+        this.ready = false; this.gcReady = false;
         reject(err);
       });
 
       this.client.on("disconnected", () => {
-        console.log("[Steam] Disconnected");
-        this.ready = false;
-        this.gcReady = false;
+        this.ready = false; this.gcReady = false;
         this.stopHello();
       });
     });
   }
 
-  private startHello(): void {
-    this.sendHello();
-    this.helloInterval = setInterval(() => {
-      if (!this.gcReady) {
-        this.sendHello();
-      } else {
-        this.stopHello();
-      }
-    }, 5000);
-  }
+  isReady() { return this.ready && this.gcReady; }
 
-  private stopHello(): void {
-    if (this.helloInterval) {
-      clearInterval(this.helloInterval);
-      this.helloInterval = null;
-    }
-  }
-
-  private sendHello(): void {
-    // Send a minimal GC Hello — just an empty protobuf
-    // The GC Hello message is basically empty for Dota 2
-    const emptyBuf = Buffer.alloc(0);
-    this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, emptyBuf);
-  }
-
-  isReady(): boolean {
-    return this.ready && this.gcReady;
-  }
-
-  /**
-   * Create a practice lobby.
-   * Uses raw protobuf encoding via manual buffer construction.
-   */
-  async createLobby(
-    name: string,
-    password: string,
-    gameMode: string = "CM",
-    region: string = "India"
-  ): Promise<SteamLobbyResult> {
-    if (!this.isReady()) throw new Error("Dota2 GC not connected");
-
-    const serverRegion = REGIONS[region] ?? 8;
+  async createLobby(name: string, password: string, gameMode = "CM", region = "India"): Promise<SteamLobbyResult> {
+    if (!this.isReady()) throw new Error("GC not ready");
+    const serverRegion = REGIONS[region] ?? 7;
     const mode = GAME_MODES[gameMode] ?? 2;
 
+    this.pendingTimers.forEach(t => clearTimeout(t));
+    this.pendingTimers = [];
+
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Lobby creation timed out")), 30000);
+      let done = false;
+      const timeout = setTimeout(() => {
+        this.waitingForLobby = false;
+        this.removeAllListeners("lobbyCreated");
+        reject(new Error("Lobby create timed out (25s)"));
+      }, 25000);
 
-      // Build the lobby details protobuf manually
-      // CMsgPracticeLobbySetDetails fields:
-      // 1: game_name (string)
-      // 3: game_mode (uint32)
-      // 5: server_region (uint32)
-      // 6: pass_key (string)
-      // 10: allow_spectating (bool)
-      // 12: fill_with_bots (bool)
-      // 15: visibility (uint32) — 0=public, 1=friends
-      const lobbyDetails = this.encodeLobbyDetails(name, password, mode, serverRegion);
-
-      // Listen for lobby response
-      const handler = (payload: Buffer) => {
+      this.waitingForLobby = true;
+      this.once("lobbyCreated", () => {
+        if (done) return;
+        done = true;
         clearTimeout(timeout);
-        this.removeListener("lobbyResponse", handler);
-        console.log("[Dota2] Lobby created successfully!");
-        resolve({ lobbyId: "active", password });
-      };
-      this.on("lobbyResponse", handler);
+        this.waitingForLobby = false;
+        console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
-      // k_EMsgGCPracticeLobbyCreate
-      // CMsgPracticeLobbyCreate has field 1: lobby_details (CMsgPracticeLobbySetDetails)
-      const createMsg = this.encodeCreateLobby(lobbyDetails);
+        // Kick bot from its Radiant slot → moves to Unassigned (PLAYER_POOL)
+        // CMsgPracticeLobbyKickFromTeam { account_id = field 1 (uint32) }
+        const t0 = setTimeout(() => {
+          const botSteam32 = this.getBotSteam32();
+          if (botSteam32 > 0) {
+            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
+            console.log(`[Dota2] → KickFromTeam self (steam32=${botSteam32}) → Unassigned`);
+          } else {
+            console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
+          }
+        }, 1500);
+        this.pendingTimers.push(t0);
 
-      this.client.sendToGC(
-        DOTA2_APP_ID,
-        EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate,
-        {},
-        createMsg
-      );
+        // Apply settings at 3s, 6s, 10s
+        [3000, 6000, 10000].forEach(d => {
+          const t = setTimeout(() => this.applySettings(name, password, mode, serverRegion), d);
+          this.pendingTimers.push(t);
+        });
 
-      console.log(`[Dota2] Creating lobby: "${name}" | ${gameMode} | ${region} | pw: ${password}`);
+        const rt = setTimeout(() => {
+          console.log("[Dota2] ✅ Lobby ready!");
+          resolve({ lobbyId: "active", password });
+        }, 4000);
+        this.pendingTimers.push(rt);
+      });
+
+      const msg = this.buildCreate(name, password, mode, serverRegion);
+      console.log(`[Dota2] → Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password}`);
+      this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
 
-  /**
-   * Invite a player to the current lobby by their Steam32 account ID.
-   */
-  invitePlayer(steam32Id: string): void {
+  private buildCreate(name: string, password: string, mode: number, region: number): Buffer {
+    const details = this.buildDetails(name, password, mode, region);
+    return Buffer.concat([
+      this.str(5, password),              // pass_key       field 5
+      this.vi(6,  this.gcVersion || 0),   // client_version field 6
+      this.sub(7, details),               // lobby_details  field 7
+    ]);
+  }
+
+  private buildDetails(name: string, password: string, mode: number, region: number): Buffer {
+    return Buffer.concat([
+      this.str(2,  name),        // game_name       field 2
+      this.vi(4,   region),      // server_region   field 4
+      this.vi(5,   mode),        // game_mode       field 5
+      this.bool(10, false),      // allow_cheats    field 10
+      this.bool(11, false),      // fill_with_bots  field 11
+      this.bool(13, true),       // allow_spectating field 13
+      this.str(15, password),    // pass_key        field 15
+      this.vi(33,  0),           // visibility=public field 33
+    ]);
+  }
+
+  private applySettings(name: string, password: string, mode: number, region: number): void {
     if (!this.isReady()) return;
-    const accountId = parseInt(steam32Id);
-    if (isNaN(accountId)) return;
-
-    // k_EMsgGCInviteToLobby — field 1: steam_id (fixed64)
-    // Steam ID = steam32 + 76561197960265728
-    const steamId64 = BigInt(steam32Id) + BigInt("76561197960265728");
-    const buf = Buffer.alloc(8);
-    buf.writeBigUInt64LE(steamId64);
-
-    // Wrap in protobuf: field 1 (wire type 1 = fixed64) = 0x09
-    const msg = Buffer.concat([Buffer.from([0x09]), buf]);
-
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCInviteToLobby, {}, msg);
-    console.log(`[Dota2] Invited player steam32: ${steam32Id}`);
+    const details = this.buildDetails(name, password, mode, region);
+    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbySetDetails, {}, details);
+    console.log(`[Dota2] → SetDetails: "${name}" mode=${mode} region=${region}`);
   }
 
-  /**
-   * Invite multiple players.
-   */
-  inviteAll(steam32Ids: string[]): void {
-    for (const id of steam32Ids) {
-      this.invitePlayer(id);
+  invitePlayer(steam32Id: string): void {
+    if (!this.isReady()) { console.warn("[Dota2] invitePlayer: not ready"); return; }
+    const accountId = parseInt(steam32Id, 10);
+    if (isNaN(accountId) || accountId <= 0) { console.warn(`[Dota2] bad steam32="${steam32Id}"`); return; }
+    const id64 = BigInt(accountId) + BigInt("76561197960265728");
+
+    // CMsgInviteToLobby { fixed64 steam_id = 1 }
+    // fixed64 = wire type 1 (64-bit), tag = (1 << 3) | 1 = 0x09
+    const buf = Buffer.alloc(9);
+    buf[0] = 0x09; // field 1, wire type 1 (64-bit fixed)
+    buf.writeBigUInt64LE(id64, 1);
+
+    this.client.sendToGC(DOTA2_APP_ID, EGCBaseMsg.k_EMsgGCInviteToLobby, {}, buf);
+    console.log(`[Dota2] 📨 Invited steam32=${steam32Id} steam64=${id64}`);
+  }
+
+  async inviteAll(steam32Ids: string[]): Promise<void> {
+    const valid = steam32Ids.filter(id => !!id && !isNaN(parseInt(id, 10)) && parseInt(id, 10) > 0);
+    if (!this.isReady()) { console.error("[Dota2] inviteAll: not ready"); return; }
+    for (let i = 0; i < valid.length; i++) {
+      this.invitePlayer(valid[i]);
+      if (i < valid.length - 1) await new Promise(r => setTimeout(r, 400));
     }
+    console.log(`[Dota2] ✅ ${valid.length} invites sent`);
   }
 
-  /**
-   * Shuffle teams in lobby.
-   */
   shuffleTeams(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCBalancedShuffleLobby, {}, Buffer.alloc(0));
-    console.log("[Dota2] Teams shuffled");
   }
-
-  /**
-   * Flip teams (swap radiant/dire).
-   */
   flipTeams(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCFlipLobbyTeams, {}, Buffer.alloc(0));
-    console.log("[Dota2] Teams flipped");
   }
-
-  /**
-   * Launch/start the lobby match.
-   */
   startGame(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLaunch, {}, Buffer.alloc(0));
-    console.log("[Dota2] Game launched!");
+    console.log("[Dota2] ✅ Game launched!");
   }
-
-  /**
-   * Destroy the current lobby.
-   */
   destroyLobby(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
     console.log("[Dota2] Lobby destroyed");
   }
-
-  /**
-   * Leave the current lobby.
-   */
-  leaveLobby(): void {
+  // Kick bot from its Radiant/Dire slot → moves to Unassigned pool
+  // Use this instead of leaveLobby so bot stays in lobby as host
+  kickBotFromTeam(): void {
     if (!this.isReady()) return;
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
-    console.log("[Dota2] Left lobby");
+    const steam32 = this.getBotSteam32();
+    if (steam32 > 0) {
+      this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, steam32));
+      console.log(`[Dota2] → KickFromTeam self (steam32=${steam32})`);
+    } else {
+      console.warn("[Dota2] kickBotFromTeam: steam32 unknown");
+    }
   }
-
-  /**
-   * Kick a player from lobby.
-   */
   kickPlayer(steam32Id: string): void {
     if (!this.isReady()) return;
-    const accountId = parseInt(steam32Id);
-    if (isNaN(accountId)) return;
-
-    // field 1: account_id (uint32)
-    const buf = this.encodeVarint(1, accountId);
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKick, {}, buf);
-    console.log(`[Dota2] Kicked player steam32: ${steam32Id}`);
+    const id = parseInt(steam32Id, 10);
+    if (!isNaN(id)) this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKick, {}, this.vi(1, id));
   }
-
-  /**
-   * Disconnect cleanly.
-   */
   disconnect(): void {
+    this.pendingTimers.forEach(t => clearTimeout(t));
+    this.pendingTimers = [];
     this.stopHello();
-    this.ready = false;
-    this.gcReady = false;
+    this.ready = false; this.gcReady = false;
     try { this.client.logOff(); } catch {}
   }
 
-  // ─── Protobuf Encoding Helpers ─────────────────────────────
-  // Manual protobuf encoding since we can't use the broken dota2 package.
-  // Protobuf wire format: https://protobuf.dev/programming-guides/encoding/
+  private botSteam32: number = 0;
 
-  private encodeVarint(fieldNumber: number, value: number): Buffer {
-    const tag = (fieldNumber << 3) | 0; // wire type 0 = varint
-    const parts: number[] = [];
-
-    // Encode tag
-    let t = tag;
-    while (t > 0x7f) { parts.push((t & 0x7f) | 0x80); t >>>= 7; }
-    parts.push(t);
-
-    // Encode value
-    let v = value >>> 0; // ensure unsigned
-    while (v > 0x7f) { parts.push((v & 0x7f) | 0x80); v >>>= 7; }
-    parts.push(v);
-
-    return Buffer.from(parts);
+  private getBotSteam32(): number {
+    if (this.botSteam32 > 0) return this.botSteam32;
+    try {
+      const sid = (this.client as any).steamID;
+      if (!sid) return 0;
+      // steam-user SteamID object: accountid is the low 32 bits
+      const id = sid.accountid ?? sid.accountID ?? 0;
+      this.botSteam32 = typeof id === 'number' ? id : parseInt(id.toString(), 10);
+      console.log(`[Dota2] Bot steam32 resolved: ${this.botSteam32}`);
+      return this.botSteam32;
+    } catch { return 0; }
   }
 
-  private encodeString(fieldNumber: number, value: string): Buffer {
-    const tag = (fieldNumber << 3) | 2; // wire type 2 = length-delimited
-    const strBuf = Buffer.from(value, "utf8");
-    const lenBuf = this.encodeRawVarint(strBuf.length);
-    const tagBuf = this.encodeRawVarint(tag);
-    return Buffer.concat([tagBuf, lenBuf, strBuf]);
+  private startHello() {
+    this.sendHello();
+    this.helloInterval = setInterval(() => { if (!this.gcReady) this.sendHello(); else this.stopHello(); }, 5000);
+  }
+  private stopHello() {
+    if (this.helloInterval) { clearInterval(this.helloInterval); this.helloInterval = null; }
+  }
+  private sendHello() {
+    this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, Buffer.alloc(0));
   }
 
-  private encodeBool(fieldNumber: number, value: boolean): Buffer {
-    return this.encodeVarint(fieldNumber, value ? 1 : 0);
+  // ── Protobuf encoding ──────────────────────────────────────────────────────
+  private raw(v: number): Buffer {
+    const p: number[] = [];
+    let x = v >>> 0;
+    while (x > 0x7f) { p.push((x & 0x7f) | 0x80); x >>>= 7; }
+    p.push(x);
+    return Buffer.from(p);
   }
-
-  private encodeRawVarint(value: number): Buffer {
-    const parts: number[] = [];
-    let v = value >>> 0;
-    while (v > 0x7f) { parts.push((v & 0x7f) | 0x80); v >>>= 7; }
-    parts.push(v);
-    return Buffer.from(parts);
+  private vi(fn: number, v: number): Buffer {
+    return Buffer.concat([this.raw((fn << 3) | 0), this.raw(v)]);
   }
-
-  private encodeSubmessage(fieldNumber: number, data: Buffer): Buffer {
-    const tag = (fieldNumber << 3) | 2;
-    const tagBuf = this.encodeRawVarint(tag);
-    const lenBuf = this.encodeRawVarint(data.length);
-    return Buffer.concat([tagBuf, lenBuf, data]);
+  private str(fn: number, s: string): Buffer {
+    const b = Buffer.from(s, "utf8");
+    return Buffer.concat([this.raw((fn << 3) | 2), this.raw(b.length), b]);
   }
-
-  private encodeLobbyDetails(
-    name: string, password: string, gameMode: number, serverRegion: number
-  ): Buffer {
-    // CMsgPracticeLobbySetDetails
-    // field 1: game_name (string)
-    // field 3: game_mode (uint32)
-    // field 5: server_region (uint32)
-    // field 6: pass_key (string)
-    // field 10: allow_spectating (bool)
-    // field 12: fill_with_bots (bool)
-    // field 15: visibility (uint32) — 1 = friends only
-
-    return Buffer.concat([
-      this.encodeString(1, name),
-      this.encodeVarint(3, gameMode),
-      this.encodeVarint(5, serverRegion),
-      this.encodeString(6, password),
-      this.encodeBool(10, true),   // allow spectating
-      this.encodeBool(12, false),  // no bots
-      this.encodeVarint(15, 1),    // friends only
-    ]);
+  private bool(fn: number, v: boolean): Buffer { return this.vi(fn, v ? 1 : 0); }
+  private bytes(fn: number, d: Buffer): Buffer {
+    return Buffer.concat([this.raw((fn << 3) | 2), this.raw(d.length), d]);
   }
-
-  private encodeCreateLobby(lobbyDetails: Buffer): Buffer {
-    // CMsgPracticeLobbyCreate
-    // field 1: lobby_details (CMsgPracticeLobbySetDetails) — submessage
-    return this.encodeSubmessage(1, lobbyDetails);
-  }
+  private sub(fn: number, d: Buffer): Buffer { return this.bytes(fn, d); }
 }
 
-// Singleton
-let botInstance: DotaBot | null = null;
-
+let instance: DotaBot | null = null;
 export function getDotaBot(): DotaBot {
-  if (!botInstance) {
-    botInstance = new DotaBot();
-  }
-  return botInstance;
+  if (!instance) instance = new DotaBot();
+  return instance;
 }
-
-export { DotaBot, REGIONS, GAME_MODES };
+export { DotaBot };

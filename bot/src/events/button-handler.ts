@@ -151,15 +151,24 @@ function isAdmin(interaction: ButtonInteraction): boolean {
   return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
 }
 
+
+
+// REPLACE handleLobbyStart — don't update status until match actually starts
 async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
   await interaction.deferReply({ ephemeral: true });
   try {
     const bot = getDotaBot();
-    if (bot.isReady()) { bot.startGame(); await updateLobby(lobbyId, { status: "active" }); await interaction.editReply("▶️ Game started!"); }
-    else { await interaction.editReply("❌ Dota bot not connected."); }
+    if (bot.isReady()) {
+      bot.startGame();
+      // Don't update status to "active" here — wait for GC to confirm match started
+      await interaction.editReply("▶️ Start signal sent! Game should begin shortly.");
+    } else {
+      await interaction.editReply("❌ Dota bot not connected.");
+    }
   } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
 }
+
 
 async function handleLobbyShuffle(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
@@ -185,13 +194,95 @@ async function handleLobbyInviteAll(interaction: ButtonInteraction, lobbyId: str
   else { await interaction.editReply("❌ Dota bot not connected."); }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// REPLACE ONLY the handleInviteMe function in button-handler.ts
+// ═══════════════════════════════════════════════════════════════
+
 async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
-  const webUser = await findUserByDiscordId(interaction.user.id);
-  if (!webUser || !webUser.steamId) { await interaction.editReply("❌ Link your Steam at **iesports.in** first."); return; }
+
+  const tag = `[InviteMe:${interaction.user.username}]`;
+
+  // ── Step 1: Is the bot connected? ────────────────────────────────────────
   const bot = getDotaBot();
-  if (bot.isReady()) { bot.invitePlayer(steamIdToSteam32(webUser.steamId)); await interaction.editReply("✅ Invite sent! Check Dota 2."); }
-  else { const lobby = await getLobby(lobbyId); await interaction.editReply(`Bot offline. Join manually:\nLobby: \`${lobby?.lobbyName}\`\nPassword: \`${lobby?.password}\``); }
+  console.log(`${tag} bot.isReady()=${bot.isReady()}`);
+
+  if (!bot.isReady()) {
+    const lobby = await getLobby(lobbyId);
+    await interaction.editReply(
+      `⚠️ Bot is offline. Join manually:\n` +
+      `**Lobby:** \`${lobby?.lobbyName ?? "IEsports Lobby"}\`\n` +
+      `**Password:** \`${lobby?.password ?? "—"}\``
+    );
+    return;
+  }
+
+  // ── Step 2: Find user in Firestore by Discord ID ─────────────────────────
+  // NOTE: findUserByDiscordId queries users collection for discordId field.
+  // This only works if the user linked their Discord on the web app.
+  // Users who signed in via Steam only (not Discord) will have discordId=null.
+  const webUser = await findUserByDiscordId(interaction.user.id);
+  console.log(`${tag} Firestore user: ${JSON.stringify({
+    found: !!webUser,
+    uid: webUser?.uid,
+    hasSteamId: !!webUser?.steamId,
+    steamId: webUser?.steamId,
+    discordId: webUser?.discordId,
+  })}`);
+
+  if (!webUser) {
+    await interaction.editReply(
+      `❌ Your Discord isn't linked to any account.\n\n` +
+      `Go to **iesports.in** → Log in with Steam → Connect Discord.\n` +
+      `Then click Invite Me again.`
+    );
+    return;
+  }
+
+  if (!webUser.steamId) {
+    await interaction.editReply(
+      `❌ No Steam account linked.\n\n` +
+      `Go to **iesports.in** → Connect Steam first.`
+    );
+    return;
+  }
+
+  // ── Step 3: Convert steam64 → steam32 ───────────────────────────────────
+  // Firestore stores steamId as steam64 (e.g. "76561198129242599")
+  // invitePlayer() needs steam32 (e.g. "168976871")
+  let steam32: string;
+  try {
+    const steam64 = webUser.steamId.trim();
+
+    // Guard: if someone stored steam32 by mistake, catch it
+    if (!steam64.startsWith("7656")) {
+      throw new Error(`Not a valid steam64 (got "${steam64}" — doesn't start with 7656)`);
+    }
+
+    const val = BigInt(steam64) - BigInt("76561197960265728");
+    if (val <= 0n) throw new Error(`Subtraction gave non-positive value: ${val}`);
+    steam32 = val.toString();
+  } catch (err: any) {
+    console.error(`${tag} Bad steamId "${webUser.steamId}": ${err.message}`);
+    await interaction.editReply(
+      `❌ Your Steam ID looks corrupted (\`${webUser.steamId}\`).\n` +
+      `Please re-link your Steam at **iesports.in**.`
+    );
+    return;
+  }
+
+  console.log(`${tag} steam64=${webUser.steamId} → steam32=${steam32}`);
+
+  // ── Step 4: Send GC invite ───────────────────────────────────────────────
+  bot.invitePlayer(steam32);
+
+  await interaction.editReply(
+    `✅ Invite sent to your Steam!\n\n` +
+    `**If it doesn't appear in Dota 2:**\n` +
+    `• Make sure Dota 2 is open\n` +
+    `• Play → Custom Lobby → Browse Lobbies\n` +
+    `• Search: \`IEsports Lobby\``
+  );
 }
 
 async function handleMoveToVC(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
@@ -212,8 +303,10 @@ async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: strin
 
 async function handleLobbyLeave(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
-  try { getDotaBot().leaveLobby(); await interaction.reply({ content: "🚪 Bot left the lobby.", ephemeral: true }); }
-  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+  try {
+    getDotaBot().kickBotFromTeam();  // ← was leaveLobby()
+    await interaction.reply({ content: "🔄 Bot moved to Unassigned.", ephemeral: true });
+  } catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
 }
 
 async function handleBotRestart(interaction: ButtonInteraction): Promise<void> {
