@@ -12,9 +12,9 @@ type SyncOptions = {
   uid: string;
   steamId: string;
   db: FirebaseFirestore.Firestore;
-  // Optional — only needed when refreshing a tournament leaderboard
   tournamentId?: string;
-  tournamentStartTime?: number; // unix seconds
+  tournamentStartTime?: number;
+  tournamentEndTime?: number;  // ADD THIS
 };
 
 export async function fetchAndSyncPlayer({
@@ -23,6 +23,7 @@ export async function fetchAndSyncPlayer({
   db,
   tournamentId,
   tournamentStartTime,
+  tournamentEndTime,  // ADD THIS
 }: SyncOptions) {
   const steam32 = (BigInt(steamId) - BigInt("76561197960265728")).toString();
 
@@ -86,7 +87,8 @@ export async function fetchAndSyncPlayer({
   if (tournamentId && tournamentStartTime !== undefined && matches?.length > 0) {
     const { totalScore, topMatches, matchesPlayed } = calculatePlayerScore(
       matches,
-      tournamentStartTime
+      tournamentStartTime,
+      tournamentEndTime ?? Math.floor(Date.now() / 1000)  // fallback to now
     );
 
     await db
