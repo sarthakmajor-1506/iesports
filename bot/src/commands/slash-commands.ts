@@ -4,7 +4,7 @@ import {
   PermissionFlagsBits,
   TextChannel,
 } from "discord.js";
-import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue } from "../services/firebase";
+import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue, getDb } from "../services/firebase";
 import { fetchMatchResult, requestMatchParse } from "../services/opendota";
 import { matchResultEmbed } from "../utils/embeds";
 import { cleanupVoiceChannels } from "../services/match-orchestrator";
@@ -32,7 +32,7 @@ export async function linksteamExecute(interaction: ChatInputCommandInteraction)
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    // Optionally fetch Steam name via Steam Web API
+    // Fetch Steam name via Steam Web API
     let steamName = "Unknown";
     const steamApiKey = process.env.STEAM_API_KEY;
     if (steamApiKey) {
@@ -45,18 +45,32 @@ export async function linksteamExecute(interaction: ChatInputCommandInteraction)
       } catch { /* use fallback */ }
     }
 
-    await getDb().collection("users").where("discordId", "==", interaction.user.id).limit(1).get().then(async snap => {
-      if (!snap.empty) {
-        await snap.docs[0].ref.update({ steamId, steamName });
-      }
-    });
+    // Update or create user record in Firestore
+    const snap = await getDb()
+      .collection("users")
+      .where("discordId", "==", interaction.user.id)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) {
+      await snap.docs[0].ref.update({ steamId, steamName });
+    } else {
+      await getDb().collection("users").add({
+        discordId: interaction.user.id,
+        steamId,
+        steamName,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     const steam32 = (BigInt(steamId) - BigInt("76561197960265728")).toString();
 
     await interaction.editReply(
       `✅ Steam linked!\n**Name:** ${steamName}\n**Steam64:** \`${steamId}\`\n**Steam32:** \`${steam32}\`\n\nYou'll now get auto-invited to lobbies.`
     );
-  } catch (err: any) {
-    await interaction.editReply(`❌ Failed: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await interaction.editReply(`❌ Failed: ${message}`);
   }
 }
 
@@ -107,7 +121,6 @@ export async function matchresultExecute(interaction: ChatInputCommandInteractio
     await requestMatchParse(dotaMatchId);
     await interaction.editReply(`🔍 Fetching match ${dotaMatchId} from OpenDota...`);
 
-    // Poll a few times
     for (let i = 0; i < 5; i++) {
       await new Promise((r) => setTimeout(r, 10000));
       const result = await fetchMatchResult(dotaMatchId);
@@ -121,12 +134,11 @@ export async function matchresultExecute(interaction: ChatInputCommandInteractio
           dotaMatchId,
           completedAt: new Date().toISOString(),
         });
-        await updateQueue(lobby.queueId, "completed");
+        await updateQueue(lobby.queueId, { status: "completed" });
 
         const embed = matchResultEmbed(result, lobby, 0);
         await interaction.editReply({ content: "✅ Match result found!", embeds: [embed] });
 
-        // Post to results channel
         const rch = process.env.RESULTS_CHANNEL_ID;
         if (rch) {
           const ch = (await interaction.client.channels.fetch(rch)) as TextChannel;
@@ -140,10 +152,9 @@ export async function matchresultExecute(interaction: ChatInputCommandInteractio
 
     await interaction.editReply("⏳ Match not yet parsed on OpenDota. Try again in a few minutes.");
   } else {
-    // Manual result
     const w = winner as "radiant" | "dire";
     await updateLobby(lobby.id, { status: "completed", winner: w, completedAt: new Date().toISOString() });
-    await updateQueue(lobby.queueId, "completed");
+    await updateQueue(lobby.queueId, { status: "completed" });
     await cleanupVoiceChannels(interaction.client);
 
     const label = w === "radiant" ? "🟢 Radiant" : "🔴 Dire";
