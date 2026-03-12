@@ -104,5 +104,14 @@ export type SoloMatchScore = {
   win: boolean;
   startTime: number;
   heroId: number;
-  duration?: number;  // ADD THIS
+  duration?: number;
+  breakdown?: {          // ADD THIS
+    killPts: number;
+    assistPts: number;
+    deathPts: number;
+    lastHitPts: number;
+    gpmPts: number;
+    xpmPts: number;
+    winBonus: number;
+  };
 };
