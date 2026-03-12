@@ -21,9 +21,13 @@ const HOW_IT_WORKS = [
 ];
 
 const SteamIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 496 512" fill="white">
-    <path d="M496 256c0 137-111.2 248-248.4 248C113.4 504 17.5 409.5 5.2 289.2L116.4 336c.5 28.4 23.7 51.3 52.2 51.3 2.9 0 5.7-.2 8.5-.7l51.4 73.3c-.6 5.1-.9 10.2-.9 15.4 0 57.4 46.7 104 104 104s104-46.6 104-104-46.7-104-104-104c-3.7 0-7.4.2-11 .6l-72.1-51.8c.3-2.8.5-5.6.5-8.4 0-17.4-4.9-33.7-13.4-47.5l117.6-47.2C381.6 132.9 416 96.4 416 51.3c0-57.4-46.7-104-104-104-57.4 0-104 46.6-104 104 0 8.4 1 16.5 2.8 24.4L106.8 128C88.7 95 52.9 72.9 11.7 72.9c-6.4 0-12.6.5-18.7 1.4L22.6 209.8c-.3 3.7-.6 7.5-.6 11.3C22 279.5 68.1 328 126 332.8l37.7 25.6c0 1.2-.1 2.5-.1 3.7 0 28.8 23.4 52.3 52.3 52.3s52.3-23.4 52.3-52.3-23.4-52.3-52.3-52.3c-4.2 0-8.2.5-12.1 1.4L138.8 256h357.2z"/>
-  </svg>
+  <img
+    src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
+    alt="Steam"
+    width={size}
+    height={size}
+    style={{ display: "block" }}
+  />
 );
 
 export default function Home() {
@@ -217,8 +221,8 @@ export default function Home() {
           ))}
         </div>
         <button className="ie-btn-steam" onClick={loginWithSteam}>
-          <SteamIcon size={16} />
-          Sign in with Steam
+          <SteamIcon size={25} />
+          SIGN IN WITH STEAM
         </button>
       </nav>
 

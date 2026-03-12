@@ -2,9 +2,10 @@
 import Navbar from "../components/Navbar";
 import DotaTournaments from "../components/DotaTournaments";
 import SoloTournaments from "../components/SoloTournaments";
+import DailyMatches from "../components/DailyMatches";
 import { useState, useEffect, useRef } from "react";
 
-type DotaTab = "tournaments" | "solo";
+type DotaTab = "tournaments" | "solo" | "daily";
 
 export default function Dota2() {
   const [dotaTab, setDotaTab] = useState<DotaTab>("tournaments");
@@ -163,7 +164,7 @@ export default function Dota2() {
             loop
             playsInline
             preload="auto"
-            aria-hidden="true"          
+            aria-hidden="true"
           />
           <div className="d2-hero-overlay" />
           <div className="d2-hero-content">
@@ -177,27 +178,31 @@ export default function Dota2() {
         {/* ── Tab switcher ── */}
         <div className="d2-tabs-wrap" style={{ paddingTop: 20, paddingBottom: 4 }}>
           <div className="d2-tabs">
-            {(["tournaments", "solo"] as DotaTab[]).map((tab) => (
-              <button
-                key={tab}
-                className={`d2-tab${dotaTab === tab ? " active" : ""}`}
-                onClick={() => setDotaTab(tab)}
-              >
-                {tab === "tournaments" ? "🏆 Tournaments" : "⚔️ Solo"}
-                {tab === "solo"}
-              </button>
-            ))}
+            <button
+              className={`d2-tab${dotaTab === "tournaments" ? " active" : ""}`}
+              onClick={() => setDotaTab("tournaments")}
+            >
+              🏆 Tournaments
+            </button>
+            <button
+              className={`d2-tab${dotaTab === "solo" ? " active" : ""}`}
+              onClick={() => setDotaTab("solo")}
+            >
+              ⚔️ Solo
+            </button>
+            <button
+              className={`d2-tab${dotaTab === "daily" ? " active" : ""}`}
+              onClick={() => setDotaTab("daily")}
+            >
+              🎮 Daily Matches
+            </button>
           </div>
         </div>
 
         {/* ── Content ── */}
         {dotaTab === "tournaments" && <DotaTournaments />}
-
-        {dotaTab === "solo" && (
-          <>
-            <SoloTournaments />
-          </>
-        )}
+        {dotaTab === "solo" && <SoloTournaments />}
+        {dotaTab === "daily" && <DailyMatches />}
       </div>
     </>
   );
