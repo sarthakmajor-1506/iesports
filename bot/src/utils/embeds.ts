@@ -67,7 +67,7 @@ export function lobbyEmbed(lobby: LobbyDoc): EmbedBuilder {
     .setColor(Colors.Green);
 
   embed.addFields(
-    { name: "Lobby ID", value: lobby.lobbyId || "N/A", inline: true },
+    { name: "Lobby ID", value: lobby.gcLobbyId || "N/A", inline: true },
     { name: "Game Mode", value: lobby.gameMode, inline: true },
     { name: "Region", value: lobby.serverRegion, inline: true }
   );

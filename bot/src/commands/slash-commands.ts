@@ -8,6 +8,7 @@ import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue } from ".
 import { fetchMatchResult, requestMatchParse } from "../services/opendota";
 import { matchResultEmbed } from "../utils/embeds";
 import { cleanupVoiceChannels } from "../services/match-orchestrator";
+import { findUserByDiscordId, getActiveLobby, updateLobby, updateQueue, getDb } from "../services/firebase";
 
 // ─── /linksteam ──────────────────────────────────────────────
 
@@ -45,7 +46,11 @@ export async function linksteamExecute(interaction: ChatInputCommandInteraction)
       } catch { /* use fallback */ }
     }
 
-    await linkSteam(interaction.user.id, steamId, steamName);
+    await getDb().collection("users").where("discordId", "==", interaction.user.id).limit(1).get().then(async snap => {
+      if (!snap.empty) {
+        await snap.docs[0].ref.update({ steamId, steamName });
+      }
+    });
     const steam32 = (BigInt(steamId) - BigInt("76561197960265728")).toString();
 
     await interaction.editReply(
