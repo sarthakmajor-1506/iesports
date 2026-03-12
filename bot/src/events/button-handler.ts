@@ -291,14 +291,28 @@ async function handleMoveToVC(interaction: ButtonInteraction, _lobbyId: string):
 }
 
 async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
-  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  if (!isAdmin(interaction)) {
+    await interaction.reply({ content: "❌ Admin only.", ephemeral: true });
+    return;
+  }
   await interaction.deferReply({ ephemeral: true });
   try {
-    const bot = getDotaBot(); if (bot.isReady()) bot.destroyLobby();
+    const bot = getDotaBot();
+    if (bot.isReady()) {
+      await bot.destroyLobby(); // now async — waits for slot move
+    } else {
+      console.log("[Destroy] Bot not ready — skipping GC destroy");
+    }
     await updateLobby(lobbyId, { status: "cancelled" });
     await cleanupVoiceChannels(interaction.client);
-    await interaction.editReply("💥 Lobby destroyed and cleaned up.");
-  } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
+    await interaction.editReply(
+      bot.isReady()
+        ? "💥 Lobby destroyed in Dota 2 and cleaned up."
+        : "🗑️ Lobby record cleared. (Bot not connected — destroy manually in Dota 2)"
+    );
+  } catch (err: any) {
+    await interaction.editReply(`❌ ${err.message}`);
+  }
 }
 
 async function handleLobbyLeave(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
