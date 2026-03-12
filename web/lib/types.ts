@@ -91,6 +91,7 @@ export type SoloPlayer = {
   disqualifyReason?: string;
 };
 
+
 export type SoloMatchScore = {
   matchId: number;
   score: number;
@@ -101,6 +102,7 @@ export type SoloMatchScore = {
   gpm: number;
   xpm: number;
   win: boolean;
-  startTime: number;        // unix timestamp
+  startTime: number;
   heroId: number;
+  duration?: number;  // ADD THIS
 };
