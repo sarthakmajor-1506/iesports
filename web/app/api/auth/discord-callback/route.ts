@@ -5,7 +5,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const uid = searchParams.get("state");  // ← read uid from state
-
+  // DEBUG
+  console.log("=== CALLBACK HIT ===");
+  console.log("code:", code ? "present" : "MISSING");
+  console.log("uid from state:", uid);
+  console.log("full URL:", req.url);
+  // END DEBUG
   if (!code || !uid) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=error`);
   }
