@@ -15,46 +15,15 @@ const EDOTAGCMsg = {
   k_EMsgGCPracticeLobbyLeave:          7040,
   k_EMsgGCPracticeLobbyLaunch:         7041,
   k_EMsgGCPracticeLobbyKick:           7081,
-  k_EMsgGCPracticeLobbyKickFromTeam:   8047,  // kick self from team → moves to unassigned
+  k_EMsgGCPracticeLobbyKickFromTeam:   8047,
   k_EMsgGCBalancedShuffleLobby:        7049,
   k_EMsgGCFlipLobbyTeams:              7320,
   k_EMsgDestroyLobbyRequest:           8097,
 };
 
-// Base GC messages (not Dota2-specific)
 const EGCBaseMsg = {
-  k_EMsgGCInviteToLobby: 4512,  // CMsgInviteToLobby { fixed64 steam_id=1, uint32 client_version=2 }
+  k_EMsgGCInviteToLobby: 4512,
 };
-
-// DOTA_GC_TEAM enum
-const DOTA_GC_TEAM = {
-  GOOD_GUYS:   0,  // Radiant
-  BAD_GUYS:    1,  // Dire
-  BROADCASTER: 2,
-  SPECTATOR:   3,
-  PLAYER_POOL: 4,  // Unassigned ← where bot should sit
-  NOTEAM:      5,
-};
-
-// ── Verified field numbers from steam-resources protobufs ─────────────────────
-// Source: node_modules/steam/node_modules/steam-resources/protobufs/dota2/
-//         dota_gcmessages_client_match_management.proto
-//
-// CMsgPracticeLobbySetDetails:
-//   field 2  = game_name (string)
-//   field 4  = server_region (uint32)
-//   field 5  = game_mode (uint32)
-//   field 10 = allow_cheats (bool)
-//   field 11 = fill_with_bots (bool)
-//   field 13 = allow_spectating (bool)
-//   field 15 = pass_key (string)
-//   field 33 = visibility (uint32) — 0=public, 1=friends, 2=unlisted
-//
-// CMsgPracticeLobbyCreate:
-//   field 1 = search_key (string)
-//   field 5 = pass_key (string)
-//   field 6 = client_version (uint32)
-//   field 7 = lobby_details (CMsgPracticeLobbySetDetails)
 
 export const REGIONS: Record<string, number> = {
   India: 16, SEA: 5, Singapore: 5,
@@ -93,9 +62,6 @@ class DotaBot extends EventEmitter {
     const password = process.env.STEAM_PASSWORD;
     if (!username || !password) throw new Error("STEAM_ACCOUNT_NAME / STEAM_PASSWORD missing");
 
-    // ── CHANGE 1: Support refresh token to avoid LoggedInElsewhere ──────────
-    // On first boot, logs in with password and prints a refresh token to console.
-    // After that, set STEAM_REFRESH_TOKEN in Railway env to skip password login.
     const savedToken = process.env.STEAM_REFRESH_TOKEN;
     const logOnOptions: any = savedToken
       ? { refreshToken: savedToken }
@@ -109,8 +75,6 @@ class DotaBot extends EventEmitter {
 
       this.client.logOn(logOnOptions);
 
-      // ── CHANGE 2: Save refresh token printed to logs on first login ─────────
-      // Copy the token from Railway logs and set it as STEAM_REFRESH_TOKEN env var.
       this.client.on("refreshToken", (token: string) => {
         console.log("[Steam] 🔑 New refresh token received — set this in Railway as STEAM_REFRESH_TOKEN:");
         console.log(token);
@@ -135,16 +99,15 @@ class DotaBot extends EventEmitter {
 
       this.client.on("receivedFromGC", (appId: number, msgType: number, payload: Buffer) => {
         if (appId !== DOTA2_APP_ID) return;
-        
-        // Log ALL messages when waiting for lobby — helps diagnose what GC is sending
+
+        // Log ALL messages when waiting for lobby
         if (this.waitingForLobby) {
-          console.log(`[GC:lobby-wait] ← msgType=${msgType} (${payload.length}b)`);
+          console.log(`[GC:lobby-wait] <- msgType=${msgType} (${payload.length}b)`);
         } else if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType)) {
-          console.log(`[GC] ← ${msgType} (${payload.length}b)`);
+          console.log(`[GC] <- ${msgType} (${payload.length}b)`);
         }
 
         if (msgType === EGCBaseClientMsg.k_EMsgGCClientWelcome) {
-          // field 1 = version (varint), tag = 0x08
           if (payload.length > 1 && payload[0] === 0x08) {
             let val = 0, shift = 0, i = 1;
             while (i < payload.length) {
@@ -159,12 +122,18 @@ class DotaBot extends EventEmitter {
           this.stopHello();
           clearTimeout(timeout);
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
+
+          // Destroy any lobby left over from a previous session.
+          // If the bot crashed/restarted while in a lobby, the GC still has it
+          // active and will silently ignore any new PracticeLobbyCreate.
+          console.log("[Dota2] -> Clearing any leftover lobby from previous session...");
+          this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+
           resolve();
         }
 
         // Ownership challenge after PracticeLobbyCreate
-        // Ownership challenge after PracticeLobbyCreate
-        // msgType 24 = classic challenge, msgType 26 = observed in some GC versions
+        // msgType 24 = classic, msgType 26 = observed in some GC versions
         if ((msgType === 24 || msgType === 26) && payload.length < 1000 && this.gcReady) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
@@ -172,24 +141,20 @@ class DotaBot extends EventEmitter {
             this.vi(2, DOTA2_APP_ID),
             this.bytes(3, ticket),
           ]);
-          // Reply on the matching response channel (24→25, 26→27)
           const replyMsg = msgType === 26 ? 27 : 25;
           this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
-          console.log(`[GC] → Ticket response sent (msgType ${msgType} → ${replyMsg})`);
+          console.log(`[GC] -> Ticket response sent (msgType ${msgType} -> ${replyMsg})`);
           if (this.waitingForLobby) this.emit("lobbyCreated");
         }
       });
 
-      // ── CHANGE 3: Handle LoggedInElsewhere gracefully instead of crashing ───
-      // eresult 6 = LoggedInElsewhere. Wait 20s for old session to expire, then retry.
-      // All other errors still reject as before.
       this.client.on("error", (err: any) => {
         if (err.eresult === 6) {
           console.warn("[Steam] ⚠️  LoggedInElsewhere — waiting 20s for old session to drop, then retrying...");
           setTimeout(() => {
             this.client.logOn(logOnOptions);
           }, 20000);
-          return; // don't reject — let the retry resolve/reject
+          return;
         }
         clearTimeout(timeout);
         this.stopHello();
@@ -214,21 +179,19 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
 
-    // ── Pre-destroy any lingering lobby before creating a new one ──
-    // If bot is already in a lobby from a previous session, GC silently
-    // ignores PracticeLobbyCreate. Sending destroy first clears the slate.
-    console.log("[Dota2] → Pre-destroy any existing lobby...");
+    // Belt-and-suspenders pre-destroy — in case something created a lobby
+    // between connect-time and now (e.g. admin manually started one).
+    console.log("[Dota2] -> Pre-destroy any existing lobby...");
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-    await new Promise(r => setTimeout(r, 5000)); // wait for GC to process
-    console.log("[Dota2] → Pre-destroy wait done, sending create...");      
-
+    await new Promise(r => setTimeout(r, 3000));
+    console.log("[Dota2] -> Sending create...");
 
     return new Promise((resolve, reject) => {
       let done = false;
       const timeout = setTimeout(() => {
         this.waitingForLobby = false;
         this.removeAllListeners("lobbyCreated");
-        reject(new Error("Lobby create timed out (25s)"));
+        reject(new Error("Lobby create timed out (45s)"));
       }, 45000);
 
       this.waitingForLobby = true;
@@ -239,20 +202,17 @@ class DotaBot extends EventEmitter {
         this.waitingForLobby = false;
         console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
-        // Kick bot from its Radiant slot → moves to Unassigned (PLAYER_POOL)
-        // CMsgPracticeLobbyKickFromTeam { account_id = field 1 (uint32) }
         const t0 = setTimeout(() => {
           const botSteam32 = this.getBotSteam32();
           if (botSteam32 > 0) {
             this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
-            console.log(`[Dota2] → KickFromTeam self (steam32=${botSteam32}) → Unassigned`);
+            console.log(`[Dota2] -> KickFromTeam self (steam32=${botSteam32}) -> Unassigned`);
           } else {
             console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
           }
         }, 1500);
         this.pendingTimers.push(t0);
 
-        // Apply settings at 3s, 6s, 10s
         [3000, 6000, 10000].forEach(d => {
           const t = setTimeout(() => this.applySettings(name, password, mode, serverRegion), d);
           this.pendingTimers.push(t);
@@ -266,7 +226,7 @@ class DotaBot extends EventEmitter {
       });
 
       const msg = this.buildCreate(name, password, mode, serverRegion);
-      console.log(`[Dota2] → Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password}`);
+      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password}`);
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
@@ -274,22 +234,22 @@ class DotaBot extends EventEmitter {
   private buildCreate(name: string, password: string, mode: number, region: number): Buffer {
     const details = this.buildDetails(name, password, mode, region);
     return Buffer.concat([
-      this.str(5, password),              // pass_key       field 5
-      this.vi(6,  this.gcVersion || 0),   // client_version field 6
-      this.sub(7, details),               // lobby_details  field 7
+      this.str(5, password),
+      this.vi(6,  this.gcVersion || 0),
+      this.sub(7, details),
     ]);
   }
 
   private buildDetails(name: string, password: string, mode: number, region: number): Buffer {
     return Buffer.concat([
-      this.str(2,  name),        // game_name       field 2
-      this.vi(4,   region),      // server_region   field 4
-      this.vi(5,   mode),        // game_mode       field 5
-      this.bool(10, false),      // allow_cheats    field 10
-      this.bool(11, false),      // fill_with_bots  field 11
-      this.bool(13, true),       // allow_spectating field 13
-      this.str(15, password),    // pass_key        field 15
-      this.vi(33,  0),           // visibility=public field 33
+      this.str(2,  name),
+      this.vi(4,   region),
+      this.vi(5,   mode),
+      this.bool(10, false),
+      this.bool(11, false),
+      this.bool(13, true),
+      this.str(15, password),
+      this.vi(33,  0),
     ]);
   }
 
@@ -297,7 +257,7 @@ class DotaBot extends EventEmitter {
     if (!this.isReady()) return;
     const details = this.buildDetails(name, password, mode, region);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbySetDetails, {}, details);
-    console.log(`[Dota2] → SetDetails: "${name}" mode=${mode} region=${region}`);
+    console.log(`[Dota2] -> SetDetails: "${name}" mode=${mode} region=${region}`);
   }
 
   invitePlayer(steam32Id: string): void {
@@ -306,10 +266,8 @@ class DotaBot extends EventEmitter {
     if (isNaN(accountId) || accountId <= 0) { console.warn(`[Dota2] bad steam32="${steam32Id}"`); return; }
     const id64 = BigInt(accountId) + BigInt("76561197960265728");
 
-    // CMsgInviteToLobby { fixed64 steam_id = 1 }
-    // fixed64 = wire type 1 (64-bit), tag = (1 << 3) | 1 = 0x09
     const buf = Buffer.alloc(9);
-    buf[0] = 0x09; // field 1, wire type 1 (64-bit fixed)
+    buf[0] = 0x09;
     buf.writeBigUInt64LE(id64, 1);
 
     this.client.sendToGC(DOTA2_APP_ID, EGCBaseMsg.k_EMsgGCInviteToLobby, {}, buf);
@@ -355,14 +313,13 @@ class DotaBot extends EventEmitter {
     );
     console.log("[Dota2] ✅ Destroy request sent");
   }
-  // Kick bot from its Radiant/Dire slot → moves to Unassigned pool
-  // Use this instead of leaveLobby so bot stays in lobby as host
+
   kickBotFromTeam(): void {
     if (!this.isReady()) return;
     const steam32 = this.getBotSteam32();
     if (steam32 > 0) {
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, steam32));
-      console.log(`[Dota2] → KickFromTeam self (steam32=${steam32})`);
+      console.log(`[Dota2] -> KickFromTeam self (steam32=${steam32})`);
     } else {
       console.warn("[Dota2] kickBotFromTeam: steam32 unknown");
     }
@@ -389,7 +346,6 @@ class DotaBot extends EventEmitter {
     try {
       const sid = (this.client as any).steamID;
       if (!sid) return 0;
-      // steam-user SteamID object: accountid is the low 32 bits
       const id = sid.accountid ?? sid.accountID ?? 0;
       this.botSteam32 = typeof id === 'number' ? id : Number(id);
       return this.botSteam32;
@@ -403,7 +359,7 @@ class DotaBot extends EventEmitter {
     const send = () => {
       if (!this.gcReady) {
         this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, Buffer.alloc(0));
-        console.log("[GC] → Hello sent");
+        console.log("[GC] -> Hello sent");
       }
     };
     send();
@@ -414,10 +370,7 @@ class DotaBot extends EventEmitter {
     if (this.helloInterval) { clearInterval(this.helloInterval); this.helloInterval = null; }
   }
 
-  // ── Protobuf encoding helpers ─────────────────────────────────────────────
-
   private vi(field: number, value: number): Buffer {
-    // varint field
     const tag = (field << 3) | 0;
     const tagBuf = this.encodeVarint(tag);
     const valBuf = this.encodeVarint(value);
@@ -425,7 +378,6 @@ class DotaBot extends EventEmitter {
   }
 
   private str(field: number, value: string): Buffer {
-    // length-delimited field (string)
     const tag = (field << 3) | 2;
     const tagBuf = this.encodeVarint(tag);
     const data = Buffer.from(value, "utf8");
@@ -434,7 +386,6 @@ class DotaBot extends EventEmitter {
   }
 
   private bytes(field: number, value: Buffer): Buffer {
-    // length-delimited field (bytes)
     const tag = (field << 3) | 2;
     const tagBuf = this.encodeVarint(tag);
     const lenBuf = this.encodeVarint(value.length);
@@ -442,7 +393,6 @@ class DotaBot extends EventEmitter {
   }
 
   private sub(field: number, value: Buffer): Buffer {
-    // embedded message (same wire type as bytes)
     return this.bytes(field, value);
   }
 
@@ -460,8 +410,6 @@ class DotaBot extends EventEmitter {
     return Buffer.from(buf);
   }
 }
-
-// ── Singleton ─────────────────────────────────────────────────────────────────
 
 let instance: DotaBot | null = null;
 export function getDotaBot(): DotaBot {
