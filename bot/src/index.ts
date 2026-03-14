@@ -186,4 +186,17 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) { console.error("❌ DISCORD_BOT_TOKEN not set"); process.exit(1); }
+
+process.on("SIGTERM", () => {
+  console.log("[Steam] SIGTERM received — logging off cleanly...");
+  try { getDotaBot().disconnect(); } catch {}
+  setTimeout(() => process.exit(0), 2000);
+});
+ 
+process.on("SIGINT", () => {
+  console.log("[Steam] SIGINT received — logging off cleanly...");
+  try { getDotaBot().disconnect(); } catch {}
+  setTimeout(() => process.exit(0), 2000);
+});
+ 
 client.login(token);

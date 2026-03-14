@@ -93,13 +93,28 @@ class DotaBot extends EventEmitter {
     const password = process.env.STEAM_PASSWORD;
     if (!username || !password) throw new Error("STEAM_ACCOUNT_NAME / STEAM_PASSWORD missing");
 
+    // ── CHANGE 1: Support refresh token to avoid LoggedInElsewhere ──────────
+    // On first boot, logs in with password and prints a refresh token to console.
+    // After that, set STEAM_REFRESH_TOKEN in Railway env to skip password login.
+    const savedToken = process.env.STEAM_REFRESH_TOKEN;
+    const logOnOptions: any = savedToken
+      ? { refreshToken: savedToken }
+      : { accountName: username, password, machineName: "IEsports-Railway-Bot" };
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.stopHello();
         reject(new Error("GC connection timed out (90s)"));
       }, 90000);
 
-      this.client.logOn({ accountName: username, password });
+      this.client.logOn(logOnOptions);
+
+      // ── CHANGE 2: Save refresh token printed to logs on first login ─────────
+      // Copy the token from Railway logs and set it as STEAM_REFRESH_TOKEN env var.
+      this.client.on("refreshToken", (token: string) => {
+        console.log("[Steam] 🔑 New refresh token received — set this in Railway as STEAM_REFRESH_TOKEN:");
+        console.log(token);
+      });
 
       this.client.on("loggedOn", () => {
         console.log(`[Steam] ✅ Logged in as ${username}`);
@@ -156,7 +171,17 @@ class DotaBot extends EventEmitter {
         }
       });
 
-      this.client.on("error", (err: Error) => {
+      // ── CHANGE 3: Handle LoggedInElsewhere gracefully instead of crashing ───
+      // eresult 6 = LoggedInElsewhere. Wait 20s for old session to expire, then retry.
+      // All other errors still reject as before.
+      this.client.on("error", (err: any) => {
+        if (err.eresult === 6) {
+          console.warn("[Steam] ⚠️  LoggedInElsewhere — waiting 20s for old session to drop, then retrying...");
+          setTimeout(() => {
+            this.client.logOn(logOnOptions);
+          }, 20000);
+          return; // don't reject — let the retry resolve/reject
+        }
         clearTimeout(timeout);
         this.stopHello();
         this.ready = false; this.gcReady = false;
@@ -287,48 +312,51 @@ class DotaBot extends EventEmitter {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCBalancedShuffleLobby, {}, Buffer.alloc(0));
   }
+
   flipTeams(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCFlipLobbyTeams, {}, Buffer.alloc(0));
   }
+
   startGame(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLaunch, {}, Buffer.alloc(0));
     console.log("[Dota2] ✅ Game launched!");
   }
-  // AFTER (fixed)
-async destroyLobby(): Promise<void> {
-  if (!this.isReady()) {
-    console.warn("[Dota2] destroyLobby: not ready");
-    return;
+
+  async destroyLobby(): Promise<void> {
+    if (!this.isReady()) {
+      console.warn("[Dota2] destroyLobby: not ready");
+      return;
+    }
+
+    // Step 1: Move bot back to Radiant slot 0 (host position)
+    // CMsgPracticeLobbySetTeamSlot { team=0 (Radiant), slot=0 }
+    const slotMsg = Buffer.concat([
+      this.vi(1, 0), // team = GOOD_GUYS (Radiant)
+      this.vi(2, 0), // slot = 0
+    ]);
+    this.client.sendToGC(
+      DOTA2_APP_ID,
+      EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot,
+      {},
+      slotMsg
+    );
+    console.log("[Dota2] → Moving bot to host slot before destroy...");
+
+    // Step 2: Wait for GC to process the slot change
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Step 3: Send destroy
+    this.client.sendToGC(
+      DOTA2_APP_ID,
+      EDOTAGCMsg.k_EMsgDestroyLobbyRequest,
+      {},
+      Buffer.alloc(0)
+    );
+    console.log("[Dota2] ✅ Destroy request sent");
   }
 
-  // Step 1: Move bot back to Radiant slot 0 (host position)
-  // CMsgPracticeLobbySetTeamSlot { team=0 (Radiant), slot=0 }
-  const slotMsg = Buffer.concat([
-    this.vi(1, 0), // team = GOOD_GUYS (Radiant)
-    this.vi(2, 0), // slot = 0
-  ]);
-  this.client.sendToGC(
-    DOTA2_APP_ID,
-    EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot,
-    {},
-    slotMsg
-  );
-  console.log("[Dota2] → Moving bot to host slot before destroy...");
-
-  // Step 2: Wait for GC to process the slot change
-  await new Promise(r => setTimeout(r, 1500));
-
-  // Step 3: Send destroy
-  this.client.sendToGC(
-    DOTA2_APP_ID,
-    EDOTAGCMsg.k_EMsgDestroyLobbyRequest,
-    {},
-    Buffer.alloc(0)
-  );
-  console.log("[Dota2] ✅ Destroy request sent");
-}
   // Kick bot from its Radiant/Dire slot → moves to Unassigned pool
   // Use this instead of leaveLobby so bot stays in lobby as host
   kickBotFromTeam(): void {
@@ -341,11 +369,13 @@ async destroyLobby(): Promise<void> {
       console.warn("[Dota2] kickBotFromTeam: steam32 unknown");
     }
   }
+
   kickPlayer(steam32Id: string): void {
     if (!this.isReady()) return;
     const id = parseInt(steam32Id, 10);
     if (!isNaN(id)) this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKick, {}, this.vi(1, id));
   }
+
   disconnect(): void {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
@@ -363,48 +393,80 @@ async destroyLobby(): Promise<void> {
       if (!sid) return 0;
       // steam-user SteamID object: accountid is the low 32 bits
       const id = sid.accountid ?? sid.accountID ?? 0;
-      this.botSteam32 = typeof id === 'number' ? id : parseInt(id.toString(), 10);
-      console.log(`[Dota2] Bot steam32 resolved: ${this.botSteam32}`);
+      this.botSteam32 = typeof id === 'number' ? id : Number(id);
       return this.botSteam32;
-    } catch { return 0; }
+    } catch {
+      return 0;
+    }
   }
 
-  private startHello() {
-    this.sendHello();
-    this.helloInterval = setInterval(() => { if (!this.gcReady) this.sendHello(); else this.stopHello(); }, 5000);
+  private startHello(): void {
+    this.stopHello();
+    const send = () => {
+      if (!this.gcReady) {
+        this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, Buffer.alloc(0));
+        console.log("[GC] → Hello sent");
+      }
+    };
+    send();
+    this.helloInterval = setInterval(send, 5000);
   }
-  private stopHello() {
+
+  private stopHello(): void {
     if (this.helloInterval) { clearInterval(this.helloInterval); this.helloInterval = null; }
   }
-  private sendHello() {
-    this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, Buffer.alloc(0));
+
+  // ── Protobuf encoding helpers ─────────────────────────────────────────────
+
+  private vi(field: number, value: number): Buffer {
+    // varint field
+    const tag = (field << 3) | 0;
+    const tagBuf = this.encodeVarint(tag);
+    const valBuf = this.encodeVarint(value);
+    return Buffer.concat([tagBuf, valBuf]);
   }
 
-  // ── Protobuf encoding ──────────────────────────────────────────────────────
-  private raw(v: number): Buffer {
-    const p: number[] = [];
-    let x = v >>> 0;
-    while (x > 0x7f) { p.push((x & 0x7f) | 0x80); x >>>= 7; }
-    p.push(x);
-    return Buffer.from(p);
+  private str(field: number, value: string): Buffer {
+    // length-delimited field (string)
+    const tag = (field << 3) | 2;
+    const tagBuf = this.encodeVarint(tag);
+    const data = Buffer.from(value, "utf8");
+    const lenBuf = this.encodeVarint(data.length);
+    return Buffer.concat([tagBuf, lenBuf, data]);
   }
-  private vi(fn: number, v: number): Buffer {
-    return Buffer.concat([this.raw((fn << 3) | 0), this.raw(v)]);
+
+  private bytes(field: number, value: Buffer): Buffer {
+    // length-delimited field (bytes)
+    const tag = (field << 3) | 2;
+    const tagBuf = this.encodeVarint(tag);
+    const lenBuf = this.encodeVarint(value.length);
+    return Buffer.concat([tagBuf, lenBuf, value]);
   }
-  private str(fn: number, s: string): Buffer {
-    const b = Buffer.from(s, "utf8");
-    return Buffer.concat([this.raw((fn << 3) | 2), this.raw(b.length), b]);
+
+  private sub(field: number, value: Buffer): Buffer {
+    // embedded message (same wire type as bytes)
+    return this.bytes(field, value);
   }
-  private bool(fn: number, v: boolean): Buffer { return this.vi(fn, v ? 1 : 0); }
-  private bytes(fn: number, d: Buffer): Buffer {
-    return Buffer.concat([this.raw((fn << 3) | 2), this.raw(d.length), d]);
+
+  private bool(field: number, value: boolean): Buffer {
+    return this.vi(field, value ? 1 : 0);
   }
-  private sub(fn: number, d: Buffer): Buffer { return this.bytes(fn, d); }
+
+  private encodeVarint(value: number): Buffer {
+    const buf: number[] = [];
+    while (value > 0x7f) {
+      buf.push((value & 0x7f) | 0x80);
+      value >>>= 7;
+    }
+    buf.push(value & 0x7f);
+    return Buffer.from(buf);
+  }
 }
+
+// ── Singleton ─────────────────────────────────────────────────────────────────
 
 let instance: DotaBot | null = null;
 export function getDotaBot(): DotaBot {
   if (!instance) instance = new DotaBot();
   return instance;
 }
-export { DotaBot };
