@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npx tsx src/index.ts",
     "build": "tsc",
-    "start": "npm run build && node dist/index.js",   
+    "start": "node dist/index.js",
     "register": "npx tsx src/deploy-commands.ts"
   },
   "dependencies": {
