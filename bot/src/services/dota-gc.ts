@@ -135,8 +135,13 @@ class DotaBot extends EventEmitter {
 
       this.client.on("receivedFromGC", (appId: number, msgType: number, payload: Buffer) => {
         if (appId !== DOTA2_APP_ID) return;
-        if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType))
+        
+        // Log ALL messages when waiting for lobby — helps diagnose what GC is sending
+        if (this.waitingForLobby) {
+          console.log(`[GC:lobby-wait] ← msgType=${msgType} (${payload.length}b)`);
+        } else if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType)) {
           console.log(`[GC] ← ${msgType} (${payload.length}b)`);
+        }
 
         if (msgType === EGCBaseClientMsg.k_EMsgGCClientWelcome) {
           // field 1 = version (varint), tag = 0x08
@@ -214,7 +219,9 @@ class DotaBot extends EventEmitter {
     // ignores PracticeLobbyCreate. Sending destroy first clears the slate.
     console.log("[Dota2] → Pre-destroy any existing lobby...");
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-    await new Promise(r => setTimeout(r, 3000)); // wait for GC to process
+    await new Promise(r => setTimeout(r, 5000)); // wait for GC to process
+    console.log("[Dota2] → Pre-destroy wait done, sending create...");      
+
 
     return new Promise((resolve, reject) => {
       let done = false;
