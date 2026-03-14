@@ -209,6 +209,13 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
 
+    // ── Pre-destroy any lingering lobby before creating a new one ──
+    // If bot is already in a lobby from a previous session, GC silently
+    // ignores PracticeLobbyCreate. Sending destroy first clears the slate.
+    console.log("[Dota2] → Pre-destroy any existing lobby...");
+    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+    await new Promise(r => setTimeout(r, 3000)); // wait for GC to process
+
     return new Promise((resolve, reject) => {
       let done = false;
       const timeout = setTimeout(() => {
@@ -333,25 +340,6 @@ class DotaBot extends EventEmitter {
       console.warn("[Dota2] destroyLobby: not ready");
       return;
     }
-
-    // Step 1: Move bot back to Radiant slot 0 (host position)
-    // CMsgPracticeLobbySetTeamSlot { team=0 (Radiant), slot=0 }
-    const slotMsg = Buffer.concat([
-      this.vi(1, 0), // team = GOOD_GUYS (Radiant)
-      this.vi(2, 0), // slot = 0
-    ]);
-    this.client.sendToGC(
-      DOTA2_APP_ID,
-      EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot,
-      {},
-      slotMsg
-    );
-    console.log("[Dota2] → Moving bot to host slot before destroy...");
-
-    // Step 2: Wait for GC to process the slot change
-    await new Promise(r => setTimeout(r, 1500));
-
-    // Step 3: Send destroy
     this.client.sendToGC(
       DOTA2_APP_ID,
       EDOTAGCMsg.k_EMsgDestroyLobbyRequest,
@@ -360,7 +348,6 @@ class DotaBot extends EventEmitter {
     );
     console.log("[Dota2] ✅ Destroy request sent");
   }
-
   // Kick bot from its Radiant/Dire slot → moves to Unassigned pool
   // Use this instead of leaveLobby so bot stays in lobby as host
   kickBotFromTeam(): void {
