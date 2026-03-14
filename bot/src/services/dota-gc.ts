@@ -51,6 +51,10 @@ class DotaBot extends EventEmitter {
   private ownershipTicket: Buffer | null = null;
   private waitingForLobby = false;
   private pendingTimers: NodeJS.Timeout[] = [];
+  // Tracks whether we believe a lobby currently exists on the GC side.
+  // Set true when lobby is confirmed, false when destroy is sent.
+  // createLobby uses this to decide how long to wait before creating.
+  private lobbyActive = false;
 
   constructor() {
     super();
@@ -124,16 +128,15 @@ class DotaBot extends EventEmitter {
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
 
           // Destroy any lobby left over from a previous session.
-          // If the bot crashed/restarted while in a lobby, the GC still has it
-          // active and will silently ignore any new PracticeLobbyCreate.
           console.log("[Dota2] -> Clearing any leftover lobby from previous session...");
           this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+          this.lobbyActive = false;
 
           resolve();
         }
 
-        // Ownership challenge after PracticeLobbyCreate
-        // msgType 24 = classic, msgType 26 = observed in some GC versions
+        // Ownership challenge — respond regardless of gcReady state.
+        // msgType 24 = classic, msgType 26 = observed in some GC versions.
         if ((msgType === 24 || msgType === 26) && payload.length < 1000) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
@@ -179,11 +182,14 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
 
-    // Belt-and-suspenders pre-destroy — in case something created a lobby
-    // between connect-time and now (e.g. admin manually started one).
-    console.log("[Dota2] -> Pre-destroy any existing lobby...");
+    // Always destroy first and wait long enough for the GC to tear it down.
+    // If a lobby was recently active (lobbyActive=true), wait 8s instead of 4s
+    // because the GC needs more time to fully tear down an occupied lobby.
+    const destroyWait = this.lobbyActive ? 8000 : 4000;
+    console.log(`[Dota2] -> Pre-destroy (lobbyActive=${this.lobbyActive}, waiting ${destroyWait}ms)...`);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-    await new Promise(r => setTimeout(r, 3000));
+    this.lobbyActive = false;
+    await new Promise(r => setTimeout(r, destroyWait));
     console.log("[Dota2] -> Sending create...");
 
     return new Promise((resolve, reject) => {
@@ -200,6 +206,7 @@ class DotaBot extends EventEmitter {
         done = true;
         clearTimeout(timeout);
         this.waitingForLobby = false;
+        this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
         const t0 = setTimeout(() => {
@@ -311,6 +318,7 @@ class DotaBot extends EventEmitter {
       {},
       Buffer.alloc(0)
     );
+    this.lobbyActive = false;
     console.log("[Dota2] ✅ Destroy request sent");
   }
 
