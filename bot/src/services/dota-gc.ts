@@ -134,7 +134,7 @@ class DotaBot extends EventEmitter {
 
         // Ownership challenge after PracticeLobbyCreate
         // msgType 24 = classic, msgType 26 = observed in some GC versions
-        if ((msgType === 24 || msgType === 26) && payload.length < 1000 && this.gcReady) {
+        if ((msgType === 24 || msgType === 26) && payload.length < 1000) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
             this.vi(1, 1),
