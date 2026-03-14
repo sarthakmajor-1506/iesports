@@ -185,7 +185,7 @@ class DotaBot extends EventEmitter {
     // Always destroy first and wait long enough for the GC to tear it down.
     // If a lobby was recently active (lobbyActive=true), wait 8s instead of 4s
     // because the GC needs more time to fully tear down an occupied lobby.
-    const destroyWait = this.lobbyActive ? 8000 : 4000;
+    const destroyWait = this.lobbyActive ? 10000 : 4000;
     console.log(`[Dota2] -> Pre-destroy (lobbyActive=${this.lobbyActive}, waiting ${destroyWait}ms)...`);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
     this.lobbyActive = false;
@@ -209,16 +209,16 @@ class DotaBot extends EventEmitter {
         this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
-        const t0 = setTimeout(() => {
-          const botSteam32 = this.getBotSteam32();
-          if (botSteam32 > 0) {
-            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
-            console.log(`[Dota2] -> KickFromTeam self (steam32=${botSteam32}) -> Unassigned`);
-          } else {
-            console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
-          }
-        }, 1500);
-        this.pendingTimers.push(t0);
+        // const t0 = setTimeout(() => {
+        //   const botSteam32 = this.getBotSteam32();
+        //   if (botSteam32 > 0) {
+        //     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
+        //     console.log(`[Dota2] -> KickFromTeam self (steam32=${botSteam32}) -> Unassigned`);
+        //   } else {
+        //     console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
+        //   }
+        // }, 1500);
+        // this.pendingTimers.push(t0);
 
         [3000, 6000, 10000].forEach(d => {
           const t = setTimeout(() => this.applySettings(name, password, mode, serverRegion), d);
