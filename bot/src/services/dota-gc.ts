@@ -158,15 +158,19 @@ class DotaBot extends EventEmitter {
         }
 
         // Ownership challenge after PracticeLobbyCreate
-        if (msgType === 24 && payload.length < 1000 && this.gcReady) {
+        // Ownership challenge after PracticeLobbyCreate
+        // msgType 24 = classic challenge, msgType 26 = observed in some GC versions
+        if ((msgType === 24 || msgType === 26) && payload.length < 1000 && this.gcReady) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
             this.vi(1, 1),
             this.vi(2, DOTA2_APP_ID),
             this.bytes(3, ticket),
           ]);
-          this.client.sendToGC(DOTA2_APP_ID, 25, {}, resp);
-          console.log("[GC] → Ticket response sent");
+          // Reply on the matching response channel (24→25, 26→27)
+          const replyMsg = msgType === 26 ? 27 : 25;
+          this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
+          console.log(`[GC] → Ticket response sent (msgType ${msgType} → ${replyMsg})`);
           if (this.waitingForLobby) this.emit("lobbyCreated");
         }
       });
@@ -211,7 +215,7 @@ class DotaBot extends EventEmitter {
         this.waitingForLobby = false;
         this.removeAllListeners("lobbyCreated");
         reject(new Error("Lobby create timed out (25s)"));
-      }, 25000);
+      }, 45000);
 
       this.waitingForLobby = true;
       this.once("lobbyCreated", () => {
