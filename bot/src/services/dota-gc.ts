@@ -51,9 +51,6 @@ class DotaBot extends EventEmitter {
   private ownershipTicket: Buffer | null = null;
   private waitingForLobby = false;
   private pendingTimers: NodeJS.Timeout[] = [];
-  // Tracks whether we believe a lobby currently exists on the GC side.
-  // Set true when lobby is confirmed, false when destroy is sent.
-  // createLobby uses this to decide how long to wait before creating.
   private lobbyActive = false;
 
   constructor() {
@@ -104,7 +101,6 @@ class DotaBot extends EventEmitter {
       this.client.on("receivedFromGC", (appId: number, msgType: number, payload: Buffer) => {
         if (appId !== DOTA2_APP_ID) return;
 
-        // Log ALL messages when waiting for lobby
         if (this.waitingForLobby) {
           console.log(`[GC:lobby-wait] <- msgType=${msgType} (${payload.length}b)`);
         } else if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType)) {
@@ -127,7 +123,6 @@ class DotaBot extends EventEmitter {
           clearTimeout(timeout);
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
 
-          // Destroy any lobby left over from a previous session.
           console.log("[Dota2] -> Clearing any leftover lobby from previous session...");
           this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
           this.lobbyActive = false;
@@ -135,8 +130,6 @@ class DotaBot extends EventEmitter {
           resolve();
         }
 
-        // Ownership challenge — respond regardless of gcReady state.
-        // msgType 24 = classic, msgType 26 = observed in some GC versions.
         if ((msgType === 24 || msgType === 26) && payload.length < 1000) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
@@ -182,9 +175,6 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
 
-    // Always destroy first and wait long enough for the GC to tear it down.
-    // If a lobby was recently active (lobbyActive=true), wait 8s instead of 4s
-    // because the GC needs more time to fully tear down an occupied lobby.
     const destroyWait = this.lobbyActive ? 10000 : 4000;
     console.log(`[Dota2] -> Pre-destroy (lobbyActive=${this.lobbyActive}, waiting ${destroyWait}ms)...`);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
@@ -209,19 +199,32 @@ class DotaBot extends EventEmitter {
         this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
-        // const t0 = setTimeout(() => {
-        //   const botSteam32 = this.getBotSteam32();
-        //   if (botSteam32 > 0) {
-        //     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
-        //     console.log(`[Dota2] -> KickFromTeam self (steam32=${botSteam32}) -> Unassigned`);
-        //   } else {
-        //     console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
-        //   }
-        // }, 1500);
-        // this.pendingTimers.push(t0);
+        // Kick bot from team into unassigned slot at 1.5s, then re-apply at 3s & 6s
+        const t0 = setTimeout(() => {
+          const botSteam32 = this.getBotSteam32();
+          if (botSteam32 > 0) {
+            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
+            console.log(`[Dota2] -> KickFromTeam self (steam32=${botSteam32}) -> Unassigned`);
+          } else {
+            console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
+          }
+        }, 1500);
+        this.pendingTimers.push(t0);
 
+        // Re-apply settings + re-kick after each applySettings call to ensure bot stays unassigned
         [3000, 6000, 10000].forEach(d => {
-          const t = setTimeout(() => this.applySettings(name, password, mode, serverRegion), d);
+          const t = setTimeout(() => {
+            this.applySettings(name, password, mode, serverRegion);
+            // Re-kick after settings update in case GC reassigns bot to a team
+            const reKick = setTimeout(() => {
+              const botSteam32 = this.getBotSteam32();
+              if (botSteam32 > 0) {
+                this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
+                console.log(`[Dota2] -> Re-KickFromTeam self after settings (steam32=${botSteam32})`);
+              }
+            }, 800);
+            this.pendingTimers.push(reKick);
+          }, d);
           this.pendingTimers.push(t);
         });
 
@@ -257,6 +260,8 @@ class DotaBot extends EventEmitter {
       this.bool(13, true),
       this.str(15, password),
       this.vi(33,  0),
+      // Field 37 = bot team slot: 4 = DOTA_GC_TEAM_NOTEAM (unassigned)
+      this.vi(37,  4),
     ]);
   }
 
