@@ -153,45 +153,33 @@ async function handleLobbyShuffle(interaction: ButtonInteraction, lobbyId: strin
   await interaction.deferReply({ ephemeral: true });
 
   try {
+    const bot = getDotaBot();
+    if (!bot.isReady()) { await interaction.editReply("❌ Dota bot not connected."); return; }
+
     const lobby = await getLobby(lobbyId);
     if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
 
-    // Gather all players across all slots
-    const allPlayers: MatchPlayer[] = [
-      ...lobby.spectators,
-      ...lobby.radiant,
-      ...lobby.dire,
-    ];
-
-    if (allPlayers.length < 2) {
+    const totalPlayers = lobby.spectators.length + lobby.radiant.length + lobby.dire.length;
+    if (totalPlayers < 2) {
       await interaction.editReply("⚠️ Not enough players to shuffle (need at least 2).");
       return;
     }
 
-    // Fisher-Yates shuffle
-    const shuffled = [...allPlayers];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    const half = Math.floor(shuffled.length / 2);
-    const radiant = shuffled.slice(0, half);
-    const dire    = shuffled.slice(half);
-
-    // Write to Firestore
-    await updateLobby(lobbyId, { radiant, dire, spectators: [] });
-
-    // Also send GC shuffle command
-    getDotaBot().shuffleTeams();
+    // Send GC BalancedShuffle — the GC randomly assigns players to Radiant/Dire server-side.
+    // The result comes back as a lobbyUpdate event (msgType 7388) which match-orchestrator
+    // listens for and syncs to Firestore + moves Discord VCs automatically.
+    // We cannot force specific players to specific slots — the GC controls that.
+    bot.shuffleTeams();
 
     await interaction.editReply(
-      `🔀 Teams shuffled and saved!\n` +
-      `🟢 Radiant (${radiant.length}): ${radiant.map(p => p.username).join(", ")}\n` +
-      `🔴 Dire (${dire.length}): ${dire.map(p => p.username).join(", ")}`
+      `🔀 Shuffle sent to Dota 2!
+` +
+      `Players are being randomly assigned to Radiant/Dire by the game server.
+` +
+      `Discord VCs will update automatically once the GC confirms team assignments.`
     );
 
-    console.log(`[Shuffle] Lobby ${lobbyId}: Radiant=${radiant.length}, Dire=${dire.length}`);
+    console.log(`[Shuffle] Lobby ${lobbyId}: GC BalancedShuffle sent`);
 
   } catch (err: any) {
     await interaction.editReply(`❌ Failed: ${err.message}`);
@@ -205,30 +193,23 @@ async function handleLobbyFlip(interaction: ButtonInteraction, lobbyId: string):
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    const lobby = await getLobby(lobbyId);
-    if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
+    const bot = getDotaBot();
+    if (!bot.isReady()) { await interaction.editReply("❌ Dota bot not connected."); return; }
 
-    if (lobby.radiant.length === 0 && lobby.dire.length === 0) {
-      await interaction.editReply("⚠️ No teams to flip. Use Shuffle first.");
-      return;
-    }
-
-    // Swap radiant ↔ dire in Firestore
-    await updateLobby(lobbyId, {
-      radiant: lobby.dire,
-      dire: lobby.radiant,
-    });
-
-    // Also send GC flip command
-    getDotaBot().flipTeams();
+    // Send GC FlipTeams — the GC swaps all Radiant players to Dire and vice versa.
+    // Result comes back as a lobbyUpdate event (msgType 7388) which match-orchestrator
+    // listens for and syncs to Firestore + moves Discord VCs automatically.
+    bot.flipTeams();
 
     await interaction.editReply(
-      `🔄 Teams flipped and saved!\n` +
-      `🟢 Radiant (${lobby.dire.length}): ${lobby.dire.map(p => p.username).join(", ")}\n` +
-      `🔴 Dire (${lobby.radiant.length}): ${lobby.radiant.map(p => p.username).join(", ")}`
+      `🔄 Flip sent to Dota 2!
+` +
+      `Radiant and Dire are being swapped by the game server.
+` +
+      `Discord VCs will update automatically once the GC confirms team assignments.`
     );
 
-    console.log(`[Flip] Lobby ${lobbyId}: swapped Radiant↔Dire`);
+    console.log(`[Flip] Lobby ${lobbyId}: GC FlipTeams sent`);
 
   } catch (err: any) {
     await interaction.editReply(`❌ Failed: ${err.message}`);
