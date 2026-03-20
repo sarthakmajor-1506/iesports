@@ -426,7 +426,6 @@ class DotaBot extends EventEmitter {
     buf.push(value & 0x7f);
     return Buffer.from(buf);
   }
-}
 
   // ── Minimal protobuf decoder ──────────────────────────────
   private readVarint(buf: Buffer, pos: number): { value: number; pos: number } {
@@ -475,6 +474,7 @@ class DotaBot extends EventEmitter {
     }
     return members;
   }
+}
 
 let instance: DotaBot | null = null;
 export function getDotaBot(): DotaBot {
