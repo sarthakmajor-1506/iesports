@@ -22,6 +22,8 @@ import { getDotaBot } from "../services/dota-gc";
 import { cleanupVoiceChannels } from "../services/match-orchestrator";
 import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
+import { ChannelType, VoiceChannel, PermissionsBitField } from "discord.js";
+import { MatchPlayer } from "../services/firebase";
 
 export async function handleButton(interaction: ButtonInteraction): Promise<void> {
   const [action, id] = interaction.customId.split(":");
@@ -285,11 +287,122 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
   );
 }
 
-async function handleMoveToVC(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
-  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
-  await interaction.reply({ content: "🔊 Voice channels are auto-created when the match starts and teams are assigned in-game.", ephemeral: true });
+async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) {
+    await interaction.reply({ content: "❌ Admin only.", ephemeral: true });
+    return;
+  }
+ 
+  await interaction.deferReply({ ephemeral: true });
+ 
+  try {
+    const lobby = await getLobby(lobbyId);
+    if (!lobby) {
+      await interaction.editReply("❌ Lobby not found.");
+      return;
+    }
+ 
+    const radiant = lobby.radiant ?? [];
+    const dire = lobby.dire ?? [];
+ 
+    if (radiant.length === 0 && dire.length === 0) {
+      await interaction.editReply(
+        "⚠️ No teams assigned yet. Teams are read from the Dota 2 lobby once players are on Radiant/Dire.\n" +
+        "Make sure players have joined their teams in-game, then click Move to VCs again."
+      );
+      return;
+    }
+ 
+    const guildId = process.env.DISCORD_GUILD_ID!;
+    const guild = await interaction.client.guilds.fetch(guildId);
+    const categoryId = process.env.VOICE_CATEGORY_ID;
+ 
+    // ── Create or reuse voice channels ──────────────────────────────────────
+ 
+    const makeVC = async (name: string, players: MatchPlayer[]): Promise<VoiceChannel> => {
+      const baseOpts: any = {
+        name,
+        type: ChannelType.GuildVoice,
+        userLimit: 6,
+        permissionOverwrites: [
+          {
+            id: guild.id,
+            deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel],
+          },
+          ...players.map((p) => ({
+            id: p.discordId,
+            allow: [
+              PermissionsBitField.Flags.Connect,
+              PermissionsBitField.Flags.ViewChannel,
+              PermissionsBitField.Flags.Speak,
+            ],
+          })),
+        ],
+      };
+      if (categoryId) baseOpts.parent = categoryId;
+      return (await guild.channels.create(baseOpts)) as VoiceChannel;
+    };
+ 
+    const radiantCh = radiant.length > 0 ? await makeVC("🟢 Radiant", radiant) : null;
+    const direCh    = dire.length    > 0 ? await makeVC("🔴 Dire",    dire)    : null;
+ 
+    // ── Move players who are already in any voice channel ───────────────────
+ 
+    let movedRadiant = 0;
+    let movedDire    = 0;
+ 
+    if (radiantCh) {
+      for (const p of radiant) {
+        try {
+          const member = await guild.members.fetch(p.discordId);
+          if (member.voice.channel) {
+            await member.voice.setChannel(radiantCh);
+            movedRadiant++;
+          }
+        } catch {}
+      }
+    }
+ 
+    if (direCh) {
+      for (const p of dire) {
+        try {
+          const member = await guild.members.fetch(p.discordId);
+          if (member.voice.channel) {
+            await member.voice.setChannel(direCh);
+            movedDire++;
+          }
+        } catch {}
+      }
+    }
+ 
+    // ── Post public announcement ─────────────────────────────────────────────
+ 
+    const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+    if (queueChannelId) {
+      try {
+        const ch = (await interaction.client.channels.fetch(queueChannelId)) as TextChannel;
+        await ch.send(
+          `⚔️ **Teams are set! Get into your voice channels!**\n\n` +
+          `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
+          (radiantCh ? `🔊 Radiant VC: <#${radiantCh.id}>\n` : "") +
+          `\n🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
+          (direCh ? `🔊 Dire VC: <#${direCh.id}>` : "")
+        );
+      } catch {}
+    }
+ 
+    await interaction.editReply(
+      `✅ Voice channels created!\n` +
+      `🟢 Radiant: moved ${movedRadiant}/${radiant.length} players\n` +
+      `🔴 Dire: moved ${movedDire}/${dire.length} players\n\n` +
+      `Players not in a voice channel won't be moved — they need to join a VC manually.`
+    );
+  } catch (err: any) {
+    console.error("[MoveToVC]", err);
+    await interaction.editReply(`❌ Failed: ${err.message}`);
+  }
 }
-
+ 
 async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) {
     await interaction.reply({ content: "❌ Admin only.", ephemeral: true });

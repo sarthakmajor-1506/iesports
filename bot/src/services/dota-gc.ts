@@ -199,8 +199,7 @@ class DotaBot extends EventEmitter {
         this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed. Moving bot to unassigned...");
 
-        // Kick bot from team into unassigned slot at 1.5s, then re-apply at 3s & 6s
-        const t0 = setTimeout(() => {
+        const kickSelf = () => {
           const botSteam32 = this.getBotSteam32();
           if (botSteam32 > 0) {
             this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
@@ -208,23 +207,13 @@ class DotaBot extends EventEmitter {
           } else {
             console.warn("[Dota2] KickFromTeam: bot steam32 unknown");
           }
-        }, 1500);
-        this.pendingTimers.push(t0);
+        };
 
-        // Re-apply settings + re-kick after each applySettings call to ensure bot stays unassigned
-        [3000, 6000, 10000].forEach(d => {
-          const t = setTimeout(() => {
-            this.applySettings(name, password, mode, serverRegion);
-            // Re-kick after settings update in case GC reassigns bot to a team
-            const reKick = setTimeout(() => {
-              const botSteam32 = this.getBotSteam32();
-              if (botSteam32 > 0) {
-                this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKickFromTeam, {}, this.vi(1, botSteam32));
-                console.log(`[Dota2] -> Re-KickFromTeam self after settings (steam32=${botSteam32})`);
-              }
-            }, 800);
-            this.pendingTimers.push(reKick);
-          }, d);
+        // Kick aggressively for 15s — NO applySettings calls here because
+        // SetDetails causes the GC to re-slot the bot back into a team.
+        // The Leave button works because it ONLY calls kickBotFromTeam(). Do the same.
+        [300, 600, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 7000, 8000, 10000, 12000, 15000].forEach(d => {
+          const t = setTimeout(kickSelf, d);
           this.pendingTimers.push(t);
         });
 
