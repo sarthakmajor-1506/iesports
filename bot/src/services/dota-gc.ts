@@ -167,7 +167,7 @@ class DotaBot extends EventEmitter {
 
   isReady() { return this.ready && this.gcReady; }
 
-  async createLobby(name: string, password: string, gameMode = "CM", region = "India"): Promise<SteamLobbyResult> {
+  async createLobby(name: string, password: string, gameMode = "AP", region = "India"): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 7;
     const mode = GAME_MODES[gameMode] ?? 2;
