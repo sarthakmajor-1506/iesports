@@ -103,7 +103,7 @@ class DotaBot extends EventEmitter {
 
         if (this.waitingForLobby) {
           console.log(`[GC:lobby-wait] <- msgType=${msgType} (${payload.length}b)`);
-        } else if (![7388, 8675, 8678, 8689, 8747, 4009].includes(msgType)) {
+        } else if (![8675, 8678, 8689, 8747, 4009].includes(msgType)) {
           console.log(`[GC] <- ${msgType} (${payload.length}b)`);
         }
 
@@ -142,6 +142,21 @@ class DotaBot extends EventEmitter {
           console.log(`[GC] -> Ticket response sent (msgType ${msgType} -> ${replyMsg})`);
           if (this.waitingForLobby) this.emit("lobbyCreated");
         }
+
+        // 7388 = CMsgPracticeLobbyResponse — fired whenever any player moves
+        // between Radiant / Dire / Unassigned in the lobby.
+        // Parse the members list and emit "lobbyUpdate" so match-orchestrator
+        // can sync team assignments to Firestore in real-time, without needing
+        // the admin to click Shuffle/Flip.
+        if (msgType === 7388 && payload.length > 0) {
+          try {
+            const members = this.parseLobbyMembers(payload);
+            if (members.length > 0) {
+              console.log(`[GC] 📋 LobbyUpdate: ${members.map(m => `steam32=${m.id} team=${m.team}`).join(", ")}`);
+              this.emit("lobbyUpdate", { members });
+            }
+          } catch { /* parse errors are non-fatal */ }
+        }
       });
 
       this.client.on("error", (err: any) => {
@@ -167,7 +182,7 @@ class DotaBot extends EventEmitter {
 
   isReady() { return this.ready && this.gcReady; }
 
-  async createLobby(name: string, password: string, gameMode = "AP", region = "India"): Promise<SteamLobbyResult> {
+  async createLobby(name: string, password: string, gameMode = "CM", region = "India"): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 7;
     const mode = GAME_MODES[gameMode] ?? 2;
@@ -412,6 +427,54 @@ class DotaBot extends EventEmitter {
     return Buffer.from(buf);
   }
 }
+
+  // ── Minimal protobuf decoder ──────────────────────────────
+  private readVarint(buf: Buffer, pos: number): { value: number; pos: number } {
+    let val = 0, shift = 0;
+    while (pos < buf.length) {
+      const b = buf[pos++];
+      val |= (b & 0x7f) << shift;
+      if (!(b & 0x80)) break;
+      shift += 7;
+    }
+    return { value: val, pos };
+  }
+
+  // Parse CLobbyMember list from CMsgPracticeLobbyResponse (msgType 7388)
+  // Top-level field 3 = repeated CLobbyMember { id=field1(uint32), team=field4(uint32) }
+  // team values: 0=Radiant, 1=Dire, 4=Unassigned
+  parseLobbyMembers(buf: Buffer): Array<{ id: number; team: number }> {
+    const members: Array<{ id: number; team: number }> = [];
+    let pos = 0;
+    while (pos < buf.length) {
+      const t = this.readVarint(buf, pos); pos = t.pos;
+      const fieldNum = t.value >>> 3;
+      const wireType = t.value & 0x7;
+      if (wireType === 0) {
+        const r = this.readVarint(buf, pos); pos = r.pos;
+      } else if (wireType === 2) {
+        const l = this.readVarint(buf, pos); pos = l.pos;
+        const sub = buf.slice(pos, pos + l.value); pos += l.value;
+        if (fieldNum === 3) {
+          let id = 0, team = 4, sp = 0;
+          while (sp < sub.length) {
+            const st = this.readVarint(sub, sp); sp = st.pos;
+            const sf = st.value >>> 3, sw = st.value & 0x7;
+            if (sw === 0) {
+              const sv = this.readVarint(sub, sp); sp = sv.pos;
+              if (sf === 1) id   = sv.value;
+              if (sf === 4) team = sv.value;
+            } else if (sw === 2) { const sl = this.readVarint(sub, sp); sp = sl.pos + sl.value; }
+            else if (sw === 1) { sp += 8; } else if (sw === 5) { sp += 4; } else break;
+          }
+          if (id > 0) members.push({ id, team });
+        }
+      } else if (wireType === 1) { pos += 8; }
+      else if (wireType === 5) { pos += 4; }
+      else break;
+    }
+    return members;
+  }
 
 let instance: DotaBot | null = null;
 export function getDotaBot(): DotaBot {

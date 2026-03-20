@@ -75,9 +75,6 @@ export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Prom
 
 // ── PHASE 2: Match time — create Dota lobby + invite ─────────
 
-// ── PHASE 2: Match time — create Dota lobby + invite ─────────
-// REPLACE the entire startMatchLobby function in match-orchestrator.ts with this.
-
 export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<string | null> {
   const guildId = process.env.DISCORD_GUILD_ID!;
   const lobbyChannelId = process.env.LOBBY_CONTROL_CHANNEL_ID;
@@ -111,7 +108,6 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);
     } catch (err: any) {
       console.error(`[Match] ❌ Lobby creation failed: ${err.message}`);
-      console.error(`[Match]    Players will need to join manually.`);
     }
   } else {
     console.log(`[Match] ⚠️  Bot not ready — skipping GC lobby creation (manual mode)`);
@@ -138,25 +134,18 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     } catch (err: any) { console.error("[Match] Lobby embed error:", err.message); }
   }
 
-  // ── Step 4: Invite players — ONLY if lobby was created ──────
-  // ✅ BUG FIX: Previously invites fired unconditionally even with no lobby.
-  // Now: only invite via GC if lobby actually exists.
-  // Always send DM + #queue message as fallback regardless.
+  // ── Step 4: Invite players ───────────────────────────────────
   if (lobbyCreated && bot.isReady()) {
     try {
       const ids = allPlayers.map(p => p.steam32Id).filter((id): id is string => !!id);
       console.log(`[Match] Sending GC invites to ${ids.length} players...`);
-      // ✅ await inviteAll — it's async with staggered delays
       await bot.inviteAll(ids);
     } catch (err: any) {
       console.error("[Match] GC invite error:", err.message);
     }
-  } else {
-    console.log(`[Match] Skipping GC invites (lobbyCreated=${lobbyCreated}, botReady=${bot.isReady()})`);
   }
 
-  // ── Step 5: DM every player with lobby details ───────────────
-  // This fires always — even in manual mode — so players always know the lobby info
+  // ── Step 5: DM every player ──────────────────────────────────
   for (const player of allPlayers) {
     try {
       const member = await guild.members.fetch(player.discordId);
@@ -173,14 +162,12 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     } catch { /* DMs closed */ }
   }
 
-  // ── Step 6: Announce in #queue channel ──────────────────────
+  // ── Step 6: Announce in #queue ───────────────────────────────
   const queueChannelId = process.env.QUEUE_CHANNEL_ID;
   if (queueChannelId) {
     try {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
-      const statusMsg = lobbyCreated
-        ? `✅ Lobby created! Steam invites sent.`
-        : `⚠️ Bot lobby unavailable — join manually using the details below.`;
+      const statusMsg = lobbyCreated ? `✅ Lobby created! Steam invites sent.` : `⚠️ Bot lobby unavailable — join manually using the details below.`;
       await ch.send(
         `🏟️ **Match Started!**\n${statusMsg}\n` +
         `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
@@ -189,7 +176,12 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     } catch (err: any) { console.error("[Match] Queue announce error:", err.message); }
   }
 
-  monitorLobbyForTeams(client, firestoreLobbyId, queue, allPlayers);
+  // ── Step 7: Poll Firestore for teams, then move to VCs ───────
+  // The GC lobbyUpdate event is unreliable — instead we poll Firestore
+  // every 5s for up to 90 minutes waiting for radiant/dire to be populated.
+  // Teams get written to Firestore either by the admin shuffle/flip flow
+  // or manually. Once they appear, VCs are created and players are moved.
+  pollFirestoreForTeams(client, firestoreLobbyId, allPlayers);
 
   await saveDailyRecord(todayKey(), {
     date: todayKey(), queueId: queue.id, lobbyId: firestoreLobbyId,
@@ -200,142 +192,232 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   return firestoreLobbyId;
 }
 
-// ── PHASE 3: Monitor GC — match starts → read teams → create VCs ─
+// ── PHASE 3: Watch for teams via GC lobbyUpdate events + Firestore poll ─────
+//
+// TWO mechanisms so both manual in-game team selection AND shuffle/flip work:
+//
+// 1. GC lobbyUpdate (real-time): dota-gc.ts now parses msgType 7388 and emits
+//    "lobbyUpdate" with a members list { id: steam32, team: 0|1|4 }.
+//    We match those steam32 IDs to our allPlayers list and sync to Firestore.
+//    This handles the case where players move teams manually in-game.
+//
+// 2. Firestore poll (fallback every 10s): catches shuffle/flip button writes
+//    and any edge cases where the GC event was missed.
 
-function monitorLobbyForTeams(client: Client, lobbyDocId: string, queue: QueueDoc, allPlayers: MatchPlayer[]): void {
+export function pollFirestoreForTeams(
+  client: Client,
+  lobbyDocId: string,
+  allPlayers: MatchPlayer[]
+): void {
+  console.log(`[Teams] Watching lobby ${lobbyDocId} for team assignments...`);
+
+  let vcDone = false;
+
+  const finish = async (radiant: MatchPlayer[], dire: MatchPlayer[]) => {
+    if (vcDone) return;
+    vcDone = true;
+    console.log(`[Teams] ✅ Teams ready — Radiant: ${radiant.length}, Dire: ${dire.length}`);
+    // Persist to Firestore so button-handler and embeds stay in sync
+    await updateLobby(lobbyDocId, { radiant, dire, spectators: [] });
+    await createVCsAndMovePlayers(client, lobbyDocId, radiant, dire);
+  };
+
+  // ── Mechanism 1: real-time GC lobbyUpdate ──────────────────
   const bot = getDotaBot();
-  if (!bot.isReady()) { console.log("[Monitor] Dota bot not ready"); return; }
+  const gcHandler = async (lobbyState: any) => {
+    if (vcDone) { bot.removeListener("lobbyUpdate", gcHandler); return; }
 
-  let matchDetected = false;
+    const members: Array<{ id: number; team: number }> = lobbyState?.members ?? [];
+    const radiant: MatchPlayer[] = [];
+    const dire:    MatchPlayer[] = [];
 
-  const handler = async (lobbyState: any) => {
-    if (matchDetected) return;
-    const matchId = lobbyState?.match_id?.toString();
-    if (matchId && matchId !== "0") {
-      matchDetected = true;
-      bot.removeListener("lobbyUpdate", handler);
-      console.log(`[Monitor] Match started! ID: ${matchId}`);
+    for (const m of members) {
+      const steam32 = m.id?.toString();
+      const player  = allPlayers.find(p => p.steam32Id === steam32);
+      if (!player) continue;
+      if (m.team === 0) radiant.push(player); // Radiant
+      if (m.team === 1) dire.push(player);    // Dire
+    }
 
-      const radiant: MatchPlayer[] = [];
-      const dire: MatchPlayer[] = [];
-
-      if (lobbyState?.members) {
-        for (const member of lobbyState.members) {
-          const steam32 = member.id?.toString();
-          const player = allPlayers.find((p) => p.steam32Id === steam32);
-          if (!player) continue;
-          if (member.team === 0) radiant.push(player);
-          else if (member.team === 1) dire.push(player);
-        }
-      }
-
-      await updateLobby(lobbyDocId, { status: "active", dotaMatchId: matchId, radiant, dire });
-
-      if (radiant.length > 0 || dire.length > 0) {
-        try {
-          const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID!);
-          const { radiantCh, direCh } = await createTeamVoiceChannels(guild, radiant, dire);
-          tempVoiceChannels.push(radiantCh.id, direCh.id);
-
-          await movePlayersToVoice(guild, radiant, radiantCh);
-          await movePlayersToVoice(guild, dire, direCh);
-
-          if (waitingRoomId) {
-            try { const wr = await guild.channels.fetch(waitingRoomId); if (wr) await wr.delete("Teams assigned"); } catch {}
-            waitingRoomId = null;
-          }
-
-          const qch = process.env.QUEUE_CHANNEL_ID;
-          if (qch) {
-            const ch = (await client.channels.fetch(qch)) as TextChannel;
-            await ch.send(
-              `⚔️ **Match is LIVE!**\n\n` +
-              `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
-              `🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n\n` +
-              `🟢 Radiant VC: <#${radiantCh.id}>\n🔴 Dire VC: <#${direCh.id}>`
-            );
-          }
-        } catch (err: any) { console.error("[Monitor] VC error:", err.message); }
-      }
-
-      pollForMatchResult(client, lobbyDocId, matchId, queue.entryFee || 0);
+    // Only act when both teams have players (avoids firing on partial updates)
+    if (radiant.length > 0 && dire.length > 0) {
+      bot.removeListener("lobbyUpdate", gcHandler);
+      clearInterval(pollInterval);
+      await finish(radiant, dire);
     }
   };
 
-  bot.on("lobbyUpdate", handler);
-  setTimeout(() => { if (!matchDetected) bot.removeListener("lobbyUpdate", handler); }, 60 * 60 * 1000);
+  if (bot.isReady()) {
+    bot.on("lobbyUpdate", gcHandler);
+    // Auto-remove after 90 min to avoid leaks
+    setTimeout(() => bot.removeListener("lobbyUpdate", gcHandler), 90 * 60 * 1000);
+  }
+
+  // ── Mechanism 2: Firestore poll every 10s (catches shuffle/flip) ──────────
+  let attempts = 0;
+  const pollInterval = setInterval(async () => {
+    if (vcDone) { clearInterval(pollInterval); return; }
+    attempts++;
+    if (attempts > 540) { // 90 min
+      clearInterval(pollInterval);
+      bot.removeListener("lobbyUpdate", gcHandler);
+      return;
+    }
+    try {
+      const lobby = await getLobby(lobbyDocId);
+      if (!lobby) { clearInterval(pollInterval); return; }
+      if (lobby.status === "cancelled" || lobby.status === "completed") {
+        clearInterval(pollInterval);
+        bot.removeListener("lobbyUpdate", gcHandler);
+        return;
+      }
+      const radiant = lobby.radiant ?? [];
+      const dire    = lobby.dire    ?? [];
+      if (radiant.length > 0 && dire.length > 0) {
+        clearInterval(pollInterval);
+        bot.removeListener("lobbyUpdate", gcHandler);
+        await finish(radiant, dire);
+      }
+    } catch (err: any) {
+      console.error("[Teams] Poll error:", err.message);
+    }
+  }, 10000);
 }
 
-// ── Voice Channels ───────────────────────────────────────────
+// ── Shared VC creation + player movement (used by poll AND button) ────────────
 
-async function createTeamVoiceChannels(guild: Guild, radiant: MatchPlayer[], dire: MatchPlayer[]): Promise<{ radiantCh: VoiceChannel; direCh: VoiceChannel }> {
+export async function createVCsAndMovePlayers(
+  client: Client,
+  lobbyDocId: string,
+  radiant: MatchPlayer[],
+  dire: MatchPlayer[]
+): Promise<{ radiantCh: VoiceChannel; direCh: VoiceChannel }> {
+  const guildId = process.env.DISCORD_GUILD_ID!;
+  const guild = await client.guilds.fetch(guildId);
   const categoryId = process.env.VOICE_CATEGORY_ID;
-  const baseOpts: any = { type: ChannelType.GuildVoice, userLimit: 6 };
-  if (categoryId) baseOpts.parent = categoryId;
 
-  const radiantCh = (await guild.channels.create({
-    name: "🟢 Radiant", ...baseOpts,
-    permissionOverwrites: [
-      { id: guild.id, deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel] },
-      ...radiant.map((p) => ({ id: p.discordId, allow: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Speak] })),
-    ],
-  })) as VoiceChannel;
+  const makeVC = async (name: string, players: MatchPlayer[]): Promise<VoiceChannel> => {
+    const opts: any = {
+      name,
+      type: ChannelType.GuildVoice,
+      userLimit: 6,
+      permissionOverwrites: [
+        { id: guild.id, deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel] },
+        ...players.map((p) => ({
+          id: p.discordId,
+          allow: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Speak],
+        })),
+      ],
+    };
+    if (categoryId) opts.parent = categoryId;
+    return (await guild.channels.create(opts)) as VoiceChannel;
+  };
 
-  const direCh = (await guild.channels.create({
-    name: "🔴 Dire", ...baseOpts,
-    permissionOverwrites: [
-      { id: guild.id, deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel] },
-      ...dire.map((p) => ({ id: p.discordId, allow: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Speak] })),
-    ],
-  })) as VoiceChannel;
+  const radiantCh = await makeVC("🟢 Radiant", radiant);
+  const direCh    = await makeVC("🔴 Dire",    dire);
+
+  tempVoiceChannels.push(radiantCh.id, direCh.id);
+
+  // Move players who are already in any voice channel
+  let movedR = 0, movedD = 0;
+  for (const p of radiant) {
+    try {
+      const m = await guild.members.fetch(p.discordId);
+      if (m.voice.channel) { await m.voice.setChannel(radiantCh); movedR++; }
+    } catch {}
+  }
+  for (const p of dire) {
+    try {
+      const m = await guild.members.fetch(p.discordId);
+      if (m.voice.channel) { await m.voice.setChannel(direCh); movedD++; }
+    } catch {}
+  }
+
+  console.log(`[Teams] Moved ${movedR}/${radiant.length} Radiant, ${movedD}/${dire.length} Dire`);
+
+  // Delete waiting room
+  if (waitingRoomId) {
+    try {
+      const wr = await guild.channels.fetch(waitingRoomId);
+      if (wr) await wr.delete("Teams assigned");
+    } catch {}
+    waitingRoomId = null;
+  }
+
+  // Announce in #queue
+  const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+  if (queueChannelId) {
+    try {
+      const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
+      await ch.send(
+        `⚔️ **Teams are set! Get into your voice channels!**\n\n` +
+        `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
+        `🔊 Radiant VC: <#${radiantCh.id}>\n\n` +
+        `🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
+        `🔊 Dire VC: <#${direCh.id}>`
+      );
+    } catch {}
+  }
 
   return { radiantCh, direCh };
 }
 
-async function movePlayersToVoice(guild: Guild, players: MatchPlayer[], channel: VoiceChannel): Promise<void> {
-  for (const p of players) {
-    try { const m = await guild.members.fetch(p.discordId); if (m.voice.channel) await m.voice.setChannel(channel); } catch {}
-  }
+// ── Voice channel cleanup ─────────────────────────────────────
+
+export async function cleanupVoiceChannels(client: Client): Promise<void> {
+  const guildId = process.env.DISCORD_GUILD_ID!;
+  try {
+    const guild = await client.guilds.fetch(guildId);
+    for (const chId of tempVoiceChannels) {
+      try { const ch = await guild.channels.fetch(chId); if (ch) await ch.delete("Match ended"); } catch {}
+    }
+    tempVoiceChannels.length = 0;
+    waitingRoomId = null;
+  } catch (err: any) { console.error("[Cleanup] Error:", err.message); }
 }
 
 // ── OpenDota Polling + Match Complete ─────────────────────────
 
-async function pollForMatchResult(client: Client, lobbyDocId: string, dotaMatchId: string, stakes: number): Promise<void> {
+export async function pollForMatchResult(client: Client, lobbyDocId: string, dotaMatchId: string, stakes: number): Promise<void> {
   await requestMatchParse(dotaMatchId);
   let attempts = 0;
   const interval = setInterval(async () => {
     attempts++;
     try {
       const result = await fetchMatchResult(dotaMatchId);
-      if (result) { clearInterval(interval); await handleMatchComplete(client, lobbyDocId, result, stakes); }
-      else if (attempts >= 20) { clearInterval(interval); }
-    } catch (err: any) { console.error("[Poll]", err.message); }
-  }, 60000);
-}
+      if (result) {
+        clearInterval(interval);
+        const lobby = await getLobby(lobbyDocId);
+        if (!lobby) return;
 
-async function handleMatchComplete(client: Client, lobbyDocId: string, result: MatchResult, stakes: number): Promise<void> {
-  const lobby = await getLobby(lobbyDocId);
-  if (!lobby) return;
+        await updateLobby(lobbyDocId, {
+          status: "completed",
+          winner: result.winner,
+          mvp: result.mvp,
+          duration: result.duration,
+          playerStats: result.players,
+          completedAt: new Date().toISOString(),
+        });
+        await updateQueue(lobby.queueId, { status: "completed" });
 
-  await updateLobby(lobbyDocId, { status: "completed", winner: result.winner, mvp: result.mvp, duration: result.duration, playerStats: result.players, completedAt: new Date().toISOString() });
-  await updateQueue(lobby.queueId, { status: "completed" });
+        const rch = process.env.RESULTS_CHANNEL_ID;
+        if (rch) {
+          try {
+            const ch = (await client.channels.fetch(rch)) as TextChannel;
+            await ch.send({ embeds: [matchResultEmbed(result, lobby, stakes)] });
+          } catch {}
+        }
 
-  const rch = process.env.RESULTS_CHANNEL_ID;
-  if (rch) {
-    try { const ch = (await client.channels.fetch(rch)) as TextChannel; await ch.send({ embeds: [matchResultEmbed(result, lobby, stakes)] }); }
-    catch (err: any) { console.error("[Match] Results error:", err.message); }
-  }
+        await cleanupVoiceChannels(client);
+        console.log(`[Match] ✅ Result recorded: ${result.winner} wins`);
+      }
+    } catch (err: any) {
+      console.error("[Poll] Error:", err.message);
+    }
 
-  await cleanupVoiceChannels(client);
-  await saveDailyRecord(todayKey(), { winner: result.winner, dotaMatchId: result.matchId, duration: result.duration, mvp: result.mvp?.steamName, completedAt: new Date().toISOString() });
-  console.log(`[Match] Complete. Winner: ${result.winner}`);
-}
-
-export async function cleanupVoiceChannels(client: Client): Promise<void> {
-  const guildId = process.env.DISCORD_GUILD_ID;
-  if (!guildId) return;
-  const guild = await client.guilds.fetch(guildId);
-  for (const chId of tempVoiceChannels) { try { const ch = await guild.channels.fetch(chId); if (ch) await ch.delete("Match ended"); } catch {} }
-  tempVoiceChannels.length = 0;
-  waitingRoomId = null;
+    if (attempts >= 72) { // 72 × 5min = 6 hours
+      clearInterval(interval);
+      console.log("[Poll] Timed out after 6 hours");
+    }
+  }, 5 * 60 * 1000);
 }

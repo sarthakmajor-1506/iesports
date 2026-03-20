@@ -17,30 +17,29 @@ import {
   getLobby,
   updateLobby,
   QueuePlayer,
+  MatchPlayer,
 } from "../services/firebase";
 import { getDotaBot } from "../services/dota-gc";
-import { cleanupVoiceChannels } from "../services/match-orchestrator";
+import { cleanupVoiceChannels, createVCsAndMovePlayers } from "../services/match-orchestrator";
 import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
-import { ChannelType, VoiceChannel, PermissionsBitField } from "discord.js";
-import { MatchPlayer } from "../services/firebase";
 
 export async function handleButton(interaction: ButtonInteraction): Promise<void> {
   const [action, id] = interaction.customId.split(":");
 
   switch (action) {
-    case "queue_join": await handleQueueJoin(interaction, id); break;
-    case "queue_leave": await handleQueueLeave(interaction, id); break;
-    case "create_queue": await handleCreateQueue(interaction); break;
-    case "lobby_start": await handleLobbyStart(interaction, id); break;
+    case "queue_join":    await handleQueueJoin(interaction, id);    break;
+    case "queue_leave":   await handleQueueLeave(interaction, id);   break;
+    case "create_queue":  await handleCreateQueue(interaction);      break;
+    case "lobby_start":   await handleLobbyStart(interaction, id);   break;
     case "lobby_shuffle": await handleLobbyShuffle(interaction, id); break;
-    case "lobby_flip": await handleLobbyFlip(interaction, id); break;
-    case "lobby_invite": await handleLobbyInviteAll(interaction, id); break;
-    case "lobby_inviteme": await handleInviteMe(interaction, id); break;
-    case "lobby_movevc": await handleMoveToVC(interaction, id); break;
+    case "lobby_flip":    await handleLobbyFlip(interaction, id);    break;
+    case "lobby_invite":  await handleLobbyInviteAll(interaction, id); break;
+    case "lobby_inviteme":await handleInviteMe(interaction, id);     break;
+    case "lobby_movevc":  await handleMoveToVC(interaction, id);     break;
     case "lobby_destroy": await handleLobbyDestroy(interaction, id); break;
-    case "lobby_leave": await handleLobbyLeave(interaction, id); break;
-    case "lobby_restart": await handleBotRestart(interaction); break;
+    case "lobby_leave":   await handleLobbyLeave(interaction, id);   break;
+    case "lobby_restart": await handleBotRestart(interaction);       break;
     case "result_radiant":
     case "result_dire":
       await handleManualResult(interaction, id, action === "result_radiant" ? "radiant" : "dire"); break;
@@ -70,12 +69,8 @@ async function handleQueueJoin(interaction: ButtonInteraction, queueId: string):
   await interaction.editReply(
     `✅ You're #${result.position} in the queue!${!webUser?.steamId ? "\n⚠️ Link Steam at **iesports.in** to get auto-invited." : ""}`
   );
-
   await refreshQueueEmbed(interaction, queueId);
 
-  // NOTE: No auto-start on queue full anymore.
-  // Match starts based on scheduledTime via cron in index.ts.
-  // If you want a "queue full" notification, add it here:
   const queue = await getQueue(queueId);
   if (queue && queue.players.length >= queue.maxPlayers) {
     const queueChannelId = process.env.QUEUE_CHANNEL_ID;
@@ -97,7 +92,7 @@ async function handleQueueLeave(interaction: ButtonInteraction, queueId: string)
   await refreshQueueEmbed(interaction, queueId);
 }
 
-// ─── Create Queue (admin only) ──────────────────────────────
+// ─── Create Queue (admin only) ───────────────────────────────
 
 async function handleCreateQueue(interaction: ButtonInteraction): Promise<void> {
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
@@ -111,36 +106,20 @@ async function handleCreateQueue(interaction: ButtonInteraction): Promise<void> 
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId("queue_name")
-        .setLabel("Queue Name")
-        .setPlaceholder("e.g. 9 PM LOBBY, WAGER LOBBY")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
+      new TextInputBuilder().setCustomId("queue_name").setLabel("Queue Name")
+        .setPlaceholder("e.g. 9 PM LOBBY, WAGER LOBBY").setStyle(TextInputStyle.Short).setRequired(true)
     ),
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId("queue_type")
-        .setLabel("Type (free / wager / sponsored)")
-        .setPlaceholder("free")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
+      new TextInputBuilder().setCustomId("queue_type").setLabel("Type (free / wager / sponsored)")
+        .setPlaceholder("free").setStyle(TextInputStyle.Short).setRequired(true)
     ),
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId("queue_fee")
-        .setLabel("Entry Fee (₹, 0 for free)")
-        .setPlaceholder("0")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
+      new TextInputBuilder().setCustomId("queue_fee").setLabel("Entry Fee (₹, 0 for free)")
+        .setPlaceholder("0").setStyle(TextInputStyle.Short).setRequired(false)
     ),
     new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId("queue_time")
-        .setLabel("Scheduled Time IST (e.g. 9:00 PM, 21:00)")
-        .setPlaceholder("9:00 PM")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
+      new TextInputBuilder().setCustomId("queue_time").setLabel("Scheduled Time IST (e.g. 9:00 PM, 21:00)")
+        .setPlaceholder("9:00 PM").setStyle(TextInputStyle.Short).setRequired(false)
     )
   );
 
@@ -153,9 +132,6 @@ function isAdmin(interaction: ButtonInteraction): boolean {
   return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
 }
 
-
-
-// REPLACE handleLobbyStart — don't update status until match actually starts
 async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
   await interaction.deferReply({ ephemeral: true });
@@ -163,7 +139,6 @@ async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string)
     const bot = getDotaBot();
     if (bot.isReady()) {
       bot.startGame();
-      // Don't update status to "active" here — wait for GC to confirm match started
       await interaction.editReply("▶️ Start signal sent! Game should begin shortly.");
     } else {
       await interaction.editReply("❌ Dota bot not connected.");
@@ -171,18 +146,129 @@ async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string)
   } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
 }
 
+// ─── Shuffle: split all players randomly into Radiant/Dire, write to Firestore ───
 
-async function handleLobbyShuffle(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+async function handleLobbyShuffle(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
-  try { getDotaBot().shuffleTeams(); await interaction.reply({ content: "🔀 Teams shuffled!", ephemeral: true }); }
-  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const lobby = await getLobby(lobbyId);
+    if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
+
+    // Gather all players across all slots
+    const allPlayers: MatchPlayer[] = [
+      ...lobby.spectators,
+      ...lobby.radiant,
+      ...lobby.dire,
+    ];
+
+    if (allPlayers.length < 2) {
+      await interaction.editReply("⚠️ Not enough players to shuffle (need at least 2).");
+      return;
+    }
+
+    // Fisher-Yates shuffle
+    const shuffled = [...allPlayers];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const half = Math.floor(shuffled.length / 2);
+    const radiant = shuffled.slice(0, half);
+    const dire    = shuffled.slice(half);
+
+    // Write to Firestore
+    await updateLobby(lobbyId, { radiant, dire, spectators: [] });
+
+    // Also send GC shuffle command
+    getDotaBot().shuffleTeams();
+
+    await interaction.editReply(
+      `🔀 Teams shuffled and saved!\n` +
+      `🟢 Radiant (${radiant.length}): ${radiant.map(p => p.username).join(", ")}\n` +
+      `🔴 Dire (${dire.length}): ${dire.map(p => p.username).join(", ")}`
+    );
+
+    console.log(`[Shuffle] Lobby ${lobbyId}: Radiant=${radiant.length}, Dire=${dire.length}`);
+
+  } catch (err: any) {
+    await interaction.editReply(`❌ Failed: ${err.message}`);
+  }
 }
 
-async function handleLobbyFlip(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
+// ─── Flip: swap Radiant ↔ Dire in Firestore ──────────────────
+
+async function handleLobbyFlip(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
-  try { getDotaBot().flipTeams(); await interaction.reply({ content: "🔄 Teams flipped!", ephemeral: true }); }
-  catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const lobby = await getLobby(lobbyId);
+    if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
+
+    if (lobby.radiant.length === 0 && lobby.dire.length === 0) {
+      await interaction.editReply("⚠️ No teams to flip. Use Shuffle first.");
+      return;
+    }
+
+    // Swap radiant ↔ dire in Firestore
+    await updateLobby(lobbyId, {
+      radiant: lobby.dire,
+      dire: lobby.radiant,
+    });
+
+    // Also send GC flip command
+    getDotaBot().flipTeams();
+
+    await interaction.editReply(
+      `🔄 Teams flipped and saved!\n` +
+      `🟢 Radiant (${lobby.dire.length}): ${lobby.dire.map(p => p.username).join(", ")}\n` +
+      `🔴 Dire (${lobby.radiant.length}): ${lobby.radiant.map(p => p.username).join(", ")}`
+    );
+
+    console.log(`[Flip] Lobby ${lobbyId}: swapped Radiant↔Dire`);
+
+  } catch (err: any) {
+    await interaction.editReply(`❌ Failed: ${err.message}`);
+  }
 }
+
+// ─── Move to VCs ─────────────────────────────────────────────
+
+async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const lobby = await getLobby(lobbyId);
+    if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
+
+    const radiant = lobby.radiant ?? [];
+    const dire    = lobby.dire    ?? [];
+
+    if (radiant.length === 0 && dire.length === 0) {
+      await interaction.editReply(
+        "⚠️ No teams assigned yet.\n\nClick **Shuffle** first to assign teams, then click Move to VCs."
+      );
+      return;
+    }
+
+    await createVCsAndMovePlayers(interaction.client, lobbyId, radiant, dire);
+
+    await interaction.editReply(
+      `✅ Done! Voice channels created and players moved.\n` +
+      `🟢 Radiant: ${radiant.length} players | 🔴 Dire: ${dire.length} players\n\n` +
+      `Players not currently in any voice channel need to join manually.`
+    );
+  } catch (err: any) {
+    console.error("[MoveToVC]", err);
+    await interaction.editReply(`❌ Failed: ${err.message}`);
+  }
+}
+
+// ─── Invite All ──────────────────────────────────────────────
 
 async function handleLobbyInviteAll(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
@@ -196,18 +282,13 @@ async function handleLobbyInviteAll(interaction: ButtonInteraction, lobbyId: str
   else { await interaction.editReply("❌ Dota bot not connected."); }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// REPLACE ONLY the handleInviteMe function in button-handler.ts
-// ═══════════════════════════════════════════════════════════════
+// ─── Invite Me ───────────────────────────────────────────────
 
 async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   const tag = `[InviteMe:${interaction.user.username}]`;
-
-  // ── Step 1: Is the bot connected? ────────────────────────────────────────
   const bot = getDotaBot();
-  console.log(`${tag} bot.isReady()=${bot.isReady()}`);
 
   if (!bot.isReady()) {
     const lobby = await getLobby(lobbyId);
@@ -219,63 +300,29 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
     return;
   }
 
-  // ── Step 2: Find user in Firestore by Discord ID ─────────────────────────
-  // NOTE: findUserByDiscordId queries users collection for discordId field.
-  // This only works if the user linked their Discord on the web app.
-  // Users who signed in via Steam only (not Discord) will have discordId=null.
   const webUser = await findUserByDiscordId(interaction.user.id);
-  console.log(`${tag} Firestore user: ${JSON.stringify({
-    found: !!webUser,
-    uid: webUser?.uid,
-    hasSteamId: !!webUser?.steamId,
-    steamId: webUser?.steamId,
-    discordId: webUser?.discordId,
-  })}`);
-
   if (!webUser) {
-    await interaction.editReply(
-      `❌ Your Discord isn't linked to any account.\n\n` +
-      `Go to **iesports.in** → Log in with Steam → Connect Discord.\n` +
-      `Then click Invite Me again.`
-    );
+    await interaction.editReply(`❌ Your Discord isn't linked to any account.\n\nGo to **iesports.in** → Log in → Connect Discord.`);
     return;
   }
-
   if (!webUser.steamId) {
-    await interaction.editReply(
-      `❌ No Steam account linked.\n\n` +
-      `Go to **iesports.in** → Connect Steam first.`
-    );
+    await interaction.editReply(`❌ No Steam account linked.\n\nGo to **iesports.in** → Connect Steam first.`);
     return;
   }
 
-  // ── Step 3: Convert steam64 → steam32 ───────────────────────────────────
-  // Firestore stores steamId as steam64 (e.g. "76561198129242599")
-  // invitePlayer() needs steam32 (e.g. "168976871")
   let steam32: string;
   try {
     const steam64 = webUser.steamId.trim();
-
-    // Guard: if someone stored steam32 by mistake, catch it
-    if (!steam64.startsWith("7656")) {
-      throw new Error(`Not a valid steam64 (got "${steam64}" — doesn't start with 7656)`);
-    }
-
+    if (!steam64.startsWith("7656")) throw new Error(`Not a valid steam64 (got "${steam64}")`);
     const val = BigInt(steam64) - BigInt("76561197960265728");
     if (val <= 0n) throw new Error(`Subtraction gave non-positive value: ${val}`);
     steam32 = val.toString();
   } catch (err: any) {
-    console.error(`${tag} Bad steamId "${webUser.steamId}": ${err.message}`);
-    await interaction.editReply(
-      `❌ Your Steam ID looks corrupted (\`${webUser.steamId}\`).\n` +
-      `Please re-link your Steam at **iesports.in**.`
-    );
+    await interaction.editReply(`❌ Your Steam ID looks corrupted. Please re-link at **iesports.in**.`);
     return;
   }
 
   console.log(`${tag} steam64=${webUser.steamId} → steam32=${steam32}`);
-
-  // ── Step 4: Send GC invite ───────────────────────────────────────────────
   bot.invitePlayer(steam32);
 
   await interaction.editReply(
@@ -287,161 +334,50 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
   );
 }
 
-async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
-  if (!isAdmin(interaction)) {
-    await interaction.reply({ content: "❌ Admin only.", ephemeral: true });
-    return;
-  }
- 
-  await interaction.deferReply({ ephemeral: true });
- 
-  try {
-    const lobby = await getLobby(lobbyId);
-    if (!lobby) {
-      await interaction.editReply("❌ Lobby not found.");
-      return;
-    }
- 
-    const radiant = lobby.radiant ?? [];
-    const dire = lobby.dire ?? [];
- 
-    if (radiant.length === 0 && dire.length === 0) {
-      await interaction.editReply(
-        "⚠️ No teams assigned yet. Teams are read from the Dota 2 lobby once players are on Radiant/Dire.\n" +
-        "Make sure players have joined their teams in-game, then click Move to VCs again."
-      );
-      return;
-    }
- 
-    const guildId = process.env.DISCORD_GUILD_ID!;
-    const guild = await interaction.client.guilds.fetch(guildId);
-    const categoryId = process.env.VOICE_CATEGORY_ID;
- 
-    // ── Create or reuse voice channels ──────────────────────────────────────
- 
-    const makeVC = async (name: string, players: MatchPlayer[]): Promise<VoiceChannel> => {
-      const baseOpts: any = {
-        name,
-        type: ChannelType.GuildVoice,
-        userLimit: 6,
-        permissionOverwrites: [
-          {
-            id: guild.id,
-            deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel],
-          },
-          ...players.map((p) => ({
-            id: p.discordId,
-            allow: [
-              PermissionsBitField.Flags.Connect,
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.Speak,
-            ],
-          })),
-        ],
-      };
-      if (categoryId) baseOpts.parent = categoryId;
-      return (await guild.channels.create(baseOpts)) as VoiceChannel;
-    };
- 
-    const radiantCh = radiant.length > 0 ? await makeVC("🟢 Radiant", radiant) : null;
-    const direCh    = dire.length    > 0 ? await makeVC("🔴 Dire",    dire)    : null;
- 
-    // ── Move players who are already in any voice channel ───────────────────
- 
-    let movedRadiant = 0;
-    let movedDire    = 0;
- 
-    if (radiantCh) {
-      for (const p of radiant) {
-        try {
-          const member = await guild.members.fetch(p.discordId);
-          if (member.voice.channel) {
-            await member.voice.setChannel(radiantCh);
-            movedRadiant++;
-          }
-        } catch {}
-      }
-    }
- 
-    if (direCh) {
-      for (const p of dire) {
-        try {
-          const member = await guild.members.fetch(p.discordId);
-          if (member.voice.channel) {
-            await member.voice.setChannel(direCh);
-            movedDire++;
-          }
-        } catch {}
-      }
-    }
- 
-    // ── Post public announcement ─────────────────────────────────────────────
- 
-    const queueChannelId = process.env.QUEUE_CHANNEL_ID;
-    if (queueChannelId) {
-      try {
-        const ch = (await interaction.client.channels.fetch(queueChannelId)) as TextChannel;
-        await ch.send(
-          `⚔️ **Teams are set! Get into your voice channels!**\n\n` +
-          `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
-          (radiantCh ? `🔊 Radiant VC: <#${radiantCh.id}>\n` : "") +
-          `\n🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
-          (direCh ? `🔊 Dire VC: <#${direCh.id}>` : "")
-        );
-      } catch {}
-    }
- 
-    await interaction.editReply(
-      `✅ Voice channels created!\n` +
-      `🟢 Radiant: moved ${movedRadiant}/${radiant.length} players\n` +
-      `🔴 Dire: moved ${movedDire}/${dire.length} players\n\n` +
-      `Players not in a voice channel won't be moved — they need to join a VC manually.`
-    );
-  } catch (err: any) {
-    console.error("[MoveToVC]", err);
-    await interaction.editReply(`❌ Failed: ${err.message}`);
-  }
-}
- 
+// ─── Destroy Lobby ───────────────────────────────────────────
+
 async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
-  if (!isAdmin(interaction)) {
-    await interaction.reply({ content: "❌ Admin only.", ephemeral: true });
-    return;
-  }
+  if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
   await interaction.deferReply({ ephemeral: true });
   try {
     const bot = getDotaBot();
     if (bot.isReady()) {
-      await bot.destroyLobby(); // now async — waits for slot move
-    } else {
-      console.log("[Destroy] Bot not ready — skipping GC destroy");
+      await bot.destroyLobby();
     }
     await updateLobby(lobbyId, { status: "cancelled" });
     await cleanupVoiceChannels(interaction.client);
     await interaction.editReply(
-      bot.isReady()
-        ? "💥 Lobby destroyed in Dota 2 and cleaned up."
-        : "🗑️ Lobby record cleared. (Bot not connected — destroy manually in Dota 2)"
+      bot.isReady() ? "💥 Lobby destroyed in Dota 2 and cleaned up." : "🗑️ Lobby record cleared. (Bot not connected — destroy manually in Dota 2)"
     );
   } catch (err: any) {
     await interaction.editReply(`❌ ${err.message}`);
   }
 }
 
+// ─── Leave (bot → unassigned) ────────────────────────────────
+
 async function handleLobbyLeave(interaction: ButtonInteraction, _lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
   try {
-    getDotaBot().kickBotFromTeam();  // ← was leaveLobby()
+    getDotaBot().kickBotFromTeam();
     await interaction.reply({ content: "🔄 Bot moved to Unassigned.", ephemeral: true });
   } catch { await interaction.reply({ content: "❌ Failed.", ephemeral: true }); }
 }
 
+// ─── Restart Bot ─────────────────────────────────────────────
+
 async function handleBotRestart(interaction: ButtonInteraction): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
   await interaction.reply({ content: "🔄 Reconnecting Dota bot...", ephemeral: true });
-  try { const bot = getDotaBot(); bot.disconnect(); await bot.connect(); await interaction.editReply("✅ Dota bot reconnected!"); }
-  catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
+  try {
+    const bot = getDotaBot();
+    bot.disconnect();
+    await bot.connect();
+    await interaction.editReply("✅ Dota bot reconnected!");
+  } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
 }
+
+// ─── Manual Result ───────────────────────────────────────────
 
 async function handleManualResult(interaction: ButtonInteraction, lobbyId: string, winner: "radiant" | "dire"): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
