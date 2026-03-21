@@ -141,7 +141,8 @@ class DotaBot extends EventEmitter {
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
           this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
           this.lobbyActive = false;
-          resolve();
+          // Wait 5s for GC session to stabilize before accepting commands
+          setTimeout(() => resolve(), 5000);
         }
 
         // ── Ownership challenge + lobby state (msgType 24 or 26) ────────────
