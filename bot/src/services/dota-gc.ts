@@ -17,7 +17,7 @@ const EDOTAGCMsg = {
   k_EMsgGCPracticeLobbyKick:           7081,
   k_EMsgGCPracticeLobbyKickFromTeam:   8047,
   k_EMsgGCBalancedShuffleLobby:        7049,
-  k_EMsgGCFlipLobbyTeams:              7320,
+  k_EMsgGCFlipLobbyTeams:             7320,
   k_EMsgDestroyLobbyRequest:           8097,
 };
 
@@ -26,6 +26,17 @@ const EGCBaseMsg = {
 };
 
 const DOTA_GC_TEAM_PLAYER_POOL = 4;
+
+// Message types that indicate a lobby state update from GC
+// These are the responses we should listen to for lobby creation confirmation
+const LOBBY_STATE_MSG_TYPES = new Set([
+  7038,  // Response to PracticeLobbyCreate
+  7046,  // Response to SetDetails
+  7049,  // Response to BalancedShuffle
+  7320,  // Response to FlipTeams
+  7388,  // Lobby list / state update
+  7465,  // Lobby state on ownership challenge
+]);
 
 export const REGIONS: Record<string, number> = {
   India: 16, SEA: 5, Singapore: 5,
@@ -145,41 +156,47 @@ class DotaBot extends EventEmitter {
           setTimeout(() => resolve(), 5000);
         }
 
-        // ── Ownership challenge + lobby state (msgType 24 or 26) ────────────
-        if ((msgType === 24 || msgType === 26 || msgType === 7465) && payload.length < 1000) {
+        // ── Ownership challenge (msgType 24 or 26) ─────────────────────────
+        if ((msgType === 24 || msgType === 26) && payload.length < 1000) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
             this.vi(1, 1),
             this.vi(2, DOTA2_APP_ID),
             this.bytes(3, ticket),
           ]);
-          // 7465 doesn't need a ticket response — only 24/26 do
-          if (msgType === 24 || msgType === 26) {
-            const replyMsg = msgType === 26 ? 27 : 25;
-            this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
-            console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
-          } else {
-            console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby creation confirmed`);
-          }
-          if (this.waitingForLobby) this.emit("lobbyCreated");
-
-          // Parse lobby member state
-          try {
-            const members = this.parseLobbyPayload(payload);
-            if (members.length > 0) {
-              this.updateLiveLobby(members);
-            }
-          } catch { /* not a lobby payload */ }
+          const replyMsg = msgType === 26 ? 27 : 25;
+          this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
+          console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
         }
 
-        // ── msgType 7388 — lobby state on reconnect ──────────────────────────
-        if (msgType === 7388 && payload.length > 0) {
+        // ── FIX #1: Broad lobby state detection ─────────────────────────────
+        // Any GC message that contains lobby member data should:
+        // a) Parse members and update live state
+        // b) If we're waiting for lobby creation, confirm it
+        //
+        // Previously only msgType 24/26/7465 triggered lobbyCreated,
+        // but the actual create response comes as other types (often with
+        // payload > 1000 bytes). Now we check ALL messages for member data.
+        if (payload.length > 0) {
           try {
             const members = this.parseLobbyPayload(payload);
             if (members.length > 0) {
               this.updateLiveLobby(members);
+
+              // If we were waiting for lobby creation, this confirms it
+              if (this.waitingForLobby) {
+                console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via member data`);
+                this.emit("lobbyCreated");
+              }
             }
-          } catch { /* non-fatal */ }
+          } catch { /* not a lobby payload — that's fine */ }
+        }
+
+        // ── Also handle 7465 specifically (lobby state with no members yet) ──
+        if (msgType === 7465 && payload.length > 0 && this.waitingForLobby) {
+          // 7465 can arrive as lobby confirmation even before members join
+          console.log(`[GC] <- 7465 (${payload.length}b) — lobby state signal`);
+          this.emit("lobbyCreated");
         }
       });
 
@@ -212,6 +229,10 @@ class DotaBot extends EventEmitter {
   }
 
   // ── Create Lobby ──────────────────────────────────────────────────────────
+  // FIX #1: Increased timeout from 45s to 90s, and broadened detection of
+  // lobby creation confirmation. The GC often takes >45s to respond but the
+  // lobby IS created — we just weren't waiting long enough or detecting the
+  // right response messages.
   async createLobby(
     name: string,
     password: string,
@@ -229,26 +250,30 @@ class DotaBot extends EventEmitter {
     console.log(`[Dota2] -> Pre-destroy (lobbyActive=${this.lobbyActive}, waiting ${destroyWait}ms)...`);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
     this.lobbyActive = false;
+    this.liveLobbyMembers = [];
     await new Promise(r => setTimeout(r, destroyWait));
     console.log("[Dota2] -> Sending create...");
 
     return new Promise((resolve, reject) => {
       let done = false;
-      const timeout = setTimeout(() => {
-        this.waitingForLobby = false;
-        this.removeAllListeners("lobbyCreated");
-        reject(new Error("Lobby create timed out (45s)"));
-      }, 45000);
 
+      // FIX #1: Register listener BEFORE sending command to avoid race condition
       this.waitingForLobby = true;
+
       this.once("lobbyCreated", () => {
         if (done) return;
         done = true;
-        clearTimeout(timeout);
+        clearTimeout(timeoutTimer);
         this.waitingForLobby = false;
         this.lobbyActive = true;
-        console.log("[Dota2] ✅ Lobby confirmed. Kicking bot to Unassigned...");
+        console.log("[Dota2] ✅ Lobby confirmed by GC.");
 
+        // FIX #5: Do NOT kick bot to Unassigned immediately.
+        // The bot needs to stay in Radiant slot 0 (host position) so that
+        // BalancedShuffle works. Instead, we'll move the bot to Unassigned
+        // only AFTER shuffle/teams are assigned, or on a delayed timer.
+        // For now, just do a single delayed kick after 30s — enough time
+        // for the admin to click Shuffle if they want to.
         const kickSelf = () => {
           const steam32 = this.getBotSteam32();
           if (steam32 > 0) {
@@ -262,10 +287,10 @@ class DotaBot extends EventEmitter {
           }
         };
 
-        [300, 600, 1000, 1500, 2000, 2500, 3000, 4000, 5000,
-         6000, 7000, 8000, 10000, 12000, 15000].forEach(d => {
-          this.pendingTimers.push(setTimeout(kickSelf, d));
-        });
+        // Delayed self-kick: wait 60s before moving to unassigned
+        // This gives time for shuffle commands to execute while bot is host
+        const kt = setTimeout(kickSelf, 60000);
+        this.pendingTimers.push(kt);
 
         const rt = setTimeout(() => {
           console.log("[Dota2] ✅ Lobby ready!");
@@ -273,6 +298,24 @@ class DotaBot extends EventEmitter {
         }, 4000);
         this.pendingTimers.push(rt);
       });
+
+      // FIX #1: Increased timeout from 45s to 90s
+      const timeoutTimer = setTimeout(() => {
+        if (done) return;
+        // Before giving up, check if we have live lobby members
+        // (GC confirmed lobby but event was missed)
+        if (this.liveLobbyMembers.length > 0) {
+          done = true;
+          this.waitingForLobby = false;
+          this.lobbyActive = true;
+          console.log("[Dota2] ✅ Lobby detected via live members (late confirmation)");
+          resolve({ lobbyId: "active", password });
+          return;
+        }
+        this.waitingForLobby = false;
+        this.removeAllListeners("lobbyCreated");
+        reject(new Error("Lobby create timed out (90s)"));
+      }, 90000);
 
       const msg = this.buildCreate(name, password, mode, serverRegion);
       console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password}`);
@@ -326,9 +369,32 @@ class DotaBot extends EventEmitter {
 
   // ── Team Management ───────────────────────────────────────────────────────
 
+  // FIX #5: Before shuffle, ensure bot is in a team slot (Radiant slot 0)
+  // so the GC recognizes us as lobby host and processes the command.
+  // After shuffle completes, kick bot back to Unassigned.
   shuffleTeams(): Promise<LobbyMember[]> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       if (!this.isReady()) { resolve([]); return; }
+
+      // Step 1: Move bot to Radiant slot 0 (host position) so GC processes shuffle
+      const steam32 = this.getBotSteam32();
+      if (steam32 > 0) {
+        // Cancel any pending self-kick timers
+        this.pendingTimers.forEach(t => clearTimeout(t));
+        this.pendingTimers = [];
+
+        // SetTeamSlot: field 1 = team (0=Radiant), field 2 = slot (0), field 3 = account_id
+        const slotMsg = Buffer.concat([
+          this.vi(1, 0),           // team = Radiant
+          this.vi(2, 0),           // slot = 0 (host)
+          this.vi(3, steam32),     // account id
+        ]);
+        this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot, {}, slotMsg);
+        console.log(`[Dota2] -> SetTeamSlot: bot to Radiant[0] (steam32=${steam32})`);
+
+        // Wait for GC to process the slot change
+        await new Promise(r => setTimeout(r, 2000));
+      }
 
       let settled = false;
 
@@ -338,6 +404,10 @@ class DotaBot extends EventEmitter {
         clearTimeout(fallback);
         const members: LobbyMember[] = lobbyState?.members ?? [];
         console.log(`[Dota2] ✅ Shuffle confirmed by GC — ${members.length} members`);
+
+        // Step 3: Kick bot back to Unassigned after shuffle
+        this.kickBotFromTeamDelayed(2000);
+
         resolve(members);
       };
 
@@ -348,9 +418,14 @@ class DotaBot extends EventEmitter {
         settled = true;
         this.removeListener("lobbyUpdate", handler);
         console.warn("[Dota2] ⚠️ Shuffle GC response timeout — using live lobby state");
+
+        // Still kick bot back to Unassigned
+        this.kickBotFromTeamDelayed(1000);
+
         resolve(this.liveLobbyMembers);
       }, 8000);
 
+      // Step 2: Send the actual shuffle command
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCBalancedShuffleLobby, {}, Buffer.alloc(0));
       console.log("[Dota2] -> BalancedShuffle sent — waiting for GC lobbyUpdate...");
     });
@@ -400,6 +475,12 @@ class DotaBot extends EventEmitter {
     }
   }
 
+  // Kick bot after a delay (used after shuffle/flip to clean up)
+  private kickBotFromTeamDelayed(delayMs: number): void {
+    const t = setTimeout(() => this.kickBotFromTeam(), delayMs);
+    this.pendingTimers.push(t);
+  }
+
   kickPlayer(steam32Id: string): void {
     if (!this.isReady()) return;
     const id = parseInt(steam32Id, 10);
@@ -414,6 +495,12 @@ class DotaBot extends EventEmitter {
     console.log("[Dota2] ✅ Game launched!");
   }
 
+  // ── FIX #4: Destroy Lobby ─────────────────────────────────────────────────
+  // Previously this only sent LobbyLeave, which made the bot leave but left
+  // a hostless lobby trapping other players. Now we:
+  // 1. Kick all known players from the lobby
+  // 2. Send DestroyLobbyRequest to actually close the lobby server-side
+  // 3. Then send LobbyLeave as cleanup
   async destroyLobby(): Promise<void> {
     if (!this.isReady()) {
       console.warn("[Dota2] destroyLobby: not ready");
@@ -422,11 +509,33 @@ class DotaBot extends EventEmitter {
 
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
-    this.liveLobbyMembers = [];
 
+    // Step 1: Kick all players from the lobby so they're freed
+    const members = [...this.liveLobbyMembers];
+    const botSteam32 = this.getBotSteam32();
+    for (const m of members) {
+      if (m.id !== botSteam32 && m.id > 0) {
+        this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyKick, {}, this.vi(1, m.id));
+        console.log(`[Dota2] -> Kicked steam32=${m.id} from lobby`);
+      }
+    }
+
+    // Small delay to let kicks process
+    if (members.length > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Step 2: Send the actual destroy request (kills the lobby server-side)
+    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+    console.log("[Dota2] -> DestroyLobbyRequest sent");
+
+    // Step 3: Also leave for good measure
+    await new Promise(r => setTimeout(r, 500));
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
+
     this.lobbyActive = false;
-    console.log("[Dota2] ✅ Bot left lobby");
+    this.liveLobbyMembers = [];
+    console.log("[Dota2] ✅ Lobby destroyed and bot left");
   }
 
   disconnect(): void {

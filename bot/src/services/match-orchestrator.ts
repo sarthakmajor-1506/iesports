@@ -51,7 +51,6 @@ export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Prom
 
     const wr = (await guild.channels.create(opts)) as VoiceChannel;
     waitingRoomId = wr.id;
-    // No tempVoiceChannels push — waiting room is cleaned up via waitingRoomId
 
     if (queueChannelId) {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
@@ -106,6 +105,16 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);
     } catch (err: any) {
       console.error(`[Match] ❌ Lobby creation failed: ${err.message}`);
+
+      // FIX #1/#2: Even if createLobby timed out, check if the lobby
+      // was actually created by looking at the bot's live lobby members.
+      // The GC often takes >45s to respond but the lobby IS created.
+      const liveMembers = bot.getLobbyMembers();
+      if (liveMembers.length > 0) {
+        console.log(`[Match] 🔄 Lobby appears to exist (${liveMembers.length} members detected) — treating as created`);
+        gcLobbyId = "active";
+        lobbyCreated = true;
+      }
     }
   } else {
     console.log(`[Match] ⚠️  Bot not ready — skipping GC lobby creation (manual mode)`);
@@ -133,6 +142,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   }
 
   // ── Step 4: Invite players ───────────────────────────────────
+  // FIX #2: This now runs because lobbyCreated is true even on late confirmation
   if (lobbyCreated && bot.isReady()) {
     try {
       const ids = allPlayers.map(p => p.steam32Id).filter((id): id is string => !!id);
@@ -271,50 +281,40 @@ export async function createVCsAndMovePlayers(
   const guild = await client.guilds.fetch(guildId);
   const categoryId = process.env.VOICE_CATEGORY_ID;
 
-  const makeVC = async (name: string, players: MatchPlayer[]): Promise<VoiceChannel> => {
-    const opts: any = {
-      name,
-      type: ChannelType.GuildVoice,
-      userLimit: 6,
-      permissionOverwrites: [
-        { id: guild.id, deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel] },
-        ...players.map((p) => ({
-          id: p.discordId,
-          allow: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Speak],
-        })),
-      ],
-    };
-    if (categoryId) opts.parent = categoryId;
-    return (await guild.channels.create(opts)) as VoiceChannel;
-  };
+  const allDiscordIds = [...radiant, ...dire].map((p) => p.discordId);
+  const permsBase: any[] = [
+    { id: guild.id, deny: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel] },
+    ...allDiscordIds.map((id) => ({
+      id,
+      allow: [PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Speak],
+    })),
+  ];
 
-  const radiantCh = await makeVC("🟢 Radiant", radiant);
-  const direCh    = await makeVC("🔴 Dire",    dire);
+  const radiantOpts: any = { name: "🟢 Radiant", type: ChannelType.GuildVoice, userLimit: 6, permissionOverwrites: permsBase };
+  const direOpts: any    = { name: "🔴 Dire",    type: ChannelType.GuildVoice, userLimit: 6, permissionOverwrites: permsBase };
+  if (categoryId) { radiantOpts.parent = categoryId; direOpts.parent = categoryId; }
 
-  // Save VC IDs to Firestore — lobby-specific, survives restarts
-  // Two bots running simultaneously will each save to their own lobbyDocId
-  await updateLobby(lobbyDocId, {
-    vcRadiantId: radiantCh.id,
-    vcDireId: direCh.id,
-  });
+  const radiantCh = (await guild.channels.create(radiantOpts)) as VoiceChannel;
+  const direCh    = (await guild.channels.create(direOpts))    as VoiceChannel;
 
-  // Move players already in any voice channel
-  let movedR = 0, movedD = 0;
-  for (const p of radiant) {
+  // Save VC IDs to Firestore for cleanup
+  await updateLobby(lobbyDocId, { vcRadiantId: radiantCh.id, vcDireId: direCh.id } as any);
+
+  // Move players
+  for (const player of radiant) {
     try {
-      const m = await guild.members.fetch(p.discordId);
-      if (m.voice.channel) { await m.voice.setChannel(radiantCh); movedR++; }
+      const member = await guild.members.fetch(player.discordId);
+      if (member.voice.channel) await member.voice.setChannel(radiantCh);
     } catch {}
   }
-  for (const p of dire) {
+  for (const player of dire) {
     try {
-      const m = await guild.members.fetch(p.discordId);
-      if (m.voice.channel) { await m.voice.setChannel(direCh); movedD++; }
+      const member = await guild.members.fetch(player.discordId);
+      if (member.voice.channel) await member.voice.setChannel(direCh);
     } catch {}
   }
-  console.log(`[Teams] Moved ${movedR}/${radiant.length} Radiant, ${movedD}/${dire.length} Dire`);
 
-  // Delete waiting room
+  // Clean up waiting room
   if (waitingRoomId) {
     try {
       const wr = await guild.channels.fetch(waitingRoomId);
@@ -323,13 +323,13 @@ export async function createVCsAndMovePlayers(
     waitingRoomId = null;
   }
 
-  // Announce in #queue
-  const queueChannelId = process.env.QUEUE_CHANNEL_ID;
-  if (queueChannelId) {
+  // Announce
+  const lobbyChId = process.env.LOBBY_CONTROL_CHANNEL_ID;
+  if (lobbyChId) {
     try {
-      const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
+      const ch = (await client.channels.fetch(lobbyChId)) as TextChannel;
       await ch.send(
-        `⚔️ **Teams are set! Get into your voice channels!**\n\n` +
+        `🎯 **Teams assigned! Get into your voice channels!**\n\n` +
         `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
         `🔊 Radiant VC: <#${radiantCh.id}>\n\n` +
         `🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
