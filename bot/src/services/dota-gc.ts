@@ -71,6 +71,7 @@ class DotaBot extends EventEmitter {
   private waitingForLobby = false;
   private pendingTimers: NodeJS.Timeout[] = [];
   private lobbyActive = false;
+  private startupCleanup = false; // true during startup while clearing stale lobby
   botSteam32 = 0;
 
   // Live lobby state — updated on every GC lobby message
@@ -150,10 +151,26 @@ class DotaBot extends EventEmitter {
           this.stopHello();
           clearTimeout(timeout);
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
+
+          // Destroy any stale lobby from previous session
+          // Send both Destroy + Leave, wait for GC to process before reporting ready
           this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+          console.log("[GC] -> Startup DestroyLobbyRequest sent");
+          setTimeout(() => {
+            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
+            console.log("[GC] -> Startup LobbyLeave sent");
+          }, 2000);
           this.lobbyActive = false;
-          // Wait 5s for GC session to stabilize before accepting commands
-          setTimeout(() => resolve(), 5000);
+          this.liveLobbyMembers = [];
+          this.startupCleanup = true; // Flag to ignore stale lobby data during startup
+
+          // Wait 8s for destroy+leave to process, then clear the startup flag
+          setTimeout(() => {
+            this.startupCleanup = false;
+            this.liveLobbyMembers = [];
+            console.log("[Steam] ✅ Dota 2 GC connected!");
+            resolve();
+          }, 8000);
         }
 
         // ── Ownership challenge (msgType 24 or 26) ─────────────────────────
@@ -174,10 +191,9 @@ class DotaBot extends EventEmitter {
         // a) Parse members and update live state
         // b) If we're waiting for lobby creation, confirm it
         //
-        // Previously only msgType 24/26/7465 triggered lobbyCreated,
-        // but the actual create response comes as other types (often with
-        // payload > 1000 bytes). Now we check ALL messages for member data.
-        if (payload.length > 0) {
+        // Skip during startup cleanup — stale lobby data from previous session
+        // should be ignored until the destroy+leave commands have processed.
+        if (payload.length > 0 && !this.startupCleanup) {
           try {
             const members = this.parseLobbyPayload(payload);
             if (members.length > 0) {
@@ -542,8 +558,15 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
     this.stopHello();
-    this.ready = false; this.gcReady = false;
-    try { this.client.logOff(); } catch {}
+    this.ready = false;
+    this.gcReady = false;
+    this.lobbyActive = false;
+    this.liveLobbyMembers = [];
+    this.botSteam32 = 0;
+    this.removeAllListeners();
+    try { this.client.removeAllListeners(); this.client.logOff(); } catch {}
+    // Create a fresh SteamUser so connect() can be called again
+    this.client = new SteamUser({ enablePicsCache: true, changelistUpdateInterval: 0 } as any);
   }
 
   // ── Bot SteamID ───────────────────────────────────────────────────────────
