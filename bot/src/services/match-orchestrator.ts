@@ -1,6 +1,5 @@
 import {
   Client,
-  Guild,
   TextChannel,
   ChannelType,
   VoiceChannel,
@@ -8,21 +7,20 @@ import {
 } from "discord.js";
 import {
   QueueDoc,
-  LobbyDoc,
   MatchPlayer,
   saveLobby,
   updateLobby,
   getLobby,
   updateQueue,
-  getQueue,
   saveDailyRecord,
 } from "./firebase";
 import { getDotaBot } from "./dota-gc";
-import { fetchMatchResult, requestMatchParse, MatchResult } from "./opendota";
+import { fetchMatchResult, requestMatchParse } from "./opendota";
 import { lobbyEmbed, matchResultEmbed } from "../utils/embeds";
 import { inviteMeButton, lobbyControlRow1, lobbyControlRow2, lobbyControlRow3 } from "../utils/buttons";
 
-const tempVoiceChannels: string[] = [];
+// NO global tempVoiceChannels array — VCs are tracked per-lobby in Firestore
+// so cleanup is always lobby-specific and survives bot restarts
 let waitingRoomId: string | null = null;
 
 function todayKey(): string {
@@ -30,7 +28,7 @@ function todayKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// ── PHASE 1: 10 min before — warning + waiting room VC ──────
+// ── PHASE 1: 10 min before — warning + waiting room VC ───────
 
 export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Promise<void> {
   const guildId = process.env.DISCORD_GUILD_ID!;
@@ -53,7 +51,7 @@ export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Prom
 
     const wr = (await guild.channels.create(opts)) as VoiceChannel;
     waitingRoomId = wr.id;
-    tempVoiceChannels.push(wr.id);
+    // No tempVoiceChannels push — waiting room is cleaned up via waitingRoomId
 
     if (queueChannelId) {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
@@ -92,7 +90,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
 
-  // ── Step 1: Create GC Lobby ─────────────────────────────────
+  // ── Step 1: Create GC Lobby ──────────────────────────────────
   let gcLobbyId: string | null = null;
   let lobbyCreated = false;
 
@@ -177,10 +175,6 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   }
 
   // ── Step 7: Poll Firestore for teams, then move to VCs ───────
-  // The GC lobbyUpdate event is unreliable — instead we poll Firestore
-  // every 5s for up to 90 minutes waiting for radiant/dire to be populated.
-  // Teams get written to Firestore either by the admin shuffle/flip flow
-  // or manually. Once they appear, VCs are created and players are moved.
   pollFirestoreForTeams(client, firestoreLobbyId, allPlayers);
 
   await saveDailyRecord(todayKey(), {
@@ -192,17 +186,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   return firestoreLobbyId;
 }
 
-// ── PHASE 3: Watch for teams via GC lobbyUpdate events + Firestore poll ─────
-//
-// TWO mechanisms so both manual in-game team selection AND shuffle/flip work:
-//
-// 1. GC lobbyUpdate (real-time): dota-gc.ts now parses msgType 7388 and emits
-//    "lobbyUpdate" with a members list { id: steam32, team: 0|1|4 }.
-//    We match those steam32 IDs to our allPlayers list and sync to Firestore.
-//    This handles the case where players move teams manually in-game.
-//
-// 2. Firestore poll (fallback every 10s): catches shuffle/flip button writes
-//    and any edge cases where the GC event was missed.
+// ── PHASE 3: Watch for teams ─────────────────────────────────
 
 export function pollFirestoreForTeams(
   client: Client,
@@ -216,49 +200,42 @@ export function pollFirestoreForTeams(
   const finish = async (radiant: MatchPlayer[], dire: MatchPlayer[]) => {
     if (vcDone) return;
     vcDone = true;
+    clearInterval(pollInterval);
+    bot.removeListener("lobbyUpdate", gcHandler);
     console.log(`[Teams] ✅ Teams ready — Radiant: ${radiant.length}, Dire: ${dire.length}`);
-    // Persist to Firestore so button-handler and embeds stay in sync
     await updateLobby(lobbyDocId, { radiant, dire, spectators: [] });
     await createVCsAndMovePlayers(client, lobbyDocId, radiant, dire);
   };
 
-  // ── Mechanism 1: real-time GC lobbyUpdate ──────────────────
   const bot = getDotaBot();
+
   const gcHandler = async (lobbyState: any) => {
     if (vcDone) { bot.removeListener("lobbyUpdate", gcHandler); return; }
-
     const members: Array<{ id: number; team: number }> = lobbyState?.members ?? [];
     const radiant: MatchPlayer[] = [];
     const dire:    MatchPlayer[] = [];
-
     for (const m of members) {
       const steam32 = m.id?.toString();
       const player  = allPlayers.find(p => p.steam32Id === steam32);
       if (!player) continue;
-      if (m.team === 0) radiant.push(player); // Radiant
-      if (m.team === 1) dire.push(player);    // Dire
+      if (m.team === 0) radiant.push(player);
+      if (m.team === 1) dire.push(player);
     }
-
-    // Only act when both teams have players (avoids firing on partial updates)
     if (radiant.length > 0 && dire.length > 0) {
-      bot.removeListener("lobbyUpdate", gcHandler);
-      clearInterval(pollInterval);
       await finish(radiant, dire);
     }
   };
 
   if (bot.isReady()) {
     bot.on("lobbyUpdate", gcHandler);
-    // Auto-remove after 90 min to avoid leaks
     setTimeout(() => bot.removeListener("lobbyUpdate", gcHandler), 90 * 60 * 1000);
   }
 
-  // ── Mechanism 2: Firestore poll every 10s (catches shuffle/flip) ──────────
   let attempts = 0;
   const pollInterval = setInterval(async () => {
     if (vcDone) { clearInterval(pollInterval); return; }
     attempts++;
-    if (attempts > 540) { // 90 min
+    if (attempts > 540) {
       clearInterval(pollInterval);
       bot.removeListener("lobbyUpdate", gcHandler);
       return;
@@ -274,8 +251,6 @@ export function pollFirestoreForTeams(
       const radiant = lobby.radiant ?? [];
       const dire    = lobby.dire    ?? [];
       if (radiant.length > 0 && dire.length > 0) {
-        clearInterval(pollInterval);
-        bot.removeListener("lobbyUpdate", gcHandler);
         await finish(radiant, dire);
       }
     } catch (err: any) {
@@ -284,7 +259,7 @@ export function pollFirestoreForTeams(
   }, 10000);
 }
 
-// ── Shared VC creation + player movement (used by poll AND button) ────────────
+// ── VC creation + player movement ────────────────────────────
 
 export async function createVCsAndMovePlayers(
   client: Client,
@@ -316,9 +291,14 @@ export async function createVCsAndMovePlayers(
   const radiantCh = await makeVC("🟢 Radiant", radiant);
   const direCh    = await makeVC("🔴 Dire",    dire);
 
-  tempVoiceChannels.push(radiantCh.id, direCh.id);
+  // Save VC IDs to Firestore — lobby-specific, survives restarts
+  // Two bots running simultaneously will each save to their own lobbyDocId
+  await updateLobby(lobbyDocId, {
+    vcRadiantId: radiantCh.id,
+    vcDireId: direCh.id,
+  });
 
-  // Move players who are already in any voice channel
+  // Move players already in any voice channel
   let movedR = 0, movedD = 0;
   for (const p of radiant) {
     try {
@@ -332,7 +312,6 @@ export async function createVCsAndMovePlayers(
       if (m.voice.channel) { await m.voice.setChannel(direCh); movedD++; }
     } catch {}
   }
-
   console.log(`[Teams] Moved ${movedR}/${radiant.length} Radiant, ${movedD}/${dire.length} Dire`);
 
   // Delete waiting room
@@ -362,17 +341,41 @@ export async function createVCsAndMovePlayers(
   return { radiantCh, direCh };
 }
 
-// ── Voice channel cleanup ─────────────────────────────────────
+// ── Voice channel cleanup — lobby-specific ────────────────────
 
-export async function cleanupVoiceChannels(client: Client): Promise<void> {
+export async function cleanupVoiceChannels(client: Client, lobbyDocId?: string): Promise<void> {
   const guildId = process.env.DISCORD_GUILD_ID!;
   try {
     const guild = await client.guilds.fetch(guildId);
-    for (const chId of tempVoiceChannels) {
-      try { const ch = await guild.channels.fetch(chId); if (ch) await ch.delete("Match ended"); } catch {}
+
+    // Delete VCs for this specific lobby from Firestore IDs
+    if (lobbyDocId) {
+      try {
+        const lobby = await getLobby(lobbyDocId);
+        if (lobby) {
+          const vcIds = [
+            (lobby as any).vcRadiantId,
+            (lobby as any).vcDireId,
+          ].filter(Boolean);
+          for (const chId of vcIds) {
+            try {
+              const ch = await guild.channels.fetch(chId);
+              if (ch) await ch.delete("Match ended");
+            } catch {}
+          }
+        }
+      } catch {}
     }
-    tempVoiceChannels.length = 0;
-    waitingRoomId = null;
+
+    // Delete waiting room if still exists
+    if (waitingRoomId) {
+      try {
+        const wr = await guild.channels.fetch(waitingRoomId);
+        if (wr) await wr.delete("Match ended");
+      } catch {}
+      waitingRoomId = null;
+    }
+
   } catch (err: any) { console.error("[Cleanup] Error:", err.message); }
 }
 
@@ -408,14 +411,14 @@ export async function pollForMatchResult(client: Client, lobbyDocId: string, dot
           } catch {}
         }
 
-        await cleanupVoiceChannels(client);
+        await cleanupVoiceChannels(client, lobbyDocId);
         console.log(`[Match] ✅ Result recorded: ${result.winner} wins`);
       }
     } catch (err: any) {
       console.error("[Poll] Error:", err.message);
     }
 
-    if (attempts >= 72) { // 72 × 5min = 6 hours
+    if (attempts >= 72) {
       clearInterval(interval);
       console.log("[Poll] Timed out after 6 hours");
     }

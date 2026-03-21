@@ -427,7 +427,7 @@ async function handleLobbyDestroy(interaction: ButtonInteraction, lobbyId: strin
       await bot.destroyLobby();
     }
     await updateLobby(lobbyId, { status: "cancelled" });
-    await cleanupVoiceChannels(interaction.client);
+    await cleanupVoiceChannels(interaction.client, lobbyId);
     await interaction.editReply(
       bot.isReady() ? "💥 Lobby destroyed in Dota 2 and cleaned up." : "🗑️ Lobby record cleared. (Bot not connected — destroy manually in Dota 2)"
     );
