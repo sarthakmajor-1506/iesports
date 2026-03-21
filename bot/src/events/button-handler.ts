@@ -146,7 +146,12 @@ async function handleLobbyStart(interaction: ButtonInteraction, lobbyId: string)
   } catch (err: any) { await interaction.editReply(`❌ ${err.message}`); }
 }
 
-// ─── Shuffle: split all players randomly into Radiant/Dire, write to Firestore ───
+// ─── Shuffle ─────────────────────────────────────────────────
+// New flow:
+// 1. Send GC BalancedShuffle
+// 2. Wait for GC to respond with new positions (up to 8s)
+// 3. If GC gave us positions → use them; otherwise fall back to live state
+// 4. Map steam32 → Firestore players, write teams, move to VCs
 
 async function handleLobbyShuffle(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
@@ -159,7 +164,6 @@ async function handleLobbyShuffle(interaction: ButtonInteraction, lobbyId: strin
     const lobby = await getLobby(lobbyId);
     if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
 
-    // Collect ALL players regardless of current team
     const allPlayers: MatchPlayer[] = [
       ...(lobby.spectators ?? []),
       ...(lobby.radiant   ?? []),
@@ -167,36 +171,67 @@ async function handleLobbyShuffle(interaction: ButtonInteraction, lobbyId: strin
     ];
 
     if (allPlayers.length < 2) {
-      await interaction.editReply("⚠️ Not enough players to shuffle (need at least 2).");
+      await interaction.editReply("⚠️ Not enough players in lobby (need at least 2).");
       return;
     }
 
-    // Randomly shuffle the array
-    const shuffled = [...allPlayers].sort(() => Math.random() - 0.5);
-    const half     = Math.ceil(shuffled.length / 2);
-    const radiant  = shuffled.slice(0, half);
-    const dire     = shuffled.slice(half);
+    // Send GC shuffle and wait for response
+    const gcMembers = await bot.shuffleTeams();
+    const botSteam32 = (bot as any).botSteam32 as number;
 
-    // Write teams to Firestore immediately — no GC parsing needed
+    // Try to map GC response to our player list
+    let radiant: MatchPlayer[] = [];
+    let dire: MatchPlayer[] = [];
+
+    if (gcMembers.length > 0) {
+      for (const m of gcMembers) {
+        if (m.id === botSteam32) continue; // skip the bot
+        const player = allPlayers.find(p => p.steam32Id === String(m.id));
+        if (!player) continue;
+        if (m.team === 0) radiant.push(player);
+        if (m.team === 1) dire.push(player);
+      }
+    }
+
+    // If GC mapping worked (players are on teams in-game), use it
+    // If not (everyone still unassigned), fall back to local random split
+    if (radiant.length === 0 && dire.length === 0) {
+      console.log("[Shuffle] GC returned no team assignments — using local random split");
+      const shuffled = [...allPlayers].sort(() => Math.random() - 0.5);
+      const half = Math.ceil(shuffled.length / 2);
+      radiant = shuffled.slice(0, half);
+      dire    = shuffled.slice(half);
+    }
+
+    // Write to Firestore
     await updateLobby(lobbyId, { radiant, dire, spectators: [] });
-    console.log(`[Shuffle] Lobby ${lobbyId}: Radiant=${radiant.map(p => p.username).join(",")}, Dire=${dire.map(p => p.username).join(",")}`);
+    console.log(`[Shuffle] Lobby ${lobbyId}: Radiant=[${radiant.map(p => p.username).join(",")}] Dire=[${dire.map(p => p.username).join(",")}]`);
 
-    // Also send GC shuffle so in-game lobby reflects the assignment
-    bot.shuffleTeams();
-
-    await interaction.editReply(
-      `🔀 **Teams assigned!**\n\n` +
-      `🟢 **Radiant (${radiant.length}):** ${radiant.map(p => p.username).join(", ")}\n` +
-      `🔴 **Dire (${dire.length}):** ${dire.map(p => p.username).join(", ")}\n\n` +
-      `Click **Move to VCs** to move players to voice channels.`
-    );
+    // Move to VCs immediately
+    try {
+      await createVCsAndMovePlayers(interaction.client, lobbyId, radiant, dire);
+      await interaction.editReply(
+        `🔀 **Shuffled & moved!**\n\n` +
+        `🟢 **Radiant (${radiant.length}):** ${radiant.map(p => p.username).join(", ")}\n` +
+        `🔴 **Dire (${dire.length}):** ${dire.map(p => p.username).join(", ")}\n\n` +
+        `✅ Players moved to voice channels.`
+      );
+    } catch {
+      await interaction.editReply(
+        `🔀 **Teams assigned!**\n\n` +
+        `🟢 **Radiant (${radiant.length}):** ${radiant.map(p => p.username).join(", ")}\n` +
+        `🔴 **Dire (${dire.length}):** ${dire.map(p => p.username).join(", ")}\n\n` +
+        `Click **Move to VCs** to move players.`
+      );
+    }
 
   } catch (err: any) {
     await interaction.editReply(`❌ Failed: ${err.message}`);
   }
 }
 
-// ─── Flip: swap Radiant ↔ Dire in Firestore ──────────────────
+// ─── Flip ─────────────────────────────────────────────────────
+// Sends GC flip, waits for response, swaps teams in Firestore, moves VCs
 
 async function handleLobbyFlip(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
@@ -209,33 +244,46 @@ async function handleLobbyFlip(interaction: ButtonInteraction, lobbyId: string):
     const lobby = await getLobby(lobbyId);
     if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
 
-    const radiant = lobby.radiant ?? [];
-    const dire    = lobby.dire    ?? [];
+    const oldRadiant = lobby.radiant ?? [];
+    const oldDire    = lobby.dire    ?? [];
 
-    if (radiant.length === 0 && dire.length === 0) {
+    if (oldRadiant.length === 0 && oldDire.length === 0) {
       await interaction.editReply("⚠️ No teams to flip. Run Shuffle first.");
       return;
     }
 
-    // Swap Radiant ↔ Dire in Firestore immediately — no GC parsing needed
-    await updateLobby(lobbyId, { radiant: dire, dire: radiant });
-    console.log(`[Flip] Lobby ${lobbyId}: Radiant↔Dire swapped in Firestore`);
+    // Send GC flip and wait for response
+    await bot.flipTeams();
 
-    // Also send GC flip so in-game lobby reflects the swap
-    bot.flipTeams();
+    // Swap in Firestore
+    await updateLobby(lobbyId, { radiant: oldDire, dire: oldRadiant });
+    console.log(`[Flip] Lobby ${lobbyId}: swapped — new Radiant=[${oldDire.map(p => p.username).join(",")}]`);
 
-    await interaction.editReply(
-      `🔄 **Teams flipped!**\n\n` +
-      `🟢 **Radiant (${dire.length}):** ${dire.map(p => p.username).join(", ")}\n` +
-      `🔴 **Dire (${radiant.length}):** ${radiant.map(p => p.username).join(", ")}\n\n` +
-      `Click **Move to VCs** to move players to voice channels.`
-    );
+    // Move to VCs immediately
+    try {
+      await createVCsAndMovePlayers(interaction.client, lobbyId, oldDire, oldRadiant);
+      await interaction.editReply(
+        `🔄 **Flipped & moved!**\n\n` +
+        `🟢 **Radiant (${oldDire.length}):** ${oldDire.map(p => p.username).join(", ")}\n` +
+        `🔴 **Dire (${oldRadiant.length}):** ${oldRadiant.map(p => p.username).join(", ")}\n\n` +
+        `✅ Players moved to voice channels.`
+      );
+    } catch {
+      await interaction.editReply(
+        `🔄 **Teams flipped!**\n\n` +
+        `🟢 **Radiant (${oldDire.length}):** ${oldDire.map(p => p.username).join(", ")}\n` +
+        `🔴 **Dire (${oldRadiant.length}):** ${oldRadiant.map(p => p.username).join(", ")}\n\n` +
+        `Click **Move to VCs** to move players.`
+      );
+    }
 
   } catch (err: any) {
     await interaction.editReply(`❌ Failed: ${err.message}`);
   }
 }
-// ─── Move to VCs ─────────────────────────────────────────────
+
+// ─── Move to VCs ──────────────────────────────────────────────
+// Reads live Dota lobby state first, then falls back to Firestore
 
 async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): Promise<void> {
   if (!isAdmin(interaction)) { await interaction.reply({ content: "❌ Admin only.", ephemeral: true }); return; }
@@ -245,12 +293,46 @@ async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): 
     const lobby = await getLobby(lobbyId);
     if (!lobby) { await interaction.editReply("❌ Lobby not found."); return; }
 
-    const radiant = lobby.radiant ?? [];
-    const dire    = lobby.dire    ?? [];
+    const bot = getDotaBot();
+    const allPlayers: MatchPlayer[] = [
+      ...(lobby.spectators ?? []),
+      ...(lobby.radiant   ?? []),
+      ...(lobby.dire      ?? []),
+    ];
+
+    let radiant: MatchPlayer[] = lobby.radiant ?? [];
+    let dire: MatchPlayer[]    = lobby.dire    ?? [];
+
+    // Try to read live positions from GC first
+    if (bot.isReady()) {
+      const gcMembers = bot.getLobbyMembers();
+      const botSteam32 = (bot as any).botSteam32 as number;
+
+      if (gcMembers.length > 0) {
+        const gcRadiant: MatchPlayer[] = [];
+        const gcDire:    MatchPlayer[] = [];
+
+        for (const m of gcMembers) {
+          if (m.id === botSteam32) continue;
+          const player = allPlayers.find(p => p.steam32Id === String(m.id));
+          if (!player) continue;
+          if (m.team === 0) gcRadiant.push(player);
+          if (m.team === 1) gcDire.push(player);
+        }
+
+        if (gcRadiant.length > 0 || gcDire.length > 0) {
+          radiant = gcRadiant;
+          dire    = gcDire;
+          // Sync to Firestore so embeds stay accurate
+          await updateLobby(lobbyId, { radiant, dire, spectators: [] });
+          console.log(`[MoveToVC] Using live GC state — Radiant: ${radiant.length}, Dire: ${dire.length}`);
+        }
+      }
+    }
 
     if (radiant.length === 0 && dire.length === 0) {
       await interaction.editReply(
-        "⚠️ No teams assigned yet.\n\nClick **Shuffle** first to assign teams, then click Move to VCs."
+        "⚠️ No teams assigned yet.\n\nHave players join Radiant/Dire in Dota 2, then click **Shuffle** or **Move to VCs**."
       );
       return;
     }
@@ -258,9 +340,9 @@ async function handleMoveToVC(interaction: ButtonInteraction, lobbyId: string): 
     await createVCsAndMovePlayers(interaction.client, lobbyId, radiant, dire);
 
     await interaction.editReply(
-      `✅ Done! Voice channels created and players moved.\n` +
+      `✅ **Done!**\n` +
       `🟢 Radiant: ${radiant.length} players | 🔴 Dire: ${dire.length} players\n\n` +
-      `Players not currently in any voice channel need to join manually.`
+      `Players not in a voice channel need to join manually.`
     );
   } catch (err: any) {
     console.error("[MoveToVC]", err);

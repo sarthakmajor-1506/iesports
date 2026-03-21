@@ -8,17 +8,16 @@ const EGCBaseClientMsg = {
   k_EMsgGCClientWelcome: 4004,
 };
 
-// From EDOTAGCMsg enum (C# reference)
 const EDOTAGCMsg = {
   k_EMsgGCPracticeLobbyCreate:         7038,
   k_EMsgGCPracticeLobbySetDetails:     7046,
-  k_EMsgGCPracticeLobbySetTeamSlot:    7047,  // moves THE BOT ONLY to a slot
+  k_EMsgGCPracticeLobbySetTeamSlot:    7047,
   k_EMsgGCPracticeLobbyLeave:          7040,
   k_EMsgGCPracticeLobbyLaunch:         7041,
   k_EMsgGCPracticeLobbyKick:           7081,
   k_EMsgGCPracticeLobbyKickFromTeam:   8047,
-  k_EMsgGCBalancedShuffleLobby:        7049,  // GC shuffles all players randomly
-  k_EMsgGCFlipLobbyTeams:              7320,  // GC flips Radiant <-> Dire
+  k_EMsgGCBalancedShuffleLobby:        7049,
+  k_EMsgGCFlipLobbyTeams:              7320,
   k_EMsgDestroyLobbyRequest:           8097,
 };
 
@@ -26,8 +25,6 @@ const EGCBaseMsg = {
   k_EMsgGCInviteToLobby: 4512,
 };
 
-// DOTA_GC_TEAM enum values
-// GOOD_GUYS=0 (Radiant), BAD_GUYS=1 (Dire), SPECTATOR=3, PLAYER_POOL=4 (Unassigned)
 const DOTA_GC_TEAM_PLAYER_POOL = 4; // Unassigned
 
 export const REGIONS: Record<string, number> = {
@@ -38,7 +35,6 @@ export const REGIONS: Record<string, number> = {
   "South Africa": 11, Chile: 14, Peru: 15, Japan: 19,
 };
 
-// AP=1 is All Pick — default for IEsports
 export const GAME_MODES: Record<string, number> = {
   AP: 1, CM: 2, RD: 3, SD: 4, AR: 5, CD: 16,
 };
@@ -48,7 +44,6 @@ export interface SteamLobbyResult {
   password: string;
 }
 
-// Lobby member as parsed from GC lobby state update (msgType 7388 / SOCache)
 export interface LobbyMember {
   id: number;   // steam32
   team: number; // 0=Radiant, 1=Dire, 4=Unassigned
@@ -64,10 +59,19 @@ class DotaBot extends EventEmitter {
   private waitingForLobby = false;
   private pendingTimers: NodeJS.Timeout[] = [];
   private lobbyActive = false;
+  private botSteam32 = 0;
+
+  // ── Live lobby state — updated every time GC sends a lobby update ──────────
+  private liveLobbyMembers: LobbyMember[] = [];
 
   constructor() {
     super();
     this.client = new SteamUser({ enablePicsCache: true, changelistUpdateInterval: 0 } as any);
+  }
+
+  // Returns the current live lobby member list (who is on which team right now)
+  getLobbyMembers(): LobbyMember[] {
+    return this.liveLobbyMembers;
   }
 
   async connect(): Promise<void> {
@@ -113,7 +117,6 @@ class DotaBot extends EventEmitter {
       this.client.on("receivedFromGC", (appId: number, msgType: number, payload: Buffer) => {
         if (appId !== DOTA2_APP_ID) return;
 
-        // Log everything except high-frequency spam
         if (this.waitingForLobby) {
           console.log(`[GC:lobby-wait] <- msgType=${msgType} (${payload.length}b)`);
         } else if (![8675, 8678, 8689, 8747, 4009].includes(msgType)) {
@@ -136,11 +139,8 @@ class DotaBot extends EventEmitter {
           this.stopHello();
           clearTimeout(timeout);
           console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
-
-          // Destroy any leftover lobby from previous session
           this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
           this.lobbyActive = false;
-
           resolve();
         }
 
@@ -156,25 +156,26 @@ class DotaBot extends EventEmitter {
           this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
           console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
           if (this.waitingForLobby) this.emit("lobbyCreated");
+
+          // ── Also try to parse as SO cache lobby update ────────────────────
+          // After any team change (join/move/shuffle/flip), GC sends updated
+          // lobby state wrapped inside msgType 26. Try all parse strategies.
+          try {
+            const members = this.parseAnyLobbyPayload(payload);
+            if (members.length > 0) {
+              this.updateLiveLobby(members);
+            }
+          } catch { /* not a lobby payload */ }
         }
 
-        // ── Lobby state update (msgType 7388) ─────────────────────────────────
-        // Fired by GC whenever any player moves teams (Radiant/Dire/Unassigned),
-        // and after Shuffle/Flip. Parse and emit so match-orchestrator can sync
-        // teams to Firestore and move Discord VCs automatically.
+        // ── Lobby state update (msgType 7388) — fired on reconnect/restore ───
         if (msgType === 7388 && payload.length > 0) {
           try {
-            const members = this.parseLobbyMembers(payload);
+            const members = this.parseAnyLobbyPayload(payload);
             if (members.length > 0) {
-              const summary = members
-                .map(m => `${m.id}:team${m.team}`)
-                .join(", ");
-              console.log(`[GC] 📋 LobbyUpdate — ${members.length} members: ${summary}`);
-              this.emit("lobbyUpdate", { members });
+              this.updateLiveLobby(members);
             }
-          } catch {
-            // parse errors are non-fatal
-          }
+          } catch { /* parse errors are non-fatal */ }
         }
       });
 
@@ -199,8 +200,15 @@ class DotaBot extends EventEmitter {
 
   isReady() { return this.ready && this.gcReady; }
 
-  // ── Create Lobby ────────────────────────────────────────────────────────────
-  // Default game mode is AP (All Pick = 1)
+  // ── Update live lobby state and emit event ───────────────────────────────────
+  private updateLiveLobby(members: LobbyMember[]): void {
+    this.liveLobbyMembers = members;
+    const summary = members.map(m => `${m.id}:team${m.team}`).join(", ");
+    console.log(`[GC] 📋 LobbyState updated — ${members.length} members: ${summary}`);
+    this.emit("lobbyUpdate", { members });
+  }
+
+  // ── Create Lobby ─────────────────────────────────────────────────────────────
   async createLobby(
     name: string,
     password: string,
@@ -209,12 +217,11 @@ class DotaBot extends EventEmitter {
   ): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 16;
-    const mode = GAME_MODES[gameMode] ?? 1; // default AP
+    const mode = GAME_MODES[gameMode] ?? 1;
 
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
 
-    // Always destroy first, wait for GC to clear it
     const destroyWait = this.lobbyActive ? 10000 : 4000;
     console.log(`[Dota2] -> Pre-destroy (lobbyActive=${this.lobbyActive}, waiting ${destroyWait}ms)...`);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
@@ -239,8 +246,6 @@ class DotaBot extends EventEmitter {
         this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed. Kicking bot to Unassigned...");
 
-        // Kick bot from team repeatedly — same logic as the working Leave button.
-        // NO applySettings calls here — SetDetails causes GC to re-slot the bot.
         const kickSelf = () => {
           const steam32 = this.getBotSteam32();
           if (steam32 > 0) {
@@ -285,22 +290,22 @@ class DotaBot extends EventEmitter {
       this.str(2,  name),
       this.vi(4,   region),
       this.vi(5,   mode),
-      this.bool(10, false), // allow_cheats
-      this.bool(11, false), // fill_with_bots
-      this.bool(13, true),  // allow_spectating
+      this.bool(10, false),
+      this.bool(11, false),
+      this.bool(13, true),
       this.str(15, password),
-      this.vi(33,  0),      // visibility = public
+      this.vi(33,  0),
     ]);
   }
 
-  // ── Invite ──────────────────────────────────────────────────────────────────
+  // ── Invite ───────────────────────────────────────────────────────────────────
   invitePlayer(steam32Id: string): void {
     if (!this.isReady()) { console.warn("[Dota2] invitePlayer: not ready"); return; }
     const accountId = parseInt(steam32Id, 10);
     if (isNaN(accountId) || accountId <= 0) { console.warn(`[Dota2] bad steam32="${steam32Id}"`); return; }
     const id64 = BigInt(accountId) + BigInt("76561197960265728");
     const buf = Buffer.alloc(9);
-    buf[0] = 0x09; // field 1, wire type 1 (fixed64)
+    buf[0] = 0x09;
     buf.writeBigUInt64LE(id64, 1);
     this.client.sendToGC(DOTA2_APP_ID, EGCBaseMsg.k_EMsgGCInviteToLobby, {}, buf);
     console.log(`[Dota2] 📨 Invited steam32=${steam32Id} steam64=${id64}`);
@@ -316,41 +321,71 @@ class DotaBot extends EventEmitter {
     console.log(`[Dota2] ✅ ${valid.length} invites sent`);
   }
 
-  // ── Team Management ─────────────────────────────────────────────────────────
-  //
-  // IMPORTANT — what the GC actually allows:
-  //
-  // k_EMsgGCBalancedShuffleLobby (7049):
-  //   The GC shuffles ALL players in the lobby randomly across Radiant/Dire.
-  //   This is the ONLY way to move other players between teams.
-  //   The result is emitted back as a lobby state update (msgType 7388).
-  //
-  // k_EMsgGCFlipLobbyTeams (7320):
-  //   The GC swaps all Radiant players to Dire and vice versa.
-  //   Also emitted back as a lobby state update (msgType 7388).
-  //
-  // k_EMsgGCPracticeLobbySetTeamSlot (7047):
-  //   Moves ONLY THE BOT ITSELF to a specific slot.
-  //   Cannot be used to move other players. (Confirmed from C# JoinTeam implementation.)
-  //
-  // k_EMsgGCPracticeLobbyKickFromTeam (8047):
-  //   Moves a player from their team back to Unassigned (PLAYER_POOL).
-  //   Used to keep bot in Unassigned after lobby creation.
+  // ── Team Management ──────────────────────────────────────────────────────────
 
-  shuffleTeams(): void {
-    if (!this.isReady()) return;
-    // Send GC balanced shuffle — GC assigns players randomly to Radiant/Dire
-    // Result comes back as lobbyUpdate event (msgType 7388) with new team assignments
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCBalancedShuffleLobby, {}, Buffer.alloc(0));
-    console.log("[Dota2] -> BalancedShuffle sent — waiting for GC lobbyUpdate...");
+  // Sends GC shuffle and waits up to 8s for the lobby state update response.
+  // Resolves with the new member list so caller can map to Discord users.
+  shuffleTeams(): Promise<LobbyMember[]> {
+    return new Promise((resolve) => {
+      if (!this.isReady()) { resolve([]); return; }
+
+      let settled = false;
+
+      const handler = (lobbyState: any) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallback);
+        const members: LobbyMember[] = lobbyState?.members ?? [];
+        console.log(`[Dota2] ✅ Shuffle confirmed by GC — ${members.length} members`);
+        resolve(members);
+      };
+
+      // Wait for the next lobbyUpdate event after sending shuffle
+      this.once("lobbyUpdate", handler);
+
+      // 8s fallback — if GC doesn't respond, return current known state
+      const fallback = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.removeListener("lobbyUpdate", handler);
+        console.warn("[Dota2] ⚠️ Shuffle GC response timeout — using live lobby state");
+        resolve(this.liveLobbyMembers);
+      }, 8000);
+
+      this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCBalancedShuffleLobby, {}, Buffer.alloc(0));
+      console.log("[Dota2] -> BalancedShuffle sent — waiting for GC lobbyUpdate...");
+    });
   }
 
-  flipTeams(): void {
-    if (!this.isReady()) return;
-    // Send GC flip — GC swaps Radiant <-> Dire
-    // Result comes back as lobbyUpdate event (msgType 7388) with new team assignments
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCFlipLobbyTeams, {}, Buffer.alloc(0));
-    console.log("[Dota2] -> FlipTeams sent — waiting for GC lobbyUpdate...");
+  // Sends GC flip and waits up to 8s for the lobby state update response.
+  flipTeams(): Promise<LobbyMember[]> {
+    return new Promise((resolve) => {
+      if (!this.isReady()) { resolve([]); return; }
+
+      let settled = false;
+
+      const handler = (lobbyState: any) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallback);
+        const members: LobbyMember[] = lobbyState?.members ?? [];
+        console.log(`[Dota2] ✅ Flip confirmed by GC — ${members.length} members`);
+        resolve(members);
+      };
+
+      this.once("lobbyUpdate", handler);
+
+      const fallback = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.removeListener("lobbyUpdate", handler);
+        console.warn("[Dota2] ⚠️ Flip GC response timeout — using live lobby state");
+        resolve(this.liveLobbyMembers);
+      }, 8000);
+
+      this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCFlipLobbyTeams, {}, Buffer.alloc(0));
+      console.log("[Dota2] -> FlipTeams sent — waiting for GC lobbyUpdate...");
+    });
   }
 
   kickBotFromTeam(): void {
@@ -377,7 +412,6 @@ class DotaBot extends EventEmitter {
     }
   }
 
-  // ── Start / Destroy ─────────────────────────────────────────────────────────
   startGame(): void {
     if (!this.isReady()) return;
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLaunch, {}, Buffer.alloc(0));
@@ -392,22 +426,21 @@ class DotaBot extends EventEmitter {
 
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
+    this.liveLobbyMembers = [];
 
-    // Per C# reference: bot must be in a team slot to be lobby owner and destroy.
-    // Move bot back to Radiant slot 0 (host position) before destroying.
-    // CMsgPracticeLobbySetTeamSlot { team=field2, slot=field3 } — moves THE BOT only
-    const slotMsg = Buffer.concat([
-      this.vi(2, 0), // team = GOOD_GUYS (Radiant)
-      this.vi(3, 0), // slot = 0
-    ]);
+    const slotMsg = Buffer.concat([this.vi(2, 0), this.vi(3, 0)]);
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot, {}, slotMsg);
     console.log("[Dota2] -> Moving bot to Radiant slot 0 before destroy...");
 
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 3000));
 
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
     this.lobbyActive = false;
     console.log("[Dota2] ✅ Destroy request sent");
+
+    await new Promise(r => setTimeout(r, 2000));
+    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+    console.log("[Dota2] ✅ Second destroy sent");
   }
 
   disconnect(): void {
@@ -418,9 +451,7 @@ class DotaBot extends EventEmitter {
     try { this.client.logOff(); } catch {}
   }
 
-  // ── Bot SteamID ─────────────────────────────────────────────────────────────
-  private botSteam32 = 0;
-
+  // ── Bot SteamID ──────────────────────────────────────────────────────────────
   private getBotSteam32(): number {
     if (this.botSteam32 > 0) return this.botSteam32;
     try {
@@ -432,7 +463,7 @@ class DotaBot extends EventEmitter {
     } catch { return 0; }
   }
 
-  // ── Hello / GC session keepalive ────────────────────────────────────────────
+  // ── Hello / GC session keepalive ─────────────────────────────────────────────
   private startHello(): void {
     this.stopHello();
     const send = () => {
@@ -449,7 +480,7 @@ class DotaBot extends EventEmitter {
     if (this.helloInterval) { clearInterval(this.helloInterval); this.helloInterval = null; }
   }
 
-  // ── Protobuf encode helpers ──────────────────────────────────────────────────
+  // ── Protobuf encode helpers ───────────────────────────────────────────────────
   private encodeVarint(value: number): Buffer {
     const buf: number[] = [];
     let v = value >>> 0;
@@ -479,7 +510,7 @@ class DotaBot extends EventEmitter {
     return this.vi(field, value ? 1 : 0);
   }
 
-  // ── Minimal protobuf decoder (for reading lobby state from GC) ──────────────
+  // ── Protobuf decode helpers ───────────────────────────────────────────────────
   private readVarint(buf: Buffer, pos: number): { value: number; pos: number } {
     let val = 0, shift = 0;
     while (pos < buf.length) {
@@ -491,48 +522,117 @@ class DotaBot extends EventEmitter {
     return { value: val, pos };
   }
 
-  // Parse CMsgPracticeLobbyResponse (msgType 7388) members list.
-  // Top-level field 3 = repeated CLobbyMember { id=field1(steam32), team=field4 }
-  // team: 0=Radiant, 1=Dire, 4=Unassigned
-  parseLobbyMembers(buf: Buffer): LobbyMember[] {
+  // Try multiple parse strategies — flat lobby proto OR SO cache wrapper
+  private parseAnyLobbyPayload(buf: Buffer): LobbyMember[] {
+    // Strategy 1: try as flat CSODOTALobby (field 3 = repeated CLobbyMember)
+    const flat = this.parseFlatLobby(buf);
+    if (flat.length > 0) return flat;
+
+    // Strategy 2: try as CMsgSOCacheSubscribed wrapper
+    // field 2 = repeated SubscribedType { field 1=type_id, field 2=repeated object_data }
+    const wrapped = this.parseSOCacheWrapper(buf);
+    if (wrapped.length > 0) return wrapped;
+
+    return [];
+  }
+
+  // Parse a flat CSODOTALobby buffer — field 3 = repeated CLobbyMember
+  private parseFlatLobby(buf: Buffer): LobbyMember[] {
     const members: LobbyMember[] = [];
     let pos = 0;
 
-    while (pos < buf.length) {
-      const t = this.readVarint(buf, pos); pos = t.pos;
-      const fieldNum = t.value >>> 3;
-      const wireType = t.value & 0x7;
+    try {
+      while (pos < buf.length) {
+        const t = this.readVarint(buf, pos); pos = t.pos;
+        const fieldNum = t.value >>> 3;
+        const wireType = t.value & 0x7;
 
-      if (wireType === 0) {
-        const r = this.readVarint(buf, pos); pos = r.pos;
-      } else if (wireType === 2) {
-        const l = this.readVarint(buf, pos); pos = l.pos;
-        const sub = buf.slice(pos, pos + l.value); pos += l.value;
+        if (wireType === 0) {
+          const r = this.readVarint(buf, pos); pos = r.pos;
+        } else if (wireType === 2) {
+          const l = this.readVarint(buf, pos); pos = l.pos;
+          const sub = buf.slice(pos, pos + l.value); pos += l.value;
 
-        if (fieldNum === 3) {
-          // Parse CLobbyMember sub-message
-          let id = 0, team = DOTA_GC_TEAM_PLAYER_POOL, sp = 0;
-          while (sp < sub.length) {
-            const st = this.readVarint(sub, sp); sp = st.pos;
-            const sf = st.value >>> 3, sw = st.value & 0x7;
-            if (sw === 0) {
-              const sv = this.readVarint(sub, sp); sp = sv.pos;
-              if (sf === 1) id   = sv.value; // account_id (steam32)
-              if (sf === 4) team = sv.value; // team
-            } else if (sw === 2) {
-              const sl = this.readVarint(sub, sp); sp = sl.pos + sl.value;
-            } else if (sw === 1) { sp += 8; }
-            else if (sw === 5) { sp += 4; }
-            else break;
+          if (fieldNum === 3) {
+            // Parse CLobbyMember
+            let id = 0, team = DOTA_GC_TEAM_PLAYER_POOL, sp = 0;
+            while (sp < sub.length) {
+              const st = this.readVarint(sub, sp); sp = st.pos;
+              const sf = st.value >>> 3, sw = st.value & 0x7;
+              if (sw === 0) {
+                const sv = this.readVarint(sub, sp); sp = sv.pos;
+                if (sf === 1) id   = sv.value;
+                if (sf === 4) team = sv.value;
+              } else if (sw === 2) {
+                const sl = this.readVarint(sub, sp); sp = sl.pos + sl.value;
+              } else if (sw === 1) { sp += 8; }
+              else if (sw === 5) { sp += 4; }
+              else break;
+            }
+            if (id > 0) members.push({ id, team });
           }
-          if (id > 0) members.push({ id, team });
-        }
-      } else if (wireType === 1) { pos += 8; }
-      else if (wireType === 5) { pos += 4; }
-      else break;
-    }
+        } else if (wireType === 1) { pos += 8; }
+        else if (wireType === 5) { pos += 4; }
+        else break;
+      }
+    } catch { /* truncated buffer */ }
 
     return members;
+  }
+
+  // Parse CMsgSOCacheSubscribed: field 2 = SubscribedType { field 1=type_id(2=lobby), field 2=object_data }
+  private parseSOCacheWrapper(buf: Buffer): LobbyMember[] {
+    let pos = 0;
+
+    try {
+      while (pos < buf.length) {
+        const t = this.readVarint(buf, pos); pos = t.pos;
+        const fieldNum = t.value >>> 3;
+        const wireType = t.value & 0x7;
+
+        if (wireType === 0) {
+          const r = this.readVarint(buf, pos); pos = r.pos;
+        } else if (wireType === 2) {
+          const l = this.readVarint(buf, pos); pos = l.pos;
+          const sub = buf.slice(pos, pos + l.value); pos += l.value;
+
+          if (fieldNum === 2) {
+            // SubscribedType — look for type_id=2 (lobby) then parse object_data
+            let typeId = 0;
+            const objectDatas: Buffer[] = [];
+            let sp = 0;
+
+            while (sp < sub.length) {
+              const st = this.readVarint(sub, sp); sp = st.pos;
+              const sf = st.value >>> 3, sw = st.value & 0x7;
+              if (sw === 0) {
+                const sv = this.readVarint(sub, sp); sp = sv.pos;
+                if (sf === 1) typeId = sv.value;
+              } else if (sw === 2) {
+                const sl = this.readVarint(sub, sp); sp = sl.pos;
+                const objData = sub.slice(sp, sp + sl.value); sp += sl.value;
+                if (sf === 2) objectDatas.push(objData);
+              } else break;
+            }
+
+            // type_id 2 = CSODOTALobby
+            if (typeId === 2 && objectDatas.length > 0) {
+              const members = this.parseFlatLobby(objectDatas[0]);
+              if (members.length > 0) return members;
+            }
+          }
+        } else if (wireType === 1) { pos += 8; }
+        else if (wireType === 5) { pos += 4; }
+        else break;
+      }
+    } catch { /* truncated buffer */ }
+
+    return [];
+  }
+
+  // Legacy alias kept for any external callers
+  parseLobbyMembers(buf: Buffer): LobbyMember[] {
+    return this.parseAnyLobbyPayload(buf);
   }
 }
 
