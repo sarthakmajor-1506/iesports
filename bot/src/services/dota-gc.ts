@@ -37,6 +37,7 @@ export const REGIONS: Record<string, number> = {
 
 export const GAME_MODES: Record<string, number> = {
   AP: 1, CM: 2, RD: 3, SD: 4, AR: 5, CD: 16,
+  ID: 24,  // ← Immortal Draft
 };
 
 export interface SteamLobbyResult {
@@ -417,19 +418,9 @@ class DotaBot extends EventEmitter {
     this.pendingTimers = [];
     this.liveLobbyMembers = [];
 
-    const slotMsg = Buffer.concat([this.vi(2, 0), this.vi(3, 0)]);
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbySetTeamSlot, {}, slotMsg);
-    console.log("[Dota2] -> SetTeamSlot Radiant:0 sent");
-
-    await new Promise(r => setTimeout(r, 3000));
-
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
     this.lobbyActive = false;
-    console.log("[Dota2] ✅ Destroy #1 sent");
-
-    await new Promise(r => setTimeout(r, 2000));
-    this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-    console.log("[Dota2] ✅ Destroy #2 sent");
+    console.log("[Dota2] ✅ Bot left lobby");
   }
 
   disconnect(): void {
