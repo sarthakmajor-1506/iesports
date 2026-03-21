@@ -156,7 +156,8 @@ class DotaBot extends EventEmitter {
           this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
           console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
           if (this.waitingForLobby) this.emit("lobbyCreated");
-
+          // TEMP DEBUG
+          console.log(`[GC:hex] msgType=${msgType} len=${payload.length} hex=${payload.toString('hex')}`);
           // ── Also try to parse as SO cache lobby update ────────────────────
           // After any team change (join/move/shuffle/flip), GC sends updated
           // lobby state wrapped inside msgType 26. Try all parse strategies.
