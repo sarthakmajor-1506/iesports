@@ -145,19 +145,24 @@ class DotaBot extends EventEmitter {
         }
 
         // ── Ownership challenge + lobby state (msgType 24 or 26) ────────────
-        if ((msgType === 24 || msgType === 26) && payload.length < 1000) {
+        if ((msgType === 24 || msgType === 26 || msgType === 7465) && payload.length < 1000) {
           const ticket = this.ownershipTicket || Buffer.alloc(0);
           const resp = Buffer.concat([
             this.vi(1, 1),
             this.vi(2, DOTA2_APP_ID),
             this.bytes(3, ticket),
           ]);
-          const replyMsg = msgType === 26 ? 27 : 25;
-          this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
-          console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
+          // 7465 doesn't need a ticket response — only 24/26 do
+          if (msgType === 24 || msgType === 26) {
+            const replyMsg = msgType === 26 ? 27 : 25;
+            this.client.sendToGC(DOTA2_APP_ID, replyMsg, {}, resp);
+            console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
+          } else {
+            console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby creation confirmed`);
+          }
           if (this.waitingForLobby) this.emit("lobbyCreated");
 
-          // Parse lobby member state from this payload
+          // Parse lobby member state
           try {
             const members = this.parseLobbyPayload(payload);
             if (members.length > 0) {
