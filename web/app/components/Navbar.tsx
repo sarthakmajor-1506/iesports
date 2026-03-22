@@ -17,7 +17,7 @@ import Image from "next/image";
 
 const games = [
   { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#F05A28", glow: "rgba(240,90,40,0.2)",  icon: "/dota2logo.png",    active: true  },
-  { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.2)",  icon: "/valorantlogo.png", active: false },
+  { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.2)",  icon: "/valorantlogo.png", active: true },
   { id: "cs2",      name: "CS:Go",    path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/csgologo.png",     active: false },
   { id: "cod",      name: "COD",      path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg",     active: false },
 ];
@@ -42,7 +42,7 @@ const DiscordIcon = ({ size = 16, color = "currentColor" }: { size?: number; col
 type PhoneStep = "phone" | "otp";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, riotData } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -92,6 +92,10 @@ export default function Navbar() {
             discordUsername: data.discordUsername,
             phone:         data.phone,
             dotaRankTier:  data.dotaRankTier,
+            riotGameName:  data.riotGameName,
+            riotTagLine:   data.riotTagLine,
+            riotAvatar:    data.riotAvatar,
+            riotVerified:  data.riotVerified,
           }));
         } catch (_) {}
       }
@@ -301,6 +305,24 @@ export default function Navbar() {
         .ph-resend-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
         .ph-resend-btn { background: none; border: none; color: #F05A28; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
         .ph-resend-btn:disabled { color: #bbb; cursor: default; }
+        .ie-accounts-row { display: flex; align-items: center; gap: 6px; }
+        .ie-acc { position: relative; display: flex; align-items: center; height: 36px; border-radius: 100px; cursor: pointer; transition: all 0.25s ease; overflow: hidden; flex-shrink: 0; }
+        .ie-acc.linked { background: #F0FDF4; border: 1.5px solid #bbf7d0; min-width: 36px; width: 36px; justify-content: center; }
+        .ie-acc.pending { background: #FFFBEB; border: 1.5px solid #fde68a; min-width: 36px; width: 36px; justify-content: center; }
+        .ie-acc.unlinked { background: #F8F7F4; border: 1.5px dashed #d0ceca; min-width: 36px; width: 36px; justify-content: center; opacity: 0.7; }
+        .ie-acc.unlinked:hover { opacity: 1; border-style: solid; }
+        .ie-acc:hover { width: auto; padding-right: 14px; }
+        .ie-acc-icon { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin: 0 7px; }
+        .ie-acc-icon.riot { border-radius: 4px; }
+        .ie-acc-details { display: none; align-items: center; gap: 6px; white-space: nowrap; }
+        .ie-acc:hover .ie-acc-details { display: flex; }
+        .ie-acc-name { font-size: 0.75rem; font-weight: 700; color: #333; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+        .ie-acc-status { font-size: 0.58rem; font-weight: 800; padding: 2px 6px; border-radius: 20px; }
+        .ie-acc-status.verified { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+        .ie-acc-status.pending { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .ie-acc-plus { font-size: 16px; color: #bbb; font-weight: 300; }
+        .ie-acc.unlinked:hover .ie-acc-plus { color: #888; }
+        @media (max-width: 900px) { .ie-accounts-row { display: none; } }
       `}</style>
 
       <nav className="ie-navbar">
@@ -330,26 +352,81 @@ export default function Navbar() {
           </div>
 
           <div className="ie-nav-right">
-            {steamData?.steamId && (
-              <div className="ie-steam-badge">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" style={{ width: 20, height: 20, opacity: 0.6 }} />
-                <img className="avatar" src={steamData.steamAvatar} alt="avatar" />
-                <span className="ie-steam-name">{steamData.steamName}</span>
-                <span className="ie-verified-badge">✓ Linked</span>
-              </div>
-            )}
+            <div className="ie-accounts-row">
+              {/* Steam */}
+              {steamData?.steamId ? (
+                <div className="ie-acc linked">
+                  <img className="ie-acc-icon" src={steamData.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"} alt="Steam" />
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name">{steamData.steamName}</span>
+                    <span className="ie-acc-status verified">✓</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="ie-acc unlinked" onClick={() => window.location.href = `/api/auth/steam?uid=${user?.uid}`}>
+                  <img className="ie-acc-icon" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" style={{ opacity: 0.4 }} />
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#888" }}>Connect Steam</span>
+                  </div>
+                </div>
+              )}
 
-            {discordLinked ? (
-              <div className="ie-discord-badge">
-                <DiscordIcon size={20} color="#5865F2" />
-                <span className="ie-discord-name">{discordUsername}</span>
-                <span className="ie-discord-verified">✓ Linked</span>
-              </div>
-            ) : (
-              <button className="ie-discord-btn" onClick={handleDiscordConnect}>
-                <DiscordIcon size={20} color="currentColor" /> Connect Discord
-              </button>
-            )}
+              {/* Discord */}
+              {discordLinked ? (
+                <div className="ie-acc linked">
+                  <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 7px", flexShrink: 0 }}>
+                    <DiscordIcon size={18} color="#5865F2" />
+                  </div>
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#4f5fc0" }}>{discordUsername}</span>
+                    <span className="ie-acc-status verified">✓</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="ie-acc unlinked" onClick={handleDiscordConnect}>
+                  <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 7px", flexShrink: 0 }}>
+                    <DiscordIcon size={18} color="#bbb" />
+                  </div>
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#888" }}>Connect Discord</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Riot / Valorant */}
+              {riotData?.riotVerified === "verified" ? (
+                <div className="ie-acc linked" onClick={() => router.push("/connect-riot")}>
+                  {riotData.riotAvatar ? (
+                    <img className="ie-acc-icon riot" src={riotData.riotAvatar} alt="Riot" />
+                  ) : (
+                    <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
+                  )}
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#ff4655" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                    <span className="ie-acc-status verified">✓</span>
+                  </div>
+                </div>
+              ) : riotData?.riotVerified === "pending" ? (
+                <div className="ie-acc pending" onClick={() => router.push("/connect-riot")}>
+                  {riotData.riotAvatar ? (
+                    <img className="ie-acc-icon riot" src={riotData.riotAvatar} alt="Riot" />
+                  ) : (
+                    <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
+                  )}
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#92400e" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                    <span className="ie-acc-status pending">Pending</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="ie-acc unlinked" onClick={() => router.push("/connect-riot")}>
+                  <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
+                  <div className="ie-acc-details">
+                    <span className="ie-acc-name" style={{ color: "#ff4655" }}>Connect Riot ID</span>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="ie-dropdown-wrap" ref={dropdownRef}>
               <button className="ie-dots-btn" onClick={() => setDropdownOpen(p => !p)} aria-label="More options">
@@ -383,6 +460,26 @@ export default function Navbar() {
                     ) : (
                       <button className="ie-dd-btn" onClick={openPhoneModal}>
                         <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
+                      </button>
+                    )}
+                  </div>
+                  <div className="ie-dd-section">
+                    <span className="ie-dd-label">Riot / Valorant</span>
+                    {riotData?.riotVerified === "verified" ? (
+                      <div className="ie-dd-item">
+                        <img src={riotData.riotAvatar || "/riot-games.png"} alt="Riot" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #22c55e" }} />
+                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                        <span className="ie-verified-badge">✓</span>
+                      </div>
+                    ) : riotData?.riotVerified === "pending" ? (
+                      <div className="ie-dd-item">
+                        <img src={riotData.riotAvatar || "/riot-games.png"} alt="Riot" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #f59e0b" }} />
+                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                        <span style={{ fontSize: "0.62rem", color: "#92400e", fontWeight: 800, background: "#fef3c7", padding: "2px 7px", borderRadius: 20, border: "1px solid #fde68a" }}>Pending</span>
+                      </div>
+                    ) : (
+                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#ff4655" }}>
+                        <img src="/riot-games.png" alt="Riot" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.7 }} /> Connect Riot ID
                       </button>
                     )}
                   </div>

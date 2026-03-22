@@ -13,11 +13,22 @@ type DotaProfile = {
   smurfRiskScore: number | null;
 };
 
+type RiotData = {
+  riotLinked: boolean;
+  riotVerified: "unlinked" | "pending" | "verified";
+  riotGameName: string;
+  riotTagLine: string;
+  riotAvatar: string;
+  riotRank: string;
+  riotTier: number;
+};
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
   steamLinked: boolean;
   dotaProfile: DotaProfile | null;
+  riotData: RiotData | null;
   logout: () => Promise<void>;
 };
 
@@ -26,21 +37,23 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   steamLinked: false,
   dotaProfile: null,
+  riotData: null,
   logout: async () => {},
 });
 
 // Pages that don't need auth — /auth/steam-success MUST be here
 // so AuthContext doesn't redirect away before signInWithCustomToken completes
-const PUBLIC_PATHS = ["/", "/login", "/auth/steam-success"];
+const PUBLIC_PATHS = ["/", "/login", "/auth/steam-success", "/auth/discord-success"];
 
 // Pages that need auth but not Steam
-const STEAM_EXEMPT_PATHS = ["/connect-steam"];
+const STEAM_EXEMPT_PATHS = ["/connect-steam", "/connect-riot"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [steamLinked, setSteamLinked] = useState(false);
   const [dotaProfile, setDotaProfile] = useState<DotaProfile | null>(null);
+  const [riotData, setRiotData] = useState<RiotData | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -61,14 +74,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           smurfRiskScore: data?.smurfRiskScore ?? null,
         });
 
+        const hasRiot = !!data?.riotGameName;
+        setRiotData({
+          riotLinked: hasRiot,
+          riotVerified: hasRiot ? (data?.riotVerified || "pending") : "unlinked",
+          riotGameName: data?.riotGameName || "",
+          riotTagLine: data?.riotTagLine || "",
+          riotAvatar: data?.riotAvatar || "",
+          riotRank: data?.riotRank || "",
+          riotTier: data?.riotTier || 0,
+        });
         if (!PUBLIC_PATHS.includes(pathname)) {
-          if (hasSteam && STEAM_EXEMPT_PATHS.includes(pathname)) {
+          // If user has Steam linked and is still on /connect-steam, redirect to dashboard
+          if (hasSteam && pathname === "/connect-steam") {
             router.push("/dashboard");
           }
+          // Don't redirect from /connect-riot — it's accessible to any logged-in user
         }
       } else {
         setSteamLinked(false);
         setDotaProfile(null);
+        setRiotData(null);
         if (!PUBLIC_PATHS.includes(pathname)) {
           router.push("/");
         }
@@ -86,7 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, logout }}>
+    
+    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, logout }}>
       {children}
     </AuthContext.Provider>
   );

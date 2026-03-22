@@ -115,3 +115,182 @@ export type SoloMatchScore = {
     winBonus: number;
   };
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VALORANT / RIOT TYPES
+// Append everything below to the bottom of your existing web/lib/types.ts
+//
+// NAMING CONVENTION — all Valorant entities use different names from Dota 2:
+//   Dota 2:   Bracket, Tournament, Team, SoloPlayer
+//   Valorant: RiotBracket, ValorantTournament, ValorantTeam, ValorantSoloPlayer
+//
+// FIRESTORE COLLECTIONS — completely separate from Dota 2:
+//   Dota 2:   "tournaments", "teams", "soloPool"
+//   Valorant: "valorantTournaments", "valorantTeams",
+//             "valorantTournaments/{id}/soloPlayers" (subcollection)
+//
+// USER DOC FIELDS — different prefix from Dota 2:
+//   Dota 2:   steamId, dotaRankTier, dotaBracket, registeredTournaments
+//   Valorant: riotGameName, riotTier, riotVerified, registeredValorantTournaments
+//
+// BRACKET SYSTEM — fundamentally different from Dota 2:
+//   Dota 2:   Static bracket from rank tier (herald_guardian, crusader_archon, etc.)
+//   Valorant: Dynamic quartile-based brackets computed POST-registration from
+//             the actual distribution of registered players' riotTier values.
+//             No bracket is assigned at registration time.
+// ══════════════════════════════════════════════════════════════════════════════
+
+
+// ── Riot user profile fields (stored on users/{uid} doc) ─────────────────────
+export interface RiotProfile {
+  riotGameName: string;
+  riotTagLine: string;
+  riotAvatar: string;           // card.small URL from Henrik API
+  riotRank: string;             // e.g. "Diamond 3" — human-readable
+  riotTier: number;             // Henrik API currenttier: 0=unranked, 3=Iron1 ... 27=Radiant
+  riotVerified: "unlinked" | "pending" | "verified";
+  riotScreenshotUrl?: string;   // Firebase Storage path for manual verification
+  riotLinkedAt?: string;        // ISO timestamp
+  riotPuuid?: string;           // Riot PUUID for future API calls
+}
+
+
+// ── Valorant bracket (S/A/B/C) — NOT the same as Dota Bracket type ──────────
+// These are assigned POST-registration via quantile computation,
+// never at registration time.
+export type RiotBracket = "S" | "A" | "B" | "C";
+
+/**
+ * Computes quartile-based brackets from an array of registered players' riotTier values.
+ *
+ * How it works:
+ * 1. Sort all players by riotTier descending (highest rank first)
+ * 2. Split into 4 equal quartiles
+ * 3. Top 25% = S, next 25% = A, next 25% = B, bottom 25% = C
+ * 4. If players tie at a quartile boundary, they go into the higher bracket
+ *
+ * Returns a Map of uid → RiotBracket for every player.
+ *
+ * This is called AFTER registration closes, BEFORE the auction begins.
+ * During registration, players have no bracket — only their raw riotTier is stored.
+ */
+export function computeValorantBrackets(
+  players: { uid: string; riotTier: number }[]
+): Map<string, RiotBracket> {
+  const result = new Map<string, RiotBracket>();
+
+  if (players.length === 0) return result;
+
+  // Sort descending by riotTier (highest rank first)
+  const sorted = [...players].sort((a, b) => b.riotTier - a.riotTier);
+
+  const total = sorted.length;
+  const q1 = Math.ceil(total * 0.25);   // top 25% cutoff index
+  const q2 = Math.ceil(total * 0.50);   // top 50% cutoff index
+  const q3 = Math.ceil(total * 0.75);   // top 75% cutoff index
+
+  for (let i = 0; i < sorted.length; i++) {
+    let bracket: RiotBracket;
+    if (i < q1)      bracket = "S";
+    else if (i < q2) bracket = "A";
+    else if (i < q3) bracket = "B";
+    else              bracket = "C";
+
+    result.set(sorted[i].uid, bracket);
+  }
+
+  return result;
+}
+
+/**
+ * Captain budget for the auction format, keyed by RiotBracket.
+ * Higher bracket (better rank) → lower budget (balancing mechanism).
+ * Applied AFTER brackets are computed post-registration.
+ */
+export const VALORANT_CAPTAIN_BUDGETS: Record<RiotBracket, number> = {
+  S: 600,
+  A: 750,
+  B: 875,
+  C: 1000,
+};
+
+/**
+ * Minimum bid points by bracket for auction format.
+ */
+export const VALORANT_MIN_BID_POINTS: Record<RiotBracket, number> = {
+  S: 150,
+  A: 100,
+  B: 60,
+  C: 30,
+};
+
+
+// ── Valorant tournament (Firestore: "valorantTournaments/{id}") ──────────────
+// NOT the same as the Dota `Tournament` type — different fields, different collection
+export interface ValorantTournament {
+  id: string;
+  name: string;
+  game: "valorant";                         // always "valorant"
+  format: "auction" | "standard";           // Dota doesn't have this
+  status: "upcoming" | "active" | "ended";
+  bracketsComputed: boolean;                // false during registration, true after admin computes
+  isTestTournament?: boolean;               // admin-only visibility flag
+  isDailyTournament?: boolean;
+  registrationDeadline: string;             // ISO string
+  startDate: string;
+  endDate: string;
+  totalSlots: number;
+  slotsBooked: number;
+  entryFee: number;
+  prizePool: string;
+  maxTeams?: number;                        // auction format: max team count
+  minBidPoints?: Record<RiotBracket, number>;
+  captainBudgets?: Record<RiotBracket, number>;
+  sTierCapPerTeam?: number;                 // max S-tier players per team
+  rules: string[];
+  desc: string;
+  // Populated AFTER bracket computation:
+  bracketCutoffs?: {                        // stored for transparency / display
+    sMinTier: number;                       // minimum riotTier to be in S
+    aMinTier: number;                       // minimum riotTier to be in A
+    bMinTier: number;                       // minimum riotTier to be in B
+  };
+}
+
+
+// ── Valorant team (Firestore: "valorantTeams/{id}") ──────────────────────────
+// NOT the same as the Dota `Team` type — uses RiotBracket, not Bracket
+export interface ValorantTeam {
+  id: string;
+  tournamentId: string;                     // references valorantTournaments/{id}
+  captainUid: string;
+  captainRiotGameName: string;
+  captainRiotTagLine: string;
+  captainBracket: RiotBracket;              // assigned post-registration
+  captainBudget: number;                    // derived from captainBracket
+  members: string[];                        // array of UIDs
+  memberBrackets: Record<string, RiotBracket>;  // assigned post-registration
+  teamCode: string;
+  status: "forming" | "full" | "confirmed";
+  sTierCount: number;                       // how many S-tier players on this team
+  createdAt: Date;
+}
+
+
+// ── Valorant solo/registered player ──────────────────────────────────────────
+// Firestore: "valorantTournaments/{id}/soloPlayers/{uid}"
+// NOT the same as Dota `SoloPlayer` — uses Riot fields, not Steam fields
+//
+// NOTE: `bracket` is null/undefined at registration time.
+// It is populated AFTER registration closes via computeValorantBrackets().
+export interface ValorantSoloPlayer {
+  uid: string;
+  riotGameName: string;
+  riotTagLine: string;
+  riotAvatar: string;
+  riotRank: string;                         // human-readable, e.g. "Diamond 3"
+  riotTier: number;                         // raw tier number for sorting/quartile computation
+  bracket?: RiotBracket | null;             // null during registration, assigned post-reg
+  registeredAt: string;                     // ISO timestamp
+}
