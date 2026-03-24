@@ -29,7 +29,7 @@ export default function DiscordFAB() {
     if (user) {
       window.location.href = `/api/auth/discord?uid=${user.uid}`;
     } else {
-      window.open("https://discord.gg/E2qTACDU", "_blank");
+      window.open("https://discord.com/channels/1475547966822682928/1475547967267143923", "_blank");
     }
   };
 
