@@ -3,34 +3,26 @@ import Navbar from "../components/Navbar";
 import DotaTournaments from "../components/DotaTournaments";
 import SoloTournaments from "../components/SoloTournaments";
 import DailyMatches from "../components/DailyMatches";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 type DotaTab = "tournaments" | "solo" | "daily";
 
 export default function Dota2() {
   const [dotaTab, setDotaTab] = useState<DotaTab>("tournaments");
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.play().catch(() => {});
-    }
-  }, []);
 
   return (
     <>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
+
         .d2-page {
           min-height: 100vh;
           background: #F8F7F4;
           color: #111;
           font-family: var(--font-geist-sans), system-ui, sans-serif;
-          position: relative;
         }
 
-        /* ── Video hero ── */
+        /* ── Hero (matching Valorant style) ── */
         .d2-hero {
           position: relative;
           overflow: hidden;
@@ -38,14 +30,20 @@ export default function Dota2() {
           display: flex;
           align-items: flex-end;
         }
-        .d2-hero-video {
+        .d2-hero-img {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
           z-index: 0;
-          pointer-events: none;
+          animation: heroKenBurns 10s ease-in-out infinite alternate;
+          will-change: transform;
+        }
+        @keyframes heroKenBurns {
+          0%   { transform: scale(1)    translateX(0);   }
+          50%  { transform: scale(1.06) translateX(-1%);  }
+          100% { transform: scale(1.1)  translateX(-2%);  }
         }
         .d2-hero-overlay {
           position: absolute;
@@ -53,8 +51,8 @@ export default function Dota2() {
           z-index: 1;
           background: linear-gradient(
             to bottom,
-            rgba(255,255,255,0) 0%,
-            rgba(248,247,244,0.55) 60%,
+            rgba(248,247,244,0) 0%,
+            rgba(248,247,244,0.5) 55%,
             rgba(248,247,244,1) 100%
           );
         }
@@ -64,24 +62,29 @@ export default function Dota2() {
           width: 100%;
           max-width: 1100px;
           margin: 0 auto;
-          padding: 0 30px 24px;
+          padding: 0 30px 28px;
           display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 16px;
+          align-items: center;
+          gap: 14px;
+        }
+        .d2-hero-logo {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .d2-hero-title {
-          font-size: 2rem;
+          font-size: 2.2rem;
           font-weight: 900;
           color: #111;
           letter-spacing: -0.03em;
-          line-height: 1;
+          line-height: 1.1;
         }
         .d2-hero-title span { color: #F05A28; }
         .d2-hero-sub {
-          font-size: 0.82rem;
+          font-size: 0.84rem;
           color: #666;
-          margin-top: 5px;
+          margin-top: 4px;
           font-weight: 500;
         }
 
@@ -89,7 +92,7 @@ export default function Dota2() {
         .d2-tabs-wrap {
           max-width: 1100px;
           margin: 0 auto;
-          padding: 0 30px 0;
+          padding: 20px 30px 0;
         }
         .d2-tabs {
           display: flex;
@@ -136,47 +139,43 @@ export default function Dota2() {
           color: #bbb;
         }
 
-        /* ── Solo coming soon ── */
-        .d2-solo-empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 400px;
-          color: #bbb;
+        @media (max-width: 700px) {
+          .d2-hero { height: 240px; }
+          .d2-hero-title { font-size: 1.6rem; }
+          .d2-hero-content { padding: 0 16px 20px; }
+          .d2-hero-logo { width: 38px; height: 38px; }
+          .d2-tabs-wrap { padding: 16px 16px 0; }
+          .d2-tab { padding: 8px 18px; font-size: 0.82rem; }
         }
-        .d2-solo-empty p.emoji { font-size: 52px; margin-bottom: 16px; }
-        .d2-solo-empty h2 { font-size: 22px; font-weight: 800; color: #333; }
-        .d2-solo-empty p.sub { font-size: 14px; color: #aaa; margin-top: 8px; }
       `}</style>
 
       <div className="d2-page">
         <Navbar />
 
-        {/* ── Hero with video background ── */}
+        {/* ── Hero (Valorant-style with background image + logo) ── */}
         <div className="d2-hero">
-          <video
-            ref={videoRef}
-            className="d2-hero-video"
-            src="/Dota2teaser.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            aria-hidden="true"
+          <img
+            className="d2-hero-img"
+            src="/dota2image3.jpeg"
+            alt="Dota 2"
+            draggable={false}
           />
           <div className="d2-hero-overlay" />
           <div className="d2-hero-content">
             <div>
-              <div className="d2-hero-title">Dota 2 <span>Tournaments</span></div>
-              <div className="d2-hero-sub">Steam-verified · Rank-locked brackets · Fast UPI payouts</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <img className="d2-hero-logo" src="/dota2logo.png" alt="Dota 2" />
+                <div className="d2-hero-title">Dota 2 <span></span></div>
+              </div>
+              <div className="d2-hero-sub">
+                Steam-verified · Rank-locked brackets · Fast UPI payouts
+              </div>
             </div>
           </div>
         </div>
 
         {/* ── Tab switcher ── */}
-        <div className="d2-tabs-wrap" style={{ paddingTop: 20, paddingBottom: 4 }}>
+        <div className="d2-tabs-wrap">
           <div className="d2-tabs">
             <button
               className={`d2-tab${dotaTab === "tournaments" ? " active" : ""}`}
