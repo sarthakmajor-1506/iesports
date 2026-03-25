@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -20,6 +18,13 @@ const HOW_IT_WORKS = [
   { icon: "🏆", title: "Get Rewarded",      desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
 ];
 
+const HERO_IMAGES = [
+  "/dota2poster3.png",
+  "/valorantimg3.jpg",
+  "/dota2image3.jpeg",
+  "/valorant-agents.jpg",
+  ];
+
 const SteamIcon = ({ size = 18 }: { size?: number }) => (
   <img
     src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
@@ -36,31 +41,43 @@ export default function Home() {
 
   const [activeSection,      setActiveSection]      = useState("home");
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | null>(null);
+  const [featuredValTournament, setFeaturedValTournament] = useState<Tournament | null>(null);
   const [tournamentLoading,  setTournamentLoading]  = useState(true);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [riotModalOpen, setRiotModalOpen] = useState(false);
+
+  // Hero image rotation state
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
 
   useEffect(() => {
     if (!loading && user) router.replace("/dota2");
   }, [user, loading, router]);
 
+  // Fetch featured tournaments via API route (uses Admin SDK, bypasses auth rules)
   useEffect(() => {
-    const fetch = async () => {
+    const fetchTournaments = async () => {
       try {
-        const q = query(collection(db, "tournaments"), where("status", "==", "upcoming"));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const d = snap.docs[0];
-          setFeaturedTournament({ id: d.id, ...d.data() } as Tournament);
+        const res = await fetch("/api/featured-tournaments");
+        const data = await res.json();
+        console.log("[Landing] Featured tournaments API response:", data);
+
+        if (data.dota) {
+          setFeaturedTournament(data.dota as Tournament);
         }
-      } catch (e) { console.error(e); }
+        if (data.valorant) {
+          setFeaturedValTournament(data.valorant as Tournament);
+        }
+      } catch (e) { console.error("[Landing] Featured tournament fetch error:", e); }
       finally { setTournamentLoading(false); }
     };
-    fetch();
+    fetchTournaments();
   }, []);
 
+  // Rotate hero images every 3 seconds
   useEffect(() => {
-    if (videoRef.current) { videoRef.current.muted = true; videoRef.current.play().catch(() => {}); }
+    const interval = setInterval(() => {
+      setHeroImageIndex((prev) => (prev + 3) % HERO_IMAGES.length);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -78,6 +95,9 @@ export default function Home() {
 
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
+
+  const valSlotsLeft = featuredValTournament ? featuredValTournament.totalSlots - featuredValTournament.slotsBooked : null;
+  const valSlotPct   = featuredValTournament ? Math.round((featuredValTournament.slotsBooked / featuredValTournament.totalSlots) * 100) : 0;
 
   if (loading) return null;
 
@@ -110,7 +130,10 @@ export default function Home() {
 
         /* Hero */
         .ie-hero { position:relative; overflow:hidden; width:100%; min-height:580px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:80px 20px 60px; }
-        .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:block; }
+        .ie-hero-bg-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; transition:opacity 1s ease-in-out; }
+        .ie-hero-bg-img.active { opacity:1; }
+        .ie-hero-bg-img.inactive { opacity:0; }
+        .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:none; }
         .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.72) 0%,rgba(0,0,0,.52) 45%,rgba(0,0,0,.82) 100%); }
         .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(240,90,40,.22) 0%,transparent 70%); pointer-events:none; z-index:2; }
         .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; }
@@ -179,6 +202,7 @@ export default function Home() {
         .ie-tourn-wrap { background:linear-gradient(135deg,#0d1117 0%,#161b22 50%,#0d1117 100%); border-radius:24px; padding:44px; display:flex; align-items:flex-start; gap:32px; box-shadow:0 16px 48px rgba(0,0,0,.18); }
         .ie-tourn-left { flex:1; }
         .ie-tourn-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(240,90,40,.15); border:1px solid rgba(240,90,40,.3); color:var(--orange); font-size:.68rem; font-weight:700; padding:4px 12px; border-radius:100px; margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em; }
+        .ie-tourn-badge.val { background:rgba(255,70,85,.15); border-color:rgba(255,70,85,.3); color:#ff4655; }
         .ie-tourn-title { font-size:clamp(1.3rem,3.5vw,2rem); font-weight:900; color:#fff; line-height:1.1; margin-bottom:8px; }
         .ie-tourn-desc { font-size:.87rem; color:rgba(255,255,255,.48); line-height:1.6; margin-bottom:24px; max-width:480px; }
         .ie-tourn-meta { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
@@ -190,8 +214,10 @@ export default function Home() {
         .ie-slots-fill { height:100%; border-radius:3px; transition:width .6s; }
         .ie-btn-register { background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:15px 36px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:52px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; transition:opacity .2s; }
         .ie-btn-register:hover { opacity:.88; }
+        .ie-btn-register.val { background:linear-gradient(135deg,#ff4655,#cc2233); border-color:#ff4655; }
         .ie-tourn-detail-link { display:block; text-align:center; margin-top:10px; font-size:.82rem; color:rgba(255,255,255,.38); text-decoration:none; transition:color .2s; }
         .ie-tourn-detail-link:hover { color:rgba(255,255,255,.7); }
+        .ie-tourn-grid { display:flex; flex-direction:column; gap:28px; }
         @media (max-width:700px) { .ie-tourn-wrap { padding:36px 24px; flex-direction:column; } .ie-tourn-right { width:100%; } }
 
         /* Modal overlay */
@@ -236,9 +262,19 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* HERO — rotating background images (video kept hidden for future use) */}
       <section className="ie-hero" id="home">
-        <video ref={videoRef} className="ie-hero-video" src="/Dota2teaser.mp4" autoPlay muted loop playsInline preload="auto" poster="/dota2-poster.jpg" aria-hidden="true" />
+        {HERO_IMAGES.map((src, i) => (
+          <img
+            key={src}
+            className={`ie-hero-bg-img ${i === heroImageIndex ? "active" : "inactive"}`}
+            src={src}
+            alt=""
+            aria-hidden="true"
+          />
+        ))}
+        {/* Video element kept for future use, hidden via CSS display:none */}
+        {/* <video className="ie-hero-video" src="/Dota2teaser.mp4" autoPlay muted loop playsInline preload="auto" poster="/dota2-poster.jpg" aria-hidden="true" /> */}
         <div className="ie-hero-overlay" />
         <div className="ie-hero-glow" />
         <div className="ie-hero-content">
@@ -302,10 +338,10 @@ export default function Home() {
           </div>
           <div className="ie-games-grid">
             {[
-              { name: "Dota 2",       tag: "Live Now",    src: "/dota2image3.jpeg",   soon: false },
-              { name: "Valorant",     tag: "Coming Soon", src: "/valorantimage1.jpg", soon: true  },
-              { name: "CS:GO",        tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true  },
-              { name: "Call of Duty", tag: "Coming Soon", src: "/codimage1.jpg",      soon: true  },
+              { name: "Dota 2",         tag: "Live Now",    src: "/dota2image3.jpeg",   soon: false },
+              { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false },
+              { name: "Counter Strike", tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true  },
+              { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true  },
             ].map(g => (
               <div className="ie-game-card" key={g.name}>
                 <Image className="ie-game-card-img" src={g.src} alt={g.name} fill sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw" style={{ objectFit: "cover" }} loading="lazy" />
@@ -349,45 +385,83 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TOURNAMENT */}
+      {/* FEATURED TOURNAMENTS */}
       <section className="ie-section ie-section-white" id="tournament">
         <div className="ie-container">
           <div className="ie-section-header">
-            <h2 className="ie-section-title">Featured <span className="accent">Tournament</span></h2>
+            <h2 className="ie-section-title">Featured <span className="accent">Tournaments</span></h2>
           </div>
           {tournamentLoading ? (
-            <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>Loading tournament…</div>
-          ) : featuredTournament ? (
-            <div className="ie-tourn-wrap">
-              <div className="ie-tourn-left">
-                <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
-                <div className="ie-tourn-title">{featuredTournament.name}</div>
-                <div className="ie-tourn-desc">{featuredTournament.desc}</div>
-                <div className="ie-tourn-meta">
-                  {[
-                    { icon: "🎮", label: featuredTournament.game },
-                    { icon: "🏆", label: featuredTournament.prizePool },
-                    { icon: "🎟️", label: featuredTournament.entry },
-                    { icon: "📅", label: featuredTournament.startDate },
-                  ].map(c => (
-                    <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
-                  ))}
-                </div>
-              </div>
-              <div className="ie-tourn-right">
-                <div className="ie-slots-num">{slotsLeft}</div>
-                <div className="ie-slots-label">slots remaining</div>
-                <div className="ie-slots-bar">
-                  <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
-                </div>
-                <button className="ie-btn-register" onClick={loginWithSteam}>
-                  <SteamIcon size={18} /> Sign in with Steam to Register
-                </button>
-                <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
-              </div>
-            </div>
-          ) : (
+            <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>Loading tournaments…</div>
+          ) : (!featuredTournament && !featuredValTournament) ? (
             <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>No upcoming tournaments right now. Check back soon!</div>
+          ) : (
+            <div className="ie-tourn-grid">
+              {/* Dota 2 Tournament */}
+              {featuredTournament && (
+                <div className="ie-tourn-wrap">
+                  <div className="ie-tourn-left">
+                    <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
+                    <div className="ie-tourn-title">{featuredTournament.name}</div>
+                    <div className="ie-tourn-desc">{featuredTournament.desc}</div>
+                    <div className="ie-tourn-meta">
+                      {[
+                        { icon: "🎮", label: featuredTournament.game },
+                        { icon: "🏆", label: featuredTournament.prizePool },
+                        { icon: "🎟️", label: featuredTournament.entry },
+                        { icon: "📅", label: featuredTournament.startDate },
+                      ].map(c => (
+                        <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="ie-tourn-right">
+                    <div className="ie-slots-num">{slotsLeft}</div>
+                    <div className="ie-slots-label">slots remaining</div>
+                    <div className="ie-slots-bar">
+                      <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
+                    </div>
+                    <button className="ie-btn-register" onClick={loginWithSteam}>
+                      <SteamIcon size={18} /> Sign in with Steam to Register
+                    </button>
+                    <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
+                  </div>
+                </div>
+              )}
+
+              {/* Valorant Tournament */}
+              {featuredValTournament && (
+                <div className="ie-tourn-wrap">
+                  <div className="ie-tourn-left">
+                    <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#ff4655" }} /> Registration Open</div>
+                    <div className="ie-tourn-title">{featuredValTournament.name}</div>
+                    <div className="ie-tourn-desc">{featuredValTournament.desc}</div>
+                    <div className="ie-tourn-meta">
+                      {[
+                        { icon: "🎮", label: featuredValTournament.game || "Valorant" },
+                        { icon: "🏆", label: featuredValTournament.prizePool || "TBD" },
+                        { icon: "🎟️", label: (featuredValTournament as any).entryFee > 0 ? `₹${(featuredValTournament as any).entryFee}` : featuredValTournament.entry || "Free" },
+                        { icon: "📅", label: featuredValTournament.startDate?.includes("T") ? new Date(featuredValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredValTournament.startDate },
+                      ].map(c => (
+                        <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="ie-tourn-right">
+                    <div className="ie-slots-num" style={{ color: "#ff4655" }}>{valSlotsLeft}</div>
+                    <div className="ie-slots-label">slots remaining</div>
+                    <div className="ie-slots-bar">
+                      <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
+                    </div>
+                    <button className="ie-btn-register val" onClick={() => setRiotModalOpen(true)}>
+                      <img src="/riot-games.png" alt="Riot" width={18} height={18} style={{ display: "block", borderRadius: 3 }} />
+                      Sign in with Riot to Register
+                    </button>
+                    <a href={`/valorant/tournament/${featuredValTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </section>
