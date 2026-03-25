@@ -2,22 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 
+/**
+ * POST /api/valorant/match-result
+ *
+ * Submits a manual series result (e.g. 2-0, 1-1, 0-2).
+ * Updates standings, recomputes Buchholz.
+ *
+ * NEW: After updating, checks if ALL matches in this round are now complete.
+ * If so, auto-resolves TBD placeholders in the next round using Swiss pairing.
+ */
 export async function POST(req: NextRequest) {
   try {
     const { tournamentId, adminKey, matchId, team1Score, team2Score } = await req.json();
 
-    if (!tournamentId || !adminKey || !matchId || team1Score === undefined || team2Score === undefined) {
+    if (!tournamentId || !adminKey || !matchId) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
     if (adminKey !== process.env.ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Validate BO2 scores
-    const s1 = Number(team1Score);
-    const s2 = Number(team2Score);
-    if (s1 + s2 > 2 || s1 < 0 || s2 < 0 || s1 > 2 || s2 > 2) {
-      return NextResponse.json({ error: "Invalid BO2 scores. Each team can win 0-2 maps, total must be <= 2." }, { status: 400 });
+    const s1 = parseInt(team1Score);
+    const s2 = parseInt(team2Score);
+
+    if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0 || s1 + s2 > 2 || s1 > 2 || s2 > 2) {
+      return NextResponse.json({ error: "Invalid scores. Each team can win 0-2 maps, total must be <= 2." }, { status: 400 });
     }
 
     const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
@@ -29,6 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
     const matchData = matchDoc.data()!;
+    const matchDay = matchData.matchDay;
 
     // ── Update match ─────────────────────────────────────────────────────────
     await matchRef.update({
@@ -39,7 +49,6 @@ export async function POST(req: NextRequest) {
     });
 
     // ── Compute points ───────────────────────────────────────────────────────
-    // BO2 Swiss: Win 2-0 = 2pts, Draw 1-1 = 1pt each, Loss 0-2 = 0pts
     let team1Points = 0;
     let team2Points = 0;
     let team1Result: "win" | "draw" | "loss" = "draw";
@@ -52,38 +61,23 @@ export async function POST(req: NextRequest) {
       team1Points = 0; team2Points = 2;
       team1Result = "loss"; team2Result = "win";
     } else {
-      // Draw (1-1)
       team1Points = 1; team2Points = 1;
-      team1Result = "draw"; team2Result = "draw";
     }
 
     // ── Update standings ─────────────────────────────────────────────────────
     const standingsRef = tournamentRef.collection("standings");
 
-    // Helper to ensure standings doc exists
     const ensureStanding = async (teamId: string, teamName: string) => {
       const ref = standingsRef.doc(teamId);
       const doc = await ref.get();
       if (!doc.exists) {
-        await ref.set({
-          teamId,
-          teamName,
-          played: 0,
-          wins: 0,
-          draws: 0,
-          losses: 0,
-          points: 0,
-          mapsWon: 0,
-          mapsLost: 0,
-          buchholz: 0,
-        });
+        await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, buchholz: 0 });
       }
     };
 
     await ensureStanding(matchData.team1Id, matchData.team1Name);
     await ensureStanding(matchData.team2Id, matchData.team2Name);
 
-    // Update team 1
     await standingsRef.doc(matchData.team1Id).update({
       played: FieldValue.increment(1),
       wins: FieldValue.increment(team1Result === "win" ? 1 : 0),
@@ -94,7 +88,6 @@ export async function POST(req: NextRequest) {
       mapsLost: FieldValue.increment(s2),
     });
 
-    // Update team 2
     await standingsRef.doc(matchData.team2Id).update({
       played: FieldValue.increment(1),
       wins: FieldValue.increment(team2Result === "win" ? 1 : 0),
@@ -106,8 +99,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ── Recompute Buchholz for ALL teams ─────────────────────────────────────
-    // Buchholz = sum of all opponents' points
-    const allMatches = await tournamentRef.collection("matches").where("status", "==", "completed").get();
+    const allCompletedMatches = await tournamentRef.collection("matches").where("status", "==", "completed").get();
     const allStandings = await standingsRef.get();
 
     const pointsMap: Record<string, number> = {};
@@ -116,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const opponentsMap: Record<string, string[]> = {};
-    for (const doc of allMatches.docs) {
+    for (const doc of allCompletedMatches.docs) {
       const d = doc.data();
       if (!opponentsMap[d.team1Id]) opponentsMap[d.team1Id] = [];
       if (!opponentsMap[d.team2Id]) opponentsMap[d.team2Id] = [];
@@ -131,11 +123,134 @@ export async function POST(req: NextRequest) {
     }
     await buchholzBatch.commit();
 
+    // ── AUTO-RESOLVE: Check if all matches in this round are now complete ────
+    let autoResolved = false;
+    let resolvedPairings: string[] = [];
+
+    try {
+      const roundMatches = await tournamentRef
+        .collection("matches")
+        .where("matchDay", "==", matchDay)
+        .get();
+
+      const allRoundComplete = roundMatches.docs.every(d => d.data().status === "completed");
+
+      if (allRoundComplete) {
+        // Check if next round has TBD matches
+        const nextRound = matchDay + 1;
+        const nextRoundMatches = await tournamentRef
+          .collection("matches")
+          .where("matchDay", "==", nextRound)
+          .get();
+
+        const tbdDocs = nextRoundMatches.docs
+          .filter(d => d.data().isTBD === true)
+          .sort((a, b) => a.data().matchIndex - b.data().matchIndex);
+
+        if (tbdDocs.length > 0) {
+          // ── Swiss pairing for next round ────────────────────────────────────
+          const teamsSnap = await tournamentRef.collection("teams").orderBy("teamIndex").get();
+          const teams = teamsSnap.docs.map(d => ({
+            id: d.id,
+            teamName: d.data().teamName,
+            teamIndex: d.data().teamIndex,
+          }));
+
+          // Refresh standings after our update
+          const freshStandings = await standingsRef.get();
+          const standings: Record<string, { points: number; mapsWon: number; mapsLost: number }> = {};
+          for (const doc of freshStandings.docs) {
+            const d = doc.data();
+            standings[doc.id] = { points: d.points || 0, mapsWon: d.mapsWon || 0, mapsLost: d.mapsLost || 0 };
+          }
+
+          // Get all past pairings to avoid repeats
+          const allMatches = await tournamentRef.collection("matches").get();
+          const pastPairings = new Set<string>();
+          for (const doc of allMatches.docs) {
+            const d = doc.data();
+            if (d.team1Id !== "TBD" && d.team2Id !== "TBD") {
+              pastPairings.add(`${d.team1Id}-${d.team2Id}`);
+              pastPairings.add(`${d.team2Id}-${d.team1Id}`);
+            }
+          }
+
+          // Sort by points descending, then map diff, then teamIndex
+          const sorted = [...teams].sort((a, b) => {
+            const ptsA = standings[a.id]?.points || 0;
+            const ptsB = standings[b.id]?.points || 0;
+            if (ptsB !== ptsA) return ptsB - ptsA;
+            const diffA = (standings[a.id]?.mapsWon || 0) - (standings[a.id]?.mapsLost || 0);
+            const diffB = (standings[b.id]?.mapsWon || 0) - (standings[b.id]?.mapsLost || 0);
+            if (diffB !== diffA) return diffB - diffA;
+            return a.teamIndex - b.teamIndex;
+          });
+
+          // Pair adjacent, avoiding repeat matchups
+          const used = new Set<string>();
+          const pairings: { team1: typeof teams[0]; team2: typeof teams[0] }[] = [];
+
+          for (let i = 0; i < sorted.length; i++) {
+            if (used.has(sorted[i].id)) continue;
+
+            let paired = false;
+            for (let j = i + 1; j < sorted.length; j++) {
+              if (used.has(sorted[j].id)) continue;
+              const key = `${sorted[i].id}-${sorted[j].id}`;
+              if (!pastPairings.has(key)) {
+                pairings.push({ team1: sorted[i], team2: sorted[j] });
+                used.add(sorted[i].id);
+                used.add(sorted[j].id);
+                paired = true;
+                break;
+              }
+            }
+
+            if (!paired && !used.has(sorted[i].id)) {
+              for (let j = i + 1; j < sorted.length; j++) {
+                if (!used.has(sorted[j].id)) {
+                  pairings.push({ team1: sorted[i], team2: sorted[j] });
+                  used.add(sorted[i].id);
+                  used.add(sorted[j].id);
+                  break;
+                }
+              }
+            }
+          }
+
+          // Update TBD match docs with actual teams
+          const resolveBatch = adminDb.batch();
+          for (let i = 0; i < Math.min(pairings.length, tbdDocs.length); i++) {
+            const p = pairings[i];
+            resolveBatch.update(tbdDocs[i].ref, {
+              team1Id: p.team1.id,
+              team2Id: p.team2.id,
+              team1Name: p.team1.teamName,
+              team2Name: p.team2.teamName,
+              isTBD: false,
+            });
+            resolvedPairings.push(`${p.team1.teamName} vs ${p.team2.teamName}`);
+          }
+
+          resolveBatch.update(tournamentRef, { currentMatchDay: nextRound });
+          await resolveBatch.commit();
+
+          autoResolved = true;
+          console.log(`[AutoResolve] Round ${matchDay} complete → resolved ${resolvedPairings.length} matches for round ${nextRound}`);
+        }
+      }
+    } catch (resolveErr: any) {
+      console.error("[AutoResolve] Error:", resolveErr.message);
+      // Don't fail the whole request if auto-resolve fails
+    }
+
     return NextResponse.json({
       success: true,
       matchId,
       team1: { name: matchData.team1Name, score: s1, points: team1Points, result: team1Result },
       team2: { name: matchData.team2Name, score: s2, points: team2Points, result: team2Result },
+      autoResolved,
+      resolvedPairings: autoResolved ? resolvedPairings : undefined,
     });
   } catch (e: any) {
     console.error("Match result error:", e);

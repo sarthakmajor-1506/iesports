@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 
+/**
+ * POST /api/valorant/shuffle-teams
+ *
+ * Now supports `deleteExisting: true` which deletes all existing teams
+ * and related matches/standings before reshuffling.
+ */
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, teamCount, teamNames } = await req.json();
+    const { tournamentId, adminKey, teamCount, teamNames, deleteExisting } = await req.json();
 
     // ── Auth ────────────────────────────────────────────────────────────────
     if (!tournamentId || !adminKey) {
@@ -14,18 +20,50 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fetch tournament ────────────────────────────────────────────────────
-    const tournamentDoc = await adminDb.collection("valorantTournaments").doc(tournamentId).get();
+    const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
+    const tournamentDoc = await tournamentRef.get();
     const tData = tournamentDoc.data();
     if (!tData) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
+    // ── Delete existing teams, matches, standings if requested ───────────────
+    if (deleteExisting) {
+      const subcollections = ["teams", "matches", "standings", "leaderboard"];
+      for (const sub of subcollections) {
+        const snap = await tournamentRef.collection(sub).get();
+        if (!snap.empty) {
+          // Firestore batch limit is 500, chunk if needed
+          const chunks: FirebaseFirestore.DocumentReference[][] = [];
+          let current: FirebaseFirestore.DocumentReference[] = [];
+          snap.docs.forEach(doc => {
+            current.push(doc.ref);
+            if (current.length >= 450) {
+              chunks.push(current);
+              current = [];
+            }
+          });
+          if (current.length > 0) chunks.push(current);
+
+          for (const chunk of chunks) {
+            const batch = adminDb.batch();
+            chunk.forEach(ref => batch.delete(ref));
+            await batch.commit();
+          }
+        }
+      }
+
+      // Reset tournament flags
+      await tournamentRef.update({
+        teamsGenerated: false,
+        teamCount: 0,
+        fixturesGenerated: false,
+        currentMatchDay: 0,
+      });
+    }
+
     // ── Fetch all registered solo players ───────────────────────────────────
-    const playersSnap = await adminDb
-      .collection("valorantTournaments")
-      .doc(tournamentId)
-      .collection("soloPlayers")
-      .get();
+    const playersSnap = await tournamentRef.collection("soloPlayers").get();
 
     const players = playersSnap.docs.map((d) => {
       const data = d.data();
@@ -53,7 +91,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Snake draft shuffle ─────────────────────────────────────────────────
-    // Sort by skill level descending (ties broken by riotTier descending)
     const sorted = [...players].sort((a, b) => {
       if (b.skillLevel !== a.skillLevel) return b.skillLevel - a.skillLevel;
       return b.riotTier - a.riotTier;
@@ -89,11 +126,7 @@ export async function POST(req: NextRequest) {
 
     // ── Write teams to Firestore ────────────────────────────────────────────
     const batch = adminDb.batch();
-    const teamsCollection = adminDb
-      .collection("valorantTournaments")
-      .doc(tournamentId)
-      .collection("teams");
-
+    const teamsCollection = tournamentRef.collection("teams");
     const teamSummaries: { id: string; teamName: string; memberCount: number; avgSkill: number }[] = [];
 
     for (const team of teams) {
@@ -121,7 +154,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Update tournament doc
-    const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
     batch.update(tournamentRef, {
       teamsGenerated: true,
       teamCount: numTeams,
@@ -134,6 +166,7 @@ export async function POST(req: NextRequest) {
       totalPlayers: players.length,
       teamCount: numTeams,
       teams: teamSummaries,
+      deletedExisting: !!deleteExisting,
     });
   } catch (e: any) {
     console.error("Shuffle teams error:", e);
