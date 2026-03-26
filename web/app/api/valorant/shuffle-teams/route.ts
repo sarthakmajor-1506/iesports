@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
 
     // ── Fetch all registered solo players ───────────────────────────────────
     const playersSnap = await tournamentRef.collection("soloPlayers").get();
-
-    const players = playersSnap.docs.map((d) => {
+    // Fetch solo players + their riotPuuid from user docs
+    const rawPlayers = playersSnap.docs.map((d) => {
       const data = d.data();
       return {
         uid: data.uid,
@@ -75,8 +75,19 @@ export async function POST(req: NextRequest) {
         riotRank: data.riotRank || "",
         riotTier: data.riotTier || 0,
         skillLevel: data.skillLevel || 1,
+        riotPuuid: "", // will be filled from user doc
       };
     });
+
+    // Batch-fetch user docs to get riotPuuid
+    const userDocs = await Promise.all(
+      rawPlayers.map(p => adminDb.collection("users").doc(p.uid).get())
+    );
+    const players = rawPlayers.map((p, i) => ({
+      ...p,
+      riotPuuid: userDocs[i].data()?.riotPuuid || "",
+    }));
+
 
     if (players.length === 0) {
       return NextResponse.json({ error: "No players registered" }, { status: 400 });

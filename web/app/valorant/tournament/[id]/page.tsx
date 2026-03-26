@@ -8,6 +8,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import Link from "next/link";
 
 type Tab = "overview" | "players" | "teams" | "standings" | "matches" | "brackets" | "leaderboard";
 
@@ -756,18 +757,29 @@ export default function ValorantTournamentDetail() {
                                     <div style={{ textAlign: "center", padding: "16px 0", color: "#bbb", fontSize: "0.82rem" }}>
                                       Match hasn't been played yet. Game details will appear here after the match.
                                     </div>
-                                  ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                      <GameDetailCard game={g1} gameNum={1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
-                                      <GameDetailCard game={g2} gameNum={2} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
-                                    </div>
-                                  )}
-                                  {(m.lobbyName || m.scheduledTime) && (
-                                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #F2F1EE", display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.68rem", color: "#999" }}>
-                                      {m.scheduledTime && <span>🕐 {new Date(m.scheduledTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>}
-                                      {m.lobbyName && <span>🏠 Lobby: {m.lobbyName}</span>}
-                                    </div>
-                                  )}
+
+
+                                ) : (
+                                    <>
+                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                        <GameDetailCard game={g1} gameNum={1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+                                        <GameDetailCard game={g2} gameNum={2} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+                                      </div>
+                                      <div style={{ marginTop: 10, textAlign: "center" }}>
+                                        <Link
+                                          href={`/valorant/match/${id}/${m.id}`}
+                                          style={{
+                                            fontSize: "0.72rem", fontWeight: 700, color: "#ff4655",
+                                            textDecoration: "none", padding: "6px 18px",
+                                            border: "1px solid #ff4655", borderRadius: 100,
+                                            display: "inline-block", transition: "all 0.15s",
+                                          }}
+                                        >
+                                          View Full Match Details →
+                                        </Link>
+                                      </div>
+                                    </>
+                                  )}             
                                 </div>
                               )}
                             </div>
@@ -818,7 +830,19 @@ export default function ValorantTournamentDetail() {
                         return (
                           <tr key={p.id} style={i === 0 ? { background: "#FFFBEB" } : {}}>
                             <td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#ff4655" : "#bbb" }}>{i === 0 ? "👑" : i + 1}</td>
-                            <td><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#999" }}>#{p.tag}</div></td>
+                            <td>
+                              {p.uid ? (
+                                <Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}>
+                                  <div style={{ fontWeight: 700 }}>{p.name}</div>
+                                  <div style={{ fontSize: "0.68rem", color: "#999" }}>#{p.tag}</div>
+                                </Link>
+                              ) : (
+                                <>
+                                  <div style={{ fontWeight: 700 }}>{p.name}</div>
+                                  <div style={{ fontSize: "0.68rem", color: "#999" }}>#{p.tag}</div>
+                                </>
+                              )}
+                            </td>
                             <td style={{ fontSize: "0.72rem", color: "#888" }}>{(p.agents || []).join(", ")}</td>
                             <td>{p.matchesPlayed || 0}</td>
                             <td style={{ fontWeight: 700, color: "#16a34a" }}>{p.totalKills || 0}</td>

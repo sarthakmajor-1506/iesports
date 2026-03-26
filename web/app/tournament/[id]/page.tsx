@@ -7,6 +7,8 @@ import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Navbar } from "../../components/Navbar";
 import RegisterModal from "../../components/RegisterModal";
+import Link from "next/link";
+
 
 const TABS = ["Overview", "Rules", "Matches", "Participants", "Streams"] as const;
 type Tab = typeof TABS[number];
