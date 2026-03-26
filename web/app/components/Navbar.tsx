@@ -47,7 +47,6 @@ export default function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Initialise from localStorage cache so there's no flash on reload
   const [steamData, setSteamData] = useState<any>(() => {
     if (typeof window === "undefined") return null;
     try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch { return null; }
@@ -66,14 +65,27 @@ export default function Navbar() {
   const [resendTimer,    setResendTimer]    = useState(0);
   const [verificationId, setVerificationId] = useState("");
 
+  // Hover expand with delay
+  const [hoveredAcc, setHoveredAcc] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const phoneRef     = useRef<HTMLInputElement>(null);
   const otpRefs      = useRef<(HTMLInputElement | null)[]>([]);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Hover expand — opens immediately but animates slowly; closes after a pause
+  const handleAccHoverIn = (id: string) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setHoveredAcc(id); // immediate — no delay, the CSS transition handles the elegance
+  };
+  const handleAccHoverOut = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setHoveredAcc(null), 800); // linger before closing
+  };
+
   useEffect(() => {
     if (!user) {
-      // Clear cache on logout
       localStorage.removeItem(CACHE_KEY);
       setSteamData(null);
       return;
@@ -82,20 +94,12 @@ export default function Navbar() {
       if (snap.exists()) {
         const data = snap.data();
         setSteamData(data);
-        // Keep cache fresh — only store what navbar needs
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify({
-            steamId:       data.steamId,
-            steamName:     data.steamName,
-            steamAvatar:   data.steamAvatar,
-            discordId:     data.discordId,
-            discordUsername: data.discordUsername,
-            phone:         data.phone,
-            dotaRankTier:  data.dotaRankTier,
-            riotGameName:  data.riotGameName,
-            riotTagLine:   data.riotTagLine,
-            riotAvatar:    data.riotAvatar,
-            riotVerified:  data.riotVerified,
+            steamId: data.steamId, steamName: data.steamName, steamAvatar: data.steamAvatar,
+            discordId: data.discordId, discordUsername: data.discordUsername, phone: data.phone,
+            dotaRankTier: data.dotaRankTier, riotGameName: data.riotGameName, riotTagLine: data.riotTagLine,
+            riotAvatar: data.riotAvatar, riotVerified: data.riotVerified,
           }));
         } catch (_) {}
       }
@@ -127,6 +131,11 @@ export default function Navbar() {
   const discordLinked   = !!steamData?.discordId;
   const discordUsername = steamData?.discordUsername || "";
   const hasPhone        = !!steamData?.phone;
+  const hasSteam        = !!steamData?.steamId;
+  const riotStatus      = riotData?.riotVerified || "unlinked"; // "verified" | "pending" | "unlinked"
+
+  // Count unlinked accounts for attention badge (includes phone)
+  const unlinkedCount = [!hasSteam, !discordLinked, riotStatus === "unlinked", !hasPhone].filter(Boolean).length;
 
   const handleDiscordConnect = () => {
     if (!user) return;
@@ -170,9 +179,7 @@ export default function Navbar() {
       recaptchaRef.current = new RecaptchaVerifier(auth, "navbar-recaptcha", {
         size: "invisible", callback: () => {}, "expired-callback": () => { clearRecaptcha(); },
       });
-      const result: ConfirmationResult = await signInWithPhoneNumber(
-        auth, `${countryCode}${digits}`, recaptchaRef.current
-      );
+      const result: ConfirmationResult = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
       setVerificationId(result.verificationId);
       setPhoneStep("otp"); startTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 150);
@@ -190,15 +197,13 @@ export default function Navbar() {
       setPhoneLoading(true); setPhoneError("");
       const credential = PhoneAuthProvider.credential(verificationId, code);
       await linkWithCredential(user, credential);
-      await updateDoc(doc(db, "users", user.uid), {
-        phone: `${countryCode}${phone.replace(/\D/g, "")}`,
-      });
+      await updateDoc(doc(db, "users", user.uid), { phone: `${countryCode}${phone.replace(/\D/g, "")}` });
       closePhoneModal();
     } catch (e: any) {
       if (e.code === "auth/invalid-verification-code") setPhoneError("Invalid OTP. Please try again.");
       else if (e.code === "auth/code-expired") setPhoneError("OTP expired. Go back and request a new one.");
       else if (e.code === "auth/provider-already-linked") setPhoneError("A phone is already linked to this account.");
-      else if (e.code === "auth/credential-already-in-use") setPhoneError("This number belongs to another account. Delete it from Firebase first.");
+      else if (e.code === "auth/credential-already-in-use") setPhoneError("This number belongs to another account.");
       else setPhoneError(e.message || "Verification failed. Please try again.");
     } finally { setPhoneLoading(false); }
   };
@@ -222,6 +227,86 @@ export default function Navbar() {
     }
   };
 
+  // Account badge component
+  const AccBadge = ({ id, linked, pending, icon, iconEl, name, label, onClick }: {
+    id: string; linked: boolean; pending?: boolean; icon?: string; iconEl?: React.ReactNode;
+    name?: string; label: string; onClick?: () => void;
+  }) => {
+    const isHovered = hoveredAcc === id;
+    const isUnlinked = !linked && !pending;
+
+    return (
+      <div
+        className={`ie-acc2 ${linked ? "linked" : pending ? "pending" : "unlinked"}`}
+        onMouseEnter={() => handleAccHoverIn(id)}
+        onMouseLeave={handleAccHoverOut}
+        onClick={onClick}
+        style={{
+          display: "flex", alignItems: "center", height: 36, borderRadius: 100,
+          cursor: onClick ? "pointer" : "default", overflow: "hidden", flexShrink: 0,
+          // Slow elegant open — width expands over 0.6s with a gentle ease-out
+          // Slow elegant close — width contracts over 0.5s with ease-in
+          transition: isHovered
+            ? "width 1.5s cubic-bezier(0.16,1,0.3,1), padding-right 1.5s cubic-bezier(0.16,1,0.3,1), background 0.3s, border-color 0.3s, box-shadow 0.3s"
+            : "width 1.5s cubic-bezier(0.4,0,0.2,1), padding-right 1.5s cubic-bezier(0.4,0,0.2,1), background 0.3s, border-color 0.3s, box-shadow 0.3s",
+          width: isHovered ? "auto" : 36, minWidth: 36,
+          maxWidth: isHovered ? 220 : 36,
+          paddingRight: isHovered ? 14 : 0,
+          background: linked ? "#F0FDF4" : pending ? "#FFFBEB" : "#FEF2F2",
+          border: `1.5px ${isUnlinked ? "dashed" : "solid"} ${linked ? "#bbf7d0" : pending ? "#fde68a" : "#f87171"}`,
+          ...(isUnlinked ? { animation: "ie-acc-pulse 2.5s ease-in-out infinite" } : {}),
+        }}
+      >
+        {/* Icon */}
+        <div style={{
+          width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, margin: "0 2px",
+          transition: "opacity 0.3s",
+        }}>
+          {iconEl || (icon && <img src={icon} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: "cover", opacity: isUnlinked ? 0.4 : 1 }} />)}
+        </div>
+
+        {/* Expanded details — always rendered, visibility controlled by opacity + max-width */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+          overflow: "hidden",
+          opacity: isHovered ? 1 : 0,
+          maxWidth: isHovered ? 180 : 0,
+          // Text fades in slowly after the width starts expanding
+          transition: isHovered
+            ? "opacity 0.8s cubic-bezier(0.16,1,0.3,1) 0.35s, max-width 1.5s cubic-bezier(0.16,1,0.3,1)"
+            : "opacity 0.2s ease 0s, max-width 1.5s cubic-bezier(0.4,0,0.2,1)",
+        }}>
+          {linked ? (
+            <>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#333", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" }}>✓</span>
+            </>
+          ) : pending ? (
+            <>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#92400e", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>Pending</span>
+            </>
+          ) : (
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#dc2626" }}>Connect {label}</span>
+          )}
+        </div>
+
+        {/* Unlinked: red dot — fades out when expanded */}
+        {isUnlinked && (
+          <div style={{
+            position: "absolute", top: -3, right: -3, width: 11, height: 11,
+            borderRadius: "50%", background: "#ef4444", border: "2px solid #fff",
+            boxShadow: "0 0 4px rgba(239,68,68,0.5)",
+            transition: "opacity 0.3s",
+            opacity: isHovered ? 0 : 1,
+            pointerEvents: "none",
+          }} />
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <style>{`
@@ -234,22 +319,29 @@ export default function Navbar() {
         .ie-nav-logo-name span { color: #F05A28; }
         .ie-nav-logo-sub { font-size: 0.58rem; color: #bbb; letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
         .ie-nav-tabs { display: flex; align-items: center; gap: 2px; flex: 1; justify-content: center; }
-        .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.84rem; font-weight: 600; color: #666; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
-        .ie-nav-tab:hover { background: #F2F1EE; color: #111; }
-        .ie-nav-tab img { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; }
+        .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #888; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
+        .ie-nav-tab:hover { background: #F2F1EE; color: #555; }
+        .ie-nav-tab img { width: 20px; height: 20px; object-fit: contain; border-radius: 5px; transition: all 0.2s; }
+        .ie-nav-tab.active img { width: 26px; height: 26px; }
+        .ie-nav-tab.active { font-size: 0.92rem; font-weight: 800; padding: 8px 18px; }
         .ie-soon-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; background: #F2F1EE; color: #bbb; }
-        .ie-nav-right { display: flex; align-items: center; gap: 10px; }
-        .ie-steam-badge { display: flex; align-items: center; gap: 8px; background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 100px; padding: 5px 12px 5px 8px; }
-        .ie-steam-badge .avatar { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #22c55e; }
-        .ie-steam-name { font-size: 0.8rem; font-weight: 700; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ie-verified-badge { font-size: 0.62rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 7px; border-radius: 20px; border: 1px solid #bbf7d0; }
-        .ie-discord-badge { display: flex; align-items: center; gap: 8px; background: #eef0ff; border: 1px solid #c7d0ff; border-radius: 100px; padding: 5px 12px 5px 10px; }
-        .ie-discord-name { font-size: 0.8rem; font-weight: 600; color: #4f5fc0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ie-discord-verified { font-size: 0.62rem; color: #4f5fc0; font-weight: 800; background: #e0e4ff; padding: 2px 7px; border-radius: 20px; border: 1px solid #c7d0ff; }
-        .ie-discord-btn { display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: #eef0ff; border: 1px solid #c7d0ff; border-radius: 100px; cursor: pointer; font-weight: 700; font-size: 0.8rem; color: #4f5fc0; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
-        .ie-discord-btn:hover { background: #e0e4ff; }
+        .ie-nav-right { display: flex; align-items: center; gap: 8px; }
+
+        /* Account badges row */
+        .ie-accounts-row2 { display: flex; align-items: center; gap: 5px; position: relative; }
+        .ie-acc2 { position: relative; }
+
+        @keyframes ie-acc-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: #f87171; }
+          50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.15); border-color: #ef4444; }
+        }
+        @keyframes ie-acc-fade-in {
+          from { opacity: 0; transform: translateX(-6px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
         .ie-dropdown-wrap { position: relative; }
-        .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #E5E3DF; background: #F8F7F4; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; }
+        .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #E5E3DF; background: #F8F7F4; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; position: relative; }
         .ie-dots-btn:hover { background: #F2F1EE; }
         .ie-dots-btn span { width: 4px; height: 4px; border-radius: 50%; background: #555; display: block; }
         .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #fff; border: 1px solid #E5E3DF; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); min-width: 230px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
@@ -264,10 +356,15 @@ export default function Navbar() {
         .ie-dd-btn.discord:hover { background: #eef0ff; }
         .ie-dd-btn.logout { color: #dc2626; }
         .ie-dd-btn.logout:hover { background: #fff1f0; }
-        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-steam-badge { display: none; } .ie-discord-badge, .ie-discord-btn { display: none; } }
+        .ie-verified-badge { font-size: 0.62rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 7px; border-radius: 20px; border: 1px solid #bbf7d0; }
+        .ie-discord-verified { font-size: 0.62rem; color: #4f5fc0; font-weight: 800; background: #e0e4ff; padding: 2px 7px; border-radius: 20px; border: 1px solid #c7d0ff; }
+
+        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } }
+
         .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #E5E3DF; background: #F8F7F4; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
         .ie-hamburger span { display: block; width: 18px; height: 2px; background: #555; border-radius: 2px; transition: all 0.2s; transform-origin: center; }
         @media (max-width: 900px) { .ie-hamburger { display: flex; } }
+
         .ie-mobile-drawer { display: none; flex-direction: column; background: #fff; border-top: 1px solid #F2F1EE; padding: 10px 12px 16px; gap: 4px; }
         .ie-mobile-drawer.open { display: flex; }
         .ie-mobile-game-btn { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #555; transition: all 0.15s; font-family: inherit; width: 100%; text-align: left; }
@@ -277,11 +374,15 @@ export default function Navbar() {
         .ie-mobile-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem; color: #555; font-weight: 500; }
         .ie-mobile-action-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; border: 1px solid #E5E3DF; cursor: pointer; font-family: inherit; background: #F8F7F4; color: #111; margin-top: 2px; }
         .ie-mobile-action-btn:hover { background: #F2F1EE; }
+        .ie-mobile-connect-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.86rem; font-weight: 700; border: 1.5px dashed #fecaca; cursor: pointer; font-family: inherit; background: #FFF5F5; color: #dc2626; margin-top: 2px; }
+        .ie-mobile-connect-btn:hover { background: #FEF2F2; border-style: solid; }
         .ie-mobile-logout { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; color: #dc2626; font-weight: 700; background: #fff1f0; border: 1px solid #fecaca; cursor: pointer; font-family: inherit; margin-top: 4px; }
         .ie-mobile-logout:hover { background: #fee2e2; }
+
         .ie-private-warning { background: #fffbeb; border-bottom: 1px solid #fde68a; padding: 7px 28px; display: flex; align-items: flex-start; gap: 10px; }
         .ie-private-warning p { color: #92400e; font-size: 0.76rem; line-height: 1.5; }
         .ie-private-warning code { background: #fef3c7; padding: 1px 5px; border-radius: 4px; font-size: 0.72rem; }
+
         .ph-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
         @media (min-width: 600px) { .ph-overlay { align-items: center; } }
         .ph-modal { background: #fff; border-radius: 20px 20px 0 0; padding: 32px 28px 40px; width: 100%; max-width: 400px; position: relative; }
@@ -305,24 +406,6 @@ export default function Navbar() {
         .ph-resend-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
         .ph-resend-btn { background: none; border: none; color: #F05A28; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
         .ph-resend-btn:disabled { color: #bbb; cursor: default; }
-        .ie-accounts-row { display: flex; align-items: center; gap: 6px; }
-        .ie-acc { position: relative; display: flex; align-items: center; height: 36px; border-radius: 100px; cursor: pointer; transition: all 0.25s ease; overflow: hidden; flex-shrink: 0; }
-        .ie-acc.linked { background: #F0FDF4; border: 1.5px solid #bbf7d0; min-width: 36px; width: 36px; justify-content: center; }
-        .ie-acc.pending { background: #FFFBEB; border: 1.5px solid #fde68a; min-width: 36px; width: 36px; justify-content: center; }
-        .ie-acc.unlinked { background: #F8F7F4; border: 1.5px dashed #d0ceca; min-width: 36px; width: 36px; justify-content: center; opacity: 0.7; }
-        .ie-acc.unlinked:hover { opacity: 1; border-style: solid; }
-        .ie-acc:hover { width: auto; padding-right: 14px; }
-        .ie-acc-icon { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin: 0 7px; }
-        .ie-acc-icon.riot { border-radius: 4px; }
-        .ie-acc-details { display: none; align-items: center; gap: 6px; white-space: nowrap; }
-        .ie-acc:hover .ie-acc-details { display: flex; }
-        .ie-acc-name { font-size: 0.75rem; font-weight: 700; color: #333; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-        .ie-acc-status { font-size: 0.58rem; font-weight: 800; padding: 2px 6px; border-radius: 20px; }
-        .ie-acc-status.verified { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
-        .ie-acc-status.pending { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-        .ie-acc-plus { font-size: 16px; color: #bbb; font-weight: 300; }
-        .ie-acc.unlinked:hover .ie-acc-plus { color: #888; }
-        @media (max-width: 900px) { .ie-accounts-row { display: none; } }
       `}</style>
 
       <nav className="ie-navbar">
@@ -342,8 +425,13 @@ export default function Navbar() {
               const isActive = activeGame?.id === g.id;
               return (
                 <button key={g.id} className={`ie-nav-tab${isActive ? " active" : ""}`} onClick={() => router.push(g.path)}
-                  style={isActive ? { background: `${g.color}12`, border: `1px solid ${g.color}35`, color: g.color, boxShadow: `0 2px 12px ${g.glow}` } : {}}>
-                  <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(55%)" }} />
+                  style={isActive ? {
+                    background: `${g.color}14`,
+                    border: `1.5px solid ${g.color}40`,
+                    color: g.color,
+                    boxShadow: `0 2px 16px ${g.glow}, inset 0 0 0 1px ${g.color}10`,
+                  } : {}}>
+                  <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(55%) opacity(70%)" }} />
                   <span>{g.name}</span>
                   {!g.active && <span className="ie-soon-badge">Soon</span>}
                 </button>
@@ -352,137 +440,130 @@ export default function Navbar() {
           </div>
 
           <div className="ie-nav-right">
-            <div className="ie-accounts-row">
+            {/* ═══ ACCOUNT BADGES (desktop) ═══ */}
+            <div className="ie-accounts-row2">
               {/* Steam */}
-              {steamData?.steamId ? (
-                <div className="ie-acc linked">
-                  <img className="ie-acc-icon" src={steamData.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"} alt="Steam" />
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name">{steamData.steamName}</span>
-                    <span className="ie-acc-status verified">✓</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="ie-acc unlinked" onClick={() => window.location.href = `/api/auth/steam?uid=${user?.uid}`}>
-                  <img className="ie-acc-icon" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" style={{ opacity: 0.4 }} />
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#888" }}>Connect Steam</span>
-                  </div>
-                </div>
-              )}
+              <AccBadge
+                id="steam"
+                linked={hasSteam}
+                icon={hasSteam ? (steamData?.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg") : "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"}
+                name={steamData?.steamName}
+                label="Steam"
+                onClick={hasSteam ? undefined : () => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}
+              />
 
               {/* Discord */}
-              {discordLinked ? (
-                <div className="ie-acc linked">
-                  <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 7px", flexShrink: 0 }}>
-                    <DiscordIcon size={18} color="#5865F2" />
-                  </div>
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#4f5fc0" }}>{discordUsername}</span>
-                    <span className="ie-acc-status verified">✓</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="ie-acc unlinked" onClick={handleDiscordConnect}>
-                  <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 7px", flexShrink: 0 }}>
-                    <DiscordIcon size={18} color="#bbb" />
-                  </div>
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#888" }}>Connect Discord</span>
-                  </div>
-                </div>
-              )}
+              <AccBadge
+                id="discord"
+                linked={discordLinked}
+                iconEl={<DiscordIcon size={18} color={discordLinked ? "#5865F2" : "#ccc"} />}
+                name={discordUsername}
+                label="Discord"
+                onClick={discordLinked ? undefined : handleDiscordConnect}
+              />
 
-              {/* Riot / Valorant */}
-              {riotData?.riotVerified === "verified" ? (
-                <div className="ie-acc linked" onClick={() => router.push("/connect-riot")}>
-                  {riotData.riotAvatar ? (
-                    <img className="ie-acc-icon riot" src={riotData.riotAvatar} alt="Riot" />
-                  ) : (
-                    <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
-                  )}
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#ff4655" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
-                    <span className="ie-acc-status verified">✓</span>
-                  </div>
-                </div>
-              ) : riotData?.riotVerified === "pending" ? (
-                <div className="ie-acc pending" onClick={() => router.push("/connect-riot")}>
-                  {riotData.riotAvatar ? (
-                    <img className="ie-acc-icon riot" src={riotData.riotAvatar} alt="Riot" />
-                  ) : (
-                    <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
-                  )}
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#92400e" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
-                    <span className="ie-acc-status pending">Pending</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="ie-acc unlinked" onClick={() => router.push("/connect-riot")}>
-                  <img className="ie-acc-icon riot" src="/riot-games.png" alt="Riot" style={{ opacity: 0.8 }} />
-                  <div className="ie-acc-details">
-                    <span className="ie-acc-name" style={{ color: "#ff4655" }}>Connect Riot ID</span>
-                  </div>
-                </div>
-              )}
+              {/* Riot */}
+              <AccBadge
+                id="riot"
+                linked={riotStatus === "verified"}
+                pending={riotStatus === "pending"}
+                icon={riotData?.riotAvatar || "/riot-games.png"}
+                name={riotData?.riotGameName ? `${riotData.riotGameName}#${riotData.riotTagLine}` : undefined}
+                label="Riot ID"
+                onClick={() => router.push("/connect-riot")}
+              />
             </div>
 
+            {/* ═══ DOTS MENU ═══ */}
             <div className="ie-dropdown-wrap" ref={dropdownRef}>
               <button className="ie-dots-btn" onClick={() => setDropdownOpen(p => !p)} aria-label="More options">
                 <span /><span /><span />
+                {/* Attention badge on dots if unlinked accounts exist */}
+                {unlinkedCount > 0 && (
+                  <div style={{
+                    position: "absolute", top: -4, right: -4, minWidth: 16, height: 16,
+                    borderRadius: 100, background: "#dc2626", border: "2px solid #fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "0.52rem", fontWeight: 900, color: "#fff",
+                  }}>{unlinkedCount}</div>
+                )}
               </button>
 
               {dropdownOpen && (
                 <div className="ie-dropdown">
-                  {steamData?.steamId && (
+                  {/* Unlinked accounts warning */}
+                  {unlinkedCount > 0 && (
+                    <div style={{ padding: "10px 12px", background: "#FFF5F5", borderBottom: "1px solid #fecaca" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626" }} />
+                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#dc2626" }}>{unlinkedCount} account{unlinkedCount > 1 ? "s" : ""} not connected</span>
+                      </div>
+                      <p style={{ fontSize: "0.64rem", color: "#999", lineHeight: 1.5 }}>Connect all accounts to participate in tournaments and receive notifications.</p>
+                    </div>
+                  )}
+
+                  {hasSteam && (
                     <div className="ie-dd-section">
                       <span className="ie-dd-label">Steam</span>
                       <div className="ie-dd-item">
-                        <img src={steamData.steamAvatar} alt="avatar" style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #22c55e" }} />
+                        <img src={steamData.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #22c55e" }} />
                         <span style={{ fontWeight: 600, color: "#222", fontSize: "0.85rem", flex: 1 }}>{steamData.steamName}</span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
                     </div>
                   )}
+                  {!hasSteam && (
+                    <div className="ie-dd-section">
+                      <span className="ie-dd-label">Steam</span>
+                      <button className="ie-dd-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; setDropdownOpen(false); }} style={{ color: "#dc2626" }}>
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 18, height: 18, opacity: 0.5 }} />
+                        Connect Steam
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="ie-dd-section">
                     <span className="ie-dd-label">Phone</span>
                     {hasPhone ? (
                       <div className="ie-dd-item">
                         <span style={{ fontSize: 16 }}>📱</span>
                         <span style={{ fontWeight: 600, color: "#333", fontSize: "0.84rem", flex: 1 }}>
-                          {steamData.phone.replace(/(\+\d{1,3})(\d{3})(\d+)(\d{3})$/, (_: string, code: string, a: string, _m: string, last: string) =>
-                            `${code} ${a}*****${last}`
-                          )}
+                          {steamData.phone.replace(/(\+\d{1,3})(\d{3})(\d+)(\d{3})$/, (_: string, code: string, a: string, _m: string, last: string) => `${code} ${a}*****${last}`)}
                         </span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
                     ) : (
-                      <button className="ie-dd-btn" onClick={openPhoneModal}>
+                      <button className="ie-dd-btn" onClick={openPhoneModal} style={{ color: "#dc2626" }}>
                         <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
                       </button>
                     )}
                   </div>
+
                   <div className="ie-dd-section">
                     <span className="ie-dd-label">Riot / Valorant</span>
-                    {riotData?.riotVerified === "verified" ? (
+                    {riotStatus === "verified" ? (
                       <div className="ie-dd-item">
-                        <img src={riotData.riotAvatar || "/riot-games.png"} alt="Riot" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #22c55e" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                        <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #22c55e" }} />
+                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
-                    ) : riotData?.riotVerified === "pending" ? (
+                    ) : riotStatus === "pending" ? (
                       <div className="ie-dd-item">
-                        <img src={riotData.riotAvatar || "/riot-games.png"} alt="Riot" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #f59e0b" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData.riotGameName}#{riotData.riotTagLine}</span>
+                        <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #f59e0b" }} />
+                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
                         <span style={{ fontSize: "0.62rem", color: "#92400e", fontWeight: 800, background: "#fef3c7", padding: "2px 7px", borderRadius: 20, border: "1px solid #fde68a" }}>Pending</span>
                       </div>
                     ) : (
-                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#ff4655" }}>
-                        <img src="/riot-games.png" alt="Riot" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.7 }} /> Connect Riot ID
+                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#dc2626" }}>
+                        <img src="/riot-games.png" alt="" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.5 }} />
+                        Connect Riot ID
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
                       </button>
                     )}
                   </div>
+
                   <div className="ie-dd-section">
                     <span className="ie-dd-label">Discord</span>
                     {discordLinked ? (
@@ -494,9 +575,11 @@ export default function Navbar() {
                     ) : (
                       <button className="ie-dd-btn discord" onClick={() => { handleDiscordConnect(); setDropdownOpen(false); }}>
                         <DiscordIcon size={18} color="#5865F2" /> Connect Discord
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
                       </button>
                     )}
                   </div>
+
                   <div className="ie-dd-section" style={{ padding: "10px" }}>
                     <button className="ie-dd-btn logout"
                       onClick={async () => { await logout(); setDropdownOpen(false); }}
@@ -516,6 +599,7 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* ═══ MOBILE DRAWER ═══ */}
         <div className={`ie-mobile-drawer${mobileMenuOpen ? " open" : ""}`}>
           {games.map((g) => {
             const isActive = activeGame?.id === g.id;
@@ -529,36 +613,64 @@ export default function Navbar() {
             );
           })}
           <div className="ie-mobile-divider" />
-          {steamData?.steamId && (
+
+          {/* Steam */}
+          {hasSteam ? (
             <div className="ie-mobile-row">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" style={{ width: 18, height: 18, opacity: 0.6 }} />
-              <img src={steamData.steamAvatar} alt="avatar" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e" }} />
+              <img src={steamData.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e" }} />
               <span style={{ flex: 1, fontWeight: 600, color: "#333" }}>{steamData.steamName}</span>
               <span className="ie-verified-badge">✓</span>
             </div>
+          ) : (
+            <button className="ie-mobile-connect-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, opacity: 0.5 }} />
+              Connect Steam
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
+            </button>
           )}
+
+          {/* Discord */}
           {discordLinked ? (
             <div className="ie-mobile-row">
               <DiscordIcon size={18} color="#5865F2" />
               <span style={{ flex: 1, fontWeight: 600, color: "#4f5fc0" }}>{discordUsername}</span>
-              <span className="ie-discord-verified">✓ Linked</span>
+              <span className="ie-discord-verified">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-game-btn" onClick={handleDiscordConnect} style={{ color: "#4f5fc0", border: "1px solid #c7d0ff", background: "#eef0ff" }}>
-              <DiscordIcon size={22} color="#5865F2" /> Connect Discord
+            <button className="ie-mobile-connect-btn" onClick={handleDiscordConnect} style={{ borderColor: "#c7d0ff", background: "#F5F7FF", color: "#4f5fc0" }}>
+              <DiscordIcon size={20} color="#5865F2" /> Connect Discord
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
             </button>
           )}
+
+          {/* Riot */}
+          {riotStatus === "verified" ? (
+            <div className="ie-mobile-row">
+              <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
+              <span style={{ flex: 1, fontWeight: 600, color: "#ff4655" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
+              <span className="ie-verified-badge">✓</span>
+            </div>
+          ) : (
+            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "#fecdd3", background: "#FFF5F5", color: "#ff4655" }}>
+              <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 3, opacity: 0.6 }} />
+              Connect Riot ID
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
+            </button>
+          )}
+
+          {/* Phone */}
           {hasPhone ? (
             <div className="ie-mobile-row">
               <span style={{ fontSize: 16 }}>📱</span>
               <span style={{ fontWeight: 600, flex: 1 }}>{steamData?.phone}</span>
-              <span className="ie-verified-badge">✓ Linked</span>
+              <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
             <button className="ie-mobile-action-btn" onClick={openPhoneModal}>
               <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
             </button>
           )}
+
           <button className="ie-mobile-logout" onClick={async () => { await logout(); }}>
             <span style={{ fontSize: 16 }}>🚪</span> Logout
           </button>

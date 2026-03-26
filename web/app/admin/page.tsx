@@ -8,7 +8,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
-interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: { game1?: any; game2?: any }; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; }
+interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: { game1?: any; game2?: any }; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; }
 interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
 
 type AdminTab = "tournament" | "players";
@@ -75,6 +75,11 @@ export default function AdminPanel() {
   const [modPlayerUid, setModPlayerUid] = useState("");
   const [modTargetTeamId, setModTargetTeamId] = useState("");
 
+  // ─── Bracket Generation ─────────────────────────────────────────────────────
+  const [bracketTopTeams, setBracketTopTeams] = useState("4");
+  const [bracketStartTime, setBracketStartTime] = useState("18:00");
+  const [bracketStartDate, setBracketStartDate] = useState(new Date().toISOString().split("T")[0]);
+
   // ─── Helpers ────────────────────────────────────────────────────────────────
   const addLog = (msg: string) => setLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
   const parsePuuids = (str: string) => str ? str.split(",").map(s => s.trim()).filter(Boolean) : [];
@@ -140,7 +145,7 @@ export default function AdminPanel() {
     return () => { unsub1(); unsub2(); };
   }, [tournamentId, authenticated]);
 
-  // ─── Fetch all players for registry tab (via admin API, not client Firestore) ─
+  // ─── Fetch all players for registry tab ─────────────────────────────────────
   useEffect(() => {
     if (!authenticated || activeTab !== "players") return;
     let cancelled = false;
@@ -165,7 +170,10 @@ export default function AdminPanel() {
 
   // ─── Derived ────────────────────────────────────────────────────────────────
   const pendingMatches = matches.filter(m => m.status === "pending" || m.status === "live");
-  const matchDays = [...new Set(matches.map(m => m.matchDay))].sort((a, b) => a - b);
+  const groupMatches = matches.filter(m => !m.isBracket);
+  const bracketMatches = matches.filter(m => m.isBracket);
+  const matchDays = [...new Set(groupMatches.map(m => m.matchDay))].sort((a, b) => a - b);
+  const bracketDays = [...new Set(bracketMatches.map(m => m.matchDay))].sort((a, b) => a - b);
 
   const filteredPlayers = allPlayers.filter(p => {
     if (!playerSearch) return true;
@@ -221,11 +229,6 @@ export default function AdminPanel() {
   const btnSuccess: React.CSSProperties = { ...btnStyle, background: "#16a34a" };
   const smallLabel: React.CSSProperties = { fontSize: "0.68rem", fontWeight: 700, color: "#999", display: "block", marginBottom: 4 };
   const selectStyle: React.CSSProperties = { ...inputStyle, cursor: "pointer" };
-  const chipStyle = (active: boolean): React.CSSProperties => ({
-    padding: "6px 16px", borderRadius: 100, border: "1.5px solid", fontWeight: 700, fontSize: "0.78rem", cursor: "pointer",
-    background: active ? "#ff4655" : "#fff", color: active ? "#fff" : "#666",
-    borderColor: active ? "#ff4655" : "#E5E3DF", transition: "all 0.15s",
-  });
 
   return (
     <>
@@ -291,7 +294,7 @@ export default function AdminPanel() {
                       {matches.length} matches ({pendingMatches.length} pending)
                     </span>
                     <span style={{ fontSize: "0.72rem", color: "#666", background: "#F2F1EE", padding: "4px 12px", borderRadius: 100 }}>
-                      {matchDays.length} round(s)
+                      {matchDays.length} group round(s) · {bracketDays.length} bracket round(s)
                     </span>
                   </div>
                 )}
@@ -355,7 +358,7 @@ export default function AdminPanel() {
                   }}>Generate All Fixtures</button>
                 </div>
 
-                {/* ═══ 3. SET LOBBY (from match/game dropdown) ═══ */}
+                {/* ═══ 3. SET LOBBY & NOTIFY ═══ */}
                 <div style={sectionStyle}>
                   <span style={labelStyle}>3. Set Lobby & Notify Discord</span>
                   <p style={{ fontSize: "0.68rem", color: "#999", marginBottom: 8 }}>
@@ -368,7 +371,7 @@ export default function AdminPanel() {
                         <option value="">Select a match...</option>
                         {pendingMatches.map(m => (
                           <option key={m.id} value={m.id}>
-                            R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
+                            {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
                           </option>
                         ))}
                       </select>
@@ -424,7 +427,7 @@ export default function AdminPanel() {
                     <option value="">Select a match...</option>
                     {matches.filter(m => m.status !== "completed").map(m => (
                       <option key={m.id} value={m.id}>
-                        R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
+                        {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
                       </option>
                     ))}
                   </select>
@@ -508,7 +511,7 @@ export default function AdminPanel() {
                     <option value="">Select a match...</option>
                     {matches.filter(m => m.status !== "completed").map(m => (
                       <option key={m.id} value={m.id}>
-                        R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
+                        {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
                       </option>
                     ))}
                   </select>
@@ -555,7 +558,7 @@ export default function AdminPanel() {
                         <option value="">Select a match...</option>
                         {matches.filter(m => m.status !== "completed").map(m => (
                           <option key={m.id} value={m.id}>
-                            R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
+                            {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
                           </option>
                         ))}
                       </select>
@@ -595,18 +598,55 @@ export default function AdminPanel() {
                     </div>
                   </div>
                 </div>
+
+                {/* ═══ 8. GENERATE BRACKETS (NEW) — FULL WIDTH ═══ */}
+                <div style={{ ...sectionStyle, gridColumn: "1 / -1", border: "1.5px solid #fde68a", background: "#FFFDF7" }}>
+                  <span style={{ ...labelStyle, color: "#f59e0b" }}>8. Generate Elimination Brackets (Post Group Stage)</span>
+                  <p style={{ fontSize: "0.72rem", color: "#888", marginBottom: 12, lineHeight: 1.5 }}>
+                    After all group stage rounds are complete, generate a single-elimination bracket from the top teams.
+                    Teams are seeded by standings position (1 vs N, 2 vs N-1, etc).
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                    <div>
+                      <label style={smallLabel}>Teams to Advance</label>
+                      <select value={bracketTopTeams} onChange={e => setBracketTopTeams(e.target.value)} style={selectStyle}>
+                        <option value="2">Top 2 (Final only)</option>
+                        <option value="4">Top 4 (Semis + Final)</option>
+                        <option value="8">Top 8 (Quarters + Semis + Final)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={smallLabel}>Bracket Start Date</label>
+                      <input value={bracketStartDate} onChange={e => setBracketStartDate(e.target.value)} style={inputStyle} type="date" />
+                    </div>
+                    <div>
+                      <label style={smallLabel}>Start Time (IST)</label>
+                      <input value={bracketStartTime} onChange={e => setBracketStartTime(e.target.value)} style={inputStyle} type="time" />
+                    </div>
+                  </div>
+                  <button disabled={loading} style={{ ...btnWarning, marginTop: 8 }}
+                    onClick={async () => {
+                      if (!confirm(`Generate elimination bracket for top ${bracketTopTeams} teams? This creates new bracket matches.`)) return;
+                      await apiCall("/api/valorant/generate-brackets", {
+                        tournamentId,
+                        topTeams: parseInt(bracketTopTeams),
+                        startTime: bracketStartTime,
+                        startDate: bracketStartDate,
+                      });
+                    }}>Generate Brackets</button>
+                </div>
               </div>
 
               {/* ═══ FIXTURES OVERVIEW ═══ */}
-              {matches.length > 0 && (
+              {groupMatches.length > 0 && (
                 <div style={{ ...sectionStyle, marginTop: 8 }}>
-                  <span style={labelStyle}>Fixtures Overview</span>
+                  <span style={labelStyle}>Group Stage Fixtures</span>
                   {matchDays.map(day => (
                     <div key={day} style={{ marginBottom: 16 }}>
                       <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#ff4655", letterSpacing: "0.1em", marginBottom: 8 }}>
                         ROUND {day}
                       </div>
-                      {matches.filter(m => m.matchDay === day).map(m => (
+                      {groupMatches.filter(m => m.matchDay === day).map(m => (
                         <div key={m.id} className="adm-match-card">
                           <div className="adm-match-day">M{m.matchIndex}</div>
                           <div className="adm-match-teams">
@@ -621,6 +661,34 @@ export default function AdminPanel() {
                               {new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}
                             </div>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ═══ BRACKET FIXTURES ═══ */}
+              {bracketMatches.length > 0 && (
+                <div style={{ ...sectionStyle, marginTop: 8, borderColor: "#fde68a" }}>
+                  <span style={{ ...labelStyle, color: "#f59e0b" }}>Bracket Fixtures</span>
+                  {bracketDays.map(day => (
+                    <div key={day} style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.1em", marginBottom: 8 }}>
+                        BRACKET ROUND {day - Math.max(...matchDays, 0)}
+                      </div>
+                      {bracketMatches.filter(m => m.matchDay === day).map(m => (
+                        <div key={m.id} className="adm-match-card" style={{ borderColor: "#fde68a" }}>
+                          <div className="adm-match-day" style={{ color: "#f59e0b" }}>
+                            {m.bracketLabel || `M${m.matchIndex}`}
+                          </div>
+                          <div className="adm-match-teams">
+                            {m.team1Name || "TBD"} vs {m.team2Name || "TBD"}
+                          </div>
+                          <div className="adm-match-score">
+                            {m.status === "completed" ? `${m.team1Score}-${m.team2Score}` : "—"}
+                          </div>
+                          <div className={`adm-match-status ${m.status}`}>{m.status}</div>
                         </div>
                       ))}
                     </div>
@@ -643,7 +711,6 @@ export default function AdminPanel() {
                 style={{ ...inputStyle, marginBottom: 16 }}
               />
 
-              {/* Header */}
               <div className="adm-player-row adm-player-header" style={{ borderBottom: "2px solid #E5E3DF" }}>
                 <div>Player</div>
                 <div>UID</div>
@@ -653,7 +720,6 @@ export default function AdminPanel() {
                 <div style={{ textAlign: "center" }}>Phone</div>
               </div>
 
-              {/* Rows */}
               <div style={{ maxHeight: 500, overflowY: "auto" }}>
                 {filteredPlayers.map(p => (
                   <div key={p.uid} className="adm-player-row">
