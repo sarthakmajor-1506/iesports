@@ -496,7 +496,8 @@ export default function ValorantTournamentDetail() {
                 ) : (
                   <div className="vtd-players-grid">
                     {players.map((p: any) => (
-                      <div key={p.uid} className="vtd-player-box">
+                      <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                      <div className="vtd-player-box">
                         {p.riotAvatar ? (
                           <img className="vtd-player-avatar-lg" src={p.riotAvatar} alt={p.riotGameName} />
                         ) : (
@@ -511,7 +512,9 @@ export default function ValorantTournamentDetail() {
                             border: `1px solid ${p.skillLevel >= 4 ? "#fde68a" : p.skillLevel >= 3 ? "#c7d0ff" : "#E5E3DF"}`,
                           }}>Skill {p.skillLevel || 1}</span>
                         </div>
-                      </div>
+                       </div> 
+                      
+                      </Link>
                     ))}
                   </div>
                 )}
@@ -602,6 +605,8 @@ export default function ValorantTournamentDetail() {
                     <thead>
                       <tr>
                         <th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
+                        <th style={{ color: "#16a34a" }}>MW</th><th style={{ color: "#dc2626" }}>ML</th>
+                        <th style={{ color: "#ff4655" }}>Pts</th><th>BH</th>
                         <th style={{ color: "#ff4655" }}>Pts</th><th>BH</th>
                       </tr>
                     </thead>
@@ -611,6 +616,8 @@ export default function ValorantTournamentDetail() {
                           <td style={{ fontWeight: 800, color: i < 6 ? "#ff4655" : "#bbb" }}>{i + 1}</td>
                           <td style={{ fontWeight: 700 }}>{s.teamName}</td>
                           <td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td>
+                          <td style={{ color: "#16a34a" }}>{s.mapsWon || 0}</td>
+                          <td style={{ color: "#dc2626" }}>{s.mapsLost || 0}</td>
                           <td style={{ fontWeight: 800, color: "#ff4655" }}>{s.points || 0}</td>
                           <td style={{ color: "#999" }}>{s.buchholz || 0}</td>
                         </tr>
@@ -652,9 +659,10 @@ export default function ValorantTournamentDetail() {
                           const t1Members = teamMembers[m.team1Id] || [];
                           const t2Members = teamMembers[m.team2Id] || [];
                           const isExpanded = expandedMatch === m.id;
-                          const g1 = m.games?.game1;
-                          const g2 = m.games?.game2;
+                          const g1 = m.game1 || m.games?.game1;
+                          const g2 = m.game2 || m.games?.game2;
                           const hasGameData = g1?.playerStats || g2?.playerStats;
+          
                           const scheduledStr = m.scheduledTime
                             ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
                             : "";
@@ -895,9 +903,9 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   const stats: any[] = game.playerStats || [];
   const t1Stats = stats.filter((s: any) => s.teamId === team1Id || s.team === "team1");
   const t2Stats = stats.filter((s: any) => s.teamId === team2Id || s.team === "team2");
-  const t1Rounds = game.team1Rounds ?? game.team1Score ?? "–";
-  const t2Rounds = game.team2Rounds ?? game.team2Score ?? "–";
-
+  const t1Rounds = game.team1RoundsWon ?? game.team1Rounds ?? "–";
+  const t2Rounds = game.team2RoundsWon ?? game.team2Rounds ?? "–";
+  
   return (
     <div style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>

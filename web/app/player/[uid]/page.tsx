@@ -100,7 +100,7 @@ export default function PlayerProfile() {
                   let playerInMatch = false;
 
                   for (const gKey of ["game1", "game2"]) {
-                    const g = m[gKey];
+                    const g = m[gKey] || m.games?.[gKey];
                     if (!g || !g.playerStats) continue;
                     const ps = g.playerStats.find((p: any) => {
                       if (d.riotPuuid && p.puuid === d.riotPuuid) return true;
@@ -169,6 +169,9 @@ export default function PlayerProfile() {
   const gamesWon = vStats?.gamesWon || 0;
   const gamesLost = totalGames - gamesWon;
   const winRate = totalGames > 0 ? Math.round((gamesWon / totalGames) * 1000) / 10 : 0;
+  const computedAcs = vStats && vStats.totalRoundsPlayed > 0
+    ? Math.round(vStats.totalScore / vStats.totalRoundsPlayed)
+    : vStats?.acs || 0;
 
   // Agent frequency
   const agentCounts: Record<string, number> = {};
@@ -220,10 +223,10 @@ export default function PlayerProfile() {
           </div>
 
           {/* ═══ STATS CARDS ═══ */}
-          {vStats && (
+          {vStats ? (
             <div className="pp-stats-row">
               <div className="pp-stat-card pp-stat-primary">
-                <div className="pp-stat-value">{vStats.acs}</div>
+                <div className="pp-stat-value">{computedAcs}</div>
                 <div className="pp-stat-label">ACS</div>
               </div>
               <div className="pp-stat-card">
@@ -243,6 +246,29 @@ export default function PlayerProfile() {
                 <div className="pp-stat-label">Win Rate</div>
               </div>
             </div>
+          ) : (
+            <div className="pp-stats-row">
+              <div className="pp-stat-card pp-stat-primary">
+                <div className="pp-stat-value">{profile.riotRank || "Unranked"}</div>
+                <div className="pp-stat-label">Valorant Rank</div>
+              </div>
+              <div className="pp-stat-card">
+                <div className="pp-stat-value">0</div>
+                <div className="pp-stat-label">Official Games</div>
+              </div>
+              <div className="pp-stat-card">
+                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-label">ACS</div>
+              </div>
+              <div className="pp-stat-card">
+                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-label">K/D</div>
+              </div>
+              <div className="pp-stat-card">
+                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-label">Win Rate</div>
+              </div>
+            </div>
           )}
 
           {/* ═══ TAB BAR ═══ */}
@@ -255,7 +281,7 @@ export default function PlayerProfile() {
           {activeTab === "valorant" && (
             <>
               {/* ── Detailed Stats ── */}
-              {vStats && (
+              {vStats ? (
                 <div className="pp-section">
                   <span className="pp-section-label">Performance Breakdown</span>
                   <div className="pp-detail-grid">
@@ -285,9 +311,12 @@ export default function PlayerProfile() {
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div className="pp-section">
+                  <span className="pp-section-label">Performance Breakdown</span>
+                  <div className="pp-empty">No official tournament match data yet. Stats will appear here once matches are played and results are fetched.</div>
+                </div>
               )}
-
-              {/* ── Top Agents ── */}
               {topAgents.length > 0 && (
                 <div className="pp-section">
                   <span className="pp-section-label">Most Played Agents</span>

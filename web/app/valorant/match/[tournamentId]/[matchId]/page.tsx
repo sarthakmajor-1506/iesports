@@ -63,9 +63,8 @@ export default function MatchDetail() {
       <><style>{styles}</style><div className="md-page"><Navbar /><div className="md-content"><div className="md-loading">Match not found.</div></div></div></>
     );
   }
-
-  const g1 = match.game1;
-  const g2 = match.game2;
+  const g1 = match.game1 || match.games?.game1;
+  const g2 = match.game2 || match.games?.game2;   
   const activeGameData = activeGame === 1 ? g1 : g2;
   const isComplete = match.status === "completed";
 
@@ -185,14 +184,14 @@ export default function MatchDetail() {
                   </div>
                   {t1Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
-                    const acs = (activeGameData.roundsPlayed || 1) > 0 ? Math.round(p.score / activeGameData.roundsPlayed) : 0;
+                    const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
+                    const acs = rounds > 0 ? Math.round(p.score / rounds) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
-                          <Link href={`/player/${p.teamId ? findUidByPuuid(p.puuid, teams, match) : ""}`} className="md-player-link">
-                            {p.name}<span className="md-player-tag">#{p.tag}</span>
-                          </Link>
+                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link"></Link>
+                          
                         </div>
                         <div className="md-stats-cell md-stats-agent">{p.agent}</div>
                         <div className="md-stats-cell md-stats-k">{p.kills}</div>
@@ -233,8 +232,7 @@ export default function MatchDetail() {
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
-                          <Link href={`/player/${p.teamId ? findUidByPuuid(p.puuid, teams, match) : ""}`} className="md-player-link">
-                            {p.name}<span className="md-player-tag">#{p.tag}</span>
+                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">
                           </Link>
                         </div>
                         <div className="md-stats-cell md-stats-agent">{p.agent}</div>
@@ -268,20 +266,19 @@ function getInitials(name: string): string {
   const clean = name?.replace(/\[.*?\]\s*/, "") || "?";
   return clean.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 3);
 }
-
-function findUidByPuuid(puuid: string, teams: Record<string, any>, match: any): string {
-  // Search team members for this puuid's uid
+function findUidByPuuid(puuid: string, playerName: string, teams: Record<string, any>, match: any): string {
   for (const teamId of [match.team1Id, match.team2Id]) {
     const team = teams[teamId];
     if (!team) continue;
     for (const m of team.members || []) {
-      // Try matching by puuid if stored, otherwise won't link
-      if (m.riotPuuid === puuid) return m.uid;
+      // Match by PUUID first (best)
+      if (m.riotPuuid && m.riotPuuid === puuid) return m.uid;
+      // Fallback: match by name (case-insensitive)
+      if (m.riotGameName && playerName && m.riotGameName.toLowerCase() === playerName.toLowerCase()) return m.uid;
     }
   }
   return "";
 }
-
 const styles = `
   .md-page { min-height: 100vh; background: #F8F7F4; font-family: var(--font-geist-sans), system-ui, sans-serif; }
   .md-content { max-width: 920px; margin: 0 auto; padding: 20px 24px 60px; }

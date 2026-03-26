@@ -275,12 +275,13 @@ export async function POST(req: NextRequest) {
       apiVersion,
       status: "completed",
     };
-
     const updatePayload: any = {
       [gameKey]: gameData,
+      [`games.${gameKey}`]: gameData,
       [`${gameKey}MatchId`]: valorantMatchId,
       [`${gameKey}Winner`]: gameWinner,
     };
+
 
     // ═══════════════════════════════════════════════════════════════════════════
     // 7. CHECK IF SERIES IS COMPLETE (BOTH GAMES FETCHED)
