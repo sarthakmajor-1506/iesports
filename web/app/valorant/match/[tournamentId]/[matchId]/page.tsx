@@ -7,6 +7,8 @@ import Navbar from "@/app/components/Navbar";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
+import type { SwissMatch } from "@/lib/types";
+
 export default function MatchDetail() {
   const params = useParams();
   const tournamentId = params.tournamentId as string;
@@ -30,10 +32,11 @@ export default function MatchDetail() {
 
         if (tDoc.exists()) setTournament({ id: tDoc.id, ...tDoc.data() });
         if (mDoc.exists()) {
-          const mData = { id: mDoc.id, ...mDoc.data() };
+          const mData = { id: mDoc.id, ...mDoc.data() } as SwissMatch;  // ← add "as SwissMatch"
           setMatch(mData);
-
+        
           // Load team docs for member info
+       
           const teamsMap: Record<string, any> = {};
           for (const teamId of [mData.team1Id, mData.team2Id]) {
             if (teamId && teamId !== "TBD") {
