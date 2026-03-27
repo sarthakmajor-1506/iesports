@@ -56,6 +56,172 @@ function getTeamTag(name: string): string {
   return m ? m[1] : getTeamInitials(name);
 }
 
+// ── Reusable match card component ─────────────────────────────────────────────
+function MatchCard({
+  m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatch, tournamentId, isBracket = false,
+}: {
+  m: any; teamMembers: Record<string, any[]>; teamLogoMap: Record<string, string>;
+  expandedMatch: string | null; setExpandedMatch: (id: string | null) => void;
+  tournamentId: string; isBracket?: boolean;
+}) {
+  const isComplete = m.status === "completed";
+  const isLive = m.status === "live";
+  const isDraw = isComplete && m.team1Score === m.team2Score;
+  const t1Win = isComplete && m.team1Score > m.team2Score;
+  const t2Win = isComplete && m.team2Score > m.team1Score;
+  const t1Members = teamMembers[m.team1Id] || [];
+  const t2Members = teamMembers[m.team2Id] || [];
+  const isExpanded = expandedMatch === m.id;
+  const g1 = m.game1 || m.games?.game1;
+  const g2 = m.game2 || m.games?.game2;
+  const hasGameData = g1?.playerStats || g2?.playerStats;
+  const scheduledStr = m.scheduledTime
+    ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
+    : "";
+
+  const bracketAccent = "#f59e0b";
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div
+        className="vtd-mc"
+        style={{
+          cursor: "pointer",
+          ...(isBracket ? { borderColor: "#f59e0b33" } : {}),
+          ...(isLive ? { borderColor: "#22c55e44" } : {}),
+          ...(isExpanded ? {
+            borderColor: isBracket ? "#f59e0b88" : "#ff465544",
+            borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0,
+          } : {}),
+        }}
+        onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
+      >
+        <div className="vtd-mc-index">
+          <span className="vtd-mc-index-num" style={isBracket ? { color: bracketAccent, fontSize: "0.55rem" } : {}}>
+            {isBracket
+              ? (m.bracketLabel || "").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 4)
+              : `M${m.matchIndex || ""}`}
+          </span>
+          <span className="vtd-mc-index-fmt" style={isBracket ? { background: "#fffbeb", color: bracketAccent } : {}}>BO2</span>
+        </div>
+
+        <div className="vtd-mc-team">
+          <div className="vtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
+            {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
+          </div>
+          <div className="vtd-mc-team-info">
+            <div className="vtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>
+              {isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}
+            </div>
+            <div className="vtd-mc-team-name" style={t1Win ? { color: "#22c55e" } : t2Win ? { color: "#999" } : {}}>{m.team1Name}</div>
+            <div className="vtd-mc-avatars">
+              {t1Members.map((p: any, i: number) => (
+                p.riotAvatar
+                  ? <img key={i} src={p.riotAvatar} alt="" />
+                  : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="vtd-mc-center">
+          {isComplete ? (
+            <>
+              <div className="vtd-mc-score-box">
+                <span className={`s ${t1Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team1Score}</span>
+                <span className="dash">-</span>
+                <span className={`s ${t2Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team2Score}</span>
+              </div>
+              <span className="vtd-mc-status-badge" style={{ background: "#f0fdf4", color: "#16a34a" }}>✓ Played</span>
+            </>
+          ) : isLive ? (
+            <>
+              <div className="vtd-mc-score-box">
+                <span className="s">{m.team1Score || 0}</span>
+                <span className="dash">-</span>
+                <span className="s">{m.team2Score || 0}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <div className="vtd-mc-live-dot" />
+                <span className="vtd-mc-status-badge" style={{ background: "#dcfce7", color: "#16a34a", padding: "1px 6px" }}>LIVE</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="vtd-mc-score-box">
+                <span className="s" style={{ color: "#ccc" }}>–</span>
+                <span className="dash">:</span>
+                <span className="s" style={{ color: "#ccc" }}>–</span>
+              </div>
+              <span className="vtd-mc-status-badge" style={{ background: "#F2F1EE", color: "#999" }}>
+                {isBracket ? "Pending" : "Upcoming"}
+              </span>
+            </>
+          )}
+          {scheduledStr && <div style={{ fontSize: "0.62rem", color: "#bbb", marginTop: 2 }}>{scheduledStr}</div>}
+        </div>
+
+        <div className="vtd-mc-team right">
+          <div className="vtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
+            {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" /> : getTeamInitials(m.team2Name)}
+          </div>
+          <div className="vtd-mc-team-info" style={{ textAlign: "right" }}>
+            <div className="vtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
+            <div className="vtd-mc-team-name" style={t2Win ? { color: "#22c55e" } : t1Win ? { color: "#999" } : {}}>{m.team2Name}</div>
+            <div className="vtd-mc-avatars">
+              {t2Members.map((p: any, i: number) => (
+                p.riotAvatar
+                  ? <img key={i} src={p.riotAvatar} alt="" />
+                  : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+          color: isExpanded ? (isBracket ? bracketAccent : "#ff4655") : "#ccc", fontSize: 12,
+          transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0,
+        }}>▼</div>
+      </div>
+
+      {/* Expandable game details */}
+      {isExpanded && (
+        <div style={{
+          background: "#FAFAF8", border: "1px solid #E5E3DF", borderTop: "none",
+          borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "14px 16px",
+        }}>
+          {!isComplete && !isLive && !hasGameData ? (
+            <div style={{ textAlign: "center", padding: "16px 0", color: "#bbb", fontSize: "0.82rem" }}>
+              Match hasn't been played yet. Game details will appear here after the match.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <GameDetailCard game={g1} gameNum={1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+                <GameDetailCard game={g2} gameNum={2} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+              </div>
+              <div style={{ marginTop: 10, textAlign: "center" }}>
+                <Link
+                  href={`/valorant/match/${tournamentId}/${m.id}`}
+                  style={{
+                    fontSize: "0.72rem", fontWeight: 700, color: "#ff4655",
+                    textDecoration: "none", padding: "6px 18px",
+                    border: "1px solid #ff4655", borderRadius: 100,
+                    display: "inline-block", transition: "all 0.15s",
+                  }}
+                >
+                  View Full Match Details →
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ValorantTournamentDetail() {
   const params = useParams();
   const router = useRouter();
@@ -154,6 +320,8 @@ export default function ValorantTournamentDetail() {
       (snap) => {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         list.sort((a: any, b: any) => {
+          // Group stage first, then bracket
+          if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1;
           if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay;
           return (a.matchIndex || 0) - (b.matchIndex || 0);
         });
@@ -226,13 +394,15 @@ export default function ValorantTournamentDetail() {
   const schedule = tournament.schedule || {};
   const userTeam = getUserTeam();
 
-  // Build team member lookup for matches
   const teamMembers: Record<string, any[]> = {};
   const teamLogoMap: Record<string, string> = {};
   teams.forEach((t: any) => {
     teamMembers[t.id] = (t.members || []).slice(0, 5);
     if (t.teamLogo) teamLogoMap[t.id] = t.teamLogo;
   });
+
+  const groupMatches = matches.filter((m: any) => !m.isBracket);
+  const bracketMatches = matches.filter((m: any) => m.isBracket);
 
   return (
     <>
@@ -325,10 +495,14 @@ export default function ValorantTournamentDetail() {
 
         .vtd-overview-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
 
-        /* ═══ NEW COMPACT MATCH CARDS (IDPL-style) ═══ */
-        .vtd-match-day-header { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #E5E3DF; display: flex; align-items: center; gap: 8px; }
+        .vtd-section-header { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid; }
+        .vtd-section-header.group { color: #999; border-color: #E5E3DF; }
+        .vtd-section-header.bracket { color: #f59e0b; border-color: #fde68a; }
+
+        .vtd-match-day-header { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #E5E3DF; display: flex; align-items: center; gap: 8px; }
         .vtd-match-day-header:first-child { margin-top: 0; }
         .vtd-match-day-header .day-num { color: #ff4655; }
+        .vtd-match-day-header.bracket-round .day-num { color: #f59e0b; }
 
         .vtd-mc { display: flex; align-items: center; background: #fff; border: 1px solid #E5E3DF; border-radius: 10px; margin-bottom: 8px; overflow: hidden; transition: box-shadow 0.15s; min-height: 64px; }
         .vtd-mc:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
@@ -357,12 +531,6 @@ export default function ValorantTournamentDetail() {
         .vtd-mc-score-box .s.draw { color: #f59e0b; }
         .vtd-mc-score-box .dash { color: #ccc; font-weight: 400; }
         .vtd-mc-status-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 8px; border-radius: 100px; margin-top: 2px; }
-
-        .vtd-mc-result { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-        .vtd-mc-result-icon { font-size: 10px; }
-        .vtd-mc-result-text { font-size: 0.58rem; font-weight: 700; color: #999; }
-
-        /* ═══ MATCH STATUS INDICATORS ═══ */
         .vtd-mc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: vtd-pulse 1.5s ease-in-out infinite; }
         @keyframes vtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -497,23 +665,22 @@ export default function ValorantTournamentDetail() {
                   <div className="vtd-players-grid">
                     {players.map((p: any) => (
                       <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                      <div className="vtd-player-box">
-                        {p.riotAvatar ? (
-                          <img className="vtd-player-avatar-lg" src={p.riotAvatar} alt={p.riotGameName} />
-                        ) : (
-                          <div className="vtd-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>
-                        )}
-                        <div className="vtd-player-info">
-                          <div className="vtd-player-name-lg">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></div>
-                          <div className="vtd-player-rank-lg">{p.riotRank || "Unranked"}</div>
-                          <span className="vtd-player-skill-lg" style={{
-                            background: p.skillLevel >= 4 ? "#fef3c7" : p.skillLevel >= 3 ? "#e0e4ff" : "#F2F1EE",
-                            color: p.skillLevel >= 4 ? "#92400e" : p.skillLevel >= 3 ? "#4f5fc0" : "#888",
-                            border: `1px solid ${p.skillLevel >= 4 ? "#fde68a" : p.skillLevel >= 3 ? "#c7d0ff" : "#E5E3DF"}`,
-                          }}>Skill {p.skillLevel || 1}</span>
+                        <div className="vtd-player-box">
+                          {p.riotAvatar ? (
+                            <img className="vtd-player-avatar-lg" src={p.riotAvatar} alt={p.riotGameName} />
+                          ) : (
+                            <div className="vtd-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>
+                          )}
+                          <div className="vtd-player-info">
+                            <div className="vtd-player-name-lg">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></div>
+                            <div className="vtd-player-rank-lg">{p.riotRank || "Unranked"}</div>
+                            <span className="vtd-player-skill-lg" style={{
+                              background: p.skillLevel >= 4 ? "#fef3c7" : p.skillLevel >= 3 ? "#e0e4ff" : "#F2F1EE",
+                              color: p.skillLevel >= 4 ? "#92400e" : p.skillLevel >= 3 ? "#4f5fc0" : "#888",
+                              border: `1px solid ${p.skillLevel >= 4 ? "#fde68a" : p.skillLevel >= 3 ? "#c7d0ff" : "#E5E3DF"}`,
+                            }}>Skill {p.skillLevel || 1}</span>
+                          </div>
                         </div>
-                       </div> 
-                      
                       </Link>
                     ))}
                   </div>
@@ -607,7 +774,6 @@ export default function ValorantTournamentDetail() {
                         <th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
                         <th style={{ color: "#16a34a" }}>MW</th><th style={{ color: "#dc2626" }}>ML</th>
                         <th style={{ color: "#ff4655" }}>Pts</th><th>BH</th>
-                        <th style={{ color: "#ff4655" }}>Pts</th><th>BH</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -629,10 +795,10 @@ export default function ValorantTournamentDetail() {
             </div>
           )}
 
-          {/* ═══════ MATCHES TAB (Expandable cards with game details) ═══════ */}
+          {/* ═══════ MATCHES TAB ═══════ */}
           {activeTab === "matches" && (
             <div>
-              {matches.filter((m: any) => !m.isBracket).length === 0 ? (
+              {matches.length === 0 ? (
                 <div className="vtd-empty">
                   <span className="vtd-empty-icon">⚔️</span>
                   <span className="vtd-empty-title">No matches scheduled</span>
@@ -640,162 +806,70 @@ export default function ValorantTournamentDetail() {
                 </div>
               ) : (
                 <>
-                  {(() => {
-                    const groupMatches = matches.filter((m: any) => !m.isBracket);
-                    const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b);
+                  {/* ── GROUP STAGE FIXTURES ── */}
+                  {groupMatches.length > 0 && (
+                    <div>
+                      <div className="vtd-section-header group">Group Stage Fixtures</div>
+                      {(() => {
+                        const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b);
+                        return days.map((day: number) => (
+                          <div key={day}>
+                            <div className="vtd-match-day-header">
+                              <span className="day-num">Round {day}</span>
+                              <span>· {groupMatches.filter((m: any) => m.matchDay === day).length} matches</span>
+                            </div>
+                            {groupMatches
+                              .filter((m: any) => m.matchDay === day)
+                              .map((m: any) => (
+                                <MatchCard
+                                  key={m.id}
+                                  m={m}
+                                  teamMembers={teamMembers}
+                                  teamLogoMap={teamLogoMap}
+                                  expandedMatch={expandedMatch}
+                                  setExpandedMatch={setExpandedMatch}
+                                  tournamentId={id}
+                                  isBracket={false}
+                                />
+                              ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
 
-                    return days.map((day: number) => (
-                      <div key={day}>
-                        <div className="vtd-match-day-header">
-                          <span className="day-num">Round {day}</span>
-                          <span>· {groupMatches.filter((m: any) => m.matchDay === day).length} matches</span>
-                        </div>
-                        {groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => {
-                          const isComplete = m.status === "completed";
-                          const isLive = m.status === "live";
-                          const isDraw = isComplete && m.team1Score === m.team2Score;
-                          const t1Win = isComplete && m.team1Score > m.team2Score;
-                          const t2Win = isComplete && m.team2Score > m.team1Score;
-                          const t1Members = teamMembers[m.team1Id] || [];
-                          const t2Members = teamMembers[m.team2Id] || [];
-                          const isExpanded = expandedMatch === m.id;
-                          const g1 = m.game1 || m.games?.game1;
-                          const g2 = m.game2 || m.games?.game2;
-                          const hasGameData = g1?.playerStats || g2?.playerStats;
-          
-                          const scheduledStr = m.scheduledTime
-                            ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
-                            : "";
-
+                  {/* ── BRACKET FIXTURES ── */}
+                  {bracketMatches.length > 0 && (
+                    <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
+                      <div className="vtd-section-header bracket">Bracket Fixtures</div>
+                      {(() => {
+                        const rounds = [...new Set(bracketMatches.map((m: any) => m.bracketRound))].sort((a: number, b: number) => a - b);
+                        return rounds.map((round: number) => {
+                          const roundMatches = bracketMatches.filter((m: any) => m.bracketRound === round);
                           return (
-                            <div key={m.id} style={{ marginBottom: 8 }}>
-                              <div
-                                className="vtd-mc"
-                                style={{
-                                  cursor: "pointer",
-                                  ...(isLive ? { borderColor: "#22c55e44" } : {}),
-                                  ...(isExpanded ? { borderColor: "#ff465544", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
-                                }}
-                                onClick={() => setExpandedMatch(isExpanded ? null : m.id)}
-                              >
-                                <div className="vtd-mc-index">
-                                  <span className="vtd-mc-index-num">M{m.matchIndex || ""}</span>
-                                  <span className="vtd-mc-index-fmt">BO2</span>
-                                </div>
-
-                                <div className="vtd-mc-team">
-                                  <div className="vtd-mc-team-logo">
-                                    {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
-                                  </div>
-                                  <div className="vtd-mc-team-info">
-                                    <div className="vtd-mc-team-tag">{getTeamTag(m.team1Name)}</div>
-                                    <div className="vtd-mc-team-name" style={t1Win ? { color: "#22c55e" } : t2Win ? { color: "#999" } : {}}>{m.team1Name}</div>
-                                    <div className="vtd-mc-avatars">
-                                      {t1Members.map((p: any, i: number) => (
-                                        p.riotAvatar ? <img key={i} src={p.riotAvatar} alt="" /> : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="vtd-mc-center">
-                                  {isComplete ? (
-                                    <>
-                                      <div className="vtd-mc-score-box">
-                                        <span className={`s ${t1Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team1Score}</span>
-                                        <span className="dash">-</span>
-                                        <span className={`s ${t2Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team2Score}</span>
-                                      </div>
-                                      <span className="vtd-mc-status-badge" style={{ background: "#f0fdf4", color: "#16a34a" }}>✓ Played</span>
-                                    </>
-                                  ) : isLive ? (
-                                    <>
-                                      <div className="vtd-mc-score-box">
-                                        <span className="s">{m.team1Score || 0}</span>
-                                        <span className="dash">-</span>
-                                        <span className="s">{m.team2Score || 0}</span>
-                                      </div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                                        <div className="vtd-mc-live-dot" />
-                                        <span className="vtd-mc-status-badge" style={{ background: "#dcfce7", color: "#16a34a", padding: "1px 6px" }}>LIVE</span>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="vtd-mc-score-box">
-                                        <span className="s" style={{ color: "#ccc" }}>–</span>
-                                        <span className="dash">:</span>
-                                        <span className="s" style={{ color: "#ccc" }}>–</span>
-                                      </div>
-                                      <span className="vtd-mc-status-badge" style={{ background: "#F2F1EE", color: "#999" }}>Upcoming</span>
-                                    </>
-                                  )}
-                                  {scheduledStr && <div style={{ fontSize: "0.62rem", color: "#bbb", marginTop: 2 }}>{scheduledStr}</div>}
-                                </div>
-
-                                <div className="vtd-mc-team right">
-                                  <div className="vtd-mc-team-logo">
-                                    {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" /> : getTeamInitials(m.team2Name)}
-                                  </div>
-                                  <div className="vtd-mc-team-info" style={{ textAlign: "right" }}>
-                                    <div className="vtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
-                                    <div className="vtd-mc-team-name" style={t2Win ? { color: "#22c55e" } : t1Win ? { color: "#999" } : {}}>{m.team2Name}</div>
-                                    <div className="vtd-mc-avatars">
-                                      {t2Members.map((p: any, i: number) => (
-                                        p.riotAvatar ? <img key={i} src={p.riotAvatar} alt="" /> : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div style={{
-                                  width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
-                                  color: isExpanded ? "#ff4655" : "#ccc", fontSize: 12, transition: "transform 0.2s",
-                                  transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0,
-                                }}>▼</div>
+                            <div key={round}>
+                              <div className="vtd-match-day-header bracket-round">
+                                <span className="day-num">Bracket Round {round}</span>
+                                <span>· {roundMatches.length} matches</span>
                               </div>
-
-                              {/* ═══ EXPANDABLE GAME DETAILS ═══ */}
-                              {isExpanded && (
-                                <div style={{
-                                  background: "#FAFAF8", border: "1px solid #E5E3DF", borderTop: "none",
-                                  borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "14px 16px",
-                                }}>
-                                  {!isComplete && !isLive && !hasGameData ? (
-                                    <div style={{ textAlign: "center", padding: "16px 0", color: "#bbb", fontSize: "0.82rem" }}>
-                                      Match hasn't been played yet. Game details will appear here after the match.
-                                    </div>
-
-
-                                ) : (
-                                    <>
-                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                                        <GameDetailCard game={g1} gameNum={1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
-                                        <GameDetailCard game={g2} gameNum={2} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
-                                      </div>
-                                      <div style={{ marginTop: 10, textAlign: "center" }}>
-                                        <Link
-                                          href={`/valorant/match/${id}/${m.id}`}
-                                          style={{
-                                            fontSize: "0.72rem", fontWeight: 700, color: "#ff4655",
-                                            textDecoration: "none", padding: "6px 18px",
-                                            border: "1px solid #ff4655", borderRadius: 100,
-                                            display: "inline-block", transition: "all 0.15s",
-                                          }}
-                                        >
-                                          View Full Match Details →
-                                        </Link>
-                                      </div>
-                                    </>
-                                  )}             
-                                </div>
-                              )}
+                              {roundMatches.map((m: any) => (
+                                <MatchCard
+                                  key={m.id}
+                                  m={m}
+                                  teamMembers={teamMembers}
+                                  teamLogoMap={teamLogoMap}
+                                  expandedMatch={expandedMatch}
+                                  setExpandedMatch={setExpandedMatch}
+                                  tournamentId={id}
+                                  isBracket={true}
+                                />
+                              ))}
                             </div>
                           );
-                        })}
-                      </div>
-                    ));
-                  })()}
+                        });
+                      })()}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -805,7 +879,7 @@ export default function ValorantTournamentDetail() {
           {activeTab === "brackets" && (
             <div>
               <DoubleBracket
-                matches={matches.filter((m: any) => m.isBracket)}
+                matches={bracketMatches}
                 bracketSize={tournament.bracketSize || 4}
                 standings={standings}
               />
@@ -905,16 +979,17 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   const t2Stats = stats.filter((s: any) => s.teamId === team2Id || s.team === "team2");
   const t1Rounds = game.team1RoundsWon ?? game.team1Rounds ?? "–";
   const t2Rounds = game.team2RoundsWon ?? game.team2Rounds ?? "–";
-  
+
   return (
     <div style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#ff4655" : "#3b82f6" }}>Game {gameNum}</span>
         <span style={{ fontSize: "0.72rem", color: "#888", fontWeight: 600 }}>{mapName}</span>
-        {isPlayed && (
+        {isPlayed ? (
           <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>✓</span>
+        ) : (
+          <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#F2F1EE", color: "#999" }}>Pending</span>
         )}
-        {!isPlayed && <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#F2F1EE", color: "#999" }}>Pending</span>}
       </div>
 
       {isPlayed && (
