@@ -137,9 +137,18 @@ function MatchCard({ match, x, y }: { match: BracketMatch; x: number; y: number 
   const t1Won = isComplete && match.team1Score > match.team2Score;
   const t2Won = isComplete && match.team2Score > match.team1Score;
 
-  const t1 = match.team1 || { teamId: match.team1Id, teamName: match.team1Name, seed: 0, members: [] };
-  const t2 = match.team2 || { teamId: match.team2Id, teamName: match.team2Name, seed: 0, members: [] };
-
+  const t1 = {
+    teamId: match.team1Id,
+    teamName: match.team1Name !== "TBD" ? match.team1Name : (match.team1?.teamName || "TBD"),
+    seed: match.team1?.seed || 0,
+    members: match.team1?.members || [],
+  };
+  const t2 = {
+    teamId: match.team2Id,
+    teamName: match.team2Name !== "TBD" ? match.team2Name : (match.team2?.teamName || "TBD"),
+    seed: match.team2?.seed || 0,
+    members: match.team2?.members || [],
+  };
   const borderColor = isLive ? C.live : isComplete ? C.winBorder : C.cardBorder;
 
   return (
