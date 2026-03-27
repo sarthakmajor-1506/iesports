@@ -2,15 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 
-/**
- * POST /api/valorant/match-result
- *
- * Submits a manual series result (e.g. 2-0, 1-1, 0-2).
- * Updates standings, recomputes Buchholz.
- *
- * NEW: After updating, checks if ALL matches in this round are now complete.
- * If so, auto-resolves TBD placeholders in the next round using Swiss pairing.
- */
 export async function POST(req: NextRequest) {
   try {
     const { tournamentId, adminKey, matchId, team1Score, team2Score } = await req.json();
@@ -31,7 +22,6 @@ export async function POST(req: NextRequest) {
 
     const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
 
-    // ── Fetch match ──────────────────────────────────────────────────────────
     const matchRef = tournamentRef.collection("matches").doc(matchId);
     const matchDoc = await matchRef.get();
     if (!matchDoc.exists) {
@@ -39,8 +29,8 @@ export async function POST(req: NextRequest) {
     }
     const matchData = matchDoc.data()!;
     const matchDay = matchData.matchDay;
+    const isBracketMatch = matchData.isBracket === true;
 
-    // ── Update match ─────────────────────────────────────────────────────────
     await matchRef.update({
       team1Score: s1,
       team2Score: s2,
@@ -48,7 +38,6 @@ export async function POST(req: NextRequest) {
       completedAt: new Date().toISOString(),
     });
 
-    // ── Compute points ───────────────────────────────────────────────────────
     let team1Points = 0;
     let team2Points = 0;
     let team1Result: "win" | "draw" | "loss" = "draw";
@@ -64,184 +53,181 @@ export async function POST(req: NextRequest) {
       team1Points = 1; team2Points = 1;
     }
 
-    // ── Update standings ─────────────────────────────────────────────────────
-    const standingsRef = tournamentRef.collection("standings");
+    // ── Update standings — GROUP STAGE ONLY ─────────────────────────────────
+    if (!isBracketMatch) {
+      const standingsRef = tournamentRef.collection("standings");
 
-    const ensureStanding = async (teamId: string, teamName: string) => {
-      const ref = standingsRef.doc(teamId);
-      const doc = await ref.get();
-      if (!doc.exists) {
-        await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, buchholz: 0 });
+      const ensureStanding = async (teamId: string, teamName: string) => {
+        const ref = standingsRef.doc(teamId);
+        const doc = await ref.get();
+        if (!doc.exists) {
+          await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, buchholz: 0 });
+        }
+      };
+
+      await ensureStanding(matchData.team1Id, matchData.team1Name);
+      await ensureStanding(matchData.team2Id, matchData.team2Name);
+
+      await standingsRef.doc(matchData.team1Id).update({
+        played: FieldValue.increment(1),
+        wins: FieldValue.increment(team1Result === "win" ? 1 : 0),
+        draws: FieldValue.increment(team1Result === "draw" ? 1 : 0),
+        losses: FieldValue.increment(team1Result === "loss" ? 1 : 0),
+        points: FieldValue.increment(team1Points),
+        mapsWon: FieldValue.increment(s1),
+        mapsLost: FieldValue.increment(s2),
+      });
+
+      await standingsRef.doc(matchData.team2Id).update({
+        played: FieldValue.increment(1),
+        wins: FieldValue.increment(team2Result === "win" ? 1 : 0),
+        draws: FieldValue.increment(team2Result === "draw" ? 1 : 0),
+        losses: FieldValue.increment(team2Result === "loss" ? 1 : 0),
+        points: FieldValue.increment(team2Points),
+        mapsWon: FieldValue.increment(s2),
+        mapsLost: FieldValue.increment(s1),
+      });
+
+      // Recompute Buchholz using only group stage matches
+      const allCompletedMatches = await tournamentRef.collection("matches")
+        .where("status", "==", "completed")
+        .where("isBracket", "!=", true)
+        .get();
+      const allStandings = await standingsRef.get();
+
+      const pointsMap: Record<string, number> = {};
+      for (const doc of allStandings.docs) {
+        pointsMap[doc.id] = doc.data().points || 0;
       }
-    };
 
-    await ensureStanding(matchData.team1Id, matchData.team1Name);
-    await ensureStanding(matchData.team2Id, matchData.team2Name);
+      const opponentsMap: Record<string, string[]> = {};
+      for (const doc of allCompletedMatches.docs) {
+        const d = doc.data();
+        if (!opponentsMap[d.team1Id]) opponentsMap[d.team1Id] = [];
+        if (!opponentsMap[d.team2Id]) opponentsMap[d.team2Id] = [];
+        opponentsMap[d.team1Id].push(d.team2Id);
+        opponentsMap[d.team2Id].push(d.team1Id);
+      }
 
-    await standingsRef.doc(matchData.team1Id).update({
-      played: FieldValue.increment(1),
-      wins: FieldValue.increment(team1Result === "win" ? 1 : 0),
-      draws: FieldValue.increment(team1Result === "draw" ? 1 : 0),
-      losses: FieldValue.increment(team1Result === "loss" ? 1 : 0),
-      points: FieldValue.increment(team1Points),
-      mapsWon: FieldValue.increment(s1),
-      mapsLost: FieldValue.increment(s2),
-    });
-
-    await standingsRef.doc(matchData.team2Id).update({
-      played: FieldValue.increment(1),
-      wins: FieldValue.increment(team2Result === "win" ? 1 : 0),
-      draws: FieldValue.increment(team2Result === "draw" ? 1 : 0),
-      losses: FieldValue.increment(team2Result === "loss" ? 1 : 0),
-      points: FieldValue.increment(team2Points),
-      mapsWon: FieldValue.increment(s2),
-      mapsLost: FieldValue.increment(s1),
-    });
-
-    // ── Recompute Buchholz for ALL teams ─────────────────────────────────────
-    const allCompletedMatches = await tournamentRef.collection("matches").where("status", "==", "completed").get();
-    const allStandings = await standingsRef.get();
-
-    const pointsMap: Record<string, number> = {};
-    for (const doc of allStandings.docs) {
-      pointsMap[doc.id] = doc.data().points || 0;
+      const buchholzBatch = adminDb.batch();
+      for (const [teamId, opponents] of Object.entries(opponentsMap)) {
+        const bScore = opponents.reduce((sum, oppId) => sum + (pointsMap[oppId] || 0), 0);
+        buchholzBatch.update(standingsRef.doc(teamId), { buchholz: bScore });
+      }
+      await buchholzBatch.commit();
     }
 
-    const opponentsMap: Record<string, string[]> = {};
-    for (const doc of allCompletedMatches.docs) {
-      const d = doc.data();
-      if (!opponentsMap[d.team1Id]) opponentsMap[d.team1Id] = [];
-      if (!opponentsMap[d.team2Id]) opponentsMap[d.team2Id] = [];
-      opponentsMap[d.team1Id].push(d.team2Id);
-      opponentsMap[d.team2Id].push(d.team1Id);
-    }
-
-    const buchholzBatch = adminDb.batch();
-    for (const [teamId, opponents] of Object.entries(opponentsMap)) {
-      const bScore = opponents.reduce((sum, oppId) => sum + (pointsMap[oppId] || 0), 0);
-      buchholzBatch.update(standingsRef.doc(teamId), { buchholz: bScore });
-    }
-    await buchholzBatch.commit();
-
-    // ── AUTO-RESOLVE: Check if all matches in this round are now complete ────
+    // ── AUTO-RESOLVE: Group stage only ───────────────────────────────────────
     let autoResolved = false;
     let resolvedPairings: string[] = [];
 
-    try {
-      const roundMatches = await tournamentRef
-        .collection("matches")
-        .where("matchDay", "==", matchDay)
-        .get();
-
-      const allRoundComplete = roundMatches.docs.every(d => d.data().status === "completed");
-
-      if (allRoundComplete) {
-        // Check if next round has TBD matches
-        const nextRound = matchDay + 1;
-        const nextRoundMatches = await tournamentRef
+    if (!isBracketMatch) {
+      try {
+        const roundMatches = await tournamentRef
           .collection("matches")
-          .where("matchDay", "==", nextRound)
+          .where("matchDay", "==", matchDay)
+          .where("isBracket", "!=", true)
           .get();
 
-        const tbdDocs = nextRoundMatches.docs
-          .filter(d => d.data().isTBD === true)
-          .sort((a, b) => a.data().matchIndex - b.data().matchIndex);
+        const allRoundComplete = roundMatches.docs.every(d => d.data().status === "completed");
 
-        if (tbdDocs.length > 0) {
-          // ── Swiss pairing for next round ────────────────────────────────────
-          const teamsSnap = await tournamentRef.collection("teams").orderBy("teamIndex").get();
-          const teams = teamsSnap.docs.map(d => ({
-            id: d.id,
-            teamName: d.data().teamName,
-            teamIndex: d.data().teamIndex,
-          }));
+        if (allRoundComplete) {
+          const nextRound = matchDay + 1;
+          const nextRoundMatches = await tournamentRef
+            .collection("matches")
+            .where("matchDay", "==", nextRound)
+            .get();
 
-          // Refresh standings after our update
-          const freshStandings = await standingsRef.get();
-          const standings: Record<string, { points: number; mapsWon: number; mapsLost: number }> = {};
-          for (const doc of freshStandings.docs) {
-            const d = doc.data();
-            standings[doc.id] = { points: d.points || 0, mapsWon: d.mapsWon || 0, mapsLost: d.mapsLost || 0 };
-          }
+          const tbdDocs = nextRoundMatches.docs
+            .filter(d => d.data().isTBD === true)
+            .sort((a, b) => a.data().matchIndex - b.data().matchIndex);
 
-          // Get all past pairings to avoid repeats
-          const allMatches = await tournamentRef.collection("matches").get();
-          const pastPairings = new Set<string>();
-          for (const doc of allMatches.docs) {
-            const d = doc.data();
-            if (d.team1Id !== "TBD" && d.team2Id !== "TBD") {
-              pastPairings.add(`${d.team1Id}-${d.team2Id}`);
-              pastPairings.add(`${d.team2Id}-${d.team1Id}`);
+          if (tbdDocs.length > 0) {
+            const teamsSnap = await tournamentRef.collection("teams").orderBy("teamIndex").get();
+            const teams = teamsSnap.docs.map(d => ({
+              id: d.id,
+              teamName: d.data().teamName,
+              teamIndex: d.data().teamIndex,
+            }));
+
+            const freshStandings = await tournamentRef.collection("standings").get();
+            const standings: Record<string, { points: number; mapsWon: number; mapsLost: number }> = {};
+            for (const doc of freshStandings.docs) {
+              const d = doc.data();
+              standings[doc.id] = { points: d.points || 0, mapsWon: d.mapsWon || 0, mapsLost: d.mapsLost || 0 };
             }
-          }
 
-          // Sort by points descending, then map diff, then teamIndex
-          const sorted = [...teams].sort((a, b) => {
-            const ptsA = standings[a.id]?.points || 0;
-            const ptsB = standings[b.id]?.points || 0;
-            if (ptsB !== ptsA) return ptsB - ptsA;
-            const diffA = (standings[a.id]?.mapsWon || 0) - (standings[a.id]?.mapsLost || 0);
-            const diffB = (standings[b.id]?.mapsWon || 0) - (standings[b.id]?.mapsLost || 0);
-            if (diffB !== diffA) return diffB - diffA;
-            return a.teamIndex - b.teamIndex;
-          });
-
-          // Pair adjacent, avoiding repeat matchups
-          const used = new Set<string>();
-          const pairings: { team1: typeof teams[0]; team2: typeof teams[0] }[] = [];
-
-          for (let i = 0; i < sorted.length; i++) {
-            if (used.has(sorted[i].id)) continue;
-
-            let paired = false;
-            for (let j = i + 1; j < sorted.length; j++) {
-              if (used.has(sorted[j].id)) continue;
-              const key = `${sorted[i].id}-${sorted[j].id}`;
-              if (!pastPairings.has(key)) {
-                pairings.push({ team1: sorted[i], team2: sorted[j] });
-                used.add(sorted[i].id);
-                used.add(sorted[j].id);
-                paired = true;
-                break;
+            const allMatches = await tournamentRef.collection("matches").get();
+            const pastPairings = new Set<string>();
+            for (const doc of allMatches.docs) {
+              const d = doc.data();
+              if (d.team1Id !== "TBD" && d.team2Id !== "TBD") {
+                pastPairings.add(`${d.team1Id}-${d.team2Id}`);
+                pastPairings.add(`${d.team2Id}-${d.team1Id}`);
               }
             }
 
-            if (!paired && !used.has(sorted[i].id)) {
+            const sorted = [...teams].sort((a, b) => {
+              const ptsA = standings[a.id]?.points || 0;
+              const ptsB = standings[b.id]?.points || 0;
+              if (ptsB !== ptsA) return ptsB - ptsA;
+              const diffA = (standings[a.id]?.mapsWon || 0) - (standings[a.id]?.mapsLost || 0);
+              const diffB = (standings[b.id]?.mapsWon || 0) - (standings[b.id]?.mapsLost || 0);
+              if (diffB !== diffA) return diffB - diffA;
+              return a.teamIndex - b.teamIndex;
+            });
+
+            const used = new Set<string>();
+            const pairings: { team1: typeof teams[0]; team2: typeof teams[0] }[] = [];
+
+            for (let i = 0; i < sorted.length; i++) {
+              if (used.has(sorted[i].id)) continue;
+              let paired = false;
               for (let j = i + 1; j < sorted.length; j++) {
-                if (!used.has(sorted[j].id)) {
+                if (used.has(sorted[j].id)) continue;
+                const key = `${sorted[i].id}-${sorted[j].id}`;
+                if (!pastPairings.has(key)) {
                   pairings.push({ team1: sorted[i], team2: sorted[j] });
                   used.add(sorted[i].id);
                   used.add(sorted[j].id);
+                  paired = true;
                   break;
                 }
               }
+              if (!paired && !used.has(sorted[i].id)) {
+                for (let j = i + 1; j < sorted.length; j++) {
+                  if (!used.has(sorted[j].id)) {
+                    pairings.push({ team1: sorted[i], team2: sorted[j] });
+                    used.add(sorted[i].id);
+                    used.add(sorted[j].id);
+                    break;
+                  }
+                }
+              }
             }
+
+            const resolveBatch = adminDb.batch();
+            for (let i = 0; i < Math.min(pairings.length, tbdDocs.length); i++) {
+              const p = pairings[i];
+              resolveBatch.update(tbdDocs[i].ref, {
+                team1Id: p.team1.id,
+                team2Id: p.team2.id,
+                team1Name: p.team1.teamName,
+                team2Name: p.team2.teamName,
+                isTBD: false,
+              });
+              resolvedPairings.push(`${p.team1.teamName} vs ${p.team2.teamName}`);
+            }
+
+            resolveBatch.update(tournamentRef, { currentMatchDay: nextRound });
+            await resolveBatch.commit();
+            autoResolved = true;
+            console.log(`[AutoResolve] Round ${matchDay} complete → resolved ${resolvedPairings.length} matches for round ${nextRound}`);
           }
-
-          // Update TBD match docs with actual teams
-          const resolveBatch = adminDb.batch();
-          for (let i = 0; i < Math.min(pairings.length, tbdDocs.length); i++) {
-            const p = pairings[i];
-            resolveBatch.update(tbdDocs[i].ref, {
-              team1Id: p.team1.id,
-              team2Id: p.team2.id,
-              team1Name: p.team1.teamName,
-              team2Name: p.team2.teamName,
-              isTBD: false,
-            });
-            resolvedPairings.push(`${p.team1.teamName} vs ${p.team2.teamName}`);
-          }
-
-          resolveBatch.update(tournamentRef, { currentMatchDay: nextRound });
-          await resolveBatch.commit();
-
-          autoResolved = true;
-          console.log(`[AutoResolve] Round ${matchDay} complete → resolved ${resolvedPairings.length} matches for round ${nextRound}`);
         }
+      } catch (resolveErr: any) {
+        console.error("[AutoResolve] Error:", resolveErr.message);
       }
-    } catch (resolveErr: any) {
-      console.error("[AutoResolve] Error:", resolveErr.message);
-      // Don't fail the whole request if auto-resolve fails
     }
 
     return NextResponse.json({
