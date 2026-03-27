@@ -10,8 +10,34 @@ interface TournamentOption { id: string; name: string; status: string; teamCount
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: { game1?: any; game2?: any }; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; }
 interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
+interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
 
-type AdminTab = "tournament" | "players";
+type AdminTab = "tournament" | "players" | "create";
+
+// ─── Game config (extensible for future games) ───────────────────────────────
+const GAME_OPTIONS = [
+  { value: "valorant", label: "Valorant" },
+  { value: "dota2", label: "Dota 2" },
+  // { value: "cs2", label: "CS2" },
+  // { value: "cod", label: "Call of Duty" },
+];
+
+const FORMAT_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  valorant: [
+    { value: "standard", label: "Standard" },
+    { value: "auction", label: "Auction" },
+  ],
+  dota2: [
+    { value: "standard", label: "Standard" },
+    { value: "solo", label: "Solo" },
+  ],
+};
+
+const STATUS_OPTIONS = [
+  { value: "upcoming", label: "Upcoming" },
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+];
 
 export default function AdminPanel() {
   // ─── Auth ───────────────────────────────────────────────────────────────────
@@ -80,6 +106,28 @@ export default function AdminPanel() {
   const [bracketStartTime, setBracketStartTime] = useState("18:00");
   const [bracketStartDate, setBracketStartDate] = useState(new Date().toISOString().split("T")[0]);
 
+  // ─── Tournament Creation Tab State ──────────────────────────────────────────
+  const [allTournaments, setAllTournaments] = useState<AllTournamentItem[]>([]);
+  const [createGame, setCreateGame] = useState("valorant");
+  const [createName, setCreateName] = useState("");
+  const [createId, setCreateId] = useState("");
+  const [createFormat, setCreateFormat] = useState("standard");
+  const [createStatus, setCreateStatus] = useState("upcoming");
+  const [createTotalSlots, setCreateTotalSlots] = useState("50");
+  const [createEntryFee, setCreateEntryFee] = useState("0");
+  const [createPrizePool, setCreatePrizePool] = useState("TBD");
+  const [createRegDeadline, setCreateRegDeadline] = useState("");
+  const [createStartDate, setCreateStartDate] = useState("");
+  const [createEndDate, setCreateEndDate] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [createRules, setCreateRules] = useState("");
+  const [createIsTest, setCreateIsTest] = useState(false);
+  const [createIsDaily, setCreateIsDaily] = useState(false);
+  // Auction-specific
+  const [createMaxTeams, setCreateMaxTeams] = useState("8");
+  const [createSTierCap, setCreateSTierCap] = useState("2");
+  const [createFilterGame, setCreateFilterGame] = useState("all");
+
   // ─── Helpers ────────────────────────────────────────────────────────────────
   const addLog = (msg: string) => setLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
   const parsePuuids = (str: string) => str ? str.split(",").map(s => s.trim()).filter(Boolean) : [];
@@ -103,6 +151,28 @@ export default function AdminPanel() {
       setLoading(false);
     }
   }, [adminKey]);
+
+  // ─── Auto-generate tournament ID from name ──────────────────────────────────
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim();
+  };
+
+  useEffect(() => {
+    if (createName && !createId) {
+      // Only auto-generate if ID is empty
+    }
+  }, [createName]);
+
+  const handleNameChange = (val: string) => {
+    setCreateName(val);
+    // Auto-generate slug from name
+    setCreateId(generateSlug(val));
+  };
 
   // ─── Fetch tournaments ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -168,6 +238,28 @@ export default function AdminPanel() {
     return () => { cancelled = true; };
   }, [authenticated, activeTab, adminKey]);
 
+  // ─── Fetch all tournaments for creation tab ─────────────────────────────────
+  const fetchAllTournaments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/list-tournaments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey }),
+      });
+      const data = await res.json();
+      if (data.tournaments) {
+        setAllTournaments(data.tournaments);
+      }
+    } catch (e) {
+      console.error("Failed to fetch all tournaments:", e);
+    }
+  }, [adminKey]);
+
+  useEffect(() => {
+    if (!authenticated || activeTab !== "create") return;
+    fetchAllTournaments();
+  }, [authenticated, activeTab, fetchAllTournaments]);
+
   // ─── Derived ────────────────────────────────────────────────────────────────
   const pendingMatches = matches.filter(m => m.status === "pending" || m.status === "live");
   const groupMatches = matches.filter(m => !m.isBracket);
@@ -186,6 +278,78 @@ export default function AdminPanel() {
       (p.phone?.includes(q))
     );
   });
+
+  const filteredTournaments = allTournaments.filter(t => {
+    if (createFilterGame === "all") return true;
+    return t.game === createFilterGame;
+  });
+
+  // ─── Create Tournament Handler ──────────────────────────────────────────────
+  const handleCreateTournament = async () => {
+    if (!createName || !createId) {
+      addLog("❌ Tournament name and ID are required");
+      return;
+    }
+
+    const body: any = {
+      game: createGame,
+      tournamentId: createId,
+      name: createName,
+      format: createFormat,
+      status: createStatus,
+      totalSlots: parseInt(createTotalSlots) || 50,
+      entryFee: parseInt(createEntryFee) || 0,
+      prizePool: createPrizePool || "TBD",
+      registrationDeadline: createRegDeadline ? `${createRegDeadline}T23:59:00+05:30` : "",
+      startDate: createStartDate ? `${createStartDate}T18:00:00+05:30` : "",
+      endDate: createEndDate ? `${createEndDate}T23:00:00+05:30` : "",
+      desc: createDesc,
+      rules: createRules ? createRules.split("\n").filter(r => r.trim()) : [],
+      isTestTournament: createIsTest,
+      isDailyTournament: createIsDaily,
+    };
+
+    // Auction-specific fields
+    if (createGame === "valorant" && createFormat === "auction") {
+      body.maxTeams = parseInt(createMaxTeams) || 8;
+      body.sTierCapPerTeam = parseInt(createSTierCap) || 2;
+      body.minBidPoints = { S: 150, A: 100, B: 60, C: 30 };
+      body.captainBudgets = { S: 600, A: 750, B: 875, C: 1000 };
+    }
+
+    try {
+      await apiCall("/api/admin/create-tournament", body);
+      // Reset form
+      setCreateName("");
+      setCreateId("");
+      setCreateDesc("");
+      setCreateRules("");
+      setCreateRegDeadline("");
+      setCreateStartDate("");
+      setCreateEndDate("");
+      setCreateIsTest(false);
+      setCreateIsDaily(false);
+      // Refresh list
+      fetchAllTournaments();
+    } catch (e) {
+      // Error already logged by apiCall
+    }
+  };
+
+  // ─── Delete Tournament Handler ──────────────────────────────────────────────
+  const handleDeleteTournament = async (t: AllTournamentItem) => {
+    if (!confirm(`Delete "${t.name}" (${t.game})?\n\nThis will permanently delete the tournament and ALL its data (teams, matches, standings, players).\n\nThis cannot be undone.`)) return;
+
+    try {
+      await apiCall("/api/admin/delete-tournament", {
+        game: t.game,
+        tournamentId: t.id,
+      });
+      fetchAllTournaments();
+    } catch (e) {
+      // Error already logged
+    }
+  };
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOGIN SCREEN
@@ -229,6 +393,19 @@ export default function AdminPanel() {
   const btnSuccess: React.CSSProperties = { ...btnStyle, background: "#16a34a" };
   const smallLabel: React.CSSProperties = { fontSize: "0.68rem", fontWeight: 700, color: "#999", display: "block", marginBottom: 4 };
   const selectStyle: React.CSSProperties = { ...inputStyle, cursor: "pointer" };
+  const textareaStyle: React.CSSProperties = { ...inputStyle, minHeight: 80, resize: "vertical" as const, fontFamily: "inherit" };
+  const checkboxRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: "0.82rem", color: "#555" };
+
+  // ─── Game badge colors ──────────────────────────────────────────────────────
+  const gameBadgeStyle = (game: string): React.CSSProperties => {
+    const colors: Record<string, { bg: string; color: string; border: string }> = {
+      valorant: { bg: "#FFF5F5", color: "#ff4655", border: "#fecdd3" },
+      dota2: { bg: "#FFF7ED", color: "#ea580c", border: "#fed7aa" },
+      cs2: { bg: "#F0F4FF", color: "#3b82f6", border: "#bfdbfe" },
+    };
+    const c = colors[game] || { bg: "#f5f5f5", color: "#666", border: "#ddd" };
+    return { fontSize: "0.62rem", fontWeight: 800, padding: "2px 10px", borderRadius: 100, background: c.bg, color: c.color, border: `1px solid ${c.border}`, textTransform: "uppercase" as const, letterSpacing: "0.08em" };
+  };
 
   return (
     <>
@@ -238,8 +415,8 @@ export default function AdminPanel() {
         .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .adm-grid { grid-template-columns: 1fr; } }
         .adm-log { background: #111; border-radius: 10px; padding: 14px; max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.72rem; color: #aaa; line-height: 1.8; }
-        .adm-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #E5E3DF; margin-bottom: 20px; }
-        .adm-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #999; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+        .adm-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #E5E3DF; margin-bottom: 20px; overflow-x: auto; }
+        .adm-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #999; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; white-space: nowrap; }
         .adm-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
         .adm-match-card { background: #fafaf8; border: 1px solid #E5E3DF; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; font-size: 0.78rem; }
         .adm-match-day { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; color: #bbb; text-transform: uppercase; }
@@ -255,18 +432,26 @@ export default function AdminPanel() {
         .adm-check { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; }
         .adm-check.yes { background: #dcfce7; color: #16a34a; }
         .adm-check.no { background: #fef2f2; color: #dc2626; }
-        @media (max-width: 700px) { .adm-player-row { grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr; font-size: 0.68rem; } }
+        .adm-tourney-row { display: grid; grid-template-columns: 60px 2fr 0.8fr 0.8fr 0.8fr 60px; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f0efe9; font-size: 0.76rem; align-items: center; }
+        .adm-tourney-row:hover { background: #fafaf8; }
+        .adm-tourney-header { font-weight: 800; color: #999; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; }
+        @media (max-width: 700px) {
+          .adm-player-row { grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr; font-size: 0.68rem; }
+          .adm-tourney-row { grid-template-columns: 50px 1.5fr 0.7fr 0.7fr 50px; font-size: 0.68rem; }
+          .adm-tourney-row > :nth-child(4) { display: none; }
+        }
       `}</style>
       <div className="adm-page">
         <Navbar />
         <div className="adm-content">
           <h1 style={{ fontSize: "1.4rem", fontWeight: 900, marginBottom: 4 }}>Tournament Admin</h1>
-          <p style={{ fontSize: "0.82rem", color: "#888", marginBottom: 20 }}>Manage your Valorant tournament</p>
+          <p style={{ fontSize: "0.82rem", color: "#888", marginBottom: 20 }}>Manage your esports tournaments</p>
 
           {/* ═══ TAB BAR ═══ */}
           <div className="adm-tab-bar">
             <button className={`adm-tab ${activeTab === "tournament" ? "active" : ""}`} onClick={() => setActiveTab("tournament")}>Tournament Ops</button>
             <button className={`adm-tab ${activeTab === "players" ? "active" : ""}`} onClick={() => setActiveTab("players")}>Player Registry</button>
+            <button className={`adm-tab ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>Create Tournament</button>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════════ */}
@@ -599,7 +784,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* ═══ 8. GENERATE BRACKETS (NEW) — FULL WIDTH ═══ */}
+                {/* ═══ 8. GENERATE BRACKETS — FULL WIDTH ═══ */}
                 <div style={{ ...sectionStyle, gridColumn: "1 / -1", border: "1.5px solid #fde68a", background: "#FFFDF7" }}>
                   <span style={{ ...labelStyle, color: "#f59e0b" }}>8. Generate Elimination Brackets (Post Group Stage)</span>
                   <p style={{ fontSize: "0.72rem", color: "#888", marginBottom: 12, lineHeight: 1.5 }}>
@@ -765,6 +950,212 @@ export default function AdminPanel() {
                 )}
               </div>
             </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {/* TAB 3: CREATE TOURNAMENT */}
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === "create" && (
+            <>
+              {/* ── Create Form ── */}
+              <div style={sectionStyle}>
+                <span style={labelStyle}>Create New Tournament</span>
+                <p style={{ fontSize: "0.72rem", color: "#888", marginBottom: 16, lineHeight: 1.5 }}>
+                  Create a tournament for any supported game. The tournament will be written to the correct Firestore collection automatically.
+                </p>
+
+                <div className="adm-grid">
+                  {/* Left column: core fields */}
+                  <div>
+                    <label style={smallLabel}>Game</label>
+                    <select value={createGame} onChange={e => { setCreateGame(e.target.value); setCreateFormat("standard"); }} style={selectStyle}>
+                      {GAME_OPTIONS.map(g => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </select>
+
+                    <label style={smallLabel}>Tournament Name</label>
+                    <input value={createName} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Valorant Auction Cup — April 2026" style={inputStyle} />
+
+                    <label style={smallLabel}>Tournament ID (slug)</label>
+                    <input value={createId} onChange={e => setCreateId(e.target.value)} placeholder="auto-generated from name" style={{ ...inputStyle, fontFamily: "monospace", fontSize: "0.82rem" }} />
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={smallLabel}>Format</label>
+                        <select value={createFormat} onChange={e => setCreateFormat(e.target.value)} style={selectStyle}>
+                          {(FORMAT_OPTIONS[createGame] || [{ value: "standard", label: "Standard" }]).map(f => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={smallLabel}>Status</label>
+                        <select value={createStatus} onChange={e => setCreateStatus(e.target.value)} style={selectStyle}>
+                          {STATUS_OPTIONS.map(s => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={smallLabel}>Total Slots</label>
+                        <input value={createTotalSlots} onChange={e => setCreateTotalSlots(e.target.value)} style={inputStyle} type="number" min="2" />
+                      </div>
+                      <div>
+                        <label style={smallLabel}>Entry Fee (₹)</label>
+                        <input value={createEntryFee} onChange={e => setCreateEntryFee(e.target.value)} style={inputStyle} type="number" min="0" />
+                      </div>
+                      <div>
+                        <label style={smallLabel}>Prize Pool</label>
+                        <input value={createPrizePool} onChange={e => setCreatePrizePool(e.target.value)} placeholder="TBD" style={inputStyle} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right column: dates, description, rules */}
+                  <div>
+                    <label style={smallLabel}>Registration Deadline</label>
+                    <input value={createRegDeadline} onChange={e => setCreateRegDeadline(e.target.value)} style={inputStyle} type="date" />
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={smallLabel}>Start Date</label>
+                        <input value={createStartDate} onChange={e => setCreateStartDate(e.target.value)} style={inputStyle} type="date" />
+                      </div>
+                      <div>
+                        <label style={smallLabel}>End Date</label>
+                        <input value={createEndDate} onChange={e => setCreateEndDate(e.target.value)} style={inputStyle} type="date" />
+                      </div>
+                    </div>
+
+                    <label style={smallLabel}>Description</label>
+                    <textarea value={createDesc} onChange={e => setCreateDesc(e.target.value)} placeholder="Short description of the tournament..." style={textareaStyle} />
+
+                    <label style={smallLabel}>Rules (one per line)</label>
+                    <textarea value={createRules} onChange={e => setCreateRules(e.target.value)} placeholder="All players must have verified Riot ID&#10;Each team must have 5 starters&#10;..." style={textareaStyle} />
+
+                    <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+                      <label style={checkboxRow}>
+                        <input type="checkbox" checked={createIsTest} onChange={e => setCreateIsTest(e.target.checked)} />
+                        Test tournament (hidden from users)
+                      </label>
+                      <label style={checkboxRow}>
+                        <input type="checkbox" checked={createIsDaily} onChange={e => setCreateIsDaily(e.target.checked)} />
+                        Daily tournament
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Auction-specific fields (Valorant only) ── */}
+                {createGame === "valorant" && createFormat === "auction" && (
+                  <div style={{ marginTop: 12, padding: 16, background: "#FFF5F5", borderRadius: 10, border: "1px solid #fecdd3" }}>
+                    <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#ff4655", display: "block", marginBottom: 10 }}>Auction Settings</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={smallLabel}>Max Teams</label>
+                        <input value={createMaxTeams} onChange={e => setCreateMaxTeams(e.target.value)} style={inputStyle} type="number" min="2" max="16" />
+                      </div>
+                      <div>
+                        <label style={smallLabel}>S-Tier Cap Per Team</label>
+                        <input value={createSTierCap} onChange={e => setCreateSTierCap(e.target.value)} style={inputStyle} type="number" min="0" max="5" />
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "0.62rem", color: "#999", marginTop: 4, lineHeight: 1.5 }}>
+                      Default bid points: S=150, A=100, B=60, C=30 · Captain budgets: S=600, A=750, B=875, C=1000
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+                  <button disabled={loading || !createName || !createId} style={btnSuccess} onClick={handleCreateTournament}>
+                    Create Tournament
+                  </button>
+                  <button style={{ ...btnSecondary, background: "#999" }} onClick={() => {
+                    setCreateName(""); setCreateId(""); setCreateDesc(""); setCreateRules("");
+                    setCreateRegDeadline(""); setCreateStartDate(""); setCreateEndDate("");
+                    setCreateIsTest(false); setCreateIsDaily(false);
+                  }}>Clear Form</button>
+                </div>
+              </div>
+
+              {/* ── Existing Tournaments List ── */}
+              <div style={sectionStyle}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <span style={{ ...labelStyle, marginBottom: 0 }}>
+                    All Tournaments ({filteredTournaments.length})
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select value={createFilterGame} onChange={e => setCreateFilterGame(e.target.value)}
+                      style={{ ...selectStyle, width: "auto", marginBottom: 0, fontSize: "0.72rem", padding: "6px 12px" }}>
+                      <option value="all">All Games</option>
+                      {GAME_OPTIONS.map(g => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </select>
+                    <button style={{ ...btnSecondary, fontSize: "0.72rem", padding: "6px 14px" }}
+                      onClick={fetchAllTournaments} disabled={loading}>
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                <div className="adm-tourney-row adm-tourney-header" style={{ borderBottom: "2px solid #E5E3DF" }}>
+                  <div>Game</div>
+                  <div>Name</div>
+                  <div>Status</div>
+                  <div>Slots</div>
+                  <div>Format</div>
+                  <div></div>
+                </div>
+
+                <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                  {filteredTournaments.map(t => (
+                    <div key={`${t.game}-${t.id}`} className="adm-tourney-row">
+                      <div>
+                        <span style={gameBadgeStyle(t.game)}>{t.game}</span>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, color: "#222", fontSize: "0.78rem" }}>
+                          {t.name}
+                          {t.isTestTournament && (
+                            <span style={{ marginLeft: 6, fontSize: "0.58rem", color: "#f59e0b", fontWeight: 800, background: "#FFF7ED", padding: "1px 6px", borderRadius: 4, border: "1px solid #fde68a" }}>TEST</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.62rem", color: "#aaa", fontFamily: "monospace" }}>{t.id}</div>
+                      </div>
+                      <div>
+                        <span className={`adm-match-status ${t.status}`}>{t.status}</span>
+                      </div>
+                      <div style={{ fontSize: "0.78rem", color: "#555" }}>
+                        {t.slotsBooked}/{t.totalSlots}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "#888", textTransform: "capitalize" }}>
+                        {t.format}
+                      </div>
+                      <div>
+                        <button
+                          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.88rem", padding: 4, opacity: loading ? 0.4 : 1 }}
+                          title="Delete tournament"
+                          disabled={loading}
+                          onClick={() => handleDeleteTournament(t)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredTournaments.length === 0 && (
+                    <div style={{ padding: 24, textAlign: "center", color: "#bbb", fontSize: "0.82rem" }}>
+                      No tournaments found. Create one above.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {/* ═══ ACTIVITY LOG ═══ */}
