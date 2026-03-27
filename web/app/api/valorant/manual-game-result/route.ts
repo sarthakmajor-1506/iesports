@@ -63,6 +63,47 @@ export async function POST(req: NextRequest) {
 
     await matchRef.update(updatePayload);
 
+    // ── BRACKET ADVANCEMENT: propagate winner/loser to next matches ──────────
+    if (isBracketMatch) {
+      const winnerId   = team1Maps >= team2Maps ? existingMatch.team1Id   : existingMatch.team2Id;
+      const winnerName = team1Maps >= team2Maps ? existingMatch.team1Name : existingMatch.team2Name;
+      const loserId    = team1Maps >= team2Maps ? existingMatch.team2Id   : existingMatch.team1Id;
+      const loserName  = team1Maps >= team2Maps ? existingMatch.team2Name : existingMatch.team1Name;
+
+      const advanceBatch = adminDb.batch();
+
+      // ── Move winner into winnerGoesTo match ────────────────────────────────
+      if (existingMatch.winnerGoesTo) {
+        const nextMatchRef = tournamentRef.collection("matches").doc(existingMatch.winnerGoesTo);
+        const nextMatchDoc = await nextMatchRef.get();
+        if (nextMatchDoc.exists) {
+          const nextMatch = nextMatchDoc.data()!;
+          // Fill the first TBD slot found
+          if (nextMatch.team1Id === "TBD") {
+            advanceBatch.update(nextMatchRef, { team1Id: winnerId, team1Name: winnerName });
+          } else if (nextMatch.team2Id === "TBD") {
+            advanceBatch.update(nextMatchRef, { team2Id: winnerId, team2Name: winnerName });
+          }
+        }
+      }
+
+      // ── Move loser into loserGoesTo match ──────────────────────────────────
+      if (existingMatch.loserGoesTo) {
+        const loseMatchRef = tournamentRef.collection("matches").doc(existingMatch.loserGoesTo);
+        const loseMatchDoc = await loseMatchRef.get();
+        if (loseMatchDoc.exists) {
+          const loseMatch = loseMatchDoc.data()!;
+          if (loseMatch.team1Id === "TBD") {
+            advanceBatch.update(loseMatchRef, { team1Id: loserId, team1Name: loserName });
+          } else if (loseMatch.team2Id === "TBD") {
+            advanceBatch.update(loseMatchRef, { team2Id: loserId, team2Name: loserName });
+          }
+        }
+      }
+
+      await advanceBatch.commit();
+    }
+
     // ── Update standings — GROUP STAGE ONLY ─────────────────────────────────
     let standingsUpdated = false;
     if (!isBracketMatch && existingMatch.status !== "completed") {
@@ -139,7 +180,7 @@ export async function POST(req: NextRequest) {
       await bBatch.commit();
     }
 
-    // ── AUTO-RESOLVE: Group stage only, fills TBD Swiss pairings ────────────
+    // ── AUTO-RESOLVE: Group stage Swiss pairings only ────────────────────────
     let autoResolved = false;
     let resolvedPairings: string[] = [];
 
