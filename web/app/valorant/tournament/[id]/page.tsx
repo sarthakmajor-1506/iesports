@@ -843,16 +843,18 @@ export default function ValorantTournamentDetail() {
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
                       <div className="vtd-section-header bracket">Bracket Fixtures</div>
                       {(() => {
-                        const rounds = [...new Set(bracketMatches.map((m: any) => m.bracketRound))].sort((a: number, b: number) => a - b);
-                        return rounds.map((round: number) => {
-                          const roundMatches = bracketMatches.filter((m: any) => m.bracketRound === round);
+                        const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b);
+                        let bracketRoundNum = 0;
+                        return days.map((day: number) => {
+                          bracketRoundNum++;
+                          const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day);
                           return (
-                            <div key={round}>
+                            <div key={day}>
                               <div className="vtd-match-day-header bracket-round">
-                                <span className="day-num">Bracket Round {round}</span>
-                                <span>· {roundMatches.length} matches</span>
+                                <span className="day-num">Bracket Round {bracketRoundNum}</span>
+                                <span>· {dayMatches.length} matches</span>
                               </div>
-                              {roundMatches.map((m: any) => (
+                              {dayMatches.map((m: any) => (
                                 <MatchCard
                                   key={m.id}
                                   m={m}
@@ -867,6 +869,7 @@ export default function ValorantTournamentDetail() {
                             </div>
                           );
                         });
+                        
                       })()}
                     </div>
                   )}
