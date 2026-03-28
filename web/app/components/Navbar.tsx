@@ -16,7 +16,7 @@ import { auth } from "@/lib/firebase";
 import Image from "next/image";
 
 const games = [
-  { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#F05A28", glow: "rgba(240,90,40,0.2)",  icon: "/dota2logo.png",    active: true  },
+  { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#3B82F6", glow: "rgba(59,130,246,0.2)",  icon: "/dota2logo.png",    active: true  },
   { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.2)",  icon: "/valorantlogo.png", active: true },
   { id: "cs2",      name: "CS:Go",    path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/csgologo.png",     active: false },
   { id: "cod",      name: "COD",      path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg",     active: false },
@@ -65,7 +65,6 @@ export default function Navbar() {
   const [resendTimer,    setResendTimer]    = useState(0);
   const [verificationId, setVerificationId] = useState("");
 
-  // Hover expand with delay
   const [hoveredAcc, setHoveredAcc] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,14 +73,13 @@ export default function Navbar() {
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Hover expand — opens immediately but animates slowly; closes after a pause
   const handleAccHoverIn = (id: string) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setHoveredAcc(id); // immediate — no delay, the CSS transition handles the elegance
+    setHoveredAcc(id);
   };
   const handleAccHoverOut = () => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => setHoveredAcc(null), 800); // linger before closing
+    hoverTimerRef.current = setTimeout(() => setHoveredAcc(null), 800);
   };
 
   useEffect(() => {
@@ -132,9 +130,8 @@ export default function Navbar() {
   const discordUsername = steamData?.discordUsername || "";
   const hasPhone        = !!steamData?.phone;
   const hasSteam        = !!steamData?.steamId;
-  const riotStatus      = riotData?.riotVerified || "unlinked"; // "verified" | "pending" | "unlinked"
+  const riotStatus      = riotData?.riotVerified || "unlinked";
 
-  // Count unlinked accounts for attention badge (includes phone)
   const unlinkedCount = [!hasSteam, !discordLinked, riotStatus === "unlinked", !hasPhone].filter(Boolean).length;
 
   const handleDiscordConnect = () => {
@@ -227,7 +224,6 @@ export default function Navbar() {
     }
   };
 
-  // Account badge component
   const AccBadge = ({ id, linked, pending, icon, iconEl, name, label, onClick }: {
     id: string; linked: boolean; pending?: boolean; icon?: string; iconEl?: React.ReactNode;
     name?: string; label: string; onClick?: () => void;
@@ -244,20 +240,17 @@ export default function Navbar() {
         style={{
           display: "flex", alignItems: "center", height: 36, borderRadius: 100,
           cursor: onClick ? "pointer" : "default", overflow: "hidden", flexShrink: 0,
-          // Slow elegant open — width expands over 0.6s with a gentle ease-out
-          // Slow elegant close — width contracts over 0.5s with ease-in
           transition: isHovered
             ? "width 1.5s cubic-bezier(0.16,1,0.3,1), padding-right 1.5s cubic-bezier(0.16,1,0.3,1), background 0.3s, border-color 0.3s, box-shadow 0.3s"
             : "width 1.5s cubic-bezier(0.4,0,0.2,1), padding-right 1.5s cubic-bezier(0.4,0,0.2,1), background 0.3s, border-color 0.3s, box-shadow 0.3s",
           width: isHovered ? "auto" : 36, minWidth: 36,
           maxWidth: isHovered ? 220 : 36,
           paddingRight: isHovered ? 14 : 0,
-          background: linked ? "#F0FDF4" : pending ? "#FFFBEB" : "#FEF2F2",
-          border: `1.5px ${isUnlinked ? "dashed" : "solid"} ${linked ? "#bbf7d0" : pending ? "#fde68a" : "#f87171"}`,
+          background: linked ? "rgba(22,163,74,0.12)" : pending ? "rgba(251,191,36,0.1)" : "rgba(239,68,68,0.1)",
+          border: `1.5px ${isUnlinked ? "dashed" : "solid"} ${linked ? "rgba(34,197,94,0.3)" : pending ? "rgba(251,191,36,0.3)" : "rgba(239,68,68,0.35)"}`,
           ...(isUnlinked ? { animation: "ie-acc-pulse 2.5s ease-in-out infinite" } : {}),
         }}
       >
-        {/* Icon */}
         <div style={{
           width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, margin: "0 2px",
@@ -266,37 +259,34 @@ export default function Navbar() {
           {iconEl || (icon && <img src={icon} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: "cover", opacity: isUnlinked ? 0.4 : 1 }} />)}
         </div>
 
-        {/* Expanded details — always rendered, visibility controlled by opacity + max-width */}
         <div style={{
           display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
           overflow: "hidden",
           opacity: isHovered ? 1 : 0,
           maxWidth: isHovered ? 180 : 0,
-          // Text fades in slowly after the width starts expanding
           transition: isHovered
             ? "opacity 0.8s cubic-bezier(0.16,1,0.3,1) 0.35s, max-width 1.5s cubic-bezier(0.16,1,0.3,1)"
             : "opacity 0.2s ease 0s, max-width 1.5s cubic-bezier(0.4,0,0.2,1)",
         }}>
           {linked ? (
             <>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#333", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" }}>✓</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#e0e0da", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "rgba(22,163,74,0.2)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span>
             </>
           ) : pending ? (
             <>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#92400e", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>Pending</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#fbbf24", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
             </>
           ) : (
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#dc2626" }}>Connect {label}</span>
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f87171" }}>Connect {label}</span>
           )}
         </div>
 
-        {/* Unlinked: red dot — fades out when expanded */}
         {isUnlinked && (
           <div style={{
             position: "absolute", top: -3, right: -3, width: 11, height: 11,
-            borderRadius: "50%", background: "#ef4444", border: "2px solid #fff",
+            borderRadius: "50%", background: "#ef4444", border: "2px solid #0A0A0C",
             boxShadow: "0 0 4px rgba(239,68,68,0.5)",
             transition: "opacity 0.3s",
             opacity: isHovered ? 0 : 1,
@@ -311,29 +301,28 @@ export default function Navbar() {
     <>
       <style>{`
         * { box-sizing: border-box; }
-        .ie-navbar { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #E5E3DF; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+        .ie-navbar { position: sticky; top: 0; z-index: 100; background: rgba(10,10,12,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #2A2A30; font-family: var(--font-geist-sans), system-ui, sans-serif; }
         .ie-nav-accent { height: 3px; transition: background 0.3s; }
         .ie-nav-row { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 62px; gap: 12px; }
         .ie-nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
-        .ie-nav-logo-name { font-size: 1.05rem; font-weight: 800; color: #111; line-height: 1; }
-        .ie-nav-logo-name span { color: #F05A28; }
-        .ie-nav-logo-sub { font-size: 0.58rem; color: #bbb; letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+        .ie-nav-logo-name { font-size: 1.05rem; font-weight: 800; color: #F0EEEA; line-height: 1; }
+        .ie-nav-logo-name span { color: #3B82F6; }
+        .ie-nav-logo-sub { font-size: 0.58rem; color: #555550; letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
         .ie-nav-tabs { display: flex; align-items: center; gap: 2px; flex: 1; justify-content: center; }
-        .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #888; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
-        .ie-nav-tab:hover { background: #F2F1EE; color: #555; }
+        .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #8A8880; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
+        .ie-nav-tab:hover { background: #18181C; color: #bbb; }
         .ie-nav-tab img { width: 20px; height: 20px; object-fit: contain; border-radius: 5px; transition: all 0.2s; }
         .ie-nav-tab.active img { width: 26px; height: 26px; }
         .ie-nav-tab.active { font-size: 0.92rem; font-weight: 800; padding: 8px 18px; }
-        .ie-soon-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; background: #F2F1EE; color: #bbb; }
+        .ie-soon-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; background: #1a1a1f; color: #555550; }
         .ie-nav-right { display: flex; align-items: center; gap: 8px; }
 
-        /* Account badges row */
         .ie-accounts-row2 { display: flex; align-items: center; gap: 5px; position: relative; }
         .ie-acc2 { position: relative; }
 
         @keyframes ie-acc-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: #f87171; }
-          50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.15); border-color: #ef4444; }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: rgba(239,68,68,0.35); }
+          50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.6); }
         }
         @keyframes ie-acc-fade-in {
           from { opacity: 0; transform: translateX(-6px); }
@@ -341,75 +330,75 @@ export default function Navbar() {
         }
 
         .ie-dropdown-wrap { position: relative; }
-        .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #E5E3DF; background: #F8F7F4; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; position: relative; }
-        .ie-dots-btn:hover { background: #F2F1EE; }
-        .ie-dots-btn span { width: 4px; height: 4px; border-radius: 50%; background: #555; display: block; }
-        .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #fff; border: 1px solid #E5E3DF; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); min-width: 230px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
+        .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #2A2A30; background: #121215; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; position: relative; }
+        .ie-dots-btn:hover { background: #18181C; }
+        .ie-dots-btn span { width: 4px; height: 4px; border-radius: 50%; background: #8A8880; display: block; }
+        .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 230px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
         @keyframes ie-dd-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-        .ie-dd-section { padding: 8px; border-bottom: 1px solid #F2F1EE; }
+        .ie-dd-section { padding: 8px; border-bottom: 1px solid #1e1e22; }
         .ie-dd-section:last-child { border-bottom: none; }
-        .ie-dd-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; padding: 4px 8px 6px; display: block; }
-        .ie-dd-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 0.84rem; color: #444; font-weight: 500; }
-        .ie-dd-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; background: none; border: none; cursor: pointer; font-family: inherit; transition: background 0.12s; text-align: left; color: #333; }
-        .ie-dd-btn:hover { background: #F2F1EE; }
-        .ie-dd-btn.discord { color: #4f5fc0; }
-        .ie-dd-btn.discord:hover { background: #eef0ff; }
-        .ie-dd-btn.logout { color: #dc2626; }
-        .ie-dd-btn.logout:hover { background: #fff1f0; }
-        .ie-verified-badge { font-size: 0.62rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 7px; border-radius: 20px; border: 1px solid #bbf7d0; }
-        .ie-discord-verified { font-size: 0.62rem; color: #4f5fc0; font-weight: 800; background: #e0e4ff; padding: 2px 7px; border-radius: 20px; border: 1px solid #c7d0ff; }
+        .ie-dd-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #555550; padding: 4px 8px 6px; display: block; }
+        .ie-dd-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 0.84rem; color: #ccc; font-weight: 500; }
+        .ie-dd-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; background: none; border: none; cursor: pointer; font-family: inherit; transition: background 0.12s; text-align: left; color: #ddd; }
+        .ie-dd-btn:hover { background: #1a1a1f; }
+        .ie-dd-btn.discord { color: #818cf8; }
+        .ie-dd-btn.discord:hover { background: rgba(99,102,241,0.1); }
+        .ie-dd-btn.logout { color: #f87171; }
+        .ie-dd-btn.logout:hover { background: rgba(239,68,68,0.1); }
+        .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
+        .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
         @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } }
 
-        .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #E5E3DF; background: #F8F7F4; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
-        .ie-hamburger span { display: block; width: 18px; height: 2px; background: #555; border-radius: 2px; transition: all 0.2s; transform-origin: center; }
+        .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #2A2A30; background: #121215; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ie-hamburger span { display: block; width: 18px; height: 2px; background: #8A8880; border-radius: 2px; transition: all 0.2s; transform-origin: center; }
         @media (max-width: 900px) { .ie-hamburger { display: flex; } }
 
-        .ie-mobile-drawer { display: none; flex-direction: column; background: #fff; border-top: 1px solid #F2F1EE; padding: 10px 12px 16px; gap: 4px; }
+        .ie-mobile-drawer { display: none; flex-direction: column; background: #0A0A0C; border-top: 1px solid #1e1e22; padding: 10px 12px 16px; gap: 4px; }
         .ie-mobile-drawer.open { display: flex; }
-        .ie-mobile-game-btn { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #555; transition: all 0.15s; font-family: inherit; width: 100%; text-align: left; }
-        .ie-mobile-game-btn:hover { background: #F2F1EE; color: #111; }
+        .ie-mobile-game-btn { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #8A8880; transition: all 0.15s; font-family: inherit; width: 100%; text-align: left; }
+        .ie-mobile-game-btn:hover { background: #18181C; color: #ddd; }
         .ie-mobile-game-btn img { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; }
-        .ie-mobile-divider { height: 1px; background: #F2F1EE; margin: 6px 0; }
-        .ie-mobile-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem; color: #555; font-weight: 500; }
-        .ie-mobile-action-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; border: 1px solid #E5E3DF; cursor: pointer; font-family: inherit; background: #F8F7F4; color: #111; margin-top: 2px; }
-        .ie-mobile-action-btn:hover { background: #F2F1EE; }
-        .ie-mobile-connect-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.86rem; font-weight: 700; border: 1.5px dashed #fecaca; cursor: pointer; font-family: inherit; background: #FFF5F5; color: #dc2626; margin-top: 2px; }
-        .ie-mobile-connect-btn:hover { background: #FEF2F2; border-style: solid; }
-        .ie-mobile-logout { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; color: #dc2626; font-weight: 700; background: #fff1f0; border: 1px solid #fecaca; cursor: pointer; font-family: inherit; margin-top: 4px; }
-        .ie-mobile-logout:hover { background: #fee2e2; }
+        .ie-mobile-divider { height: 1px; background: #1e1e22; margin: 6px 0; }
+        .ie-mobile-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem; color: #8A8880; font-weight: 500; }
+        .ie-mobile-action-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; border: 1px solid #2A2A30; cursor: pointer; font-family: inherit; background: #121215; color: #F0EEEA; margin-top: 2px; }
+        .ie-mobile-action-btn:hover { background: #18181C; }
+        .ie-mobile-connect-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.86rem; font-weight: 700; border: 1.5px dashed rgba(239,68,68,0.35); cursor: pointer; font-family: inherit; background: rgba(239,68,68,0.06); color: #f87171; margin-top: 2px; }
+        .ie-mobile-connect-btn:hover { background: rgba(239,68,68,0.1); border-style: solid; }
+        .ie-mobile-logout { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 0.88rem; color: #f87171; font-weight: 700; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); cursor: pointer; font-family: inherit; margin-top: 4px; }
+        .ie-mobile-logout:hover { background: rgba(239,68,68,0.14); }
 
-        .ie-private-warning { background: #fffbeb; border-bottom: 1px solid #fde68a; padding: 7px 28px; display: flex; align-items: flex-start; gap: 10px; }
-        .ie-private-warning p { color: #92400e; font-size: 0.76rem; line-height: 1.5; }
-        .ie-private-warning code { background: #fef3c7; padding: 1px 5px; border-radius: 4px; font-size: 0.72rem; }
+        .ie-private-warning { background: rgba(146,64,14,0.12); border-bottom: 1px solid rgba(251,191,36,0.25); padding: 7px 28px; display: flex; align-items: flex-start; gap: 10px; }
+        .ie-private-warning p { color: #fbbf24; font-size: 0.76rem; line-height: 1.5; }
+        .ie-private-warning code { background: rgba(251,191,36,0.15); padding: 1px 5px; border-radius: 4px; font-size: 0.72rem; color: #fbbf24; }
 
-        .ph-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
+        .ph-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
         @media (min-width: 600px) { .ph-overlay { align-items: center; } }
-        .ph-modal { background: #fff; border-radius: 20px 20px 0 0; padding: 32px 28px 40px; width: 100%; max-width: 400px; position: relative; }
+        .ph-modal { background: #18181C; border-radius: 20px 20px 0 0; padding: 32px 28px 40px; width: 100%; max-width: 400px; position: relative; }
         @media (min-width: 600px) { .ph-modal { border-radius: 20px; } }
-        .ph-close { position: absolute; top: 14px; right: 16px; background: #F2F1EE; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; color: #555; display: flex; align-items: center; justify-content: center; }
-        .ph-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 6px; }
-        .ph-sub { font-size: .85rem; color: #777; margin-bottom: 24px; line-height: 1.5; }
-        .ph-label { font-size: .8rem; font-weight: 600; color: #666; margin-bottom: 6px; display: block; }
+        .ph-close { position: absolute; top: 14px; right: 16px; background: #121215; border: 1px solid #2A2A30; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; color: #8A8880; display: flex; align-items: center; justify-content: center; }
+        .ph-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 6px; color: #F0EEEA; }
+        .ph-sub { font-size: .85rem; color: #8A8880; margin-bottom: 24px; line-height: 1.5; }
+        .ph-label { font-size: .8rem; font-weight: 600; color: #8A8880; margin-bottom: 6px; display: block; }
         .ph-row { display: flex; gap: 10px; margin-bottom: 16px; }
-        .ph-select { flex: 0 0 96px; padding: 12px 8px; border: 1.5px solid #E5E3DF; border-radius: 10px; font-family: inherit; font-size: .9rem; background: #F8F7F4; }
-        .ph-input { flex: 1; padding: 12px 14px; border: 1.5px solid #E5E3DF; border-radius: 10px; font-family: inherit; font-size: .95rem; outline: none; transition: border-color .2s; }
-        .ph-input:focus { border-color: #F05A28; }
-        .ph-error { font-size: .8rem; color: #dc2626; min-height: 18px; margin-bottom: 8px; }
-        .ph-btn { width: 100%; background: #F05A28; color: #fff; border: none; border-radius: 100px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .ph-btn:hover { background: #D44A1A; }
+        .ph-select { flex: 0 0 96px; padding: 12px 8px; border: 1.5px solid #2A2A30; border-radius: 10px; font-family: inherit; font-size: .9rem; background: #121215; color: #F0EEEA; }
+        .ph-input { flex: 1; padding: 12px 14px; border: 1.5px solid #2A2A30; border-radius: 10px; font-family: inherit; font-size: .95rem; outline: none; transition: border-color .2s; background: #121215; color: #F0EEEA; }
+        .ph-input:focus { border-color: #3B82F6; }
+        .ph-error { font-size: .8rem; color: #f87171; min-height: 18px; margin-bottom: 8px; }
+        .ph-btn { width: 100%; background: #3B82F6; color: #fff; border: none; border-radius: 100px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .ph-btn:hover { background: #2563EB; }
         .ph-btn:disabled { opacity: .6; cursor: not-allowed; }
-        .ph-btn-back { background: none; border: none; color: #F05A28; font-size: .86rem; font-weight: 600; cursor: pointer; font-family: inherit; margin-bottom: 18px; padding: 0; display: flex; align-items: center; gap: 4px; }
+        .ph-btn-back { background: none; border: none; color: #3B82F6; font-size: .86rem; font-weight: 600; cursor: pointer; font-family: inherit; margin-bottom: 18px; padding: 0; display: flex; align-items: center; gap: 4px; }
         .ph-otp-wrap { display: flex; gap: 8px; justify-content: space-between; margin-bottom: 4px; }
-        .ph-otp-input { width: 44px; height: 52px; text-align: center; border: 1.5px solid #E5E3DF; border-radius: 10px; font-size: 1.3rem; font-weight: 700; font-family: inherit; background: #F8F7F4; outline: none; transition: border-color .2s; }
-        .ph-otp-input:focus { border-color: #F05A28; }
+        .ph-otp-input { width: 44px; height: 52px; text-align: center; border: 1.5px solid #2A2A30; border-radius: 10px; font-size: 1.3rem; font-weight: 700; font-family: inherit; background: #121215; color: #F0EEEA; outline: none; transition: border-color .2s; }
+        .ph-otp-input:focus { border-color: #3B82F6; }
         .ph-resend-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-        .ph-resend-btn { background: none; border: none; color: #F05A28; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .ph-resend-btn:disabled { color: #bbb; cursor: default; }
+        .ph-resend-btn { background: none; border: none; color: #3B82F6; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .ph-resend-btn:disabled { color: #555550; cursor: default; }
       `}</style>
 
       <nav className="ie-navbar">
-        <div className="ie-nav-accent" style={{ background: activeGame?.color || "#F05A28" }} />
+        <div className="ie-nav-accent" style={{ background: activeGame?.color || "#3B82F6" }} />
         <div className="ie-nav-row">
 
           <div className="ie-nav-logo" onClick={() => router.push(activeGame?.path || "/dota2")}>
@@ -431,7 +420,7 @@ export default function Navbar() {
                     color: g.color,
                     boxShadow: `0 2px 16px ${g.glow}, inset 0 0 0 1px ${g.color}10`,
                   } : {}}>
-                  <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(55%) opacity(70%)" }} />
+                  <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(45%) opacity(60%)" }} />
                   <span>{g.name}</span>
                   {!g.active && <span className="ie-soon-badge">Soon</span>}
                 </button>
@@ -440,9 +429,7 @@ export default function Navbar() {
           </div>
 
           <div className="ie-nav-right">
-            {/* ═══ ACCOUNT BADGES (desktop) ═══ */}
             <div className="ie-accounts-row2">
-              {/* Steam */}
               <AccBadge
                 id="steam"
                 linked={hasSteam}
@@ -451,18 +438,14 @@ export default function Navbar() {
                 label="Steam"
                 onClick={hasSteam ? undefined : () => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}
               />
-
-              {/* Discord */}
               <AccBadge
                 id="discord"
                 linked={discordLinked}
-                iconEl={<DiscordIcon size={18} color={discordLinked ? "#5865F2" : "#ccc"} />}
+                iconEl={<DiscordIcon size={18} color={discordLinked ? "#818cf8" : "#555550"} />}
                 name={discordUsername}
                 label="Discord"
                 onClick={discordLinked ? undefined : handleDiscordConnect}
               />
-
-              {/* Riot */}
               <AccBadge
                 id="riot"
                 linked={riotStatus === "verified"}
@@ -474,15 +457,13 @@ export default function Navbar() {
               />
             </div>
 
-            {/* ═══ DOTS MENU ═══ */}
             <div className="ie-dropdown-wrap" ref={dropdownRef}>
               <button className="ie-dots-btn" onClick={() => setDropdownOpen(p => !p)} aria-label="More options">
                 <span /><span /><span />
-                {/* Attention badge on dots if unlinked accounts exist */}
                 {unlinkedCount > 0 && (
                   <div style={{
                     position: "absolute", top: -4, right: -4, minWidth: 16, height: 16,
-                    borderRadius: 100, background: "#dc2626", border: "2px solid #fff",
+                    borderRadius: 100, background: "#dc2626", border: "2px solid #0A0A0C",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "0.52rem", fontWeight: 900, color: "#fff",
                   }}>{unlinkedCount}</div>
@@ -491,14 +472,13 @@ export default function Navbar() {
 
               {dropdownOpen && (
                 <div className="ie-dropdown">
-                  {/* Unlinked accounts warning */}
                   {unlinkedCount > 0 && (
-                    <div style={{ padding: "10px 12px", background: "#FFF5F5", borderBottom: "1px solid #fecaca" }}>
+                    <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", borderBottom: "1px solid rgba(239,68,68,0.2)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626" }} />
-                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#dc2626" }}>{unlinkedCount} account{unlinkedCount > 1 ? "s" : ""} not connected</span>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
+                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f87171" }}>{unlinkedCount} account{unlinkedCount > 1 ? "s" : ""} not connected</span>
                       </div>
-                      <p style={{ fontSize: "0.64rem", color: "#999", lineHeight: 1.5 }}>Connect all accounts to participate in tournaments and receive notifications.</p>
+                      <p style={{ fontSize: "0.64rem", color: "#555550", lineHeight: 1.5 }}>Connect all accounts to participate in tournaments and receive notifications.</p>
                     </div>
                   )}
 
@@ -507,7 +487,7 @@ export default function Navbar() {
                       <span className="ie-dd-label">Steam</span>
                       <div className="ie-dd-item">
                         <img src={steamData.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #22c55e" }} />
-                        <span style={{ fontWeight: 600, color: "#222", fontSize: "0.85rem", flex: 1 }}>{steamData.steamName}</span>
+                        <span style={{ fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem", flex: 1 }}>{steamData.steamName}</span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
                     </div>
@@ -515,10 +495,10 @@ export default function Navbar() {
                   {!hasSteam && (
                     <div className="ie-dd-section">
                       <span className="ie-dd-label">Steam</span>
-                      <button className="ie-dd-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; setDropdownOpen(false); }} style={{ color: "#dc2626" }}>
+                      <button className="ie-dd-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; setDropdownOpen(false); }} style={{ color: "#f87171" }}>
                         <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 18, height: 18, opacity: 0.5 }} />
                         Connect Steam
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
                       </button>
                     </div>
                   )}
@@ -528,15 +508,15 @@ export default function Navbar() {
                     {hasPhone ? (
                       <div className="ie-dd-item">
                         <span style={{ fontSize: 16 }}>📱</span>
-                        <span style={{ fontWeight: 600, color: "#333", fontSize: "0.84rem", flex: 1 }}>
+                        <span style={{ fontWeight: 600, color: "#ddd", fontSize: "0.84rem", flex: 1 }}>
                           {steamData.phone.replace(/(\+\d{1,3})(\d{3})(\d+)(\d{3})$/, (_: string, code: string, a: string, _m: string, last: string) => `${code} ${a}*****${last}`)}
                         </span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
                     ) : (
-                      <button className="ie-dd-btn" onClick={openPhoneModal} style={{ color: "#dc2626" }}>
+                      <button className="ie-dd-btn" onClick={openPhoneModal} style={{ color: "#f87171" }}>
                         <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
                       </button>
                     )}
                   </div>
@@ -546,20 +526,20 @@ export default function Navbar() {
                     {riotStatus === "verified" ? (
                       <div className="ie-dd-item">
                         <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #22c55e" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
+                        <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
                         <span className="ie-verified-badge">✓</span>
                       </div>
                     ) : riotStatus === "pending" ? (
                       <div className="ie-dd-item">
                         <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #f59e0b" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#222", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
-                        <span style={{ fontSize: "0.62rem", color: "#92400e", fontWeight: 800, background: "#fef3c7", padding: "2px 7px", borderRadius: 20, border: "1px solid #fde68a" }}>Pending</span>
+                        <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
+                        <span style={{ fontSize: "0.62rem", color: "#fbbf24", fontWeight: 800, background: "rgba(251,191,36,0.12)", padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
                       </div>
                     ) : (
-                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#dc2626" }}>
+                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
                         <img src="/riot-games.png" alt="" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.5 }} />
                         Connect Riot ID
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
                       </button>
                     )}
                   </div>
@@ -568,14 +548,14 @@ export default function Navbar() {
                     <span className="ie-dd-label">Discord</span>
                     {discordLinked ? (
                       <div className="ie-dd-item">
-                        <DiscordIcon size={18} color="#5865F2" />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#4f5fc0" }}>{discordUsername}</span>
+                        <DiscordIcon size={18} color="#818cf8" />
+                        <span style={{ flex: 1, fontWeight: 600, color: "#818cf8" }}>{discordUsername}</span>
                         <span className="ie-discord-verified">✓</span>
                       </div>
                     ) : (
                       <button className="ie-dd-btn discord" onClick={() => { handleDiscordConnect(); setDropdownOpen(false); }}>
-                        <DiscordIcon size={18} color="#5865F2" /> Connect Discord
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "#FEF2F2", color: "#dc2626", border: "1px solid #fecaca" }}>Required</span>
+                        <DiscordIcon size={18} color="#818cf8" /> Connect Discord
+                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
                       </button>
                     )}
                   </div>
@@ -583,7 +563,7 @@ export default function Navbar() {
                   <div className="ie-dd-section" style={{ padding: "10px" }}>
                     <button className="ie-dd-btn logout"
                       onClick={async () => { await logout(); setDropdownOpen(false); }}
-                      style={{ justifyContent: "center", background: "#fff1f0", border: "1px solid #fecaca", borderRadius: "100px", padding: "10px 0" }}>
+                      style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "100px", padding: "10px 0" }}>
                       🚪 Logout
                     </button>
                   </div>
@@ -599,14 +579,13 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* ═══ MOBILE DRAWER ═══ */}
         <div className={`ie-mobile-drawer${mobileMenuOpen ? " open" : ""}`}>
           {games.map((g) => {
             const isActive = activeGame?.id === g.id;
             return (
               <button key={g.id} className="ie-mobile-game-btn" onClick={() => router.push(g.path)}
                 style={isActive ? { background: `${g.color}10`, border: `1px solid ${g.color}30`, color: g.color } : {}}>
-                <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(55%)" }} />
+                <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(45%)" }} />
                 <span style={{ flex: 1 }}>{g.name}</span>
                 {!g.active && <span className="ie-soon-badge">Soon</span>}
               </button>
@@ -614,36 +593,33 @@ export default function Navbar() {
           })}
           <div className="ie-mobile-divider" />
 
-          {/* Steam */}
           {hasSteam ? (
             <div className="ie-mobile-row">
               <img src={steamData.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e" }} />
-              <span style={{ flex: 1, fontWeight: 600, color: "#333" }}>{steamData.steamName}</span>
+              <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da" }}>{steamData.steamName}</span>
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
             <button className="ie-mobile-connect-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}>
               <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, opacity: 0.5 }} />
               Connect Steam
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
             </button>
           )}
 
-          {/* Discord */}
           {discordLinked ? (
             <div className="ie-mobile-row">
-              <DiscordIcon size={18} color="#5865F2" />
-              <span style={{ flex: 1, fontWeight: 600, color: "#4f5fc0" }}>{discordUsername}</span>
+              <DiscordIcon size={18} color="#818cf8" />
+              <span style={{ flex: 1, fontWeight: 600, color: "#818cf8" }}>{discordUsername}</span>
               <span className="ie-discord-verified">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={handleDiscordConnect} style={{ borderColor: "#c7d0ff", background: "#F5F7FF", color: "#4f5fc0" }}>
-              <DiscordIcon size={20} color="#5865F2" /> Connect Discord
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
+            <button className="ie-mobile-connect-btn" onClick={handleDiscordConnect} style={{ borderColor: "rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.06)", color: "#818cf8" }}>
+              <DiscordIcon size={20} color="#818cf8" /> Connect Discord
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
             </button>
           )}
 
-          {/* Riot */}
           {riotStatus === "verified" ? (
             <div className="ie-mobile-row">
               <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
@@ -651,14 +627,13 @@ export default function Navbar() {
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "#fecdd3", background: "#FFF5F5", color: "#ff4655" }}>
+            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "rgba(255,70,85,0.3)", background: "rgba(255,70,85,0.06)", color: "#ff4655" }}>
               <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 3, opacity: 0.6 }} />
               Connect Riot ID
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#dc2626" }}>Required</span>
+              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
             </button>
           )}
 
-          {/* Phone */}
           {hasPhone ? (
             <div className="ie-mobile-row">
               <span style={{ fontSize: 16 }}>📱</span>
@@ -731,7 +706,7 @@ export default function Navbar() {
                     onClick={() => { setOtp(["","","","","",""]); setPhoneError(""); clearRecaptcha(); setVerificationId(""); sendOtp(); }}>
                     Resend OTP
                   </button>
-                  {resendTimer > 0 && <span style={{ fontSize: ".82rem", color: "#aaa" }}>Resend in {resendTimer}s</span>}
+                  {resendTimer > 0 && <span style={{ fontSize: ".82rem", color: "#555550" }}>Resend in {resendTimer}s</span>}
                 </div>
               </>
             )}

@@ -58,7 +58,6 @@ export default function PlayerProfile() {
     const load = async () => {
       setLoading(true);
       try {
-        // 1. Fetch user profile
         const userDoc = await getDoc(doc(db, "users", uid));
         if (userDoc.exists()) {
           const d = userDoc.data();
@@ -70,7 +69,6 @@ export default function PlayerProfile() {
             discordUsername: d.discordUsername, steamName: d.steamName,
           });
 
-          // 2. Fetch global leaderboard by puuid
           if (d.riotPuuid) {
             const glDoc = await getDoc(doc(db, "globalLeaderboard", d.riotPuuid));
             if (glDoc.exists()) {
@@ -78,7 +76,6 @@ export default function PlayerProfile() {
             }
           }
 
-          // 3. Fetch match history from tournaments the user participated in
           if (d.registeredValorantTournaments?.length > 0) {
             const history: MatchHistoryItem[] = [];
 
@@ -95,7 +92,6 @@ export default function PlayerProfile() {
                   const m = mDoc.data();
                   if (m.status !== "completed") continue;
 
-                  // Check if this player was in this match
                   const games: MatchHistoryItem["games"] = [];
                   let playerInMatch = false;
 
@@ -173,7 +169,6 @@ export default function PlayerProfile() {
     ? Math.round(vStats.totalScore / vStats.totalRoundsPlayed)
     : vStats?.acs || 0;
 
-  // Agent frequency
   const agentCounts: Record<string, number> = {};
   for (const mh of matchHistory) {
     for (const g of mh.games) {
@@ -242,7 +237,7 @@ export default function PlayerProfile() {
                 <div className="pp-stat-label">Losses</div>
               </div>
               <div className="pp-stat-card">
-                <div className="pp-stat-value" style={{ color: winRate >= 50 ? "#16a34a" : "#dc2626" }}>{winRate}%</div>
+                <div className="pp-stat-value" style={{ color: winRate >= 50 ? "#4ade80" : "#f87171" }}>{winRate}%</div>
                 <div className="pp-stat-label">Win Rate</div>
               </div>
             </div>
@@ -257,15 +252,15 @@ export default function PlayerProfile() {
                 <div className="pp-stat-label">Official Games</div>
               </div>
               <div className="pp-stat-card">
-                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-value" style={{ color: "#555550" }}>—</div>
                 <div className="pp-stat-label">ACS</div>
               </div>
               <div className="pp-stat-card">
-                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-value" style={{ color: "#555550" }}>—</div>
                 <div className="pp-stat-label">K/D</div>
               </div>
               <div className="pp-stat-card">
-                <div className="pp-stat-value" style={{ color: "#bbb" }}>—</div>
+                <div className="pp-stat-value" style={{ color: "#555550" }}>—</div>
                 <div className="pp-stat-label">Win Rate</div>
               </div>
             </div>
@@ -280,17 +275,16 @@ export default function PlayerProfile() {
           {/* ═══ VALORANT TAB ═══ */}
           {activeTab === "valorant" && (
             <>
-              {/* ── Detailed Stats ── */}
               {vStats ? (
                 <div className="pp-section">
                   <span className="pp-section-label">Performance Breakdown</span>
                   <div className="pp-detail-grid">
                     <div className="pp-detail-item">
-                      <span className="pp-detail-num" style={{ color: "#16a34a" }}>{vStats.totalKills}</span>
+                      <span className="pp-detail-num" style={{ color: "#4ade80" }}>{vStats.totalKills}</span>
                       <span className="pp-detail-lbl">Total Kills</span>
                     </div>
                     <div className="pp-detail-item">
-                      <span className="pp-detail-num" style={{ color: "#dc2626" }}>{vStats.totalDeaths}</span>
+                      <span className="pp-detail-num" style={{ color: "#f87171" }}>{vStats.totalDeaths}</span>
                       <span className="pp-detail-lbl">Total Deaths</span>
                     </div>
                     <div className="pp-detail-item">
@@ -298,7 +292,7 @@ export default function PlayerProfile() {
                       <span className="pp-detail-lbl">Total Assists</span>
                     </div>
                     <div className="pp-detail-item">
-                      <span className="pp-detail-num" style={{ color: vStats.kd >= 1.0 ? "#16a34a" : "#dc2626", fontWeight: 900 }}>{vStats.kd}</span>
+                      <span className="pp-detail-num" style={{ color: vStats.kd >= 1.0 ? "#4ade80" : "#f87171", fontWeight: 900 }}>{vStats.kd}</span>
                       <span className="pp-detail-lbl">K/D Ratio</span>
                     </div>
                     <div className="pp-detail-item">
@@ -331,7 +325,6 @@ export default function PlayerProfile() {
                 </div>
               )}
 
-              {/* ── Match History ── */}
               <div className="pp-section">
                 <span className="pp-section-label">Match History ({matchHistory.length})</span>
                 {matchHistory.length === 0 ? (
@@ -402,74 +395,74 @@ export default function PlayerProfile() {
 }
 
 const baseStyles = `
-  .pp-page { min-height: 100vh; background: #F8F7F4; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+  .pp-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; }
   .pp-content { max-width: 860px; margin: 0 auto; padding: 20px 24px 60px; }
-  .pp-loading { text-align: center; padding: 80px 20px; color: #999; font-size: 0.9rem; }
+  .pp-loading { text-align: center; padding: 80px 20px; color: #555550; font-size: 0.9rem; }
 
   .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
   .pp-header-left { display: flex; align-items: center; gap: 16px; }
-  .pp-avatar { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; border: 2px solid #E5E3DF; }
+  .pp-avatar { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; border: 2px solid #2A2A30; }
   .pp-avatar-init { width: 72px; height: 72px; border-radius: 14px; background: linear-gradient(135deg, #ff4655 0%, #c62c3a 100%); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; }
   .pp-header-info { }
-  .pp-name { font-size: 1.5rem; font-weight: 900; color: #111; margin: 0; }
-  .pp-tag { color: #bbb; font-weight: 400; font-size: 1.1rem; }
+  .pp-name { font-size: 1.5rem; font-weight: 900; color: #F0EEEA; margin: 0; }
+  .pp-tag { color: #555550; font-weight: 400; font-size: 1.1rem; }
   .pp-rank { font-size: 0.82rem; color: #ff4655; font-weight: 700; margin-top: 2px; }
 
   .pp-stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
-  .pp-stat-card { background: #fff; border: 1px solid #E5E3DF; border-radius: 14px; padding: 20px 16px; text-align: center; }
-  .pp-stat-primary { border-color: #ff4655; background: #FFFBFB; }
-  .pp-stat-value { font-size: 1.6rem; font-weight: 900; color: #111; }
-  .pp-stat-green { color: #16a34a; }
-  .pp-stat-red { color: #dc2626; }
-  .pp-stat-label { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-top: 4px; }
+  .pp-stat-card { background: #121215; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px 16px; text-align: center; }
+  .pp-stat-primary { border-color: #ff4655; background: rgba(255,70,85,0.06); }
+  .pp-stat-value { font-size: 1.6rem; font-weight: 900; color: #F0EEEA; }
+  .pp-stat-green { color: #4ade80; }
+  .pp-stat-red { color: #f87171; }
+  .pp-stat-label { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; margin-top: 4px; }
 
-  .pp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #E5E3DF; margin-bottom: 24px; }
-  .pp-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #999; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+  .pp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #2A2A30; margin-bottom: 24px; }
+  .pp-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #555550; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
   .pp-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
 
-  .pp-section { background: #fff; border: 1px solid #E5E3DF; border-radius: 14px; padding: 20px 24px; margin-bottom: 16px; }
-  .pp-section-label { display: block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #bbb; margin-bottom: 16px; }
+  .pp-section { background: #121215; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px 24px; margin-bottom: 16px; }
+  .pp-section-label { display: block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #555550; margin-bottom: 16px; }
 
   .pp-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .pp-detail-item { text-align: center; padding: 12px; background: #FAFAF8; border-radius: 10px; }
-  .pp-detail-num { display: block; font-size: 1.4rem; font-weight: 800; color: #111; }
-  .pp-detail-lbl { display: block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-top: 4px; }
+  .pp-detail-item { text-align: center; padding: 12px; background: #18181C; border-radius: 10px; }
+  .pp-detail-num { display: block; font-size: 1.4rem; font-weight: 800; color: #F0EEEA; }
+  .pp-detail-lbl { display: block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; margin-top: 4px; }
 
   .pp-agents-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .pp-agent-chip { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #FAFAF8; border: 1px solid #E5E3DF; border-radius: 100px; }
-  .pp-agent-name { font-size: 0.82rem; font-weight: 700; color: #333; }
-  .pp-agent-count { font-size: 0.68rem; color: #999; }
+  .pp-agent-chip { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; }
+  .pp-agent-name { font-size: 0.82rem; font-weight: 700; color: #e0e0da; }
+  .pp-agent-count { font-size: 0.68rem; color: #555550; }
 
-  .pp-empty { text-align: center; padding: 40px 20px; color: #bbb; font-size: 0.85rem; }
+  .pp-empty { text-align: center; padding: 40px 20px; color: #555550; font-size: 0.85rem; }
 
   .pp-matches { display: flex; flex-direction: column; gap: 8px; }
-  .pp-match-card { border: 1px solid #E5E3DF; border-radius: 10px; overflow: hidden; }
+  .pp-match-card { border: 1px solid #2A2A30; border-radius: 10px; overflow: hidden; }
   .pp-match-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background 0.1s; }
-  .pp-match-header:hover { background: #FAFAF8; }
+  .pp-match-header:hover { background: #18181C; }
   .pp-match-meta { display: flex; flex-direction: column; min-width: 120px; }
-  .pp-match-tournament { font-size: 0.62rem; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+  .pp-match-tournament { font-size: 0.62rem; font-weight: 700; color: #555550; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
   .pp-match-round { font-size: 0.72rem; font-weight: 800; color: #ff4655; }
   .pp-match-teams { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .pp-match-team { font-size: 0.82rem; font-weight: 700; color: #333; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pp-match-score { font-size: 0.92rem; font-weight: 900; color: #111; min-width: 50px; text-align: center; }
-  .pp-match-expand { font-size: 10px; color: #ccc; transition: transform 0.2s; }
+  .pp-match-team { font-size: 0.82rem; font-weight: 700; color: #e0e0da; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-match-score { font-size: 0.92rem; font-weight: 900; color: #F0EEEA; min-width: 50px; text-align: center; }
+  .pp-match-expand { font-size: 10px; color: #3a3a42; transition: transform 0.2s; }
   .pp-match-expand.open { transform: rotate(180deg); color: #ff4655; }
 
   .pp-match-detail { padding: 0 16px 12px; }
   .pp-game-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; }
-  .pp-game-row.won { background: #f0fdf4; }
-  .pp-game-row.lost { background: #fef2f2; }
+  .pp-game-row.won { background: rgba(22,163,74,0.1); }
+  .pp-game-row.lost { background: rgba(239,68,68,0.08); }
   .pp-game-map { display: flex; align-items: center; gap: 10px; }
-  .pp-game-num { font-size: 0.62rem; font-weight: 800; color: #bbb; text-transform: uppercase; }
-  .pp-game-map-name { font-size: 0.82rem; font-weight: 700; color: #333; }
-  .pp-game-rounds { font-size: 0.78rem; font-weight: 800; color: #666; }
+  .pp-game-num { font-size: 0.62rem; font-weight: 800; color: #555550; text-transform: uppercase; }
+  .pp-game-map-name { font-size: 0.82rem; font-weight: 700; color: #e0e0da; }
+  .pp-game-rounds { font-size: 0.78rem; font-weight: 800; color: #8A8880; }
   .pp-game-stats { display: flex; align-items: center; gap: 12px; }
-  .pp-game-agent { font-size: 0.72rem; color: #888; }
-  .pp-game-kda { font-size: 0.82rem; font-weight: 800; color: #333; }
-  .pp-game-acs { font-size: 0.72rem; font-weight: 700; color: #666; }
+  .pp-game-agent { font-size: 0.72rem; color: #8A8880; }
+  .pp-game-kda { font-size: 0.82rem; font-weight: 800; color: #e0e0da; }
+  .pp-game-acs { font-size: 0.72rem; font-weight: 700; color: #8A8880; }
   .pp-game-result { font-size: 0.58rem; font-weight: 800; padding: 2px 10px; border-radius: 100px; }
-  .pp-game-result.win { background: #dcfce7; color: #16a34a; }
-  .pp-game-result.loss { background: #fee2e2; color: #dc2626; }
+  .pp-game-result.win { background: rgba(22,163,74,0.15); color: #4ade80; }
+  .pp-game-result.loss { background: rgba(239,68,68,0.12); color: #f87171; }
 
   @media (max-width: 700px) {
     .pp-stats-row { grid-template-columns: repeat(3, 1fr); }

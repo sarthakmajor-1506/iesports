@@ -32,11 +32,9 @@ export default function MatchDetail() {
 
         if (tDoc.exists()) setTournament({ id: tDoc.id, ...tDoc.data() });
         if (mDoc.exists()) {
-          const mData = { id: mDoc.id, ...mDoc.data() } as SwissMatch;  // ← add "as SwissMatch"
+          const mData = { id: mDoc.id, ...mDoc.data() } as SwissMatch;
           setMatch(mData);
         
-          // Load team docs for member info
-       
           const teamsMap: Record<string, any> = {};
           for (const teamId of [mData.team1Id, mData.team2Id]) {
             if (teamId && teamId !== "TBD") {
@@ -71,7 +69,6 @@ export default function MatchDetail() {
   const activeGameData = activeGame === 1 ? g1 : g2;
   const isComplete = match.status === "completed";
 
-  // Split players by team for the active game
   const t1Players = (activeGameData?.playerStats || []).filter((p: any) =>
     p.tournamentTeam === "team1" || p.teamId === match.team1Id
   );
@@ -200,7 +197,7 @@ export default function MatchDetail() {
                         <div className="md-stats-cell md-stats-k">{p.kills}</div>
                         <div className="md-stats-cell md-stats-d">{p.deaths}</div>
                         <div className="md-stats-cell">{p.assists}</div>
-                        <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#16a34a" : "#dc2626" }}>{kd}</div>
+                        <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
                         <div className="md-stats-cell" style={{ fontWeight: 700 }}>{acs}</div>
                         <div className="md-stats-cell">{hs}%</div>
                         <div className="md-stats-cell">{p.damageDealt?.toLocaleString() || 0}</div>
@@ -242,7 +239,7 @@ export default function MatchDetail() {
                         <div className="md-stats-cell md-stats-k">{p.kills}</div>
                         <div className="md-stats-cell md-stats-d">{p.deaths}</div>
                         <div className="md-stats-cell">{p.assists}</div>
-                        <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#16a34a" : "#dc2626" }}>{kd}</div>
+                        <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
                         <div className="md-stats-cell" style={{ fontWeight: 700 }}>{acs}</div>
                         <div className="md-stats-cell">{hs}%</div>
                         <div className="md-stats-cell">{p.damageDealt?.toLocaleString() || 0}</div>
@@ -274,80 +271,78 @@ function findUidByPuuid(puuid: string, playerName: string, teams: Record<string,
     const team = teams[teamId];
     if (!team) continue;
     for (const m of team.members || []) {
-      // Match by PUUID first (best)
       if (m.riotPuuid && m.riotPuuid === puuid) return m.uid;
-      // Fallback: match by name (case-insensitive)
       if (m.riotGameName && playerName && m.riotGameName.toLowerCase() === playerName.toLowerCase()) return m.uid;
     }
   }
   return "";
 }
 const styles = `
-  .md-page { min-height: 100vh; background: #F8F7F4; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+  .md-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; }
   .md-content { max-width: 920px; margin: 0 auto; padding: 20px 24px 60px; }
-  .md-loading { text-align: center; padding: 80px 20px; color: #999; }
+  .md-loading { text-align: center; padding: 80px 20px; color: #555550; }
 
-  .md-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: #999; margin-bottom: 20px; }
+  .md-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: #555550; margin-bottom: 20px; }
   .md-breadcrumb-link { color: #ff4655; text-decoration: none; font-weight: 600; }
   .md-breadcrumb-link:hover { text-decoration: underline; }
-  .md-breadcrumb-sep { color: #ddd; }
+  .md-breadcrumb-sep { color: #2A2A30; }
 
-  .md-header { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #E5E3DF; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; }
+  .md-header { display: flex; align-items: center; justify-content: space-between; background: #121215; border: 1px solid #2A2A30; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; }
   .md-header-team { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 120px; }
   .md-header-team-left { align-items: flex-start; }
   .md-header-team-right { align-items: flex-end; }
   .md-header-team-logo { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #ff4655, #c62c3a); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; }
   .md-header-team-right .md-header-team-logo { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-  .md-header-team-name { font-size: 0.88rem; font-weight: 800; color: #333; text-align: center; max-width: 160px; }
+  .md-header-team-name { font-size: 0.88rem; font-weight: 800; color: #e0e0da; text-align: center; max-width: 160px; }
   .md-header-center { text-align: center; }
-  .md-header-score { display: flex; align-items: center; gap: 8px; font-size: 2.2rem; font-weight: 900; color: #ddd; }
-  .md-score-win { color: #111; }
-  .md-header-score-sep { color: #ddd; font-weight: 400; }
+  .md-header-score { display: flex; align-items: center; gap: 8px; font-size: 2.2rem; font-weight: 900; color: #3a3a42; }
+  .md-score-win { color: #F0EEEA; }
+  .md-header-score-sep { color: #3a3a42; font-weight: 400; }
   .md-header-status { font-size: 0.62rem; font-weight: 800; padding: 3px 14px; border-radius: 100px; display: inline-block; margin-top: 6px; }
-  .md-header-status.completed { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-  .md-header-status.live { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-  .md-header-status.pending { background: #FFF7ED; color: #f59e0b; border: 1px solid #fde68a; }
-  .md-header-date { font-size: 0.68rem; color: #bbb; margin-top: 4px; }
+  .md-header-status.completed { background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .md-header-status.live { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .md-header-status.pending { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+  .md-header-date { font-size: 0.68rem; color: #555550; margin-top: 4px; }
 
   .md-game-tabs { display: flex; gap: 12px; margin-bottom: 20px; }
-  .md-game-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; background: #fff; border: 1.5px solid #E5E3DF; border-radius: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-  .md-game-tab.active { border-color: #ff4655; background: #FFFBFB; }
-  .md-game-tab.done .md-game-tab-num::after { content: " ✓"; color: #16a34a; }
-  .md-game-tab-num { font-size: 0.72rem; font-weight: 800; color: #333; text-transform: uppercase; letter-spacing: 0.08em; }
-  .md-game-tab-info { font-size: 0.78rem; font-weight: 600; color: #666; }
-  .md-game-tab-pending { color: #ccc; }
+  .md-game-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; background: #121215; border: 1.5px solid #2A2A30; border-radius: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .md-game-tab.active { border-color: #ff4655; background: rgba(255,70,85,0.06); }
+  .md-game-tab.done .md-game-tab-num::after { content: " ✓"; color: #4ade80; }
+  .md-game-tab-num { font-size: 0.72rem; font-weight: 800; color: #e0e0da; text-transform: uppercase; letter-spacing: 0.08em; }
+  .md-game-tab-info { font-size: 0.78rem; font-weight: 600; color: #8A8880; }
+  .md-game-tab-pending { color: #3a3a42; }
 
   .md-scoreboard { }
-  .md-map-banner { display: flex; align-items: center; justify-content: space-between; background: #111; color: #fff; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; }
+  .md-map-banner { display: flex; align-items: center; justify-content: space-between; background: #18181C; color: #F0EEEA; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #2A2A30; }
   .md-map-name { font-size: 1rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
   .md-round-score { display: flex; align-items: center; gap: 8px; font-size: 1.6rem; font-weight: 900; }
   .md-rs-win { color: #4ade80; }
-  .md-rs-loss { color: #888; }
-  .md-rs-sep { color: #555; font-weight: 400; }
+  .md-rs-loss { color: #8A8880; }
+  .md-rs-sep { color: #555550; font-weight: 400; }
 
-  .md-team-section { background: #fff; border: 1px solid #E5E3DF; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
+  .md-team-section { background: #121215; border: 1px solid #2A2A30; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
   .md-team-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-  .md-team-winner { font-size: 0.56rem; padding: 2px 8px; background: #dcfce7; color: #16a34a; border-radius: 100px; border: 1px solid #bbf7d0; }
+  .md-team-winner { font-size: 0.56rem; padding: 2px 8px; background: rgba(22,163,74,0.12); color: #4ade80; border-radius: 100px; border: 1px solid rgba(34,197,94,0.3); }
 
   .md-stats-table { width: 100%; }
-  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #E5E3DF; }
-  .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #bbb; }
-  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #f5f4f0; align-items: center; }
+  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
+  .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; }
+  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
   .md-stats-row:last-child { border-bottom: none; }
-  .md-stats-cell { font-size: 0.82rem; color: #333; }
+  .md-stats-cell { font-size: 0.82rem; color: #e0e0da; }
   .md-stats-player { font-weight: 700; }
-  .md-player-link { color: #333; text-decoration: none; }
+  .md-player-link { color: #e0e0da; text-decoration: none; }
   .md-player-link:hover { color: #ff4655; }
-  .md-player-tag { color: #ccc; font-weight: 400; font-size: 0.72rem; }
-  .md-stats-agent { font-size: 0.72rem; color: #888; }
-  .md-stats-k { color: #16a34a; font-weight: 700; }
-  .md-stats-d { color: #dc2626; }
+  .md-player-tag { color: #3a3a42; font-weight: 400; font-size: 0.72rem; }
+  .md-stats-agent { font-size: 0.72rem; color: #8A8880; }
+  .md-stats-k { color: #4ade80; font-weight: 700; }
+  .md-stats-d { color: #f87171; }
   .md-stats-kd { font-weight: 800; }
 
-  .md-pending-game { text-align: center; padding: 60px 20px; background: #fff; border: 1px solid #E5E3DF; border-radius: 14px; }
+  .md-pending-game { text-align: center; padding: 60px 20px; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; }
   .md-pending-icon { font-size: 2rem; display: block; margin-bottom: 12px; }
-  .md-pending-text { display: block; font-size: 0.92rem; font-weight: 700; color: #666; margin-bottom: 6px; }
-  .md-pending-sub { display: block; font-size: 0.76rem; color: #bbb; }
+  .md-pending-text { display: block; font-size: 0.92rem; font-weight: 700; color: #8A8880; margin-bottom: 6px; }
+  .md-pending-sub { display: block; font-size: 0.76rem; color: #555550; }
 
   @media (max-width: 700px) {
     .md-header { flex-direction: column; gap: 16px; padding: 20px; }

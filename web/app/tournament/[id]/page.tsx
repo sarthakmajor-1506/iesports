@@ -9,7 +9,6 @@ import { Navbar } from "../../components/Navbar";
 import RegisterModal from "../../components/RegisterModal";
 import Link from "next/link";
 
-
 const TABS = ["Overview", "Rules", "Matches", "Participants", "Streams"] as const;
 type Tab = typeof TABS[number];
 
@@ -53,10 +52,10 @@ export default function TournamentPage() {
 
   if (loading || tLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "#0A0A0C", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, border: "3px solid #E5E3DF", borderTopColor: "#F05A28", borderRadius: "50%", animation: "tp-spin 0.8s linear infinite" }} />
-          <span style={{ color: "#bbb", fontSize: "0.85rem" }}>Loading tournament…</span>
+          <div style={{ width: 36, height: 36, border: "3px solid #2A2A30", borderTopColor: "#3B82F6", borderRadius: "50%", animation: "tp-spin 0.8s linear infinite" }} />
+          <span style={{ color: "#555550", fontSize: "0.85rem" }}>Loading tournament…</span>
         </div>
         <style>{`@keyframes tp-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -65,10 +64,10 @@ export default function TournamentPage() {
 
   if (!tournament) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F8F7F4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "#0A0A0C", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, fontFamily: "system-ui, sans-serif" }}>
         <span style={{ fontSize: 40 }}>🎮</span>
-        <p style={{ color: "#888", fontSize: "1rem", fontWeight: 600 }}>Tournament not found.</p>
-        <button onClick={() => router.push("/dota2")} style={{ background: "#F05A28", color: "#fff", border: "none", borderRadius: 100, padding: "10px 24px", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}>
+        <p style={{ color: "#8A8880", fontSize: "1rem", fontWeight: 600 }}>Tournament not found.</p>
+        <button onClick={() => router.push("/dota2")} style={{ background: "#3B82F6", color: "#fff", border: "none", borderRadius: 100, padding: "10px 24px", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}>
           ← Back to Tournaments
         </button>
       </div>
@@ -82,113 +81,101 @@ export default function TournamentPage() {
   const fillColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e";
 
   const statusBadge = isEnded
-    ? { label: "Ended",    bg: "#F2F1EE", color: "#999",    border: "#E5E3DF" }
+    ? { label: "Ended",    bg: "#1a1a1f", color: "#555550",    border: "#2A2A30" }
     : isOngoing
-    ? { label: "🟢 Live",  bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" }
-    : { label: "Upcoming", bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe" };
+    ? { label: "🟢 Live",  bg: "rgba(22,163,74,0.12)", color: "#4ade80", border: "rgba(34,197,94,0.3)" }
+    : { label: "Upcoming", bg: "rgba(59,130,246,0.12)", color: "#60A5FA", border: "rgba(59,130,246,0.3)" };
 
   return (
     <>
       <style>{`
         @keyframes tp-spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; }
-        .tp-page { min-height: 100vh; background: #F8F7F4; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #111; }
+        .tp-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #F0EEEA; }
 
-        /* Hero */
-        .tp-hero { background: #fff; border-bottom: 1px solid #E5E3DF; }
+        .tp-hero { background: #121215; border-bottom: 1px solid #2A2A30; }
         .tp-hero-inner { max-width: 1100px; margin: 0 auto; padding: 28px 30px 24px; }
         .tp-breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
-        .tp-back-btn { display: flex; align-items: center; gap: 6px; background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 100px; padding: 6px 14px; color: #555; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-        .tp-back-btn:hover { background: #F2F1EE; color: #111; }
-        .tp-breadcrumb-sep { color: #ddd; font-size: 0.8rem; }
-        .tp-breadcrumb-cur { color: #bbb; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+        .tp-back-btn { display: flex; align-items: center; gap: 6px; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; padding: 6px 14px; color: #8A8880; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .tp-back-btn:hover { background: #1a1a1f; color: #F0EEEA; }
+        .tp-breadcrumb-sep { color: #2A2A30; font-size: 0.8rem; }
+        .tp-breadcrumb-cur { color: #555550; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 
         .tp-hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: start; }
         @media (max-width: 700px) { .tp-hero-grid { grid-template-columns: 1fr; } }
 
         .tp-hero-badges { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .tp-status-badge { font-size: 0.68rem; font-weight: 800; padding: 4px 12px; border-radius: 100px; }
-        .tp-game-badge { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: #888; background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 100px; padding: 3px 10px; }
+        .tp-game-badge { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: #8A8880; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; padding: 3px 10px; }
         .tp-game-badge img { width: 14px; height: 14px; object-fit: contain; }
 
-        .tp-hero-title { font-size: 1.6rem; font-weight: 900; color: #111; margin-bottom: 6px; line-height: 1.2; }
-        .tp-hero-desc { color: #888; font-size: 0.88rem; margin-bottom: 20px; line-height: 1.5; }
+        .tp-hero-title { font-size: 1.6rem; font-weight: 900; color: #F0EEEA; margin-bottom: 6px; line-height: 1.2; }
+        .tp-hero-desc { color: #8A8880; font-size: 0.88rem; margin-bottom: 20px; line-height: 1.5; }
 
         .tp-meta-row { display: flex; gap: 0; flex-wrap: wrap; }
-        .tp-meta-item { display: flex; flex-direction: column; padding: 0 20px 0 0; margin-right: 20px; border-right: 1px solid #E5E3DF; }
+        .tp-meta-item { display: flex; flex-direction: column; padding: 0 20px 0 0; margin-right: 20px; border-right: 1px solid #2A2A30; }
         .tp-meta-item:last-child { border-right: none; }
-        .tp-meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; margin-bottom: 3px; }
-        .tp-meta-val { font-size: 0.85rem; font-weight: 700; color: #333; }
+        .tp-meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #555550; margin-bottom: 3px; }
+        .tp-meta-val { font-size: 0.85rem; font-weight: 700; color: #e0e0da; }
 
-        /* Right panel */
-        .tp-panel { background: #F8F7F4; border: 1px solid #E5E3DF; border-radius: 14px; padding: 20px; min-width: 220px; display: flex; flex-direction: column; gap: 16px; }
-        .tp-prize-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; margin-bottom: 4px; }
-        .tp-prize-amount { font-size: 2rem; font-weight: 900; color: #F05A28; line-height: 1; }
-        .tp-slots-text { font-size: 0.75rem; color: #888; display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .tp-slots-text strong { color: #111; font-weight: 800; }
-        .tp-slots-bar { height: 5px; background: #E5E3DF; border-radius: 3px; overflow: hidden; }
+        .tp-panel { background: #18181C; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px; min-width: 220px; display: flex; flex-direction: column; gap: 16px; }
+        .tp-prize-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #555550; margin-bottom: 4px; }
+        .tp-prize-amount { font-size: 2rem; font-weight: 900; color: #3B82F6; line-height: 1; }
+        .tp-slots-text { font-size: 0.75rem; color: #8A8880; display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .tp-slots-text strong { color: #F0EEEA; font-weight: 800; }
+        .tp-slots-bar { height: 5px; background: #2A2A30; border-radius: 3px; overflow: hidden; }
         .tp-slots-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
-        .tp-reg-btn { width: 100%; padding: 13px; background: #F05A28; color: #fff; border: none; border-radius: 100px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: background 0.15s; box-shadow: 0 2px 12px rgba(240,90,40,0.25); }
-        .tp-reg-btn:hover { background: #D44A1A; }
-        .tp-reg-done { width: 100%; padding: 13px; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 100px; font-size: 0.9rem; font-weight: 800; text-align: center; }
+        .tp-reg-btn { width: 100%; padding: 13px; background: #3B82F6; color: #fff; border: none; border-radius: 100px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: background 0.15s; box-shadow: 0 2px 12px rgba(59,130,246,0.25); }
+        .tp-reg-btn:hover { background: #2563EB; }
+        .tp-reg-done { width: 100%; padding: 13px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.9rem; font-weight: 800; text-align: center; }
 
-        /* Bracket pills */
         .tp-brackets { max-width: 1100px; margin: 0 auto; padding: 16px 30px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
         @media (max-width: 800px) { .tp-brackets { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .tp-brackets { grid-template-columns: 1fr 1fr; } }
-        .tp-bracket-card { background: #fff; border: 1px solid #E5E3DF; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .tp-bracket-card { background: #121215; border: 1px solid #2A2A30; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .tp-bracket-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
         .tp-bracket-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-        .tp-bracket-name { font-size: 0.72rem; font-weight: 700; color: #666; }
-        .tp-bracket-slots { font-size: 1.1rem; font-weight: 800; color: #111; }
-        .tp-bracket-slots span { color: #bbb; font-size: 0.75rem; font-weight: 400; }
-        .tp-bracket-bar { height: 3px; background: #F2F1EE; border-radius: 2px; overflow: hidden; margin-top: 6px; }
+        .tp-bracket-name { font-size: 0.72rem; font-weight: 700; color: #8A8880; }
+        .tp-bracket-slots { font-size: 1.1rem; font-weight: 800; color: #F0EEEA; }
+        .tp-bracket-slots span { color: #555550; font-size: 0.75rem; font-weight: 400; }
+        .tp-bracket-bar { height: 3px; background: #1e1e22; border-radius: 2px; overflow: hidden; margin-top: 6px; }
 
-        /* Tabs */
         .tp-tabs-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 30px 0; }
-        .tp-tabs { display: flex; gap: 0; border-bottom: 1px solid #E5E3DF; margin-bottom: 24px; overflow-x: auto; }
-        .tp-tab { padding: 10px 18px; background: transparent; border: none; font-size: 0.86rem; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
-        .tp-tab.active { color: #F05A28; border-bottom-color: #F05A28; font-weight: 800; }
-        .tp-tab:hover:not(.active) { color: #444; }
+        .tp-tabs { display: flex; gap: 0; border-bottom: 1px solid #2A2A30; margin-bottom: 24px; overflow-x: auto; }
+        .tp-tab { padding: 10px 18px; background: transparent; border: none; font-size: 0.86rem; font-weight: 600; color: #8A8880; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
+        .tp-tab.active { color: #3B82F6; border-bottom-color: #3B82F6; font-weight: 800; }
+        .tp-tab:hover:not(.active) { color: #ccc; }
 
-        /* Tab content */
         .tp-tab-content { padding-bottom: 48px; }
 
-        /* Cards */
-        .tp-card { background: #fff; border: 1px solid #E5E3DF; border-radius: 12px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .tp-card-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #bbb; margin-bottom: 16px; display: block; }
-        .tp-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-card { background: #121215; border: 1px solid #2A2A30; border-radius: 12px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+        .tp-card-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #555550; margin-bottom: 16px; display: block; }
+        .tp-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid #1e1e22; }
         .tp-row:last-child { border-bottom: none; }
-        .tp-row-key { font-size: 0.84rem; color: #888; }
-        .tp-row-val { font-size: 0.84rem; font-weight: 700; color: #333; }
+        .tp-row-key { font-size: 0.84rem; color: #8A8880; }
+        .tp-row-val { font-size: 0.84rem; font-weight: 700; color: #e0e0da; }
 
-        /* Prize rows */
-        .tp-prize-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-prize-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #1e1e22; }
         .tp-prize-row:last-child { border-bottom: none; }
-        .tp-prize-place { font-size: 0.9rem; color: #444; }
+        .tp-prize-place { font-size: 0.9rem; color: #ccc; }
         .tp-prize-val { font-size: 0.95rem; font-weight: 800; }
 
-        /* Rules */
-        .tp-rule { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #F2F1EE; }
+        .tp-rule { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #1e1e22; }
         .tp-rule:last-child { border-bottom: none; }
-        .tp-rule-num { color: #F05A28; font-weight: 800; font-size: 0.85rem; min-width: 22px; }
-        .tp-rule-text { color: #555; font-size: 0.85rem; line-height: 1.6; }
+        .tp-rule-num { color: #3B82F6; font-weight: 800; font-size: 0.85rem; min-width: 22px; }
+        .tp-rule-text { color: #8A8880; font-size: 0.85rem; line-height: 1.6; }
 
-        /* Empty state */
         .tp-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 0; gap: 10px; }
         .tp-empty-icon { font-size: 2.5rem; }
-        .tp-empty-title { font-size: 1rem; font-weight: 800; color: #333; }
-        .tp-empty-sub { font-size: 0.82rem; color: #aaa; }
+        .tp-empty-title { font-size: 1rem; font-weight: 800; color: #e0e0da; }
+        .tp-empty-sub { font-size: 0.82rem; color: #555550; }
       `}</style>
 
       <div className="tp-page">
         <Navbar />
 
-        {/* ── HERO ── */}
         <div className="tp-hero">
           <div className="tp-hero-inner">
-
-            {/* Breadcrumb */}
             <div className="tp-breadcrumb">
               <button className="tp-back-btn" onClick={() => router.push("/dota2")}>← Tournaments</button>
               <span className="tp-breadcrumb-sep">›</span>
@@ -196,21 +183,20 @@ export default function TournamentPage() {
             </div>
 
             <div className="tp-hero-grid">
-              {/* Left */}
               <div>
                 <div className="tp-hero-badges">
                   <span className="tp-status-badge" style={{ background: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}` }}>
                     {statusBadge.label}
                   </span>
                   {isRegistered && !isEnded && (
-                    <span className="tp-status-badge" style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>✓ Registered</span>
+                    <span className="tp-status-badge" style={{ background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓ Registered</span>
                   )}
                   <span className="tp-game-badge">
                     <img src="https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png" alt="Dota 2" />
                     Dota 2
                   </span>
                   {tournament.month && (
-                    <span style={{ fontSize: "0.72rem", color: "#bbb", fontWeight: 600 }}>{tournament.month}</span>
+                    <span style={{ fontSize: "0.72rem", color: "#555550", fontWeight: 600 }}>{tournament.month}</span>
                   )}
                 </div>
 
@@ -232,13 +218,11 @@ export default function TournamentPage() {
                 </div>
               </div>
 
-              {/* Right panel */}
               <div className="tp-panel">
                 <div>
                   <div className="tp-prize-label">Prize Pool</div>
                   <div className="tp-prize-amount">{tournament.prizePool}</div>
                 </div>
-
                 <div>
                   <div className="tp-slots-text">
                     <span><strong>{slotsLeft}</strong> slots left</span>
@@ -248,7 +232,6 @@ export default function TournamentPage() {
                     <div className="tp-slots-fill" style={{ width: `${pct}%`, background: fillColor }} />
                   </div>
                 </div>
-
                 {!isEnded && (
                   isRegistered ? (
                     <div className="tp-reg-done">✓ You're Registered</div>
@@ -266,7 +249,6 @@ export default function TournamentPage() {
           </div>
         </div>
 
-        {/* ── BRACKET PILLS ── */}
         {tournament.brackets && (
           <div className="tp-brackets">
             {Object.entries(tournament.brackets).map(([key, val]: any) => {
@@ -276,7 +258,7 @@ export default function TournamentPage() {
                 legend_ancient:   { name: "Legend – Ancient",  color: "#a855f7" },
                 divine_immortal:  { name: "Divine – Immortal", color: "#f59e0b" },
               };
-              const b = labels[key] || { name: key, color: "#F05A28" };
+              const b = labels[key] || { name: key, color: "#3B82F6" };
               const bPct = Math.round((val.slotsBooked / val.slotsTotal) * 100);
               return (
                 <div key={key} className="tp-bracket-card">
@@ -296,7 +278,6 @@ export default function TournamentPage() {
           </div>
         )}
 
-        {/* ── TABS ── */}
         <div className="tp-tabs-wrap">
           <div className="tp-tabs">
             {TABS.map(tab => (
@@ -307,8 +288,6 @@ export default function TournamentPage() {
           </div>
 
           <div className="tp-tab-content">
-
-            {/* OVERVIEW */}
             {activeTab === "Overview" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div className="tp-card">
@@ -326,7 +305,6 @@ export default function TournamentPage() {
                     </div>
                   ))}
                 </div>
-
                 <div className="tp-card">
                   <span className="tp-card-label">Prize Distribution</span>
                   {[
@@ -339,14 +317,13 @@ export default function TournamentPage() {
                       <span className="tp-prize-val" style={{ color: item.color }}>{item.prize} of {tournament.prizePool}</span>
                     </div>
                   ))}
-                  <p style={{ color: "#bbb", fontSize: "0.75rem", marginTop: 14, lineHeight: 1.5 }}>
+                  <p style={{ color: "#555550", fontSize: "0.75rem", marginTop: 14, lineHeight: 1.5 }}>
                     Prizes paid via UPI within 48 hours of tournament end.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* RULES */}
             {activeTab === "Rules" && (
               <div className="tp-card" style={{ maxWidth: 680 }}>
                 <span className="tp-card-label">Tournament Rules</span>
@@ -359,7 +336,6 @@ export default function TournamentPage() {
               </div>
             )}
 
-            {/* MATCHES */}
             {activeTab === "Matches" && (
               <div className="tp-empty">
                 <span className="tp-empty-icon">🗓️</span>
@@ -368,7 +344,6 @@ export default function TournamentPage() {
               </div>
             )}
 
-            {/* PARTICIPANTS */}
             {activeTab === "Participants" && (
               <div className="tp-empty">
                 <span className="tp-empty-icon">👥</span>
@@ -377,7 +352,6 @@ export default function TournamentPage() {
               </div>
             )}
 
-            {/* STREAMS */}
             {activeTab === "Streams" && (
               <div className="tp-empty">
                 <span className="tp-empty-icon">📺</span>
@@ -385,7 +359,6 @@ export default function TournamentPage() {
                 <span className="tp-empty-sub">Stream links will be added closer to the tournament date.</span>
               </div>
             )}
-
           </div>
         </div>
       </div>

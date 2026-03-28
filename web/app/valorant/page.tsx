@@ -19,8 +19,8 @@ export default function Valorant() {
 
         .val-page {
           min-height: 100vh;
-          background: #F8F7F4;
-          color: #111;
+          background: #0A0A0C;
+          color: #F0EEEA;
           font-family: var(--font-geist-sans), system-ui, sans-serif;
         }
 
@@ -53,9 +53,9 @@ export default function Valorant() {
           z-index: 1;
           background: linear-gradient(
             to bottom,
-            rgba(248,247,244,0) 0%,
-            rgba(248,247,244,0.5) 55%,
-            rgba(248,247,244,1) 100%
+            rgba(10,10,12,0) 0%,
+            rgba(10,10,12,0.5) 55%,
+            rgba(10,10,12,1) 100%
           );
         }
         .val-hero-content {
@@ -73,19 +73,19 @@ export default function Valorant() {
           width: 48px;
           height: 48px;
           border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
         .val-hero-title {
           font-size: 2.2rem;
           font-weight: 900;
-          color: #111;
+          color: #F0EEEA;
           letter-spacing: -0.03em;
           line-height: 1.1;
         }
         .val-hero-title span { color: #ff4655; }
         .val-hero-sub {
           font-size: 0.84rem;
-          color: #666;
+          color: #8A8880;
           margin-top: 4px;
           font-weight: 500;
         }
@@ -106,14 +106,14 @@ export default function Valorant() {
           line-height: 1.5;
         }
         .val-banner-box.amber {
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          color: #92400e;
+          background: rgba(146,64,14,0.15);
+          border: 1px solid rgba(253,230,138,0.3);
+          color: #fbbf24;
         }
         .val-banner-box.gray {
-          background: #F8F7F4;
-          border: 1px solid #E5E3DF;
-          color: #888;
+          background: #121215;
+          border: 1px solid #2A2A30;
+          color: #8A8880;
         }
         .val-banner-link {
           color: #ff4655;
@@ -124,7 +124,7 @@ export default function Valorant() {
         }
         .val-banner-link:hover { text-decoration: underline; }
 
-        /* ── Tabs (pill style matching Dota) ── */
+        /* ── Tabs ── */
         .val-tabs-wrap {
           max-width: 1100px;
           margin: 0 auto;
@@ -133,19 +133,19 @@ export default function Valorant() {
         .val-tabs {
           display: flex;
           gap: 2px;
-          background: #fff;
+          background: #121215;
           border-radius: 12px;
           padding: 4px;
-          border: 1px solid #E5E3DF;
+          border: 1px solid #2A2A30;
           width: fit-content;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
         }
         .val-tab {
           padding: 9px 26px;
           border-radius: 9px;
           border: none;
           background: transparent;
-          color: #888;
+          color: #8A8880;
           cursor: pointer;
           font-size: 0.88rem;
           font-weight: 600;
@@ -155,7 +155,7 @@ export default function Valorant() {
           align-items: center;
           gap: 7px;
         }
-        .val-tab:hover { background: #F2F1EE; color: #555; }
+        .val-tab:hover { background: #1a1a1f; color: #bbb; }
         .val-tab.active {
           background: #ff4655;
           color: #fff;
@@ -167,13 +167,13 @@ export default function Valorant() {
         .val-coming-soon {
           text-align: center;
           padding: 80px 20px;
-          color: #bbb;
+          color: #555550;
         }
         .val-coming-soon-icon { font-size: 48px; margin-bottom: 12px; }
         .val-coming-soon-title {
           font-size: 1.1rem;
           font-weight: 700;
-          color: #888;
+          color: #8A8880;
           margin-bottom: 6px;
         }
         .val-coming-soon-text { font-size: 0.85rem; }
@@ -192,7 +192,6 @@ export default function Valorant() {
       <div className="val-page">
         <Navbar />
 
-        {/* ── Hero ── */}
         <div className="val-hero">
           <img
             className="val-hero-img"
@@ -214,7 +213,6 @@ export default function Valorant() {
           </div>
         </div>
 
-        {/* ── Riot ID Banners ── */}
         <div className="val-banner">
           {riotData?.riotLinked && riotData?.riotVerified === "pending" && (
             <div className="val-banner-box amber">
@@ -239,7 +237,6 @@ export default function Valorant() {
           )}
         </div>
 
-        {/* ── Tabs (pill style) ── */}
         <div className="val-tabs-wrap">
           <div className="val-tabs">
             <button
@@ -257,7 +254,6 @@ export default function Valorant() {
           </div>
         </div>
 
-        {/* ── Content ── */}
         {valTab === "tournaments" && <ValorantTournaments />}
         {valTab === "solo" && (
           <div className="val-coming-soon">

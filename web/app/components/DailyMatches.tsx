@@ -81,9 +81,6 @@ function groupByDate(lobbies: Lobby[]) {
 }
 
 // ── Smart Discord Button ──────────────────────────────────────────────────────
-// - Not logged in → open Discord server as guest
-// - Logged in, Discord not linked → trigger OAuth flow (/api/auth/discord)
-// - Logged in, Discord linked → open the server directly
 function DiscordButton() {
   const { user } = useAuth();
   const [discordLinked, setDiscordLinked] = useState(false);
@@ -107,13 +104,10 @@ function DiscordButton() {
 
   const handleClick = () => {
     if (discordLinked) {
-      // Connected → go straight to server
       window.open(DISCORD_SERVER_URL, "_blank");
     } else if (user) {
-      // Logged in but Discord not linked → run OAuth
       window.location.href = `/api/auth/discord?uid=${user.uid}`;
     } else {
-      // Guest → open server
       window.open(DISCORD_SERVER_URL, "_blank");
     }
   };
@@ -157,23 +151,23 @@ function HowItWorks() {
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #E5E3DF",
+        background: "#121215",
+        border: "1px solid #2A2A30",
         borderRadius: 16,
         padding: "28px 32px",
         marginBottom: 36,
-        boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 6px rgba(0,0,0,0.2)",
       }}
     >
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#F05A28", textTransform: "uppercase", marginBottom: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#3B82F6", textTransform: "uppercase", marginBottom: 4 }}>
           How It Works
         </div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#111", letterSpacing: "-0.02em" }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#F0EEEA", letterSpacing: "-0.02em" }}>
           Play every Day
         </div>
-        <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: "#8A8880", marginTop: 4 }}>
           Daily 10-player lobbies · Auto-tracked results · Zero entry fee
         </div>
       </div>
@@ -205,23 +199,23 @@ function HowItWorks() {
           <div
             key={s.step}
             style={{
-              background: "#F8F7F4",
+              background: "#18181C",
               borderRadius: 12,
               padding: "18px 20px",
-              border: "1px solid #E5E3DF",
+              border: "1px solid #2A2A30",
               display: "flex",
               flexDirection: "column",
               gap: 8,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#F05A28", background: "#FEE9E0", borderRadius: 20, padding: "2px 8px", letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#3B82F6", background: "rgba(59,130,246,0.12)", borderRadius: 20, padding: "2px 8px", letterSpacing: "0.05em" }}>
                 STEP {s.step}
               </span>
               <span style={{ fontSize: 20 }}>{s.icon}</span>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{s.title}</div>
-            <div style={{ fontSize: 12, color: "#777", lineHeight: 1.6 }}>{s.desc}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#F0EEEA" }}>{s.title}</div>
+            <div style={{ fontSize: 12, color: "#8A8880", lineHeight: 1.6 }}>{s.desc}</div>
             {s.cta && <div style={{ marginTop: 4 }}>{s.cta}</div>}
           </div>
         ))}
@@ -230,15 +224,15 @@ function HowItWorks() {
       {/* Queue reminder */}
       <div style={{
         marginTop: 18, padding: "12px 18px",
-        background: "#FEF9F7", border: "1px solid #FDDDD3",
+        background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)",
         borderRadius: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
       }}>
         <span style={{ fontSize: 18 }}>⏰</span>
         <div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#F05A28" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#3B82F6" }}>
             Queue opens every day 
           </span>
-          <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: "#555550", marginLeft: 8 }}>
             First 10 players in → lobby created → Dota2 lobby invite sent. Be on time.
           </span>
         </div>
@@ -273,37 +267,37 @@ export default function DailyMatches() {
       {/* Match History */}
       <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#F05A28", textTransform: "uppercase", marginBottom: 2 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#3B82F6", textTransform: "uppercase", marginBottom: 2 }}>
             Match History
           </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#111", letterSpacing: "-0.02em" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#F0EEEA", letterSpacing: "-0.02em" }}>
             Recent Daily Games
           </div>
         </div>
         {!loading && !error && lobbies.length > 0 && (
-          <span style={{ fontSize: 12, color: "#aaa" }}>
+          <span style={{ fontSize: 12, color: "#555550" }}>
             {lobbies.length} match{lobbies.length !== 1 ? "es" : ""} recorded
           </span>
         )}
       </div>
 
       {loading && (
-        <div style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 12, padding: "48px 0", textAlign: "center", color: "#bbb", fontSize: 14 }}>
+        <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "48px 0", textAlign: "center", color: "#555550", fontSize: 14 }}>
           Loading matches...
         </div>
       )}
 
       {error && (
-        <div style={{ background: "#fff", border: "1px solid #FECACA", borderRadius: 12, padding: "24px", color: "#EF4444", fontSize: 13 }}>
+        <div style={{ background: "#121215", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: "24px", color: "#f87171", fontSize: 13 }}>
           Failed to load match history: {error}
         </div>
       )}
 
       {!loading && !error && lobbies.length === 0 && (
-        <div style={{ background: "#fff", border: "1px dashed #E5E3DF", borderRadius: 12, padding: "48px 24px", textAlign: "center" }}>
+        <div style={{ background: "#121215", border: "1px dashed #2A2A30", borderRadius: 12, padding: "48px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🎮</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#333" }}>No matches played yet</div>
-          <div style={{ fontSize: 13, color: "#aaa", marginTop: 6 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#e0e0da" }}>No matches played yet</div>
+          <div style={{ fontSize: 13, color: "#555550", marginTop: 6 }}>
             First match appears here after tonight's queue at 9 PM IST.
           </div>
         </div>
@@ -314,11 +308,11 @@ export default function DailyMatches() {
           {Object.entries(groupByDate(lobbies)).map(([date, matches]) => (
             <div key={date} style={{ marginBottom: 36 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <span style={{ color: "#555", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                <span style={{ color: "#8A8880", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                   {date}
                 </span>
-                <div style={{ flex: 1, height: 1, background: "#E5E3DF" }} />
-                <span style={{ fontSize: 11, color: "#bbb", whiteSpace: "nowrap" }}>
+                <div style={{ flex: 1, height: 1, background: "#2A2A30" }} />
+                <span style={{ fontSize: 11, color: "#555550", whiteSpace: "nowrap" }}>
                   {matches.length} match{matches.length !== 1 ? "es" : ""}
                 </span>
               </div>
@@ -337,13 +331,13 @@ export default function DailyMatches() {
 function MatchCard({ lobby }: { lobby: Lobby }) {
   const [expanded, setExpanded] = useState(false);
   const hasMatchId = !!lobby.dotaMatchId;
-  const winnerColor = lobby.winner === "radiant" ? "#22c55e" : lobby.winner === "dire" ? "#ef4444" : "#E5E3DF";
+  const winnerColor = lobby.winner === "radiant" ? "#22c55e" : lobby.winner === "dire" ? "#ef4444" : "#2A2A30";
   const duration = formatDuration(lobby.duration);
 
   return (
     <div
-      style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 12, marginBottom: 10, overflow: "hidden", transition: "box-shadow 0.15s" }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)")}
+      style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, marginBottom: 10, overflow: "hidden", transition: "box-shadow 0.15s" }}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.3)")}
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
       <div style={{ display: "flex" }}>
@@ -358,10 +352,10 @@ function MatchCard({ lobby }: { lobby: Lobby }) {
           >
             {/* Left */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 150 }}>
-              <span style={{ color: "#111", fontWeight: 700, fontSize: 13, fontFamily: "monospace" }}>
+              <span style={{ color: "#F0EEEA", fontWeight: 700, fontSize: 13, fontFamily: "monospace" }}>
                 {hasMatchId ? `#${lobby.dotaMatchId}` : `Lobby ${lobby.id.slice(0, 8)}…`}
               </span>
-              <span style={{ color: "#aaa", fontSize: 11 }}>
+              <span style={{ color: "#555550", fontSize: 11 }}>
                 {lobby.completedAt ? formatDate(lobby.completedAt) : "In progress"}
               </span>
             </div>
@@ -369,7 +363,7 @@ function MatchCard({ lobby }: { lobby: Lobby }) {
             {/* Center */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
               <TeamPills players={lobby.radiant} side="radiant" winner={lobby.winner} />
-              <span style={{ color: "#ccc", fontSize: 11, fontWeight: 700, padding: "3px 10px", background: "#F8F7F4", borderRadius: 6, border: "1px solid #E5E3DF" }}>
+              <span style={{ color: "#555550", fontSize: 11, fontWeight: 700, padding: "3px 10px", background: "#18181C", borderRadius: 6, border: "1px solid #2A2A30" }}>
                 VS
               </span>
               <TeamPills players={lobby.dire} side="dire" winner={lobby.winner} />
@@ -382,8 +376,8 @@ function MatchCard({ lobby }: { lobby: Lobby }) {
                   {lobby.winner === "radiant" ? "Radiant Win" : "Dire Win"}
                 </span>
               )}
-              {duration && <span style={{ color: "#aaa", fontSize: 11 }}>⏱ {duration}</span>}
-              {hasMatchId && <span style={{ fontSize: 11, color: "#6366f1", textDecoration: "underline", cursor: "pointer" }}>OpenDota ↗</span>}
+              {duration && <span style={{ color: "#555550", fontSize: 11 }}>⏱ {duration}</span>}
+              {hasMatchId && <span style={{ fontSize: 11, color: "#818cf8", textDecoration: "underline", cursor: "pointer" }}>OpenDota ↗</span>}
             </div>
           </div>
 
@@ -391,7 +385,7 @@ function MatchCard({ lobby }: { lobby: Lobby }) {
           {lobby.playerStats && lobby.playerStats.length > 0 && (
             <>
               <div
-                style={{ borderTop: "1px solid #F2F1EE", padding: "7px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#bbb", fontSize: 11, fontWeight: 600, userSelect: "none" }}
+                style={{ borderTop: "1px solid #1e1e22", padding: "7px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#555550", fontSize: 11, fontWeight: 600, userSelect: "none" }}
                 onClick={() => setExpanded(!expanded)}
               >
                 {expanded ? "▲ Hide player stats" : "▼ Show player stats"}
@@ -411,9 +405,9 @@ function TeamPills({ players, side, winner }: { players: MatchPlayer[]; side: "r
   return (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: 220, justifyContent: side === "radiant" ? "flex-end" : "flex-start" }}>
       {players.length === 0
-        ? <span style={{ color: "#ccc", fontSize: 11 }}>—</span>
+        ? <span style={{ color: "#555550", fontSize: 11 }}>—</span>
         : players.map((p, i) => (
-          <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, fontWeight: isWinner ? 700 : 500, background: isWinner ? `${color}15` : "#F8F7F4", color: isWinner ? color : "#666", border: `1px solid ${isWinner ? `${color}33` : "#E5E3DF"}` }}>
+          <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, fontWeight: isWinner ? 700 : 500, background: isWinner ? `${color}15` : "#18181C", color: isWinner ? color : "#8A8880", border: `1px solid ${isWinner ? `${color}33` : "#2A2A30"}` }}>
             {p.steamName || p.username}
           </span>
         ))
@@ -427,7 +421,7 @@ function PlayerStatsTable({ stats }: { stats: PlayerStat[] }) {
     <div style={{ padding: "0 20px 16px", overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
-          <tr style={{ color: "#aaa", textAlign: "left", borderBottom: "1px solid #F2F1EE", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <tr style={{ color: "#555550", textAlign: "left", borderBottom: "1px solid #1e1e22", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>
             <th style={{ padding: "6px 8px" }}>Player</th>
             <th style={{ padding: "6px 8px" }}>Hero</th>
             <th style={{ padding: "6px 8px", textAlign: "center" }}>K</th>
@@ -437,12 +431,12 @@ function PlayerStatsTable({ stats }: { stats: PlayerStat[] }) {
         </thead>
         <tbody>
           {stats.map((s, i) => (
-            <tr key={i} style={{ borderBottom: "1px solid #F8F7F4" }}>
-              <td style={{ padding: "7px 8px", color: "#333", fontWeight: 600 }}>{s.steamName}</td>
-              <td style={{ padding: "7px 8px", color: "#888" }}>{s.hero || "—"}</td>
-              <td style={{ padding: "7px 8px", textAlign: "center", color: "#22c55e", fontWeight: 700 }}>{s.kills}</td>
-              <td style={{ padding: "7px 8px", textAlign: "center", color: "#ef4444", fontWeight: 700 }}>{s.deaths}</td>
-              <td style={{ padding: "7px 8px", textAlign: "center", color: "#f59e0b", fontWeight: 700 }}>{s.assists}</td>
+            <tr key={i} style={{ borderBottom: "1px solid #1e1e22" }}>
+              <td style={{ padding: "7px 8px", color: "#e0e0da", fontWeight: 600 }}>{s.steamName}</td>
+              <td style={{ padding: "7px 8px", color: "#8A8880" }}>{s.hero || "—"}</td>
+              <td style={{ padding: "7px 8px", textAlign: "center", color: "#4ade80", fontWeight: 700 }}>{s.kills}</td>
+              <td style={{ padding: "7px 8px", textAlign: "center", color: "#f87171", fontWeight: 700 }}>{s.deaths}</td>
+              <td style={{ padding: "7px 8px", textAlign: "center", color: "#fbbf24", fontWeight: 700 }}>{s.assists}</td>
             </tr>
           ))}
         </tbody>

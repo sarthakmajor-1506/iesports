@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 /**
- * Double Elimination Bracket — Light Theme
+ * Double Elimination Bracket — OLED Dark Theme
  *
  * Dynamically adjusts bracket structure based on team count:
  *   2 teams → Grand Final only
@@ -66,36 +66,36 @@ const ROW_GAP = 28;
 const SECTION_GAP = 56;
 const PAD = 30;
 
-// ── Theme colors (light, matching app) ────────────────────────────────────────
+// ── Theme colors (OLED dark) ──────────────────────────────────────────────────
 const C = {
-  bg: "#F8F7F4",
-  cardBg: "#FFFFFF",
-  cardBorder: "#E5E3DF",
-  cardBorderHover: "#D5D3CF",
-  divider: "#F2F1EE",
-  text: "#111111",
-  textSec: "#666666",
-  textMuted: "#999999",
-  textPlaceholder: "#CCCCCC",
+  bg: "#0A0A0C",
+  cardBg: "#121215",
+  cardBorder: "#2A2A30",
+  cardBorderHover: "#3a3a42",
+  divider: "#1e1e22",
+  text: "#F0EEEA",
+  textSec: "#8A8880",
+  textMuted: "#555550",
+  textPlaceholder: "#3a3a42",
   accent: "#ff4655",
-  accentLight: "#fff0f1",
-  accentBorder: "#fecdd3",
-  win: "#16a34a",
-  winBg: "#f0fdf4",
-  winBorder: "#bbf7d0",
-  loss: "#dc2626",
-  lossBg: "#fef2f2",
+  accentLight: "rgba(255,70,85,0.1)",
+  accentBorder: "rgba(255,70,85,0.25)",
+  win: "#4ade80",
+  winBg: "rgba(22,163,74,0.12)",
+  winBorder: "rgba(34,197,94,0.3)",
+  loss: "#f87171",
+  lossBg: "rgba(239,68,68,0.1)",
   live: "#f59e0b",
-  liveBg: "#fffbeb",
+  liveBg: "rgba(245,158,11,0.12)",
   blue: "#3b82f6",
-  connector: "#D5D3CF",
+  connector: "#3a3a42",
   connectorDotUpper: "#3b82f6",
   connectorDotLower: "#ff4655",
-  seedBg: "#eff6ff",
-  seedText: "#3b82f6",
-  seedBorder: "#bfdbfe",
-  byeBg: "#F8F7F4",
-  byeText: "#CCCCCC",
+  seedBg: "rgba(59,130,246,0.12)",
+  seedText: "#60A5FA",
+  seedBorder: "rgba(59,130,246,0.3)",
+  byeBg: "#18181C",
+  byeText: "#3a3a42",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function makePlaceholder(
   };
 }
 
-// ── SVG Match Card (light theme) ──────────────────────────────────────────────
+// ── SVG Match Card ────────────────────────────────────────────────────────────
 function MatchCard({ match, x, y }: { match: BracketMatch; x: number; y: number }) {
   const isComplete = match.status === "completed";
   const isLive = match.status === "live";
@@ -156,7 +156,7 @@ function MatchCard({ match, x, y }: { match: BracketMatch; x: number; y: number 
   return (
     <g transform={`translate(${x}, ${y})`}>
       {/* Shadow */}
-      <rect width={MATCH_W} height={MATCH_H} rx={10} ry={10} fill="rgba(0,0,0,0.03)" x={1} y={2} />
+      <rect width={MATCH_W} height={MATCH_H} rx={10} ry={10} fill="rgba(0,0,0,0.2)" x={1} y={2} />
       {/* Card */}
       <rect width={MATCH_W} height={MATCH_H} rx={10} ry={10} fill={C.cardBg} stroke={borderColor} strokeWidth={1.2} />
 
@@ -271,7 +271,7 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, y, matchId, rowId
         <>
           <rect x={MATCH_W - 30} y={3} width={22} height={26} rx={5}
             fill={isWinner ? C.winBg : isComplete ? C.lossBg : C.bg}
-            stroke={isWinner ? C.winBorder : isComplete ? "#fecaca" : C.cardBorder} strokeWidth={0.5} />
+            stroke={isWinner ? C.winBorder : isComplete ? "rgba(239,68,68,0.25)" : C.cardBorder} strokeWidth={0.5} />
           <text x={MATCH_W - 19} y={21} fill={isWinner ? C.win : isComplete ? (isLoser ? C.loss : C.textMuted) : C.textPlaceholder}
             fontSize={12} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
             {isComplete ? score : "–"}
@@ -382,7 +382,6 @@ function Bracket2({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3-TEAM: UB Final (#1 vs #2) → LB Final (UB loser vs #3) → Grand Final
-// Top 2 in UB, #3 starts in LB with bye
 // ═══════════════════════════════════════════════════════════════════════════════
 function Bracket3({ matchMap, teams, hasMatches }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
@@ -404,7 +403,7 @@ function Bracket3({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
     hasMatches ? (matchMap[id] || makePlaceholder(id, num, a, b)) : makePlaceholder(id, num, a, b);
 
   const mUBF = getM("wb-final", 1, t1, t2);
-  const mLBF = getM("lb-final", 2, TBD_TEAM, { ...t3, teamName: t3.teamName }); // UB loser vs #3
+  const mLBF = getM("lb-final", 2, TBD_TEAM, { ...t3, teamName: t3.teamName });
   const mGF = getM("grand-final", 3, TBD_TEAM, TBD_TEAM);
 
   return (
@@ -412,28 +411,22 @@ function Bracket3({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
       <ColHeader x={ubFinal.x + MATCH_W / 2} y={PAD} text="UPPER BRACKET FINAL" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
-      {/* UB Final → GF */}
       <Connector x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
 
-      {/* LB section */}
       <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER BRACKET" color={C.accent} />
       <ColHeader x={lbFinal.x + MATCH_W / 2} y={losersY - 14} text="LOWER BRACKET FINAL" />
 
-      {/* LB Final → GF */}
       <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
 
-      {/* UB Final → LB Final (loser drops) */}
       <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
-      {/* Cards */}
       <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} />
       <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} />
       <MatchCard match={mGF} x={gf.x} y={gf.y} />
 
-      {/* Seed #3 annotation */}
       <text x={lbFinal.x + MATCH_W + 10} y={lbFinal.y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={9} fontFamily="system-ui" fontStyle="italic">
         #3 seed starts in lower bracket
@@ -444,33 +437,14 @@ function Bracket3({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4-TEAM BRACKET — 50/50 SPLIT
-//
-// Upper Bracket: #1 vs #2 (UB Semi)
-// Lower Bracket: #3 vs #4 (LB R1)
-//
-// Flow:
-//   UB Semi winner → UB Final (bye, goes straight to GF upper slot)
-//   UB Semi loser  → LB Final vs LB R1 winner
-//   LB Final winner → Grand Final lower slot
-//
-// Simplified: Since there's only 1 UB match, UB "Final" is just the semi.
-//   UB Semi winner → GF (upper slot)
-//   UB Semi loser  → LB Final
-//   LB R1 winner   → LB Final
-//   LB Final winner → GF (lower slot)
 // ═══════════════════════════════════════════════════════════════════════════════
 function Bracket4({ matchMap, teams, hasMatches }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
-  // Upper Bracket: single match (#1 vs #2)
   const ubSemi = { x: colX(0), y: PAD + 30 };
-
-  // Lower Bracket: #3 vs #4 plays in R1, then winner faces UB loser in LB Final
   const losersY = ubSemi.y + MATCH_H + SECTION_GAP + 30;
   const lbR1 = { x: colX(0), y: losersY };
   const lbF = { x: colX(1), y: losersY };
-
-  // Grand Final: UB winner vs LB Final winner
   const gfY = ubSemi.y + (losersY - ubSemi.y) / 2;
   const gf = { x: colX(2), y: gfY };
 
@@ -481,45 +455,37 @@ function Bracket4({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
   const getM = (id: string, num: number, a: TeamSlot, b: TeamSlot) =>
     hasMatches ? (matchMap[id] || makePlaceholder(id, num, a, b)) : makePlaceholder(id, num, a, b);
 
-  // 50/50 split: Top 2 in UB, Bottom 2 in LB
-  const mUBSemi = getM("wb-semi-m1", 1, t(0), t(1));    // #1 vs #2
-  const mLBR1 = getM("lb-r1-m1", 2, t(2), t(3));        // #3 vs #4
-  const mLBF = getM("lb-final", 3, TBD_TEAM, TBD_TEAM);  // UB loser vs LB R1 winner
-  const mGF = getM("grand-final", 4, TBD_TEAM, TBD_TEAM); // UB winner vs LB Final winner
+  const mUBSemi = getM("wb-semi-m1", 1, t(0), t(1));
+  const mLBR1 = getM("lb-r1-m1", 2, t(2), t(3));
+  const mLBF = getM("lb-final", 3, TBD_TEAM, TBD_TEAM);
+  const mGF = getM("grand-final", 4, TBD_TEAM, TBD_TEAM);
 
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length || 4}>
       <ColHeader x={ubSemi.x + MATCH_W / 2} y={PAD} text="UPPER BRACKET" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
-      {/* UB Semi → GF (winner goes directly) */}
       <Connector x1={ubSemi.x + MATCH_W} y1={ubSemi.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubSemi.x + MATCH_W} y={ubSemi.y + MATCH_H / 2} />
 
-      {/* UB Semi loser drops to LB Final */}
       <Connector x1={ubSemi.x + MATCH_W / 2} y1={ubSemi.y + MATCH_H} x2={lbF.x + MATCH_W / 4} y2={lbF.y} />
       <CDot x={ubSemi.x + MATCH_W / 2} y={ubSemi.y + MATCH_H} lower />
 
-      {/* Lower bracket */}
       <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER BRACKET" color={C.accent} />
       <ColHeader x={lbR1.x + MATCH_W / 2} y={losersY - 14} text="LOWER R1" />
       <ColHeader x={lbF.x + MATCH_W / 2} y={losersY - 14} text="LOWER FINAL" />
 
-      {/* LB R1 → LB Final */}
       <Connector x1={lbR1.x + MATCH_W} y1={lbR1.y + MATCH_H / 2} x2={lbF.x} y2={lbF.y + 3 * MATCH_H / 4} />
       <CDot x={lbR1.x + MATCH_W} y={lbR1.y + MATCH_H / 2} lower />
 
-      {/* LB Final → GF */}
       <Connector x1={lbF.x + MATCH_W} y1={lbF.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbF.x + MATCH_W} y={lbF.y + MATCH_H / 2} lower />
 
-      {/* Cards */}
       <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} />
       <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} />
       <MatchCard match={mLBF} x={lbF.x} y={lbF.y} />
       <MatchCard match={mGF} x={gf.x} y={gf.y} />
 
-      {/* Annotations */}
       <text x={ubSemi.x + MATCH_W + 10} y={ubSemi.y + MATCH_H / 2 - 4}
         fill={C.win} fontSize={8.5} fontFamily="system-ui" fontWeight={700}>
         Winner → Grand Final
@@ -533,44 +499,28 @@ function Bracket4({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 8-TEAM BRACKET — 50/50 SPLIT (5-8 teams, with byes for < 8)
-//
-// Upper Bracket (top 4 from standings):
-//   UB R1: #1 vs #4, #2 vs #3
-//   UB Final: UB R1 winners
-//
-// Lower Bracket (bottom 4 from standings, seeds #5-#8):
-//   LB R1: #5 vs #8, #6 vs #7  (direct seeded matches)
-//   LB R2: LB R1 winners vs UB R1 losers (dropping down)
-//   LB Semi: LB R2 winners
-//   LB Final: LB Semi winner vs UB Final loser
-//
-// Grand Final: UB Final winner vs LB Final winner
+// 8-TEAM BRACKET — 50/50 SPLIT
 // ═══════════════════════════════════════════════════════════════════════════════
 function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
-  // Upper Bracket positions (only 2 R1 matches now — top 4 teams)
   const ubR1Y = (i: number) => PAD + 30 + i * (MATCH_H + ROW_GAP);
   const ubR1 = [0, 1].map(i => ({ x: colX(0), y: ubR1Y(i) }));
   const ubFinalY = ubR1Y(0) + (MATCH_H + ROW_GAP) / 2;
   const ubFinal = { x: colX(1), y: ubFinalY };
 
-  // Lower Bracket positions (bottom 4 teams start here)
   const losersBaseY = ubR1[1].y + MATCH_H + SECTION_GAP + 30;
   const lbR1 = [0, 1].map(i => ({ x: colX(0), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
   const lbR2 = [0, 1].map(i => ({ x: colX(1), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
   const lbSemi = { x: colX(2), y: losersBaseY + (MATCH_H + ROW_GAP) / 2 };
   const lbFinal = { x: colX(3), y: lbSemi.y };
 
-  // Grand Final: centered between UB Final and LB Final
   const gfY = ubFinal.y + (lbFinal.y - ubFinal.y) / 2;
   const gf = { x: colX(3) + MATCH_W / 2, y: gfY };
 
   const totalW = gf.x + MATCH_W + PAD;
   const totalH = lbR1[1].y + MATCH_H + PAD + 20;
 
-  // Top 4 → Upper Bracket, Bottom 4 → Lower Bracket
   const ubTeam = (i: number) => (i < Math.min(4, teams.length)) ? teams[i] : BYE_TEAM;
   const lbTeam = (i: number) => {
     const idx = 4 + i;
@@ -580,20 +530,17 @@ function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
   const getM = (id: string, num: number, a: TeamSlot, b: TeamSlot) =>
     hasMatches ? (matchMap[id] || makePlaceholder(id, num, a, b)) : makePlaceholder(id, num, a, b);
 
-  // Upper Bracket R1: #1 vs #4, #2 vs #3
   const mUBR1 = [
-    getM("wb-r1-m1", 1, ubTeam(0), ubTeam(3)),  // #1 vs #4
-    getM("wb-r1-m2", 2, ubTeam(1), ubTeam(2)),  // #2 vs #3
+    getM("wb-r1-m1", 1, ubTeam(0), ubTeam(3)),
+    getM("wb-r1-m2", 2, ubTeam(1), ubTeam(2)),
   ];
 
   let mNum = 3;
   const mUBF = getM("wb-final", mNum++, TBD_TEAM, TBD_TEAM);
 
-  // Lower Bracket R1: #5 vs #8, #6 vs #7 (these teams START here)
-  const mLBR1_1 = getM("lb-r1-m1", mNum++, lbTeam(0), lbTeam(3)); // #5 vs #8
-  const mLBR1_2 = getM("lb-r1-m2", mNum++, lbTeam(1), lbTeam(2)); // #6 vs #7
+  const mLBR1_1 = getM("lb-r1-m1", mNum++, lbTeam(0), lbTeam(3));
+  const mLBR1_2 = getM("lb-r1-m2", mNum++, lbTeam(1), lbTeam(2));
 
-  // LB R2: LB R1 winners vs UB R1 losers dropping down
   const mLBR2_1 = getM("lb-r2-m1", mNum++, TBD_TEAM, TBD_TEAM);
   const mLBR2_2 = getM("lb-r2-m2", mNum++, TBD_TEAM, TBD_TEAM);
 
@@ -603,32 +550,26 @@ function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
 
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length || 8}>
-      {/* Column headers */}
       <ColHeader x={colX(0) + MATCH_W / 2} y={PAD} text="UPPER R1" />
       <ColHeader x={colX(1) + MATCH_W / 2} y={PAD} text="UPPER FINAL" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
-      {/* UB R1 → UB Final connectors */}
       <Connector x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + MATCH_H / 4} />
       <Connector x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + 3 * MATCH_H / 4} />
       <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
       <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
 
-      {/* UB Final → GF */}
       <Connector x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
 
-      {/* UB R1 losers drop to LB R2 */}
       <Connector x1={ubR1[0].x + MATCH_W / 2} y1={ubR1[0].y + MATCH_H} x2={lbR2[0].x + MATCH_W / 4} y2={lbR2[0].y} />
       <CDot x={ubR1[0].x + MATCH_W / 2} y={ubR1[0].y + MATCH_H} lower />
       <Connector x1={ubR1[1].x + MATCH_W / 2} y1={ubR1[1].y + MATCH_H} x2={lbR2[1].x + MATCH_W / 4} y2={lbR2[1].y} />
       <CDot x={ubR1[1].x + MATCH_W / 2} y={ubR1[1].y + MATCH_H} lower />
 
-      {/* UB Final loser drops to LB Final */}
       <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
-      {/* ── Lower Bracket Section ─────────────────────────────────────── */}
       <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
 
       <ColHeader x={colX(0) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R1" />
@@ -636,7 +577,6 @@ function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
       <ColHeader x={colX(2) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER SEMI" />
       <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER FINAL" />
 
-      {/* LB R1 → LB R2 (winners advance, face UB dropdowns) */}
       {[0, 1].map(i => (
         <g key={`lbr1-lbr2-${i}`}>
           <Connector x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + 3 * MATCH_H / 4} />
@@ -644,26 +584,20 @@ function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
         </g>
       ))}
 
-      {/* LB R2 → LB Semi */}
       <Connector x1={lbR2[0].x + MATCH_W} y1={lbR2[0].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + MATCH_H / 4} />
       <Connector x1={lbR2[1].x + MATCH_W} y1={lbR2[1].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + 3 * MATCH_H / 4} />
       <CDot x={lbR2[0].x + MATCH_W} y={lbR2[0].y + MATCH_H / 2} lower />
       <CDot x={lbR2[1].x + MATCH_W} y={lbR2[1].y + MATCH_H / 2} lower />
 
-      {/* LB Semi → LB Final */}
       <Connector x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={lbFinal.y + 3 * MATCH_H / 4} />
       <CDot x={lbSemi.x + MATCH_W} y={lbSemi.y + MATCH_H / 2} lower />
 
-      {/* LB Final → GF */}
       <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
 
-      {/* ── Match Cards ───────────────────────────────────────────────── */}
-      {/* Upper Bracket */}
       {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} />)}
       <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} />
 
-      {/* Lower Bracket */}
       <MatchCard match={mLBR1_1} x={lbR1[0].x} y={lbR1[0].y} />
       <MatchCard match={mLBR1_2} x={lbR1[1].x} y={lbR1[1].y} />
       <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} />
@@ -671,10 +605,8 @@ function Bracket8({ matchMap, teams, hasMatches }: { matchMap: Record<string, Br
       <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} />
       <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} />
 
-      {/* Grand Final */}
       <MatchCard match={mGF} x={gf.x} y={gf.y} />
 
-      {/* Annotations showing the split */}
       <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
         Top 4 from group stage

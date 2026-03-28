@@ -17,12 +17,12 @@ export default function Dota2() {
 
         .d2-page {
           min-height: 100vh;
-          background: #F8F7F4;
-          color: #111;
+          background: #0A0A0C;
+          color: #F0EEEA;
           font-family: var(--font-geist-sans), system-ui, sans-serif;
         }
 
-        /* ── Hero (matching Valorant style) ── */
+        /* ── Hero ── */
         .d2-hero {
           position: relative;
           overflow: hidden;
@@ -51,9 +51,9 @@ export default function Dota2() {
           z-index: 1;
           background: linear-gradient(
             to bottom,
-            rgba(248,247,244,0) 0%,
-            rgba(248,247,244,0.5) 55%,
-            rgba(248,247,244,1) 100%
+            rgba(10,10,12,0) 0%,
+            rgba(10,10,12,0.5) 55%,
+            rgba(10,10,12,1) 100%
           );
         }
         .d2-hero-content {
@@ -71,19 +71,19 @@ export default function Dota2() {
           width: 48px;
           height: 48px;
           border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
         .d2-hero-title {
           font-size: 2.2rem;
           font-weight: 900;
-          color: #111;
+          color: #F0EEEA;
           letter-spacing: -0.03em;
           line-height: 1.1;
         }
-        .d2-hero-title span { color: #F05A28; }
+        .d2-hero-title span { color: #3B82F6; }
         .d2-hero-sub {
           font-size: 0.84rem;
-          color: #666;
+          color: #8A8880;
           margin-top: 4px;
           font-weight: 500;
         }
@@ -97,19 +97,19 @@ export default function Dota2() {
         .d2-tabs {
           display: flex;
           gap: 2px;
-          background: #fff;
+          background: #121215;
           border-radius: 12px;
           padding: 4px;
-          border: 1px solid #E5E3DF;
+          border: 1px solid #2A2A30;
           width: fit-content;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
         }
         .d2-tab {
           padding: 9px 28px;
           border-radius: 9px;
           border: none;
           background: transparent;
-          color: #888;
+          color: #8A8880;
           cursor: pointer;
           font-size: 0.9rem;
           font-weight: 600;
@@ -119,24 +119,24 @@ export default function Dota2() {
           align-items: center;
           gap: 7px;
         }
-        .d2-tab:hover { background: #F2F1EE; color: #555; }
+        .d2-tab:hover { background: #1a1a1f; color: #bbb; }
         .d2-tab.active {
-          background: #F05A28;
+          background: #3B82F6;
           color: #fff;
-          box-shadow: 0 2px 10px rgba(240,90,40,0.3);
+          box-shadow: 0 2px 10px rgba(59,130,246,0.3);
         }
-        .d2-tab.active:hover { background: #D44A1A; }
+        .d2-tab.active:hover { background: #2563EB; }
         .d2-soon-badge {
           font-size: 0.58rem;
-          background: rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.15);
           padding: 1px 6px;
           border-radius: 20px;
           font-weight: 700;
           letter-spacing: 0.04em;
         }
         .d2-tab:not(.active) .d2-soon-badge {
-          background: #F2F1EE;
-          color: #bbb;
+          background: #1a1a1f;
+          color: #555550;
         }
 
         @media (max-width: 700px) {
@@ -152,7 +152,6 @@ export default function Dota2() {
       <div className="d2-page">
         <Navbar />
 
-        {/* ── Hero (Valorant-style with background image + logo) ── */}
         <div className="d2-hero">
           <img
             className="d2-hero-img"
@@ -174,7 +173,6 @@ export default function Dota2() {
           </div>
         </div>
 
-        {/* ── Tab switcher ── */}
         <div className="d2-tabs-wrap">
           <div className="d2-tabs">
             <button
@@ -198,7 +196,6 @@ export default function Dota2() {
           </div>
         </div>
 
-        {/* ── Content ── */}
         {dotaTab === "tournaments" && <DotaTournaments />}
         {dotaTab === "solo" && <SoloTournaments />}
         {dotaTab === "daily" && <DailyMatches />}
