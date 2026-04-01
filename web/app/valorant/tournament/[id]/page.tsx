@@ -247,8 +247,17 @@ export default function ValorantTournamentDetail() {
 
   const regClosed = countdown === "Registration Closed";
   const slotsLeft = tournament.totalSlots - tournament.slotsBooked;
-  const canRegister = !regClosed && !isRegistered && slotsLeft > 0;
   const schedule = tournament.schedule || {};
+
+  // Check if registration has opened
+  const isRegOpen = (() => {
+    if (schedule.registrationOpens) {
+      return new Date() >= new Date(schedule.registrationOpens);
+    }
+    return true; // no explicit open date → assume open
+  })();
+
+  const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
   const userTeam = getUserTeam();
   const teamMembers: Record<string, any[]> = {};
   const teamLogoMap: Record<string, string> = {};
@@ -413,11 +422,25 @@ export default function ValorantTournamentDetail() {
           <div className="vtd-reg-bar">
             <div className="vtd-reg-info">
               <div className="vtd-reg-slots">{slotsLeft} slots left</div>
-              <div className="vtd-reg-countdown">{countdown}</div>
+              <div className="vtd-reg-countdown">
+                {!isRegOpen ? `Registration opens ${formatDate(schedule.registrationOpens)}` : countdown}
+              </div>
             </div>
             {canRegister && <button className="vtd-reg-btn" onClick={() => setShowRegister(true)}>Register →</button>}
             {isRegistered && <div className="vtd-reg-done">✓ Registered</div>}
-            {regClosed && !isRegistered && <span style={{ fontSize: "0.82rem", color: "#555550" }}>Registration closed</span>}
+            {!isRegOpen && !isRegistered && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ padding: "8px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid #2A2A30", borderRadius: 100, textAlign: "center" }}>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#8A8880" }}>Coming Soon</div>
+                  {schedule.registrationOpens && (
+                    <div style={{ fontSize: "0.68rem", color: "#555550", marginTop: 2 }}>
+                      Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {regClosed && !isRegistered && isRegOpen && <span style={{ fontSize: "0.82rem", color: "#555550" }}>Registration closed</span>}
           </div>
 
           <div className="vtd-tabs">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
+
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
@@ -651,7 +652,7 @@ export default function Navbar() {
           </button>
         </div>
 
-        {steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (
+        {pathname?.startsWith("/dota") && steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (
           <div className="ie-private-warning">
             <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
             <p><strong>Your Dota 2 profile is private.</strong> Enable <code>Expose Public Match Data</code> in Dota 2 → Settings → Social. Play one match. Changes take up to 24 hours.</p>

@@ -71,6 +71,26 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
+    // ── Schedule object (timeline info for players) ───────────────────────────
+    if (fields.schedule && typeof fields.schedule === "object") {
+      const schedule: Record<string, string> = {};
+      const scheduleKeys = [
+        "registrationOpens",
+        "registrationCloses",
+        "squadCreation",
+        "groupStageStart",
+        "groupStageEnd",
+      ];
+      for (const key of scheduleKeys) {
+        if (fields.schedule[key] && typeof fields.schedule[key] === "string") {
+          schedule[key] = fields.schedule[key];
+        }
+      }
+      if (Object.keys(schedule).length > 0) {
+        tournamentData.schedule = schedule;
+      }
+    }
+
     // ── Game-specific fields ──────────────────────────────────────────────────
     if (game === "valorant") {
       if (fields.format === "auction") {

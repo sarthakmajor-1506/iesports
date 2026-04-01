@@ -43,6 +43,17 @@ export default function ValorantTournaments() {
     try { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }); } catch { return iso; }
   };
 
+  const isRegistrationOpen = (t: ValorantTournament) => {
+    const now = new Date();
+    // If there's an explicit registrationOpens date, use it
+    if (t.schedule?.registrationOpens) {
+      return now >= new Date(t.schedule.registrationOpens);
+    }
+    // Otherwise check deadline hasn't passed and tournament isn't ended
+    const deadline = new Date(t.registrationDeadline);
+    return now <= deadline;
+  };
+
   return (
     <>
       <style>{`
@@ -80,9 +91,19 @@ export default function ValorantTournaments() {
         .vt-slots { text-align: right; min-width: 60px; }
         .vt-slots-num { font-size: 1.1rem; font-weight: 800; color: #F0EEEA; }
         .vt-slots-label { font-size: 0.62rem; color: #555550; font-weight: 500; }
-        .vt-reg-btn { padding: 8px 20px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+
         .vt-reg-btn:hover { background: #e63e4d; }
-        .vt-reg-done { padding: 8px 16px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
+
+
+        .vt-reg-btn { padding: 8px 20px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: background 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
+
+        .vt-reg-done { padding: 8px 16px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; min-width: 130px; text-align: center; }
+
+        .vt-coming-soon { padding: 6px 14px; background: rgba(255,255,255,0.04); border: 1px solid #2A2A30; border-radius: 100px; text-align: center; white-space: nowrap; min-width: 130px; }
+
+
+        .vt-coming-soon-label { font-size: 0.7rem; font-weight: 800; color: #8A8880; }
+        .vt-coming-soon-date { font-size: 0.6rem; color: #555550; margin-top: 2px; }
 
         .vt-empty { text-align: center; padding: 60px 20px; color: #555550; }
         .vt-empty-icon { font-size: 44px; margin-bottom: 12px; }
@@ -109,6 +130,7 @@ export default function ValorantTournaments() {
                 {tournaments.filter(t => t.status !== "ended").map((t) => {
                   const slotsLeft = t.totalSlots - t.slotsBooked;
                   const isRegistered = registeredIds.has(t.id);
+                  const regOpen = isRegistrationOpen(t);
                   return (
                     <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
                       <div className="vt-card-accent" style={{ background: "#ff4655" }} />
@@ -126,7 +148,18 @@ export default function ValorantTournaments() {
                       </div>
                       <div className="vt-card-right">
                         <div className="vt-slots"><div className="vt-slots-num">{slotsLeft}</div><div className="vt-slots-label">slots left</div></div>
-                        {isRegistered ? <div className="vt-reg-done">✓ Registered</div> : <button className="vt-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}`); }}>Register →</button>}
+                        {isRegistered ? (
+                          <div className="vt-reg-done">✓ Registered</div>
+                        ) : !regOpen ? (
+                          <div className="vt-coming-soon">
+                            <div className="vt-coming-soon-label">Coming Soon</div>
+                            {t.schedule?.registrationOpens && (
+                              <div className="vt-coming-soon-date">Reg opens {formatDate(t.schedule.registrationOpens)}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <button className="vt-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}`); }}>Register →</button>
+                        )}
                       </div>
                     </div>
                   );
