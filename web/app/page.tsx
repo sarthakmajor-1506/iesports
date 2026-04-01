@@ -13,7 +13,7 @@ interface Tournament {
 
 const HOW_IT_WORKS = [
   { icon: "🔗", title: "Connect & Join",    desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
-  { icon: "⚔️", title: "5v5 and Solo Mode", desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
+  { icon: "⚔️", title: "Multiple Modes", desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
   { icon: "📊", title: "Automated Results", desc: "We track your match results automatically. Just play your game as usual, no manual reporting.", color: "#8b5cf6" },
   { icon: "🏆", title: "Get Rewarded",      desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
 ];
