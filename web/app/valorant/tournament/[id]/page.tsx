@@ -25,7 +25,7 @@ const TABS: { key: Tab; label: string; Icon: React.FC<{ size?: number; strokeWid
   { key: "teams",       label: "Teams",        Icon: Shield },
   { key: "standings",   label: "Standings",    Icon: Trophy },
   { key: "matches",     label: "Matches",      Icon: Swords },
-  { key: "brackets",    label: "Brackets",     Icon: GitBranch },
+  { key: "brackets",    label: "Bracket",      Icon: GitBranch },
   { key: "leaderboard", label: "Leaderboard",  Icon: BarChart3 },
 ];
 
@@ -427,10 +427,15 @@ function ValorantTournamentDetailInner() {
         .vtd-tl-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; margin-left: 8px; }
 
         /* ── Rules ── */
-        .vtd-rule { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .vtd-rule { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: flex-start; }
         .vtd-rule:last-child { border-bottom: none; }
-        .vtd-rule-num { font-size: 0.82rem; font-weight: 900; color: #ff4655; min-width: 24px; }
-        .vtd-rule-text { font-size: 0.9rem; color: #8A8880; line-height: 1.6; }
+        .vtd-rule-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; border-radius: 50%; background: rgba(255,70,85,0.15); border: 1px solid rgba(255,70,85,0.4); font-size: 0.65rem; font-weight: 900; color: #ff4655; margin-top: 1px; }
+        .vtd-rule-text { font-size: 0.88rem; color: #8A8880; line-height: 1.6; }
+        .vtd-rules-scroll { max-height: 400px; overflow-y: auto; padding-right: 4px; }
+        .vtd-rules-scroll::-webkit-scrollbar { width: 4px; }
+        .vtd-rules-scroll::-webkit-scrollbar-track { background: transparent; }
+        .vtd-rules-scroll::-webkit-scrollbar-thumb { background: rgba(255,70,85,0.35); border-radius: 4px; }
+        .vtd-rules-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,70,85,0.6); }
 
         /* ── Empty states ── */
         .vtd-empty { text-align: center; padding: 70px 20px; }
@@ -690,14 +695,14 @@ function ValorantTournamentDetailInner() {
                   {(tournament.rules || []).length > 0 && (
                     <div className="vtd-card">
                       <span className="vtd-card-label"><ScrollText size={12} style={{ display: "inline", marginRight: 6 }} />Rules</span>
-                      {(tournament.rules || []).slice(0, 3).map((rule: string, i: number) => (
-                        <div key={i} className="vtd-rule"><span className="vtd-rule-num">{i + 1}.</span><span className="vtd-rule-text">{rule}</span></div>
-                      ))}
-                      {(tournament.rules || []).length > 3 && (
-                        <button onClick={() => { setActiveTab("standings"); router.replace("?tab=standings", { scroll: false }); }} style={{ marginTop: 12, background: "none", border: "none", color: "#ff4655", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
-                          + {tournament.rules.length - 3} more rules →
-                        </button>
-                      )}
+                      <div className="vtd-rules-scroll">
+                        {(tournament.rules || []).map((rule: string, i: number) => (
+                          <div key={i} className="vtd-rule">
+                            <span className="vtd-rule-num">{i + 1}</span>
+                            <span className="vtd-rule-text">{rule}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -872,11 +877,35 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ BRACKETS ═══ */}
           {activeTab === "brackets" && (
-            <div className="vtd-tab-pane">
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <div className="vtd-tab-pane" style={{ animation: "vtd-fadein 0.3s ease" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#F0EEEA" }}>Elimination Bracket</h3>
+                  <span style={{
+                    fontSize: "0.6rem", fontWeight: 900, letterSpacing: "0.1em",
+                    padding: "3px 10px", borderRadius: 100,
+                    background: tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.12)" : "rgba(255,70,85,0.12)",
+                    border: `1px solid ${tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.35)" : "rgba(255,70,85,0.35)"}`,
+                    color: tournament.bracketFormat === "single_elimination" ? "#f59e0b" : "#ff4655",
+                  }}>
+                    {tournament.bracketFormat === "single_elimination" ? "SINGLE ELIMINATION" : "DOUBLE ELIMINATION"}
+                  </span>
+                </div>
                 <button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=brackets`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share Brackets</button>
               </div>
-              <DoubleBracket matches={bracketMatches} bracketSize={tournament.bracketSize || 4} standings={standings} />
+              {tournament.bracketFormat === "single_elimination" ? (
+                <DoubleBracket
+                  matches={bracketMatches.filter((m: any) => m.bracketType !== "lower")}
+                  bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
+                  standings={standings}
+                />
+              ) : (
+                <DoubleBracket
+                  matches={bracketMatches}
+                  bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
+                  standings={standings}
+                />
+              )}
             </div>
           )}
 

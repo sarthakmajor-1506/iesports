@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/app/components/Navbar";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; }
@@ -152,9 +153,25 @@ export default function AdminPanel() {
   const [createTourneyStageStart, setCreateTourneyStageStart] = useState("");
   const [createTourneyStageEnd, setCreateTourneyStageEnd] = useState("");
 
+  // ─── Tournament Structure fields (teams / players) ──────────────────────────
+  const [createTotalTeams, setCreateTotalTeams] = useState("8");
+  const [createPlayersPerTeam, setCreatePlayersPerTeam] = useState("5");
+  const [createUpperBracketTeams, setCreateUpperBracketTeams] = useState("4");
+  const [createLowerBracketTeams, setCreateLowerBracketTeams] = useState("4");
+
+  // ─── Share image background fields ──────────────────────────────────────────
+  const [shareDefaultBg, setShareDefaultBg] = useState("");
+  const [shareOverviewBg, setShareOverviewBg] = useState("");
+  const [shareRegisterBg, setShareRegisterBg] = useState("");
+  const [shareTeamsBg, setShareTeamsBg] = useState("");
+  const [shareScheduleBg, setShareScheduleBg] = useState("");
+  const [shareFormatBg, setShareFormatBg] = useState("");
+  const [shareBgUploading, setShareBgUploading] = useState<Record<string, boolean>>({});
+
   // ─── Collapsible section state ───────────────────────────────────────────────
   const [showDesignSection, setShowDesignSection] = useState(false);
   const [showShareSection, setShowShareSection] = useState(false);
+  const [showStructureSection, setShowStructureSection] = useState(false);
   const [createFilterGame, setCreateFilterGame] = useState("all");
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -363,14 +380,39 @@ export default function AdminPanel() {
     if (createBannerImage) body.bannerImage = createBannerImage;
 
     // Share image metadata
-    if (createTagline || createHighlightText) {
-      body.shareImages = {};
-      if (createTagline) body.shareImages.tagline = createTagline;
-      if (createHighlightText) body.shareImages.highlightText = createHighlightText;
-    }
+    const shareImagesObj: Record<string, string> = {};
+    if (createTagline) shareImagesObj.tagline = createTagline;
+    if (createHighlightText) shareImagesObj.highlightText = createHighlightText;
+    if (shareDefaultBg) shareImagesObj.defaultBg = shareDefaultBg;
+    if (shareOverviewBg) shareImagesObj.overviewBg = shareOverviewBg;
+    if (shareRegisterBg) shareImagesObj.registerBg = shareRegisterBg;
+    if (shareTeamsBg) shareImagesObj.teamsBg = shareTeamsBg;
+    if (shareScheduleBg) shareImagesObj.scheduleBg = shareScheduleBg;
+    if (shareFormatBg) shareImagesObj.formatBg = shareFormatBg;
+    if (Object.keys(shareImagesObj).length > 0) body.shareImages = shareImagesObj;
 
+    // Tournament structure
+    body.totalTeams = parseInt(createTotalTeams) || 8;
+    body.playersPerTeam = parseInt(createPlayersPerTeam) || 5;
+    body.upperBracketTeams = parseInt(createUpperBracketTeams) || Math.ceil(body.totalTeams / 2);
+    body.lowerBracketTeams = parseInt(createLowerBracketTeams) || Math.floor(body.totalTeams / 2);
+
+    const createdId = createId;
     try {
       await apiCall("/api/admin/create-tournament", body);
+
+      // Auto-seed dummy preview data
+      try {
+        await fetch("/api/valorant/seed-dummy-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
+          body: JSON.stringify({ tournamentId: createdId }),
+        });
+        addLog(`✅ seed-dummy-data: Preview data generated for ${createdId}`);
+      } catch (e) {
+        addLog(`⚠️ seed-dummy-data: Could not auto-seed preview data (tournament was created)`);
+      }
+
       setCreateName(""); setCreateId(""); setCreateDesc(""); setCreateRules("");
       setCreateRegDeadline(""); setCreateStartDate(""); setCreateEndDate("");
       setCreateIsTest(false); setCreateIsDaily(false);
@@ -382,8 +424,29 @@ export default function AdminPanel() {
       setCreateGrandFinalBestOf("3"); setCreateEliminationBestOf("2");
       setCreateBracketTeamCount(""); setCreateBannerImage("");
       setCreateTagline(""); setCreateHighlightText("");
+      setCreateTotalTeams("8"); setCreatePlayersPerTeam("5");
+      setCreateUpperBracketTeams("4"); setCreateLowerBracketTeams("4");
+      setShareDefaultBg(""); setShareOverviewBg(""); setShareRegisterBg("");
+      setShareTeamsBg(""); setShareScheduleBg(""); setShareFormatBg("");
       fetchAllTournaments();
     } catch (e) { /* logged */ }
+  };
+
+  // ─── Share BG Image Upload ─────────────────────────────────────────────────
+  const handleShareBgUpload = async (type: string, file: File, setter: (url: string) => void) => {
+    setShareBgUploading(prev => ({ ...prev, [type]: true }));
+    try {
+      const path = `tournament-share-bgs/${createId || "tmp"}/${type}.jpg`;
+      const sRef = storageRef(storage, path);
+      await uploadBytes(sRef, file);
+      const url = await getDownloadURL(sRef);
+      setter(url);
+      addLog(`✅ Uploaded ${type} background image`);
+    } catch (e: any) {
+      addLog(`❌ Upload failed for ${type}: ${e.message}`);
+    } finally {
+      setShareBgUploading(prev => ({ ...prev, [type]: false }));
+    }
   };
 
   // ─── Delete Tournament Handler ──────────────────────────────────────────────
@@ -565,6 +628,56 @@ export default function AdminPanel() {
                   </div>
                 );
               })()}
+
+              {/* ═══ PREVIEW DATA CONTROLS ═══ */}
+              {tournamentId && (
+                <div style={{ marginBottom: 12, padding: "12px 16px", background: "#14100a", border: "1px solid #3a2a10", borderRadius: 10 }}>
+                  <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#f59e0b", marginBottom: 8 }}>Preview Data Controls</div>
+                  <p style={{ fontSize: "0.65rem", color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
+                    Preview data (isDummy=true) is auto-generated on tournament creation. Real operations (shuffle, generate fixtures) will replace it automatically.
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button disabled={loading} style={{ padding: "7px 14px", background: "#1a1200", border: "1px solid #f59e0b44", color: "#f59e0b", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                      onClick={async () => {
+                        if (!confirm("This will delete existing dummy data and regenerate preview data. Real data will not be affected.")) return;
+                        setLoading(true);
+                        try {
+                          const res = await fetch("/api/valorant/seed-dummy-data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
+                            body: JSON.stringify({ tournamentId }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error);
+                          addLog(`✅ Regenerated preview data: ${data.teams} teams, ${data.groupMatches} group matches, ${data.bracketMatches} bracket matches`);
+                        } catch (e: any) {
+                          addLog(`❌ Regenerate preview data: ${e.message}`);
+                        } finally { setLoading(false); }
+                      }}>
+                      Regenerate Preview Data
+                    </button>
+                    <button disabled={loading} style={{ padding: "7px 14px", background: "#1a0505", border: "1px solid #ff465544", color: "#ff4655", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                      onClick={async () => {
+                        if (!confirm("This will delete ALL dummy (isDummy=true) teams, matches, and leaderboard entries. Continue?")) return;
+                        setLoading(true);
+                        try {
+                          const res = await fetch("/api/valorant/seed-dummy-data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
+                            body: JSON.stringify({ tournamentId, clearOnly: true }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error);
+                          addLog(`✅ Cleared ${data.cleared} dummy documents`);
+                        } catch (e: any) {
+                          addLog(`❌ Clear dummy data: ${e.message}`);
+                        } finally { setLoading(false); }
+                      }}>
+                      Clear Dummy Data
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="adm-grid">
                 {/* ═══ 1. SHUFFLE TEAMS ═══ */}
@@ -1174,23 +1287,94 @@ export default function AdminPanel() {
                   )}
                 </div>
 
+                {/* ── Tournament Structure (collapsible) ── */}
+                <div style={{ marginTop: 8, border: "1px solid #1e3a1e", borderRadius: 10, overflow: "hidden" }}>
+                  <button onClick={() => setShowStructureSection(v => !v)}
+                    style={{ width: "100%", padding: "12px 16px", background: "#0a180a", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#86efac" }}>👥 Tournament Structure {showStructureSection ? "▲" : "▼"}</span>
+                    <span style={{ fontSize: "0.62rem", color: "#555", fontWeight: 400 }}>Teams, players, bracket seeding</span>
+                  </button>
+                  {showStructureSection && (
+                    <div style={{ padding: 16, borderTop: "1px solid #1e4a1e" }}>
+                      <p style={{ fontSize: "0.65rem", color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+                        These values are used to auto-generate preview data on creation and to render the tournament structure diagram.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div>
+                          <label style={smallLabel}>Total Teams</label>
+                          <input value={createTotalTeams} onChange={e => {
+                            setCreateTotalTeams(e.target.value);
+                            const n = parseInt(e.target.value) || 8;
+                            setCreateUpperBracketTeams(String(Math.ceil(n / 2)));
+                            setCreateLowerBracketTeams(String(Math.floor(n / 2)));
+                          }} style={inputStyle} type="number" min="2" max="32" placeholder="8" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Players Per Team</label>
+                          <input value={createPlayersPerTeam} onChange={e => setCreatePlayersPerTeam(e.target.value)} style={inputStyle} type="number" min="1" max="10" placeholder="5" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Upper Bracket Seeds</label>
+                          <input value={createUpperBracketTeams} onChange={e => setCreateUpperBracketTeams(e.target.value)} style={inputStyle} type="number" min="1" placeholder="4" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Lower Bracket Seeds</label>
+                          <input value={createLowerBracketTeams} onChange={e => setCreateLowerBracketTeams(e.target.value)} style={inputStyle} type="number" min="1" placeholder="4" />
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 8, padding: "8px 12px", background: "#000", borderRadius: 8, fontSize: "0.65rem", color: "#666", fontFamily: "monospace", lineHeight: 1.8 }}>
+                        <span style={{ color: "#86efac" }}>// Structure preview</span><br />
+                        {createTotalTeams || 8} teams × {createPlayersPerTeam || 5} players = <span style={{ color: "#86efac" }}>{(parseInt(createTotalTeams) || 8) * (parseInt(createPlayersPerTeam) || 5)} total players</span><br />
+                        UB seeds: <span style={{ color: "#60a5fa" }}>{createUpperBracketTeams || "4"}</span> · LB seeds: <span style={{ color: "#60a5fa" }}>{createLowerBracketTeams || "4"}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* ── Share Image Config (collapsible) ── */}
                 <div style={{ marginTop: 8, border: "1px solid #2a3a2a", borderRadius: 10, overflow: "hidden" }}>
                   <button onClick={() => setShowShareSection(v => !v)}
                     style={{ width: "100%", padding: "12px 16px", background: "#0e1a0e", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#4ade80" }}>🖼 Share Image Config {showShareSection ? "▲" : "▼"}</span>
-                    <span style={{ fontSize: "0.62rem", color: "#555", fontWeight: 400 }}>Pre-populates tournament share cards</span>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#4ade80" }}>🖼 Share Image Customization {showShareSection ? "▲" : "▼"}</span>
+                    <span style={{ fontSize: "0.62rem", color: "#555", fontWeight: 400 }}>Backgrounds for share cards</span>
                   </button>
                   {showShareSection && (
                     <div style={{ padding: 16, borderTop: "1px solid #1e5c1e" }}>
+                      <p style={{ fontSize: "0.65rem", color: "#666", marginBottom: 12, lineHeight: 1.5 }}>
+                        Set custom backgrounds for tournament share images. Leave blank to use the default Valorant theme.
+                      </p>
                       <div>
-                        <label style={smallLabel}>Tagline (appears on overview/visual cards)</label>
-                        <input value={createTagline} onChange={e => setCreateTagline(e.target.value)} style={inputStyle} placeholder="e.g. The most competitive Valorant tournament in India" />
+                        <label style={smallLabel}>Tagline (appears on overview cards)</label>
+                        <input value={createTagline} onChange={e => setCreateTagline(e.target.value)} style={inputStyle} placeholder="e.g. India's Premier Valorant Tournament" />
                       </div>
                       <div>
-                        <label style={smallLabel}>Highlight Text (large text on visual card)</label>
+                        <label style={smallLabel}>Highlight Text (key stat on visual card)</label>
                         <input value={createHighlightText} onChange={e => setCreateHighlightText(e.target.value)} style={inputStyle} placeholder="e.g. ₹10,000 Prize Pool" />
                       </div>
+                      {/* Per-image background fields */}
+                      {([
+                        { key: "default", label: "Default Background (fallback for all)", val: shareDefaultBg, set: setShareDefaultBg },
+                        { key: "overview", label: "Overview Image Background", val: shareOverviewBg, set: setShareOverviewBg },
+                        { key: "register", label: "Register Image Background", val: shareRegisterBg, set: setShareRegisterBg },
+                        { key: "teams", label: "Teams Image Background", val: shareTeamsBg, set: setShareTeamsBg },
+                        { key: "schedule", label: "Schedule Image Background", val: shareScheduleBg, set: setShareScheduleBg },
+                        { key: "format", label: "Format Image Background", val: shareFormatBg, set: setShareFormatBg },
+                      ] as { key: string; label: string; val: string; set: (v: string) => void }[]).map(({ key, label, val, set }) => (
+                        <div key={key} style={{ marginTop: 10 }}>
+                          <label style={smallLabel}>{label}</label>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input value={val} onChange={e => set(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="URL or /public/path" />
+                            <label style={{ padding: "7px 12px", background: "#1a1a1e", border: "1px solid #2a2a30", borderRadius: 8, fontSize: "0.68rem", color: "#ccc", cursor: shareBgUploading[key] ? "wait" : "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit", fontWeight: 600 }}>
+                              {shareBgUploading[key] ? "Uploading…" : "Upload"}
+                              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleShareBgUpload(key, file, set);
+                              }} />
+                            </label>
+                            {val && <img src={val} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", border: "1px solid #333", flexShrink: 0 }} />}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1231,6 +1415,10 @@ export default function AdminPanel() {
                     setCreateGrandFinalBestOf("3"); setCreateEliminationBestOf("2");
                     setCreateBracketTeamCount(""); setCreateBannerImage("");
                     setCreateTagline(""); setCreateHighlightText("");
+                    setCreateTotalTeams("8"); setCreatePlayersPerTeam("5");
+                    setCreateUpperBracketTeams("4"); setCreateLowerBracketTeams("4");
+                    setShareDefaultBg(""); setShareOverviewBg(""); setShareRegisterBg("");
+                    setShareTeamsBg(""); setShareScheduleBg(""); setShareFormatBg("");
                   }}>Clear Form</button>
                 </div>
               </div>

@@ -282,7 +282,19 @@ export interface ValorantTournament {
   shareImages?: {
     tagline?: string;
     highlightText?: string;
+    defaultBg?: string;
+    overviewBg?: string;
+    registerBg?: string;
+    teamsBg?: string;
+    scheduleBg?: string;
+    formatBg?: string;
   };
+  // Preview / structure fields
+  totalTeams?: number;
+  playersPerTeam?: number;
+  upperBracketTeams?: number;
+  lowerBracketTeams?: number;
+  dummyDataSeeded?: boolean;
 }
 
 
