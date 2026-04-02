@@ -75,20 +75,31 @@ export async function POST(req: NextRequest) {
     if (fields.schedule && typeof fields.schedule === "object") {
       const schedule: Record<string, string> = {};
       const scheduleKeys = [
-        "registrationOpens",
-        "registrationCloses",
-        "squadCreation",
-        "groupStageStart",
-        "groupStageEnd",
+        "registrationOpens", "registrationCloses", "squadCreation",
+        "groupStageStart", "groupStageEnd", "tourneyStageStart", "tourneyStageEnd",
       ];
       for (const key of scheduleKeys) {
         if (fields.schedule[key] && typeof fields.schedule[key] === "string") {
           schedule[key] = fields.schedule[key];
         }
       }
-      if (Object.keys(schedule).length > 0) {
-        tournamentData.schedule = schedule;
+      if (Object.keys(schedule).length > 0) tournamentData.schedule = schedule;
+    }
+
+    // ── Structure / design fields (all games) ─────────────────────────────────
+    const numFields = ["groupStageRounds", "matchesPerRound", "bracketBestOf", "grandFinalBestOf", "eliminationBestOf", "bracketTeamCount", "totalTeams", "playersPerTeam", "upperBracketTeams", "lowerBracketTeams"];
+    for (const f of numFields) {
+      if (fields[f] !== undefined && fields[f] !== null && fields[f] !== "") {
+        tournamentData[f] = Number(fields[f]);
       }
+    }
+    if (fields.bracketFormat) tournamentData.bracketFormat = fields.bracketFormat;
+    if (fields.bannerImage) tournamentData.bannerImage = fields.bannerImage;
+    if (fields.description) tournamentData.description = fields.description;
+
+    // ── Share image metadata ──────────────────────────────────────────────────
+    if (fields.shareImages && typeof fields.shareImages === "object") {
+      tournamentData.shareImages = fields.shareImages;
     }
 
     // ── Game-specific fields ──────────────────────────────────────────────────

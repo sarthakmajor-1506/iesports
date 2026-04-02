@@ -11,7 +11,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!loading && !user) router.push("/");
     else if (!loading && user && !steamLinked) router.push("/connect-steam");
-    else if (!loading && user && steamLinked) router.push("/dota2");
+    else if (!loading && user && steamLinked) router.push("/valorant");
   }, [user, loading, steamLinked, router]);
 
   return (

@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!PUBLIC_PATHS.includes(pathname)) {
           // If user has Steam linked and is still on /connect-steam, redirect to dashboard
           if (hasSteam && pathname === "/connect-steam") {
-            router.push("/dashboard");
+            router.push("/valorant");
           }
           // Don't redirect from /connect-riot — it's accessible to any logged-in user
         }
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSteamLinked(false);
         setDotaProfile(null);
         setRiotData(null);
-        if (!PUBLIC_PATHS.includes(pathname)) {
+        if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/player/")) {
           router.push("/");
         }
       }

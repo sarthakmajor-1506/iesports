@@ -18,15 +18,15 @@ export async function POST(req: NextRequest) {
   if (!tourneySnap.exists) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
   const t = tourneySnap.data()!;
 
-  const totalTeams = t.totalTeams || 8;
   const playersPerTeam = t.playersPerTeam || 5;
+  const totalTeams = t.totalTeams || (t.totalSlots ? Math.floor(t.totalSlots / playersPerTeam) : 8);
   const upperBracketTeams = t.upperBracketTeams || Math.ceil(totalTeams / 2);
   const lowerBracketTeams = t.lowerBracketTeams || Math.floor(totalTeams / 2);
   const groupStageRounds = t.groupStageRounds || 3;
   const bracketFormat = t.bracketFormat || "double_elimination";
 
   // ── Clear existing dummy data ────────────────────────────────────────────────
-  const subcollections = ["teams", "matches", "leaderboard"];
+  const subcollections = ["teams", "matches", "leaderboard", "standings"];
   let cleared = 0;
   for (const sub of subcollections) {
     const snap = await adminDb.collection("valorantTournaments").doc(tournamentId).collection(sub).get();
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         team1Score: 0,
         team2Score: 0,
         status: "upcoming",
-        isBracketMatch: false,
+        isBracket: false,
         game1: null,
         game2: null,
         scheduledTime: null,
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
           team2Id: null, team2Name: "TBD",
           team1Score: 0, team2Score: 0,
           status: "upcoming",
-          isBracketMatch: true,
+          isBracket: true,
           bracketRound: ubRound,
           bracketPosition: i + 1,
           bracketType: "upper",
@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
           team2Id: null, team2Name: "TBD",
           team1Score: 0, team2Score: 0,
           status: "upcoming",
-          isBracketMatch: true,
+          isBracket: true,
           bracketRound: lbRound,
           bracketPosition: i + 1,
           bracketType: "lower",
@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
       team2Id: null, team2Name: "TBD",
       team1Score: 0, team2Score: 0,
       status: "upcoming",
-      isBracketMatch: true,
+      isBracket: true,
       bracketRound: 99,
       bracketPosition: 1,
       bracketType: "grand_final",
@@ -277,7 +277,7 @@ export async function POST(req: NextRequest) {
           team2Id: null, team2Name: "TBD",
           team1Score: 0, team2Score: 0,
           status: "upcoming",
-          isBracketMatch: true,
+          isBracket: true,
           bracketRound: seRound,
           bracketPosition: i + 1,
           bracketType: "upper",
@@ -296,25 +296,40 @@ export async function POST(req: NextRequest) {
   // ── 4. Generate dummy leaderboard ─────────────────────────────────────────────
   const lbBatch = adminDb.batch();
   let lbEntry = 0;
+  const AGENTS = ["Jett", "Reyna", "Omen", "Sage", "Sova", "Killjoy", "Cypher", "Raze", "Breach", "Viper", "Phoenix", "Brimstone", "Astra", "Chamber", "Fade", "Gekko", "Neon", "Skye", "Yoru", "Harbor"];
   for (let ti = 0; ti < teamsUsed; ti++) {
     const teamName = teamNames[ti];
     for (let pi = 0; pi < playersPerTeam; pi++) {
       const uid = `dummy_player_${lbEntry}`;
-      const kills = randInt(20, 80);
-      const deaths = randInt(15, 60);
-      const assists = randInt(10, 40);
-      const roundsPlayed = randInt(40, 80);
-      const acs = Math.round((kills * 25 + assists * 5) / Math.max(roundsPlayed / 20, 1));
+      const totalKills = randInt(20, 80);
+      const totalDeaths = randInt(15, 60);
+      const totalAssists = randInt(10, 40);
+      const totalRoundsPlayed = randInt(40, 80);
+      const totalScore = randInt(totalRoundsPlayed * 100, totalRoundsPlayed * 350);
+      const matchesPlayed = randInt(2, 6);
+      const kd = Math.round((totalKills / Math.max(1, totalDeaths)) * 100) / 100;
+      const hsPercent = randInt(15, 40);
+      const totalDamageDealt = randInt(totalRoundsPlayed * 80, totalRoundsPlayed * 200);
+      const agentCount = randInt(1, 3);
+      const agents = Array.from({ length: agentCount }, () => pick(AGENTS)).filter((v, i, a) => a.indexOf(v) === i);
+      const playerName = pick(PLAYER_NAMES);
       const ref = adminDb.collection("valorantTournaments").doc(tournamentId).collection("leaderboard").doc(uid);
       lbBatch.set(ref, {
         uid,
-        riotGameName: `Player${lbEntry + 1}`,
+        name: playerName,
+        tag: String(randInt(1000, 9999)),
+        riotGameName: playerName,
         teamName,
-        kills,
-        deaths,
-        assists,
-        acs: Math.min(acs, 350),
-        roundsPlayed,
+        totalKills,
+        totalDeaths,
+        totalAssists,
+        totalScore,
+        totalRoundsPlayed,
+        matchesPlayed,
+        kd,
+        hsPercent,
+        totalDamageDealt,
+        agents,
         isDummy: true,
       });
       lbEntry++;

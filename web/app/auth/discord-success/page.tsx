@@ -17,7 +17,7 @@ function DiscordSuccessInner() {
       return;
     }
     signInWithCustomToken(auth, token)
-      .then(() => router.replace("/dota2"))
+      .then(() => router.replace("/valorant"))
       .catch((e) => {
         console.error("signInWithCustomToken (Discord) failed:", e.message);
         router.replace("/?error=discord_failed");

@@ -125,7 +125,7 @@ export default function Navbar() {
     g.id === "dota2"
       ? pathname === "/dota2" || pathname === "/dashboard" || pathname.startsWith("/tournament")
       : pathname.startsWith(g.path)
-  ) || games[0];
+  ) || games.find((g) => g.id === "valorant")!;
 
   const discordLinked   = !!steamData?.discordId;
   const discordUsername = steamData?.discordUsername || "";
@@ -334,7 +334,7 @@ export default function Navbar() {
         .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #2A2A30; background: #121215; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; position: relative; }
         .ie-dots-btn:hover { background: #18181C; }
         .ie-dots-btn span { width: 4px; height: 4px; border-radius: 50%; background: #8A8880; display: block; }
-        .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 230px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
+        .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 276px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
         @keyframes ie-dd-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         .ie-dd-section { padding: 8px; border-bottom: 1px solid #1e1e22; }
         .ie-dd-section:last-child { border-bottom: none; }
@@ -344,6 +344,8 @@ export default function Navbar() {
         .ie-dd-btn:hover { background: #1a1a1f; }
         .ie-dd-btn.discord { color: #818cf8; }
         .ie-dd-btn.discord:hover { background: rgba(99,102,241,0.1); }
+        .ie-dd-btn.profile { color: #60a5fa; }
+        .ie-dd-btn.profile:hover { background: rgba(96,165,250,0.1); }
         .ie-dd-btn.logout { color: #f87171; }
         .ie-dd-btn.logout:hover { background: rgba(239,68,68,0.1); }
         .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
@@ -402,7 +404,7 @@ export default function Navbar() {
         <div className="ie-nav-accent" style={{ background: activeGame?.color || "#3B82F6" }} />
         <div className="ie-nav-row">
 
-          <div className="ie-nav-logo" onClick={() => router.push(activeGame?.path || "/dota2")}>
+          <div className="ie-nav-logo" onClick={() => router.push(activeGame?.path || "/valorant")}>
             <Image src="/ielogo.png" alt="Indian Esports" width={36} height={36} style={{ borderRadius: 8 }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
@@ -561,7 +563,12 @@ export default function Navbar() {
                     )}
                   </div>
 
-                  <div className="ie-dd-section" style={{ padding: "10px" }}>
+                  <div className="ie-dd-section" style={{ padding: "10px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <button className="ie-dd-btn profile"
+                      onClick={() => { router.push(`/player/${user?.uid}`); setDropdownOpen(false); }}
+                      style={{ justifyContent: "center", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "100px", padding: "10px 0" }}>
+                      👤 Profile
+                    </button>
                     <button className="ie-dd-btn logout"
                       onClick={async () => { await logout(); setDropdownOpen(false); }}
                       style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "100px", padding: "10px 0" }}>

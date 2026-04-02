@@ -68,9 +68,9 @@ export async function GET(req: NextRequest) {
   );
 
   const Footer = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 64px 44px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
-      <div style={{ fontSize: 26, fontWeight: 900, color: "#ff4655" }}>iesports.in</div>
-      <div style={{ fontSize: 15, color: "rgba(255,255,255,0.3)", fontWeight: 500 }}>Indian Esports Platform</div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 24, paddingLeft: 64, paddingRight: 64, paddingBottom: 44, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ fontSize: 26, fontWeight: 900, color: "#ff4655", display: "flex" }}>iesports.in</div>
+      <div style={{ fontSize: 15, color: "rgba(255,255,255,0.3)", fontWeight: 500, display: "flex" }}>Indian Esports Platform</div>
     </div>
   );
 
@@ -92,16 +92,16 @@ export async function GET(req: NextRequest) {
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "32px 64px 0" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 28 }}>
           {chips.map((c, i) => (
-            <div key={i} style={{ display: "inline-flex", alignSelf: "flex-start", fontSize: 14, fontWeight: 700, padding: "6px 18px", borderRadius: 100, background: c.bg, border: `1px solid ${c.bd}`, color: c.c }}>{c.txt}</div>
+            <div key={i} style={{ display: "flex", alignSelf: "flex-start", fontSize: 14, fontWeight: 700, padding: "6px 18px", borderRadius: 100, background: c.bg, border: `1px solid ${c.bd}`, color: c.c }}>{c.txt}</div>
           ))}
         </div>
-        <div style={{ fontSize: 72, fontWeight: 900, color: "#fff", lineHeight: 1.0, letterSpacing: "-0.03em", marginBottom: 16 }}>{name}</div>
-        <div style={{ fontSize: 22, color: "rgba(255,255,255,0.5)", marginBottom: 48 }}>{tagline}</div>
+        <div style={{ fontSize: 72, fontWeight: 900, color: "#fff", lineHeight: 1.0, letterSpacing: "-0.03em", marginBottom: 16, display: "flex" }}>{name}</div>
+        <div style={{ fontSize: 22, color: "rgba(255,255,255,0.5)", marginBottom: 48, display: "flex" }}>{tagline}</div>
         <div style={{ display: "flex", gap: 16 }}>
           {stats.map((s, i) => (
-            <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: "20px 24px" }}>
-              <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 6 }}>{s.val}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.4)" }}>{s.lbl}</div>
+            <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: "20px 24px", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 6, display: "flex" }}>{s.val}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.4)", display: "flex" }}>{s.lbl.toUpperCase()}</div>
             </div>
           ))}
         </div>
@@ -115,13 +115,13 @@ export async function GET(req: NextRequest) {
     ];
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "40px 64px 0" }}>
-        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 16, textTransform: "uppercase" }}>HOW TO REGISTER</div>
-        <div style={{ fontSize: 58, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 48 }}>Join {name}</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 16, display: "flex" }}>HOW TO REGISTER</div>
+        <div style={{ fontSize: 58, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 48, display: "flex" }}>Join {name}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
           {steps.map((s, i) => (
             <div key={i} style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
               <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255,70,85,0.15)", border: "2px solid rgba(255,70,85,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#ff4655", flexShrink: 0 }}>{s.n}</div>
-              <div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 6 }}>{s.t}</div>
                 <div style={{ fontSize: 18, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{s.d}</div>
               </div>
@@ -138,23 +138,23 @@ export async function GET(req: NextRequest) {
     const formatDesc = t.format === "shuffle" ? "Balanced snake draft by rank" : t.format === "auction" ? "Captain auction with rank-weighted budgets" : "Pre-formed teams";
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "40px 64px 0" }}>
-        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 16, textTransform: "uppercase" }}>TEAMS</div>
-        <div style={{ fontSize: 58, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 24 }}>{name}</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 16, display: "flex" }}>TEAMS</div>
+        <div style={{ fontSize: 58, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 24, display: "flex" }}>{name}</div>
         <div style={{ display: "flex", gap: 16, marginBottom: 40 }}>
           {[
-            { val: String(t.totalTeams || "?"), lbl: "Teams" },
-            { val: String(t.playersPerTeam || 5), lbl: "Players/Team" },
-            { val: String((t.totalTeams || 0) * (t.playersPerTeam || 5) || "?"), lbl: "Total Players" },
+            { val: String(t.totalTeams || "?"), lbl: "TEAMS" },
+            { val: String(t.playersPerTeam || 5), lbl: "PLAYERS/TEAM" },
+            { val: String((t.totalTeams || 0) * (t.playersPerTeam || 5) || "?"), lbl: "TOTAL PLAYERS" },
           ].map((s, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "20px 28px", flex: 1 }}>
-              <div style={{ fontSize: 40, fontWeight: 900, color: "#ff4655", marginBottom: 6 }}>{s.val}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.lbl}</div>
+            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "20px 28px", flex: 1, display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 40, fontWeight: 900, color: "#ff4655", marginBottom: 6, display: "flex" }}>{s.val}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", display: "flex" }}>{s.lbl}</div>
             </div>
           ))}
         </div>
-        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: "24px 32px" }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Team Formation</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>{fmtLabel} — {formatDesc}</div>
+        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: "24px 32px", display: "flex", flexDirection: "column" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", marginBottom: 10, display: "flex" }}>TEAM FORMATION</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#fff", display: "flex" }}>{fmtLabel} — {formatDesc}</div>
         </div>
       </div>
     );
@@ -170,8 +170,8 @@ export async function GET(req: NextRequest) {
     ].filter(e => e.date);
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "32px 64px 0" }}>
-        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 12, textTransform: "uppercase" }}>SCHEDULE</div>
-        <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 36 }}>{name}</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 12, display: "flex" }}>SCHEDULE</div>
+        <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 36, display: "flex" }}>{name}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {events.slice(0, 6).map((e, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", background: e.accent ? "rgba(255,70,85,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 12, border: `1px solid ${e.accent ? "rgba(255,70,85,0.2)" : "rgba(255,255,255,0.05)"}` }}>
@@ -185,20 +185,20 @@ export async function GET(req: NextRequest) {
   } else {
     // type === "format"
     const stages = [
-      { lbl: "GROUP STAGE", sub: `Swiss System · BO${t.matchesPerRound || 2} · ${t.groupStageRounds || 3} Rounds · Buchholz Tiebreaker`, color: "#3b82f6" },
-      { lbl: `→ Top ${t.bracketTeamCount || "50%"} → Upper Bracket  |  Bottom → Lower Bracket`, sub: "", color: "#555", isArrow: true },
-      { lbl: "BRACKET STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single Elimination" : "Double Elimination"} · BO${t.bracketBestOf || 2}`, color: "#f59e0b" },
-      { lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3} · Champion crowned`, color: "#ff4655" },
+      { lbl: "GROUP STAGE", sub: `Swiss System · BO${t.matchesPerRound || 2} · ${t.groupStageRounds || 3} Rounds · Buchholz Tiebreaker`, color: "#3b82f6", bg: "rgba(59,130,246,0.06)", bd: "rgba(59,130,246,0.19)" },
+      { lbl: `→ Top ${t.bracketTeamCount || "50%"} → Upper Bracket  |  Bottom → Lower Bracket`, sub: "", color: "#555", bg: "", bd: "", isArrow: true },
+      { lbl: "BRACKET STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single Elimination" : "Double Elimination"} · BO${t.bracketBestOf || 2}`, color: "#f59e0b", bg: "rgba(245,158,11,0.06)", bd: "rgba(245,158,11,0.19)" },
+      { lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3} · Champion crowned`, color: "#ff4655", bg: "rgba(255,70,85,0.06)", bd: "rgba(255,70,85,0.19)" },
     ];
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 64px 0" }}>
-        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 12, textTransform: "uppercase" }}>TOURNAMENT FORMAT</div>
-        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 40 }}>{name}</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 12, display: "flex" }}>TOURNAMENT FORMAT</div>
+        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 40, display: "flex" }}>{name}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {stages.map((s, i) => s.isArrow ? (
-            <div key={i} style={{ fontSize: 16, color: "#555550", fontWeight: 700, padding: "4px 0" }}>{s.lbl}</div>
+            <div key={i} style={{ fontSize: 16, color: "#555550", fontWeight: 700, padding: "4px 0", display: "flex" }}>{s.lbl}</div>
           ) : (
-            <div key={i} style={{ background: `${s.color}10`, border: `1px solid ${s.color}30`, borderRadius: 20, padding: "22px 28px" }}>
+            <div key={i} style={{ background: s.bg, border: `1px solid ${s.bd}`, borderRadius: 20, padding: "22px 28px", display: "flex", flexDirection: "column" }}>
               <div style={{ fontSize: 22, fontWeight: 900, color: s.color, marginBottom: 8 }}>{s.lbl}</div>
               <div style={{ fontSize: 17, color: "rgba(255,255,255,0.5)" }}>{s.sub}</div>
             </div>
@@ -208,23 +208,25 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return new ImageResponse(
-    (
-      <div style={{ width: SIZE, height: SIZE, display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", position: "relative", overflow: "hidden" }}>
-        <Bg />
-        <Grid />
-        <Overlay />
-        {/* Glow top-left */}
-        <div style={{ position: "absolute", top: -120, left: -120, width: 400, height: 400, background: "rgba(255,70,85,0.18)", borderRadius: "50%", filter: "blur(100px)", display: "flex" }} />
-        {/* Glow bottom-right */}
-        <div style={{ position: "absolute", bottom: -80, right: -80, width: 300, height: 300, background: "rgba(255,70,85,0.12)", borderRadius: "50%", filter: "blur(80px)", display: "flex" }} />
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
-          <Header label={type.toUpperCase()} />
-          {content}
-          <Footer />
+  try {
+    return new ImageResponse(
+      (
+        <div style={{ width: SIZE, height: SIZE, display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", position: "relative", overflow: "hidden" }}>
+          <Bg />
+          <Grid />
+          <Overlay />
+          <div style={{ position: "absolute", top: -120, left: -120, width: 400, height: 400, background: "radial-gradient(circle, rgba(255,70,85,0.22) 0%, rgba(255,70,85,0.08) 50%, transparent 70%)", borderRadius: "50%", display: "flex" }} />
+          <div style={{ position: "absolute", bottom: -80, right: -80, width: 300, height: 300, background: "radial-gradient(circle, rgba(255,70,85,0.16) 0%, rgba(255,70,85,0.06) 50%, transparent 70%)", borderRadius: "50%", display: "flex" }} />
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
+            <Header label={type.toUpperCase()} />
+            {content}
+            <Footer />
+          </div>
         </div>
-      </div>
-    ),
-    { width: SIZE, height: SIZE }
-  );
+      ),
+      { width: SIZE, height: SIZE }
+    );
+  } catch (e: any) {
+    return new Response(`Image generation failed: ${e.message}`, { status: 500 });
+  }
 }

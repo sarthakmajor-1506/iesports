@@ -111,6 +111,10 @@ export default function AdminPanel() {
   const [bracketStartTime, setBracketStartTime] = useState("18:00");
   const [bracketStartDate, setBracketStartDate] = useState(new Date().toISOString().split("T")[0]);
 
+  // ─── Match Time Editing ─────────────────────────────────────────────────────
+  const [editingMatchTime, setEditingMatchTime] = useState<string | null>(null);
+  const [editMatchTimeVal, setEditMatchTimeVal] = useState("");
+
   // ─── Tournament Creation Tab State ──────────────────────────────────────────
   const [allTournaments, setAllTournaments] = useState<AllTournamentItem[]>([]);
   const [createGame, setCreateGame] = useState("valorant");
@@ -220,7 +224,7 @@ export default function AdminPanel() {
         totalSlots: d.data().totalSlots,
       }));
       setTournaments(all.sort((a, b) => a.name.localeCompare(b.name)));
-      if (!tournamentId && all.length > 0) setTournamentId(all[0].id);
+      setTournamentId(prev => prev || (all.length > 0 ? all[0].id : ""));
     });
     return () => unsub();
   }, [authenticated]);
@@ -996,9 +1000,24 @@ export default function AdminPanel() {
                           <div className="adm-match-teams">{m.team1Name || "TBD"} vs {m.team2Name || "TBD"}</div>
                           <div className="adm-match-score">{m.status === "completed" ? `${m.team1Score}-${m.team2Score}` : "—"}</div>
                           <div className={`adm-match-status ${m.status}`}>{m.status}</div>
-                          {m.scheduledTime && (
-                            <div style={{ fontSize: "0.62rem", color: "#555" }}>
-                              {new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}
+                          {editingMatchTime === m.id ? (
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <input type="datetime-local" value={editMatchTimeVal} onChange={e => setEditMatchTimeVal(e.target.value)} style={{ fontSize: "0.62rem", padding: "2px 6px", background: "#1a1a1e", border: "1px solid #3a3a3e", borderRadius: 4, color: "#e0e0e0", fontFamily: "inherit" }} />
+                              <button style={{ fontSize: "0.58rem", padding: "2px 8px", background: "#0a2010", border: "1px solid #22c55e44", color: "#4ade80", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => {
+                                try {
+                                  await apiCall("/api/valorant/match-update", { tournamentId, matchId: m.id, action: "set-time", scheduledTime: editMatchTimeVal ? toISTISOString(editMatchTimeVal) : null });
+                                  setEditingMatchTime(null);
+                                } catch {}
+                              }}>Save</button>
+                              <button style={{ fontSize: "0.58rem", padding: "2px 8px", background: "#1a1a1e", border: "1px solid #3a3a3e", color: "#888", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setEditingMatchTime(null)}>Cancel</button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.62rem", color: m.scheduledTime ? "#555" : "#333", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }} onClick={() => {
+                              setEditingMatchTime(m.id);
+                              setEditMatchTimeVal(m.scheduledTime ? new Date(m.scheduledTime).toISOString().slice(0, 16) : "");
+                            }}>
+                              {m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "No time set"}
+                              <span style={{ fontSize: "0.5rem", color: "#555" }}>✏️</span>
                             </div>
                           )}
                         </div>
@@ -1022,6 +1041,26 @@ export default function AdminPanel() {
                           <div className="adm-match-teams">{m.team1Name || "TBD"} vs {m.team2Name || "TBD"}</div>
                           <div className="adm-match-score">{m.status === "completed" ? `${m.team1Score}-${m.team2Score}` : "—"}</div>
                           <div className={`adm-match-status ${m.status}`}>{m.status}</div>
+                          {editingMatchTime === m.id ? (
+                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <input type="datetime-local" value={editMatchTimeVal} onChange={e => setEditMatchTimeVal(e.target.value)} style={{ fontSize: "0.62rem", padding: "2px 6px", background: "#1a1a1e", border: "1px solid #3a3a3e", borderRadius: 4, color: "#e0e0e0", fontFamily: "inherit" }} />
+                              <button style={{ fontSize: "0.58rem", padding: "2px 8px", background: "#0a2010", border: "1px solid #22c55e44", color: "#4ade80", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => {
+                                try {
+                                  await apiCall("/api/valorant/match-update", { tournamentId, matchId: m.id, action: "set-time", scheduledTime: editMatchTimeVal ? toISTISOString(editMatchTimeVal) : null });
+                                  setEditingMatchTime(null);
+                                } catch {}
+                              }}>Save</button>
+                              <button style={{ fontSize: "0.58rem", padding: "2px 8px", background: "#1a1a1e", border: "1px solid #3a3a3e", color: "#888", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setEditingMatchTime(null)}>Cancel</button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.62rem", color: m.scheduledTime ? "#555" : "#333", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }} onClick={() => {
+                              setEditingMatchTime(m.id);
+                              setEditMatchTimeVal(m.scheduledTime ? new Date(m.scheduledTime).toISOString().slice(0, 16) : "");
+                            }}>
+                              {m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "No time set"}
+                              <span style={{ fontSize: "0.5rem", color: "#555" }}>✏️</span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

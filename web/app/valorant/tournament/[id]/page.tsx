@@ -587,28 +587,28 @@ function ValorantTournamentDetailInner() {
 
         /* ── Share modal ── */
         .vtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
-        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; max-width: 720px; width: 100%; }
+        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; max-width: 440px; width: 100%; }
         .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #F0EEEA; display: flex; align-items: center; gap: 10px; }
         .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
         .vtd-share-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
-        .vtd-share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .vtd-share-img-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
-        .vtd-share-img-card:hover { border-color: rgba(255,70,85,0.3); }
-        .vtd-share-img-preview { width: 100%; aspect-ratio: 1/1; background: #0a1018; display: block; }
-        .vtd-share-img-footer { padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); }
-        .vtd-share-img-label { font-size: 0.72rem; font-weight: 800; color: #8A8880; flex: 1; }
-        .vtd-share-img-btn { padding: 5px 12px; border-radius: 100px; font-size: 0.68rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; border: none; transition: all 0.15s; }
-        .vtd-share-img-btn.dl { background: rgba(255,70,85,0.15); color: #ff4655; border: 1px solid rgba(255,70,85,0.3); }
-        .vtd-share-img-btn.dl:hover { background: rgba(255,70,85,0.25); }
+        .vtd-share-carousel { position: relative; width: 100%; }
+        .vtd-share-carousel-img { width: 100%; aspect-ratio: 1/1; background: #0a1018; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); }
+        .vtd-share-carousel-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+        .vtd-share-carousel-btn { width: 36px; height: 36px; border-radius: 100px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8A8880; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+        .vtd-share-carousel-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .vtd-share-carousel-btn:disabled { opacity: 0.3; cursor: default; }
+        .vtd-share-carousel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #F0EEEA; }
+        .vtd-share-carousel-dots { display: flex; gap: 5px; }
+        .vtd-share-carousel-dot { width: 6px; height: 6px; border-radius: 100px; background: rgba(255,255,255,0.15); transition: all 0.2s; }
+        .vtd-share-carousel-dot.active { background: #ff4655; width: 16px; }
+        .vtd-share-carousel-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .vtd-share-img-btn { padding: 10px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; flex: 1; }
+        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #ff4655, #c62c3a); color: #fff; }
+        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(255,70,85,0.35); }
         .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
         .vtd-share-img-btn.cp:hover { background: rgba(255,255,255,0.1); color: #fff; }
-        .vtd-share-actions { display: flex; gap: 10px; margin-top: 16px; }
-        .vtd-share-dl-btn { flex: 1; padding: 12px; background: linear-gradient(135deg, #ff4655, #c62c3a); color: #fff; border: none; border-radius: 100px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s; }
-        .vtd-share-dl-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,70,85,0.4); }
-        .vtd-share-copy-btn { padding: 12px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #ccc; border-radius: 100px; font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-        .vtd-share-copy-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-        @media (max-width: 600px) { .vtd-share-grid { grid-template-columns: 1fr; } }
 
         /* ── Animations ── */
         @keyframes vtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -671,7 +671,7 @@ function ValorantTournamentDetailInner() {
                   </div>
                 )}
                 {regClosed && !isRegistered && isRegOpen && <span style={{ fontSize: "0.86rem", color: "#555550", fontWeight: 600 }}>Registration Closed</span>}
-                <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
+                <button className="vtd-hero-share-btn" onClick={() => { setShareSlide(0); setShowShareCard(true); }} title="Share tournament">
                   <Share2 size={18} />
                 </button>
               </div>
@@ -923,6 +923,10 @@ function ValorantTournamentDetailInner() {
                 <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Matches</span><TabSharePopover tabKey="matches" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} /></div><div className="vtd-empty"><Swords size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No matches scheduled</span><span className="vtd-empty-sub">Matches will appear once pairings are generated.</span></div></div>
               ) : (
                 <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span className="vtd-card-label" style={{ marginBottom: 0 }}>Matches</span>
+                    <TabSharePopover tabKey="matches" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} />
+                  </div>
                   {groupMatches.length > 0 && (
                     <div>
                       <div className="vtd-section-header group">Group Stage Fixtures</div>
@@ -1021,58 +1025,67 @@ function ValorantTournamentDetailInner() {
               5 ready-to-share images for social media. Click Download to save, or Copy to clipboard.
             </p>
 
-            {/* 5-card grid */}
-            <div className="vtd-share-grid">
-              {([
+            {/* Carousel */}
+            {(() => {
+              const slides = [
                 { type: "overview",  label: "Tournament Overview" },
                 { type: "register",  label: "How to Register" },
                 { type: "teams",     label: "Team Structure" },
                 { type: "schedule",  label: "Schedule" },
                 { type: "format",    label: "Tournament Format" },
-              ] as { type: string; label: string }[]).map(({ type, label }) => {
-                const src = `/api/valorant/share-image?tournamentId=${id}&type=${type}`;
-                const download = async () => {
-                  try {
-                    const res = await fetch(src);
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.download = `${(tournament?.name || "tournament").replace(/\s+/g, "_")}_${type}.png`;
-                    a.href = url; a.click();
-                    URL.revokeObjectURL(url);
-                  } catch {}
-                };
-                const copyImg = async () => {
-                  try {
-                    const res = await fetch(src);
-                    const blob = await res.blob();
-                    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-                    setShowToast(true); setTimeout(() => setShowToast(false), 2000);
-                  } catch {
-                    navigator.clipboard.writeText(window.location.href);
-                    setShowToast(true); setTimeout(() => setShowToast(false), 2000);
-                  }
-                };
-                return (
-                  <div key={type} className="vtd-share-img-card">
-                    <img className="vtd-share-img-preview" src={src} alt={label} loading="lazy" />
-                    <div className="vtd-share-img-footer">
-                      <span className="vtd-share-img-label">{label}</span>
-                      <button className="vtd-share-img-btn dl" onClick={download}><Download size={11} /> DL</button>
-                      <button className="vtd-share-img-btn cp" onClick={copyImg}><Copy size={11} /></button>
+              ];
+              const current = slides[shareSlide] || slides[0];
+              const src = `/api/valorant/share-image?tournamentId=${id}&type=${current.type}`;
+              const download = async () => {
+                try {
+                  const res = await fetch(src);
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.download = `${(tournament?.name || "tournament").replace(/\s+/g, "_")}_${current.type}.png`;
+                  a.href = url; a.click();
+                  URL.revokeObjectURL(url);
+                } catch {}
+              };
+              const copyImg = async () => {
+                try {
+                  const res = await fetch(src);
+                  const blob = await res.blob();
+                  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                  setShowToast(true); setTimeout(() => setShowToast(false), 2000);
+                } catch {
+                  navigator.clipboard.writeText(window.location.href);
+                  setShowToast(true); setTimeout(() => setShowToast(false), 2000);
+                }
+              };
+              return (
+                <div className="vtd-share-carousel">
+                  <img className="vtd-share-carousel-img" src={src} alt={current.label} />
+                  <div className="vtd-share-carousel-nav">
+                    <button className="vtd-share-carousel-btn" disabled={shareSlide === 0} onClick={() => setShareSlide(s => Math.max(0, s - 1))}><ChevronLeft size={16} /></button>
+                    <div className="vtd-share-carousel-center">
+                      <span className="vtd-share-carousel-label">{current.label}</span>
+                      <div className="vtd-share-carousel-dots">
+                        {slides.map((_, i) => (<div key={i} className={`vtd-share-carousel-dot${i === shareSlide ? " active" : ""}`} onClick={() => setShareSlide(i)} style={{ cursor: "pointer" }} />))}
+                      </div>
                     </div>
+                    <button className="vtd-share-carousel-btn" disabled={shareSlide === slides.length - 1} onClick={() => setShareSlide(s => Math.min(slides.length - 1, s + 1))}><ChevronRight size={16} /></button>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="vtd-share-carousel-actions">
+                    <button className="vtd-share-img-btn dl" onClick={download}><Download size={11} /> Download</button>
+                    <button className="vtd-share-img-btn cp" onClick={copyImg}><Copy size={11} /> Copy</button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Social links + bottom */}
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+" Entry"}\n\nRegister: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <MessageCircle size={15} /> WhatsApp
               </a>
-              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)}\nRegister: ${window.location.href} @ieSports_in`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(29,155,240,0.1)", border: "1px solid rgba(29,155,240,0.3)", color: "#1d9bf0", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <Send size={15} /> Twitter/X
+              <a href="https://www.instagram.com/iesports.in/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(225,48,108,0.1)", border: "1px solid rgba(225,48,108,0.3)", color: "#E1306C", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Camera size={15} /> Instagram
               </a>
               <button style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#8A8880", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                 onClick={() => { navigator.clipboard.writeText(window.location.href); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}>

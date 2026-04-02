@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
     const {
       tournamentId, adminKey, matchId, action,
       gameNumber, lobbyName, lobbyPassword,
-      notifyDiscord,
+      notifyDiscord, scheduledTime,
     } = await req.json();
 
     if (!tournamentId || !adminKey || !matchId || !action) {
@@ -456,6 +456,9 @@ export async function POST(req: NextRequest) {
         deletedChannels: vcsToDelete.length,
       });
 
+    } else if (action === "set-time") {
+      await matchRef.update({ scheduledTime: scheduledTime || null });
+      return NextResponse.json({ success: true, matchId, action: "set-time", scheduledTime });
     } else {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
