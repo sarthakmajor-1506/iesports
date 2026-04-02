@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
   ChevronLeft, ChevronRight, Download, MessageCircle, Send,
-  Coins, Target, Info, Zap,
+  Coins, Target, Info, Zap, Camera, Link2, X,
 } from "lucide-react";
 
 type Tab = "overview" | "players" | "teams" | "standings" | "matches" | "brackets" | "leaderboard";
@@ -161,6 +161,58 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
   );
 }
 
+function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToast }: {
+  tabKey: string; id: string; tournamentName: string;
+  tabContentRef: React.RefObject<HTMLDivElement | null>;
+  setShowToast: (v: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <button className="vtd-tab-share" onClick={() => setOpen(v => !v)}>
+        <Share2 size={12} /> Share
+      </button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 200, background: "rgba(10,16,24,0.97)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 8, minWidth: 188, boxShadow: "0 12px 40px rgba(0,0,0,0.6)", overflow: "hidden" }}>
+          <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,70,85,0.15)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`);
+              setShowToast(true); setTimeout(() => setShowToast(false), 2000); setOpen(false);
+            }}>
+            <Link2 size={14} /> Copy Link
+          </button>
+          <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,70,85,0.15)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            onClick={async () => {
+              if (!tabContentRef.current) return;
+              setOpen(false);
+              try {
+                const html2canvas = (await import("html2canvas")).default;
+                const canvas = await html2canvas(tabContentRef.current, { backgroundColor: "#0f1923", scale: 2, useCORS: true, logging: false });
+                const link = document.createElement("a");
+                link.download = `${tournamentName.replace(/\s+/g, "_")}_${tabKey}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+              } catch {}
+            }}>
+            <Camera size={14} /> Share as Image
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ValorantTournamentDetailInner() {
   const params = useParams();
   const router = useRouter();
@@ -190,6 +242,7 @@ function ValorantTournamentDetailInner() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const tabContentRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
@@ -534,16 +587,28 @@ function ValorantTournamentDetailInner() {
 
         /* ── Share modal ── */
         .vtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
-        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,70,85,0.2); border-radius: 20px; padding: 24px; max-width: 520px; width: 100%; }
-        .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .vtd-share-modal-title { font-size: 1rem; font-weight: 900; color: #F0EEEA; }
-        .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; color: #8A8880; }
-        .vtd-share-card { width: 100%; aspect-ratio: 1/1; background: #0f1923; border-radius: 16px; overflow: hidden; position: relative; }
+        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; max-width: 720px; width: 100%; }
+        .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #F0EEEA; display: flex; align-items: center; gap: 10px; }
+        .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
+        .vtd-share-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .vtd-share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .vtd-share-img-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
+        .vtd-share-img-card:hover { border-color: rgba(255,70,85,0.3); }
+        .vtd-share-img-preview { width: 100%; aspect-ratio: 1/1; background: #0a1018; display: block; }
+        .vtd-share-img-footer { padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); }
+        .vtd-share-img-label { font-size: 0.72rem; font-weight: 800; color: #8A8880; flex: 1; }
+        .vtd-share-img-btn { padding: 5px 12px; border-radius: 100px; font-size: 0.68rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; border: none; transition: all 0.15s; }
+        .vtd-share-img-btn.dl { background: rgba(255,70,85,0.15); color: #ff4655; border: 1px solid rgba(255,70,85,0.3); }
+        .vtd-share-img-btn.dl:hover { background: rgba(255,70,85,0.25); }
+        .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
+        .vtd-share-img-btn.cp:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .vtd-share-actions { display: flex; gap: 10px; margin-top: 16px; }
         .vtd-share-dl-btn { flex: 1; padding: 12px; background: linear-gradient(135deg, #ff4655, #c62c3a); color: #fff; border: none; border-radius: 100px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s; }
         .vtd-share-dl-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,70,85,0.4); }
         .vtd-share-copy-btn { padding: 12px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #ccc; border-radius: 100px; font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
         .vtd-share-copy-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        @media (max-width: 600px) { .vtd-share-grid { grid-template-columns: 1fr; } }
 
         /* ── Animations ── */
         @keyframes vtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -637,7 +702,7 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === "overview" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>
@@ -747,11 +812,11 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ PLAYERS ═══ */}
           {activeTab === "players" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               <div className="vtd-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Registered Players ({players.length})</span>
-                  <button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=players`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share Players</button>
+                  <TabSharePopover tabKey="players" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} />
                 </div>
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
@@ -777,9 +842,9 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ TEAMS ═══ */}
           {activeTab === "teams" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               {teams.length === 0 ? (
-                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Teams</span><button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=teams`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share</button></div><div className="vtd-empty"><Shield size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">Teams not generated yet</span><span className="vtd-empty-sub">Teams will be shuffled after registration closes.</span></div></div>
+                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Teams</span><TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} /></div><div className="vtd-empty"><Shield size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">Teams not generated yet</span><span className="vtd-empty-sub">Teams will be shuffled after registration closes.</span></div></div>
               ) : (
                 <div className="vtd-teams-grid">
                   {teams.map((team: any) => { const isMyTeam = userTeam?.id === team.id; const canEdit = isMyTeam && !team.teamNameSet; const isEditing = editingTeamId === team.id; return (
@@ -831,11 +896,11 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ STANDINGS ═══ */}
           {activeTab === "standings" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               <div className="vtd-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Group Stage Standings</span>
-                  <button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=standings`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share</button>
+                  <TabSharePopover tabKey="standings" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} />
                 </div>
                 {standings.length === 0 ? (
                   <div className="vtd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No standings yet</span><span className="vtd-empty-sub">Standings will appear once matches are played.</span></div>
@@ -853,9 +918,9 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ MATCHES ═══ */}
           {activeTab === "matches" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               {matches.length === 0 ? (
-                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Matches</span><button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=matches`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share</button></div><div className="vtd-empty"><Swords size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No matches scheduled</span><span className="vtd-empty-sub">Matches will appear once pairings are generated.</span></div></div>
+                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Matches</span><TabSharePopover tabKey="matches" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} /></div><div className="vtd-empty"><Swords size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No matches scheduled</span><span className="vtd-empty-sub">Matches will appear once pairings are generated.</span></div></div>
               ) : (
                 <>
                   {groupMatches.length > 0 && (
@@ -877,7 +942,7 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ BRACKETS ═══ */}
           {activeTab === "brackets" && (
-            <div className="vtd-tab-pane" style={{ animation: "vtd-fadein 0.3s ease" }}>
+            <div className="vtd-tab-pane" ref={tabContentRef} style={{ animation: "vtd-fadein 0.3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#F0EEEA" }}>Elimination Bracket</h3>
@@ -891,7 +956,7 @@ function ValorantTournamentDetailInner() {
                     {tournament.bracketFormat === "single_elimination" ? "SINGLE ELIMINATION" : "DOUBLE ELIMINATION"}
                   </span>
                 </div>
-                <button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=brackets`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share Brackets</button>
+                <TabSharePopover tabKey="brackets" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} />
               </div>
               {tournament.bracketFormat === "single_elimination" ? (
                 <DoubleBracket
@@ -911,11 +976,11 @@ function ValorantTournamentDetailInner() {
 
           {/* ═══ LEADERBOARD ═══ */}
           {activeTab === "leaderboard" && (
-            <div className="vtd-tab-pane">
+            <div className="vtd-tab-pane" ref={tabContentRef}>
               <div className="vtd-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Player Leaderboard — MVP Tracker</span>
-                  <button className="vtd-tab-share" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=leaderboard`); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Share2 size={12} /> Share</button>
+                  <TabSharePopover tabKey="leaderboard" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} />
                 </div>
                 {leaderboard.length === 0 ? (
                   <div className="vtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No stats yet</span><span className="vtd-empty-sub">Player stats will appear once match data is fetched.</span></div>
@@ -949,162 +1014,75 @@ function ValorantTournamentDetailInner() {
         <div className="vtd-share-overlay" onClick={e => { if (e.target === e.currentTarget) setShowShareCard(false); }}>
           <div className="vtd-share-modal">
             <div className="vtd-share-modal-head">
-              <div>
-                <div className="vtd-share-modal-title">Share Tournament</div>
-                <div style={{ fontSize: "0.72rem", color: "#555550", marginTop: 3 }}>
-                  {shareSlide + 1} / 5 — {["Overview","How to Register","Visual","Schedule","Format"][shareSlide]}
-                </div>
-              </div>
-              <button className="vtd-share-close" onClick={() => setShowShareCard(false)}>✕</button>
+              <div className="vtd-share-modal-title"><Share2 size={18} /> Share Tournament</div>
+              <button className="vtd-share-close" onClick={() => setShowShareCard(false)}><X size={16} /></button>
             </div>
+            <p style={{ fontSize: "0.75rem", color: "#555550", marginBottom: 16, marginTop: -8 }}>
+              5 ready-to-share images for social media. Click Download to save, or Copy to clipboard.
+            </p>
 
-            {/* Slide navigator */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-              {["Overview","Register","Visual","Schedule","Format"].map((lbl, i) => (
-                <button key={i} onClick={() => setShareSlide(i)} style={{ flex: 1, padding: "6px 4px", borderRadius: 8, border: `1px solid ${shareSlide === i ? "#ff4655" : "rgba(255,255,255,0.08)"}`, background: shareSlide === i ? "rgba(255,70,85,0.15)" : "rgba(255,255,255,0.03)", color: shareSlide === i ? "#ff4655" : "#555550", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>{lbl}</button>
-              ))}
-            </div>
-
-            {/* Card preview */}
-            <div ref={shareCardRef} className="vtd-share-card">
-              {/* Shared background */}
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, #120510 0%, #0a1018 50%, #080c12 100%)" }} />
-              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 20%, rgba(255,70,85,0.18) 0%, transparent 55%)" }} />
-              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,70,85,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,70,85,0.05) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
-
-              {/* Shared branding */}
-              <div style={{ position: "absolute", top: "7%", left: "8%", right: "8%", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 2 }}>
-                <div style={{ fontSize: "0.58rem", fontWeight: 900, letterSpacing: "0.25em", textTransform: "uppercase" as const, color: "#ff4655" }}>IESPORTS.IN</div>
-                <div style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#555550" }}>VALORANT</div>
-              </div>
-
-              {/* Slide 0: Overview */}
-              {shareSlide === 0 && (
-                <div style={{ position: "relative", zIndex: 1, padding: "18% 8% 8%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontSize: "0.5rem", fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 14, height: 2, background: "#ff4655" }} />TOURNAMENT
+            {/* 5-card grid */}
+            <div className="vtd-share-grid">
+              {([
+                { type: "overview",  label: "Tournament Overview" },
+                { type: "register",  label: "How to Register" },
+                { type: "teams",     label: "Team Structure" },
+                { type: "schedule",  label: "Schedule" },
+                { type: "format",    label: "Tournament Format" },
+              ] as { type: string; label: string }[]).map(({ type, label }) => {
+                const src = `/api/valorant/share-image?tournamentId=${id}&type=${type}`;
+                const download = async () => {
+                  try {
+                    const res = await fetch(src);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.download = `${(tournament?.name || "tournament").replace(/\s+/g, "_")}_${type}.png`;
+                    a.href = url; a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {}
+                };
+                const copyImg = async () => {
+                  try {
+                    const res = await fetch(src);
+                    const blob = await res.blob();
+                    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                    setShowToast(true); setTimeout(() => setShowToast(false), 2000);
+                  } catch {
+                    navigator.clipboard.writeText(window.location.href);
+                    setShowToast(true); setTimeout(() => setShowToast(false), 2000);
+                  }
+                };
+                return (
+                  <div key={type} className="vtd-share-img-card">
+                    <img className="vtd-share-img-preview" src={src} alt={label} loading="lazy" />
+                    <div className="vtd-share-img-footer">
+                      <span className="vtd-share-img-label">{label}</span>
+                      <button className="vtd-share-img-btn dl" onClick={download}><Download size={11} /> DL</button>
+                      <button className="vtd-share-img-btn cp" onClick={copyImg}><Copy size={11} /></button>
                     </div>
-                    <div style={{ fontSize: "clamp(1.1rem, 4vw, 1.6rem)", fontWeight: 900, color: "#F0EEEA", lineHeight: 1.1, marginBottom: 10, letterSpacing: "-0.02em" }}>{tournament.name}</div>
-                    {tournament.shareImages?.tagline && <div style={{ fontSize: "0.72rem", color: "rgba(240,238,234,0.6)", marginBottom: 14 }}>{tournament.shareImages.tagline}</div>}
-                    <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-                      {[{ txt: tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard", c: "#ff4655", bg: "rgba(255,70,85,0.12)", bd: "rgba(255,70,85,0.3)" }, { txt: tournament.entryFee === 0 ? "Free Entry" : `₹${tournament.entryFee} Entry`, c: "#ccc", bg: "rgba(255,255,255,0.05)", bd: "rgba(255,255,255,0.1)" }, ...(tournament.prizePool && tournament.prizePool !== "0" ? [{ txt: `${tournament.prizePool.startsWith("₹") ? tournament.prizePool : "₹"+tournament.prizePool} Prize`, c: "#fbbf24", bg: "rgba(251,191,36,0.1)", bd: "rgba(251,191,36,0.3)" }] : [])].map((tag, i) => (
-                        <div key={i} style={{ fontSize: "0.58rem", fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: tag.bg, border: `1px solid ${tag.bd}`, color: tag.c }}>{tag.txt}</div>
-                      ))}
-                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {[{ val: `${tournament.slotsBooked}/${tournament.totalSlots}`, lbl: "Players" }, { val: formatDate(tournament.startDate), lbl: "Date" }, { val: "5v5", lbl: "Format" }].map((s, i) => (
-                      <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "8px", textAlign: "center" as const }}>
-                        <div style={{ fontSize: "0.72rem", fontWeight: 900, color: "#F0EEEA" }}>{s.val}</div>
-                        <div style={{ fontSize: "0.48rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", color: "#555550", marginTop: 2 }}>{s.lbl}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Slide 1: How to Register */}
-              {shareSlide === 1 && (
-                <div style={{ position: "relative", zIndex: 1, padding: "18% 8% 8%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontSize: "0.5rem", fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 14, height: 2, background: "#ff4655" }} />HOW TO REGISTER</div>
-                    <div style={{ fontSize: "1.2rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 18 }}>Join the Tournament</div>
-                    {[{ n: "1", t: "Sign Up on iEsports.in", d: "Create your account using phone OTP or Discord login" }, { n: "2", t: "Connect Your Riot ID", d: "Link your Valorant account for rank verification" }, { n: "3", t: "Register for Tournament", d: `Find "${tournament.name}" and click Register` }].map((step, i) => (
-                      <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "flex-start" }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,70,85,0.15)", border: "1.5px solid rgba(255,70,85,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 900, color: "#ff4655", flexShrink: 0 }}>{step.n}</div>
-                        <div><div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#F0EEEA", marginBottom: 2 }}>{step.t}</div><div style={{ fontSize: "0.62rem", color: "#8A8880", lineHeight: 1.4 }}>{step.d}</div></div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ background: "rgba(255,70,85,0.08)", border: "1px solid rgba(255,70,85,0.25)", borderRadius: 12, padding: "12px 16px", textAlign: "center" as const }}>
-                    <div style={{ fontSize: "0.9rem", fontWeight: 900, color: "#ff4655" }}>iesports.in</div>
-                    <div style={{ fontSize: "0.58rem", color: "#8A8880", marginTop: 2 }}>Indian Esports — Competitive Gaming Platform</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Slide 2: Visual */}
-              {shareSlide === 2 && (
-                <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" as const, padding: "8%" }}>
-                  <div>
-                    <div style={{ width: 60, height: 4, background: "linear-gradient(90deg, #ff4655, #c62c3a)", borderRadius: 2, margin: "0 auto 20px" }} />
-                    <div style={{ fontSize: "clamp(1.4rem, 5vw, 2.2rem)", fontWeight: 900, color: "#F0EEEA", lineHeight: 1.0, letterSpacing: "-0.03em", marginBottom: 14 }}>{tournament.name}</div>
-                    {tournament.shareImages?.highlightText && <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fbbf24", marginBottom: 10 }}>{tournament.shareImages.highlightText}</div>}
-                    <div style={{ fontSize: "0.78rem", color: "rgba(240,238,234,0.5)", marginBottom: 24 }}>{formatDate(tournament.startDate)} · Valorant 5v5</div>
-                    <div style={{ display: "inline-block", padding: "10px 24px", borderRadius: 100, background: "linear-gradient(135deg, #ff4655, #c62c3a)", color: "#fff", fontSize: "0.8rem", fontWeight: 800 }}>Register at iesports.in</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Slide 3: Schedule */}
-              {shareSlide === 3 && (
-                <div style={{ position: "relative", zIndex: 1, padding: "18% 8% 8%", height: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ fontSize: "0.5rem", fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 14, height: 2, background: "#ff4655" }} />SCHEDULE</div>
-                  <div style={{ fontSize: "1rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 10 }}>{tournament.name}</div>
-                  {[
-                    { lbl: "Registration Opens", date: schedule.registrationOpens },
-                    { lbl: "Registration Closes", date: schedule.registrationCloses },
-                    { lbl: "Squad Creation", date: schedule.squadCreation },
-                    { lbl: "Group Stage Starts", date: schedule.groupStageStart },
-                    { lbl: "Group Stage Ends", date: schedule.groupStageEnd },
-                    { lbl: "Bracket Stage", date: schedule.tourneyStageStart },
-                  ].filter(s => s.date).map((s, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontSize: "0.65rem", color: "#8A8880", fontWeight: 600 }}>{s.lbl}</div>
-                      <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#F0EEEA" }}>{formatDate(s.date!)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Slide 4: Format Explainer */}
-              {shareSlide === 4 && (
-                <div style={{ position: "relative", zIndex: 1, padding: "18% 8% 8%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontSize: "0.5rem", fontWeight: 900, letterSpacing: "0.2em", color: "#ff4655", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 14, height: 2, background: "#ff4655" }} />TOURNAMENT FORMAT</div>
-                    <div style={{ fontSize: "1rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 18 }}>{tournament.name}</div>
-                    {[
-                      { title: "Group Stage", icon: "⚔️", desc: `${tournament.groupStageRounds || 3} Swiss rounds · BO${tournament.matchesPerRound || 2} per match`, color: "#3b82f6" },
-                      { title: "→ Top Teams Advance", icon: "⬆️", desc: `Top ${tournament.bracketTeamCount || "50%"} of teams qualify for brackets`, color: "#555550" },
-                      { title: "Bracket Stage", icon: "🏅", desc: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} elimination · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
-                      { title: "Grand Final", icon: "🏆", desc: `Best of ${tournament.grandFinalBestOf || 3} · Winner takes prize pool`, color: "#ff4655" },
-                    ].map((s, i) => (
-                      <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "center", opacity: s.color === "#555550" ? 0.6 : 1 }}>
-                        <div style={{ fontSize: "1.2rem", width: 28, textAlign: "center" as const, flexShrink: 0 }}>{s.icon}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "0.72rem", fontWeight: 900, color: s.color }}>{s.title}</div>
-                          <div style={{ fontSize: "0.6rem", color: "#8A8880", marginTop: 1 }}>{s.desc}</div>
-                        </div>
-                        {i < 3 && <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)", marginLeft: 6 }} />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
 
-            {/* Prev/Next nav */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-              <button onClick={() => setShareSlide(s => Math.max(0, s - 1))} disabled={shareSlide === 0} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 100, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: shareSlide === 0 ? "#2a2a30" : "#8A8880", cursor: shareSlide === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700 }}><ChevronLeft size={14} /> Prev</button>
-              <div style={{ display: "flex", gap: 6 }}>{[0,1,2,3,4].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: shareSlide === i ? "#ff4655" : "rgba(255,255,255,0.15)", transition: "background 0.2s" }} />)}</div>
-              <button onClick={() => setShareSlide(s => Math.min(4, s + 1))} disabled={shareSlide === 4} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 100, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: shareSlide === 4 ? "#2a2a30" : "#8A8880", cursor: shareSlide === 4 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700 }}>Next <ChevronRight size={14} /></button>
-            </div>
-
-            {/* Action buttons */}
-            <div className="vtd-share-actions" style={{ marginTop: 12 }}>
-              <button className="vtd-share-dl-btn" onClick={downloadShareCard}><Download size={15} /> Download</button>
-              <button className="vtd-share-copy-btn" onClick={() => { navigator.clipboard.writeText(window.location.href); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}><Copy size={14} /> Copy Link</button>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+  " Entry"}${tournament.prizePool && tournament.prizePool !== "0" ? " · " + tournament.prizePool + " Prize" : ""}\n\nRegister at: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            {/* Social links + bottom */}
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+" Entry"}\n\nRegister: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <MessageCircle size={15} /> WhatsApp
               </a>
-              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)}\n${tournament.prizePool && tournament.prizePool !== "0" ? "🏆 " + tournament.prizePool + " Prize\n" : ""}Register: ${window.location.href} @ieSports_in`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(29,155,240,0.1)", border: "1px solid rgba(29,155,240,0.3)", color: "#1d9bf0", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)}\nRegister: ${window.location.href} @ieSports_in`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(29,155,240,0.1)", border: "1px solid rgba(29,155,240,0.3)", color: "#1d9bf0", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <Send size={15} /> Twitter/X
               </a>
+              <button style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#8A8880", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => { navigator.clipboard.writeText(window.location.href); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}>
+                <Copy size={15} /> Copy Link
+              </button>
             </div>
-            <div style={{ marginTop: 8, fontSize: "0.68rem", color: "#555550", textAlign: "center" }}>Screenshot or download to share on Instagram</div>
+            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>Images are 1080×1080 — optimised for Instagram, Stories, and WhatsApp</div>
+
+            {/* Hidden ref for legacy html2canvas compat */}
+            <div ref={shareCardRef} style={{ display: "none" }} />
           </div>
         </div>
       )}

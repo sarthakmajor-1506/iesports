@@ -60,7 +60,7 @@ export default function ValorantTournaments() {
     <>
       <style>{`
         @keyframes vt-sk-pulse { 0%,100%{background-position:-200% 0} 50%{background-position:200% 0} }
-        .vt-sk { background: linear-gradient(90deg,#0d1118 0%,#1a2535 40%,#0d1118 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:12px; }
+        .vt-sk { background: linear-gradient(90deg,rgba(255,70,85,0.04) 0%,rgba(255,70,85,0.1) 40%,rgba(255,70,85,0.04) 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:16px; }
       `}</style>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 30px 48px" }}>
         <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
@@ -76,60 +76,64 @@ export default function ValorantTournaments() {
   return (
     <>
       <style>{`
-        .vt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 30px 48px; }
+        @keyframes vt-card-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 
-        .vt-stats { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        .vt-stat-pill { display: flex; align-items: center; gap: 8px; background: #121215; border: 1px solid #2A2A30; border-radius: 100px; padding: 6px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .vt-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 30px 56px; }
+
+        .vt-stats { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+        .vt-stat-pill { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 6px 16px; }
         .vt-stat-num { font-size: 1rem; font-weight: 800; color: #F0EEEA; }
         .vt-stat-num.red { color: #ff4655; }
         .vt-stat-num.green { color: #4ade80; }
         .vt-stat-num.blue { color: #60A5FA; }
-        .vt-stat-label { font-size: 0.75rem; color: #8A8880; font-weight: 500; }
-        .vt-stat-divider { width: 1px; height: 16px; background: #2A2A30; }
+        .vt-stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.45); font-weight: 500; }
+        .vt-stat-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.1); }
 
-        .vt-section-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #555550; margin-bottom: 10px; margin-top: 6px; }
+        .vt-section-label { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 12px; margin-top: 8px; }
 
-        .vt-card { background: #121215; border: 1px solid #2A2A30; border-radius: 12px; overflow: hidden; display: flex; align-items: stretch; cursor: pointer; transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s; box-shadow: 0 1px 4px rgba(0,0,0,0.2); margin-bottom: 10px; }
-        .vt-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.35); transform: translateY(-1px); border-color: #3a3a42; }
-        .vt-card.ended { opacity: 0.6; }
-        .vt-card.registered { border-color: rgba(34,197,94,0.3); background: rgba(22,163,74,0.06); }
+        .vt-card {
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+          overflow: hidden; display: flex; align-items: stretch; cursor: pointer;
+          transition: all 0.25s ease; margin-bottom: 10px; backdrop-filter: blur(8px);
+          animation: vt-card-up 0.35s ease both;
+        }
+        .vt-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(255,70,85,0.15); border-color: rgba(255,70,85,0.3); }
+        .vt-card.ended { opacity: 0.5; }
+        .vt-card.registered { border-color: rgba(34,197,94,0.35); background: rgba(22,163,74,0.07); }
+        .vt-card.registered:hover { box-shadow: 0 8px 30px rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
 
         .vt-card-accent { width: 4px; flex-shrink: 0; }
-        .vt-card-body { flex: 1; display: flex; align-items: center; gap: 20px; padding: 14px 18px; }
-        .vt-card-icon { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+        .vt-card-body { flex: 1; display: flex; align-items: center; gap: 18px; padding: 16px 20px; }
+        .vt-card-icon { width: 46px; height: 46px; border-radius: 12px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08); }
         .vt-card-icon img { width: 100%; height: 100%; object-fit: cover; }
         .vt-card-info { flex: 1; min-width: 0; }
-        .vt-card-name { font-size: 0.95rem; font-weight: 800; color: #F0EEEA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .vt-card-meta { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; align-items: center; }
-        .vt-card-chip { font-size: 0.68rem; font-weight: 600; color: #8A8880; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
+        .vt-card-name { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vt-card-meta { display: flex; gap: 7px; margin-top: 5px; flex-wrap: wrap; align-items: center; }
+        .vt-card-chip { font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
         .vt-badge-auction { font-size: 0.62rem; font-weight: 800; color: #ff4655; background: rgba(255,70,85,0.1); border: 1px solid rgba(255,70,85,0.25); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
-        .vt-badge-daily { font-size: 0.62rem; font-weight: 800; color: #8A8880; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
+        .vt-badge-daily { font-size: 0.62rem; font-weight: 800; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
-        .vt-card-right { display: flex; align-items: center; gap: 14px; padding-right: 18px; flex-shrink: 0; }
+        .vt-card-right { display: flex; align-items: center; gap: 14px; padding-right: 20px; flex-shrink: 0; }
         .vt-slots { text-align: right; min-width: 60px; }
         .vt-slots-num { font-size: 1.1rem; font-weight: 800; color: #F0EEEA; }
-        .vt-slots-label { font-size: 0.62rem; color: #555550; font-weight: 500; }
+        .vt-slots-label { font-size: 0.62rem; color: rgba(255,255,255,0.3); font-weight: 500; }
 
-        .vt-reg-btn:hover { background: #e63e4d; }
-
-
-        .vt-reg-btn { padding: 8px 20px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: background 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
+        .vt-reg-btn { padding: 9px 22px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
+        .vt-reg-btn:hover { background: #e63e4d; box-shadow: 0 0 20px rgba(255,70,85,0.4); transform: translateY(-1px); }
 
         .vt-reg-done { padding: 8px 16px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; min-width: 130px; text-align: center; }
 
-        .vt-coming-soon { padding: 6px 14px; background: rgba(255,255,255,0.04); border: 1px solid #2A2A30; border-radius: 100px; text-align: center; white-space: nowrap; min-width: 130px; }
+        .vt-coming-soon { padding: 8px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; text-align: center; white-space: nowrap; min-width: 130px; }
+        .vt-coming-soon-label { font-size: 0.7rem; font-weight: 800; color: rgba(255,255,255,0.4); }
+        .vt-coming-soon-date { font-size: 0.6rem; color: rgba(255,255,255,0.25); margin-top: 2px; }
 
-
-        .vt-coming-soon-label { font-size: 0.7rem; font-weight: 800; color: #8A8880; }
-        .vt-coming-soon-date { font-size: 0.6rem; color: #555550; margin-top: 2px; }
-
-        .vt-empty { text-align: center; padding: 60px 20px; color: #555550; }
+        .vt-empty { text-align: center; padding: 70px 20px; color: #555550; }
         .vt-empty-icon { font-size: 44px; margin-bottom: 12px; }
-        .vt-empty-text { font-size: 0.9rem; }
+        .vt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
-        @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 12px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 36px; height: 36px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; } }
-        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 40px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-right { padding: 0 14px 12px; justify-content: space-between; width: 100%; box-sizing: border-box; } }
+        @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 13px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 38px; height: 38px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } }
+        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } }
       `}</style>
 
       <div className="vt-wrap">
@@ -151,7 +155,7 @@ export default function ValorantTournaments() {
                   const isRegistered = registeredIds.has(t.id);
                   const regOpen = isRegistrationOpen(t);
                   return (
-                    <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
+                    <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s` }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
                       <div className="vt-card-accent" style={{ background: "#ff4655" }} />
                       <div className="vt-card-body">
                         <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
