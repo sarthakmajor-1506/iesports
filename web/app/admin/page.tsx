@@ -137,6 +137,24 @@ export default function AdminPanel() {
   // Auction-specific
   const [createMaxTeams, setCreateMaxTeams] = useState("8");
   const [createSTierCap, setCreateSTierCap] = useState("2");
+
+  // ─── Tournament Design / Structure fields ───────────────────────────────────
+  const [createGroupRounds, setCreateGroupRounds] = useState("3");
+  const [createMatchesPerRound, setCreateMatchesPerRound] = useState("2");
+  const [createBracketFormat, setCreateBracketFormat] = useState("double_elimination");
+  const [createBracketBestOf, setCreateBracketBestOf] = useState("2");
+  const [createGrandFinalBestOf, setCreateGrandFinalBestOf] = useState("3");
+  const [createEliminationBestOf, setCreateEliminationBestOf] = useState("2");
+  const [createBracketTeamCount, setCreateBracketTeamCount] = useState("");
+  const [createBannerImage, setCreateBannerImage] = useState("");
+  const [createTagline, setCreateTagline] = useState("");
+  const [createHighlightText, setCreateHighlightText] = useState("");
+  const [createTourneyStageStart, setCreateTourneyStageStart] = useState("");
+  const [createTourneyStageEnd, setCreateTourneyStageEnd] = useState("");
+
+  // ─── Collapsible section state ───────────────────────────────────────────────
+  const [showDesignSection, setShowDesignSection] = useState(false);
+  const [showShareSection, setShowShareSection] = useState(false);
   const [createFilterGame, setCreateFilterGame] = useState("all");
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -280,12 +298,16 @@ export default function AdminPanel() {
     const squadCreation = toISTISOString(createSquadCreation);
     const groupStageStart = toISTISOString(createGroupStageStart);
     const groupStageEnd = toISTISOString(createGroupStageEnd);
+    const tourneyStageStart = toISTISOString(createTourneyStageStart);
+    const tourneyStageEnd = toISTISOString(createTourneyStageEnd);
 
     if (regOpens) schedule.registrationOpens = regOpens;
     if (regCloses) schedule.registrationCloses = regCloses;
     if (squadCreation) schedule.squadCreation = squadCreation;
     if (groupStageStart) schedule.groupStageStart = groupStageStart;
     if (groupStageEnd) schedule.groupStageEnd = groupStageEnd;
+    if (tourneyStageStart) schedule.tourneyStageStart = tourneyStageStart;
+    if (tourneyStageEnd) schedule.tourneyStageEnd = tourneyStageEnd;
 
     return Object.keys(schedule).length > 0 ? schedule : null;
   };
@@ -330,6 +352,23 @@ export default function AdminPanel() {
       body.captainBudgets = { S: 600, A: 750, B: 875, C: 1000 };
     }
 
+    // Tournament structure / design fields
+    if (createGroupRounds) body.groupStageRounds = parseInt(createGroupRounds) || 3;
+    if (createMatchesPerRound) body.matchesPerRound = parseInt(createMatchesPerRound) || 2;
+    body.bracketFormat = createBracketFormat || "double_elimination";
+    if (createBracketBestOf) body.bracketBestOf = parseInt(createBracketBestOf) || 2;
+    if (createGrandFinalBestOf) body.grandFinalBestOf = parseInt(createGrandFinalBestOf) || 3;
+    if (createEliminationBestOf) body.eliminationBestOf = parseInt(createEliminationBestOf) || 2;
+    if (createBracketTeamCount) body.bracketTeamCount = parseInt(createBracketTeamCount);
+    if (createBannerImage) body.bannerImage = createBannerImage;
+
+    // Share image metadata
+    if (createTagline || createHighlightText) {
+      body.shareImages = {};
+      if (createTagline) body.shareImages.tagline = createTagline;
+      if (createHighlightText) body.shareImages.highlightText = createHighlightText;
+    }
+
     try {
       await apiCall("/api/admin/create-tournament", body);
       setCreateName(""); setCreateId(""); setCreateDesc(""); setCreateRules("");
@@ -337,6 +376,12 @@ export default function AdminPanel() {
       setCreateIsTest(false); setCreateIsDaily(false);
       setCreateRegOpens(""); setCreateSquadCreation("");
       setCreateGroupStageStart(""); setCreateGroupStageEnd("");
+      setCreateTourneyStageStart(""); setCreateTourneyStageEnd("");
+      setCreateGroupRounds("3"); setCreateMatchesPerRound("2");
+      setCreateBracketFormat("double_elimination"); setCreateBracketBestOf("2");
+      setCreateGrandFinalBestOf("3"); setCreateEliminationBestOf("2");
+      setCreateBracketTeamCount(""); setCreateBannerImage("");
+      setCreateTagline(""); setCreateHighlightText("");
       fetchAllTournaments();
     } catch (e) { /* logged */ }
   };
@@ -487,6 +532,39 @@ export default function AdminPanel() {
                   </div>
                 )}
               </div>
+
+              {/* ═══ TOURNAMENT BLUEPRINT ═══ */}
+              {tournamentId && (() => {
+                const t = tournaments.find(t => t.id === tournamentId) as any;
+                if (!t) return null;
+                const gRounds = t.groupStageRounds || "?";
+                const bo = t.matchesPerRound || 2;
+                const advance = t.bracketTeamCount || "Top 50%";
+                const bFormat = t.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim";
+                const bBo = t.bracketBestOf || 2;
+                const gfBo = t.grandFinalBestOf || 3;
+                return (
+                  <div style={{ marginBottom: 12, padding: "14px 18px", background: "linear-gradient(135deg, #0a1820, #080e18)", border: "1px solid #1e3a5f", borderRadius: 12 }}>
+                    <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#60a5fa", marginBottom: 12 }}>Tournament Blueprint</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
+                      {[
+                        { label: "Group Stage", sub: `${gRounds} rounds · BO${bo}`, color: "#3b82f6" },
+                        { arrow: `→ ${advance} advance` },
+                        { label: "Bracket", sub: `${bFormat} · BO${bBo}`, color: "#f59e0b" },
+                        { arrow: "→ Finals" },
+                        { label: "Grand Final", sub: `BO${gfBo}`, color: "#ff4655" },
+                      ].map((s: any, i: number) => s.arrow ? (
+                        <div key={i} style={{ fontSize: "0.6rem", color: "#555", fontWeight: 700, padding: "0 4px" }}>{s.arrow}</div>
+                      ) : (
+                        <div key={i} style={{ background: `${s.color}12`, border: `1px solid ${s.color}30`, borderRadius: 8, padding: "8px 14px" }}>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 900, color: s.color }}>{s.label}</div>
+                          <div style={{ fontSize: "0.6rem", color: "#8A8880", marginTop: 2 }}>{s.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="adm-grid">
                 {/* ═══ 1. SHUFFLE TEAMS ═══ */}
@@ -1015,6 +1093,14 @@ export default function AdminPanel() {
                       <label style={{ ...smallLabel, color: "#22c55e" }}>Group Stage End</label>
                       <input value={createGroupStageEnd} onChange={e => setCreateGroupStageEnd(e.target.value)} style={inputStyle} type="datetime-local" />
                     </div>
+                    <div>
+                      <label style={{ ...smallLabel, color: "#22c55e" }}>Bracket Stage Start</label>
+                      <input value={createTourneyStageStart} onChange={e => setCreateTourneyStageStart(e.target.value)} style={inputStyle} type="datetime-local" />
+                    </div>
+                    <div>
+                      <label style={{ ...smallLabel, color: "#22c55e" }}>Bracket Stage End</label>
+                      <input value={createTourneyStageEnd} onChange={e => setCreateTourneyStageEnd(e.target.value)} style={inputStyle} type="datetime-local" />
+                    </div>
                   </div>
 
                   {/* Preview */}
@@ -1028,6 +1114,83 @@ export default function AdminPanel() {
                       &nbsp;&nbsp;<span style={{ color: "#fde68a" }}>groupStageStart</span>: <span style={{ color: "#6ee7b7" }}>"{toISTISOString(createGroupStageStart) || "—"}"</span>,<br />
                       &nbsp;&nbsp;<span style={{ color: "#fde68a" }}>groupStageEnd</span>: <span style={{ color: "#6ee7b7" }}>"{toISTISOString(createGroupStageEnd) || "—"}"</span><br />
                       {"}"}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Tournament Design Section (collapsible) ── */}
+                <div style={{ marginTop: 12, border: "1px solid #2a3a4a", borderRadius: 10, overflow: "hidden" }}>
+                  <button onClick={() => setShowDesignSection(v => !v)}
+                    style={{ width: "100%", padding: "12px 16px", background: "#0e1a24", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#60a5fa" }}>🏗 Tournament Design {showDesignSection ? "▲" : "▼"}</span>
+                    <span style={{ fontSize: "0.62rem", color: "#555", fontWeight: 400 }}>Group/bracket structure, format per stage</span>
+                  </button>
+                  {showDesignSection && (
+                    <div style={{ padding: 16, borderTop: "1px solid #1e3a5f" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div>
+                          <label style={smallLabel}>Group Stage Rounds</label>
+                          <input value={createGroupRounds} onChange={e => setCreateGroupRounds(e.target.value)} style={inputStyle} type="number" min="1" max="10" placeholder="3" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Matches Per Round (BO?)</label>
+                          <input value={createMatchesPerRound} onChange={e => setCreateMatchesPerRound(e.target.value)} style={inputStyle} type="number" min="1" max="5" placeholder="2 (BO2)" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Teams to Bracket</label>
+                          <input value={createBracketTeamCount} onChange={e => setCreateBracketTeamCount(e.target.value)} style={inputStyle} type="number" min="2" placeholder="e.g. 8" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Bracket Format</label>
+                          <select value={createBracketFormat} onChange={e => setCreateBracketFormat(e.target.value)} style={selectStyle}>
+                            <option value="double_elimination">Double Elimination</option>
+                            <option value="single_elimination">Single Elimination</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Bracket BO (each match)</label>
+                          <input value={createBracketBestOf} onChange={e => setCreateBracketBestOf(e.target.value)} style={inputStyle} type="number" min="1" max="5" placeholder="2" />
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Grand Final BO</label>
+                          <input value={createGrandFinalBestOf} onChange={e => setCreateGrandFinalBestOf(e.target.value)} style={inputStyle} type="number" min="1" max="7" placeholder="3" />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={smallLabel}>Banner Image URL (optional)</label>
+                        <input value={createBannerImage} onChange={e => setCreateBannerImage(e.target.value)} style={inputStyle} placeholder="https://... or /public/..." />
+                      </div>
+                      {/* Live preview */}
+                      {(createGroupRounds || createBracketFormat) && (
+                        <div style={{ marginTop: 10, padding: "10px 14px", background: "#000", borderRadius: 8, fontSize: "0.72rem", color: "#888", lineHeight: 2, fontFamily: "monospace" }}>
+                          <span style={{ color: "#4ade80" }}>// Tournament Flow Preview</span><br />
+                          Group Stage: <span style={{ color: "#60a5fa" }}>{createGroupRounds || 3} rounds</span> · BO<span style={{ color: "#60a5fa" }}>{createMatchesPerRound || 2}</span><br />
+                          → Top <span style={{ color: "#f59e0b" }}>{createBracketTeamCount || "50%"}</span> teams advance<br />
+                          Bracket: <span style={{ color: "#f59e0b" }}>{createBracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</span> · BO<span style={{ color: "#f59e0b" }}>{createBracketBestOf || 2}</span><br />
+                          Grand Final: BO<span style={{ color: "#ff4655" }}>{createGrandFinalBestOf || 3}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Share Image Config (collapsible) ── */}
+                <div style={{ marginTop: 8, border: "1px solid #2a3a2a", borderRadius: 10, overflow: "hidden" }}>
+                  <button onClick={() => setShowShareSection(v => !v)}
+                    style={{ width: "100%", padding: "12px 16px", background: "#0e1a0e", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#4ade80" }}>🖼 Share Image Config {showShareSection ? "▲" : "▼"}</span>
+                    <span style={{ fontSize: "0.62rem", color: "#555", fontWeight: 400 }}>Pre-populates tournament share cards</span>
+                  </button>
+                  {showShareSection && (
+                    <div style={{ padding: 16, borderTop: "1px solid #1e5c1e" }}>
+                      <div>
+                        <label style={smallLabel}>Tagline (appears on overview/visual cards)</label>
+                        <input value={createTagline} onChange={e => setCreateTagline(e.target.value)} style={inputStyle} placeholder="e.g. The most competitive Valorant tournament in India" />
+                      </div>
+                      <div>
+                        <label style={smallLabel}>Highlight Text (large text on visual card)</label>
+                        <input value={createHighlightText} onChange={e => setCreateHighlightText(e.target.value)} style={inputStyle} placeholder="e.g. ₹10,000 Prize Pool" />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1062,6 +1225,12 @@ export default function AdminPanel() {
                     setCreateIsTest(false); setCreateIsDaily(false);
                     setCreateRegOpens(""); setCreateSquadCreation("");
                     setCreateGroupStageStart(""); setCreateGroupStageEnd("");
+                    setCreateTourneyStageStart(""); setCreateTourneyStageEnd("");
+                    setCreateGroupRounds("3"); setCreateMatchesPerRound("2");
+                    setCreateBracketFormat("double_elimination"); setCreateBracketBestOf("2");
+                    setCreateGrandFinalBestOf("3"); setCreateEliminationBestOf("2");
+                    setCreateBracketTeamCount(""); setCreateBannerImage("");
+                    setCreateTagline(""); setCreateHighlightText("");
                   }}>Clear Form</button>
                 </div>
               </div>

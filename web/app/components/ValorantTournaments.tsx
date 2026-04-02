@@ -11,6 +11,7 @@ export default function ValorantTournaments() {
   const { user } = useAuth();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<ValorantTournament[]>([]);
+  const [tLoading, setTLoading] = useState(true);
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function ValorantTournaments() {
       const ended = visible.filter((t) => t.status === "ended").sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 1);
       const upcoming = visible.filter((t) => t.status === "upcoming" || t.status === "active").sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3);
       setTournaments([...ended, ...upcoming]);
+      setTLoading(false);
     });
     return () => unsub();
   }, []);
@@ -53,6 +55,23 @@ export default function ValorantTournaments() {
     const deadline = new Date(t.registrationDeadline);
     return now <= deadline;
   };
+
+  if (tLoading) return (
+    <>
+      <style>{`
+        @keyframes vt-sk-pulse { 0%,100%{background-position:-200% 0} 50%{background-position:200% 0} }
+        .vt-sk { background: linear-gradient(90deg,#0d1118 0%,#1a2535 40%,#0d1118 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:12px; }
+      `}</style>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 30px 48px" }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+          {[120, 100, 140].map((w, i) => <div key={i} className="vt-sk" style={{ width: w, height: 38, borderRadius: 100 }} />)}
+        </div>
+        {[1, 2, 3].map(i => (
+          <div key={i} className="vt-sk" style={{ height: 88, marginBottom: 10 }} />
+        ))}
+      </div>
+    </>
+  );
 
   return (
     <>

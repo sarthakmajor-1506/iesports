@@ -268,7 +268,20 @@ export interface ValorantTournament {
     groupStageEnd: string;
     tourneyStageStart?: string;
     tourneyStageEnd?: string;
-
+  };
+  // Tournament structure / design fields (set at creation time)
+  description?: string;
+  bannerImage?: string;
+  groupStageRounds?: number;
+  matchesPerRound?: number;
+  bracketFormat?: "double_elimination" | "single_elimination";
+  bracketBestOf?: number;
+  grandFinalBestOf?: number;
+  eliminationBestOf?: number;
+  bracketTeamCount?: number;
+  shareImages?: {
+    tagline?: string;
+    highlightText?: string;
   };
 }
 
