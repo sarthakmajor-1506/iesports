@@ -93,13 +93,13 @@ export async function GET(req: NextRequest) {
 
   // ── Graceful color palette ──
   const CL = {
-    rose: "#e05672",
-    gold: "#c8a44e",
-    lavender: "#8a7cbf",
-    sky: "#6a9fd8",
-    steel: "#5b8ec9",
-    sage: "#5aad7e",
-    amber: "#d49845",
+    rose: "#FF4655",
+    gold: "#3CCBFF",
+    lavender: "#FF4655",
+    sky: "#3CCBFF",
+    steel: "#2A9FCC",
+    sage: "#4ade80",
+    amber: "#FF4655",
     cream: "rgba(255,255,255,0.55)",
     muted: "rgba(255,255,255,0.35)",
   };
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
         overflow: "hidden",
       }}
     >
-      {/* Base gradient */}
+      {/* Base gradient — Valorant dark navy */}
       <div
         style={{
           position: "absolute",
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
           width: S,
           height: S,
           background:
-            "linear-gradient(155deg, #080612 0%, #120e1e 25%, #0c0a18 50%, #0a0814 75%, #070510 100%)",
+            "linear-gradient(155deg, #0A0F2A 0%, #0F1923 25%, #0A1428 50%, #0D0F1A 75%, #080C1E 100%)",
           display: "flex",
         }}
       />
@@ -159,12 +159,12 @@ export async function GET(req: NextRequest) {
             width: S,
             height: S,
             background:
-              "linear-gradient(180deg, rgba(8,6,14,0.70) 0%, rgba(8,6,14,0.88) 60%, rgba(8,6,14,0.95) 100%)",
+              "linear-gradient(180deg, rgba(10,15,42,0.70) 0%, rgba(10,15,42,0.88) 60%, rgba(10,15,42,0.95) 100%)",
             display: "flex",
           }}
         />
       )}
-      {/* Glow: top-left warm gold */}
+      {/* Glow: top-left Valorant red */}
       <div
         style={{
           position: "absolute",
@@ -174,11 +174,11 @@ export async function GET(req: NextRequest) {
           height: 700,
           borderRadius: 9999,
           background:
-            "radial-gradient(circle, rgba(200,164,78,0.18) 0%, rgba(200,164,78,0.04) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,70,85,0.18) 0%, rgba(255,70,85,0.04) 50%, transparent 70%)",
           display: "flex",
         }}
       />
-      {/* Glow: bottom-right lavender */}
+      {/* Glow: bottom-right Valorant cyan */}
       <div
         style={{
           position: "absolute",
@@ -188,11 +188,11 @@ export async function GET(req: NextRequest) {
           height: 600,
           borderRadius: 9999,
           background:
-            "radial-gradient(circle, rgba(138,124,191,0.14) 0%, rgba(138,124,191,0.03) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(60,203,255,0.14) 0%, rgba(60,203,255,0.03) 50%, transparent 70%)",
           display: "flex",
         }}
       />
-      {/* Glow: center-right rose */}
+      {/* Glow: center-right red */}
       <div
         style={{
           position: "absolute",
@@ -202,11 +202,11 @@ export async function GET(req: NextRequest) {
           height: 450,
           borderRadius: 9999,
           background:
-            "radial-gradient(circle, rgba(224,86,114,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,70,85,0.08) 0%, transparent 70%)",
           display: "flex",
         }}
       />
-      {/* Dot grid — gold tint */}
+      {/* Dot grid — cyan tint */}
       <div
         style={{
           position: "absolute",
@@ -215,12 +215,12 @@ export async function GET(req: NextRequest) {
           width: S,
           height: S,
           backgroundImage:
-            "radial-gradient(rgba(200,164,78,0.07) 1px, transparent 1px)",
+            "radial-gradient(rgba(60,203,255,0.06) 1px, transparent 1px)",
           backgroundSize: "36px 36px",
           display: "flex",
         }}
       />
-      {/* Angular accent line top-right */}
+      {/* Angular accent line top-right — Valorant red */}
       <div
         style={{
           position: "absolute",
@@ -229,12 +229,12 @@ export async function GET(req: NextRequest) {
           width: 500,
           height: 2,
           background:
-            "linear-gradient(90deg, transparent, rgba(200,164,78,0.30), transparent)",
+            "linear-gradient(90deg, transparent, rgba(255,70,85,0.30), transparent)",
           transform: "rotate(-30deg)",
           display: "flex",
         }}
       />
-      {/* Angular accent line bottom-left */}
+      {/* Angular accent line bottom-left — cyan */}
       <div
         style={{
           position: "absolute",
@@ -243,7 +243,7 @@ export async function GET(req: NextRequest) {
           width: 400,
           height: 1.5,
           background:
-            "linear-gradient(90deg, transparent, rgba(224,86,114,0.20), transparent)",
+            "linear-gradient(90deg, transparent, rgba(60,203,255,0.20), transparent)",
           transform: "rotate(-30deg)",
           display: "flex",
         }}
@@ -313,8 +313,8 @@ export async function GET(req: NextRequest) {
             fontWeight: 900,
             letterSpacing: "0.15em",
             padding: "8px 18px",
-            background: "rgba(224,86,114,0.08)",
-            border: "1px solid rgba(224,86,114,0.22)",
+            background: "rgba(255,70,85,0.10)",
+            border: "1px solid rgba(255,70,85,0.25)",
             borderRadius: 100,
             color: CL.rose,
             display: "flex",

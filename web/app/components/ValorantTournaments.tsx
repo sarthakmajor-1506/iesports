@@ -162,9 +162,15 @@ export default function ValorantTournaments() {
                   const isRegistered = registeredIds.has(t.id);
                   const regState = getRegistrationState(t);
                   return (
-                    <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s` }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
-                      <div className="vt-card-accent" style={{ background: "#3CCBFF" }} />
-                      <div className="vt-card-body">
+                    <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s`, position: "relative" }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
+                      {t.bannerImage && (
+                        <>
+                          <img src={t.bannerImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.08, borderRadius: 16, pointerEvents: "none" }} />
+                          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,15,42,0.85) 0%, rgba(10,15,42,0.5) 50%, rgba(10,15,42,0.85) 100%)", borderRadius: 16, pointerEvents: "none" }} />
+                        </>
+                      )}
+                      <div className="vt-card-accent" style={{ background: "#3CCBFF", position: "relative", zIndex: 1 }} />
+                      <div className="vt-card-body" style={{ position: "relative", zIndex: 1 }}>
                         <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
                         <div className="vt-card-info">
                           <div className="vt-card-name">{t.name}</div>
@@ -193,7 +199,7 @@ export default function ValorantTournaments() {
                           </div>
                         </div>
                       </div>
-                      <div className="vt-card-right">
+                      <div className="vt-card-right" style={{ position: "relative", zIndex: 1 }}>
                         <div className="vt-slots">
                           <div className="vt-slots-text"><strong>{t.slotsBooked}</strong> / {t.totalSlots} filled</div>
                           <div className="vt-slots-bar"><div className="vt-slots-fill" style={{ width: `${Math.round((t.slotsBooked / t.totalSlots) * 100)}%`, background: t.slotsBooked / t.totalSlots > 0.8 ? "#ef4444" : t.slotsBooked / t.totalSlots > 0.5 ? "#f59e0b" : "#22c55e" }} /></div>

@@ -490,7 +490,7 @@ function ValorantTournamentDetailInner() {
         .vtd-hero-title { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900; color: #E6E6E6; line-height: 1.05; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) both; letter-spacing: -0.03em; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
         .vtd-hero-desc { font-size: 1rem; color: rgba(230,230,230,0.65); margin-top: 10px; max-width: 560px; line-height: 1.6; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.08s both; }
         .vtd-hero-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.16s both; flex-wrap: wrap; }
-        .vtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
+        .vtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(60,203,255,0.12); border: 1px solid rgba(60,203,255,0.3); color: #3CCBFF; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
         .vtd-hero-share-btn:hover { background: rgba(60,203,255,0.25); border-color: rgba(60,203,255,0.5); transform: scale(1.05); }
         @keyframes vtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -674,7 +674,7 @@ function ValorantTournamentDetailInner() {
 
         /* ── Tab share button ── */
         .vtd-tab-share { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 100px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 700; transition: all 0.15s; }
-        .vtd-tab-share:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.2); }
+        .vtd-tab-share:hover { background: rgba(60,203,255,0.12); color: #3CCBFF; border-color: rgba(60,203,255,0.3); }
         .vtd-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #fff; padding: 10px 22px; border-radius: 100px; font-size: 0.85rem; font-weight: 700; z-index: 2000; animation: vtd-toast-in 0.3s ease-out, vtd-toast-out 0.3s ease-in 1.7s both; pointer-events: none; display: flex; align-items: center; gap: 7px; }
         @keyframes vtd-toast-in { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         @keyframes vtd-toast-out { from { opacity: 1; } to { opacity: 0; } }
@@ -685,12 +685,12 @@ function ValorantTournamentDetailInner() {
         .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #E6E6E6; display: flex; align-items: center; gap: 10px; }
         .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
-        .vtd-share-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .vtd-share-close:hover { background: rgba(60,203,255,0.12); color: #3CCBFF; }
         .vtd-share-carousel { position: relative; width: 100%; }
         .vtd-share-carousel-img { width: 100%; aspect-ratio: 1/1; background: #0A0F2A; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); }
         .vtd-share-carousel-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
         .vtd-share-carousel-btn { width: 36px; height: 36px; border-radius: 100px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8A8880; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
-        .vtd-share-carousel-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .vtd-share-carousel-btn:hover { background: rgba(60,203,255,0.12); color: #3CCBFF; }
         .vtd-share-carousel-btn:disabled { opacity: 0.3; cursor: default; }
         .vtd-share-carousel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #E6E6E6; }
@@ -702,7 +702,7 @@ function ValorantTournamentDetailInner() {
         .vtd-share-img-btn.dl { background: linear-gradient(135deg, #3CCBFF, #2A9FCC); color: #fff; }
         .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(60,203,255,0.35); }
         .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
-        .vtd-share-img-btn.cp:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .vtd-share-img-btn.cp:hover { background: rgba(60,203,255,0.10); color: #3CCBFF; }
 
         /* ── Animations ── */
         @keyframes vtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -769,7 +769,7 @@ function ValorantTournamentDetailInner() {
 
         {/* ═══ HERO ═══ */}
         <div className="vtd-hero">
-          <img className="vtd-hero-bg" src="/valorantimg3.jpg" alt="" aria-hidden="true" />
+          <img className="vtd-hero-bg" src={tournament.bannerImage || "/valorantimg3.jpg"} alt="" aria-hidden="true" />
           <img className="vtd-hero-agent" src="/valorant-agents.jpg" alt="" aria-hidden="true" />
           <div className="vtd-hero-overlay" />
           <div className="vtd-hero-content">

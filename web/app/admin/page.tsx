@@ -1487,8 +1487,18 @@ export default function AdminPanel() {
                         </div>
                       </div>
                       <div>
-                        <label style={smallLabel}>Banner Image URL (optional)</label>
-                        <input value={createBannerImage} onChange={e => setCreateBannerImage(e.target.value)} style={inputStyle} placeholder="https://... or /public/..." />
+                        <label style={smallLabel}>Banner Image (optional)</label>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <input value={createBannerImage} onChange={e => setCreateBannerImage(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="https://... or /public/..." />
+                          <label style={{ padding: "7px 12px", background: "#1a1a1e", border: "1px solid #2a2a30", borderRadius: 8, fontSize: "0.68rem", color: "#ccc", cursor: shareBgUploading["banner"] ? "wait" : "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit", fontWeight: 600 }}>
+                            {shareBgUploading["banner"] ? "Uploading…" : "Upload"}
+                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleShareBgUpload("banner", file, setCreateBannerImage);
+                            }} />
+                          </label>
+                          {createBannerImage && <img src={createBannerImage} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", border: "1px solid #333", flexShrink: 0 }} />}
+                        </div>
                       </div>
                       {/* Live preview */}
                       {(createGroupRounds || createBracketFormat) && (

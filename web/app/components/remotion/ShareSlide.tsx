@@ -71,13 +71,13 @@ export interface ShareSlideProps {
    ═══════════════════════════════════════════════ */
 
 const C = {
-  rose: "#e05672",       // softer Valorant-inspired red
-  gold: "#c8a44e",       // matches the shield logo
-  lavender: "#8a7cbf",   // muted purple
-  sky: "#6a9fd8",        // calm blue
-  steel: "#5b8ec9",      // deeper blue for stages
-  sage: "#5aad7e",       // refined green
-  amber: "#d49845",      // warm amber
+  rose: "#FF4655",       // Valorant signature red
+  gold: "#3CCBFF",       // Valorant cyan (primary accent)
+  lavender: "#FF4655",   // Valorant red for secondary glow
+  sky: "#3CCBFF",        // Valorant cyan
+  steel: "#2A9FCC",      // deeper cyan for stages
+  sage: "#4ade80",       // green for success states
+  amber: "#FF4655",      // red accent
   cream: "rgba(255,255,255,0.55)",
   muted: "rgba(255,255,255,0.35)",
 } as const;
@@ -130,13 +130,13 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
 
   return (
     <AbsoluteFill>
-      {/* Base gradient — deep, warm-tinted dark */}
+      {/* Base gradient — Valorant dark navy */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(155deg, #080612 0%, #120e1e 25%, #0c0a18 50%, #0a0814 75%, #070510 100%)",
+            "linear-gradient(155deg, #0A0F2A 0%, #0F1923 25%, #0A1428 50%, #0D0F1A 75%, #080C1E 100%)",
         }}
       />
       {/* Uploaded background image */}
@@ -158,12 +158,12 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
             style={{
               position: "absolute",
               inset: 0,
-              background: "linear-gradient(180deg, rgba(8,6,18,0.7) 0%, rgba(8,6,18,0.5) 40%, rgba(8,6,18,0.8) 100%)",
+              background: "linear-gradient(180deg, rgba(10,15,42,0.7) 0%, rgba(10,15,42,0.5) 40%, rgba(10,15,42,0.8) 100%)",
             }}
           />
         </>
       )}
-      {/* Glow: top-left warm gold */}
+      {/* Glow: top-left Valorant red */}
       <div
         style={{
           position: "absolute",
@@ -173,11 +173,11 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
           height: 700,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(200,164,78,0.18) 0%, rgba(200,164,78,0.04) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,70,85,0.18) 0%, rgba(255,70,85,0.04) 50%, transparent 70%)",
           transform: `scale(${breathe})`,
         }}
       />
-      {/* Glow: bottom-right lavender */}
+      {/* Glow: bottom-right Valorant cyan */}
       <div
         style={{
           position: "absolute",
@@ -187,11 +187,11 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
           height: 600,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(138,124,191,0.14) 0%, rgba(138,124,191,0.03) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(60,203,255,0.14) 0%, rgba(60,203,255,0.03) 50%, transparent 70%)",
           transform: `scale(${breathe2})`,
         }}
       />
-      {/* Glow: center-right rose (subtle) */}
+      {/* Glow: center-right red (subtle) */}
       <div
         style={{
           position: "absolute",
@@ -201,22 +201,22 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
           height: 450,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(224,86,114,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,70,85,0.08) 0%, transparent 70%)",
           transform: `scale(${breathe})`,
         }}
       />
-      {/* Dot grid — gold tint */}
+      {/* Dot grid — cyan tint */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "radial-gradient(rgba(200,164,78,0.07) 1px, transparent 1px)",
+            "radial-gradient(rgba(60,203,255,0.06) 1px, transparent 1px)",
           backgroundSize: "36px 36px",
           opacity: dotOpacity,
         }}
       />
-      {/* Accent line top-right */}
+      {/* Accent line top-right — Valorant red */}
       <div
         style={{
           position: "absolute",
@@ -225,12 +225,12 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
           width: 500,
           height: 2,
           background:
-            "linear-gradient(90deg, transparent, rgba(200,164,78,0.30), transparent)",
+            "linear-gradient(90deg, transparent, rgba(255,70,85,0.30), transparent)",
           transform: `rotate(${lineRotate1}deg)`,
           opacity: fade(frame, 5, 20),
         }}
       />
-      {/* Accent line bottom-left */}
+      {/* Accent line bottom-left — cyan */}
       <div
         style={{
           position: "absolute",
@@ -239,7 +239,7 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
           width: 400,
           height: 1.5,
           background:
-            "linear-gradient(90deg, transparent, rgba(224,86,114,0.20), transparent)",
+            "linear-gradient(90deg, transparent, rgba(60,203,255,0.20), transparent)",
           transform: `rotate(${lineRotate2}deg)`,
           opacity: fade(frame, 8, 20),
         }}
@@ -319,8 +319,8 @@ function AnimatedTopBar({
             fontWeight: 900,
             letterSpacing: "0.15em",
             padding: "8px 18px",
-            background: "rgba(224,86,114,0.08)",
-            border: "1px solid rgba(224,86,114,0.22)",
+            background: "rgba(255,70,85,0.10)",
+            border: "1px solid rgba(255,70,85,0.25)",
             borderRadius: 100,
             color: C.rose,
           }}
