@@ -23,12 +23,21 @@ type RiotData = {
   riotTier: number;
 };
 
+type UserProfile = {
+  fullName: string;
+  phone: string;
+  discordId: string;
+  discordUsername: string;
+  steamId: string;
+};
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
   steamLinked: boolean;
   dotaProfile: DotaProfile | null;
   riotData: RiotData | null;
+  userProfile: UserProfile | null;
   logout: () => Promise<void>;
 };
 
@@ -38,6 +47,7 @@ const AuthContext = createContext<AuthContextType>({
   steamLinked: false,
   dotaProfile: null,
   riotData: null,
+  userProfile: null,
   logout: async () => {},
 });
 
@@ -54,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [steamLinked, setSteamLinked] = useState(false);
   const [dotaProfile, setDotaProfile] = useState<DotaProfile | null>(null);
   const [riotData, setRiotData] = useState<RiotData | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -72,6 +83,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dotaBracket: data?.dotaBracket ?? null,
           dotaMMR: data?.dotaMMR ?? null,
           smurfRiskScore: data?.smurfRiskScore ?? null,
+        });
+
+        setUserProfile({
+          fullName: data?.fullName || "",
+          phone: data?.phone || u.phoneNumber || "",
+          discordId: data?.discordId || "",
+          discordUsername: data?.discordUsername || "",
+          steamId: data?.steamId || "",
         });
 
         const hasRiot = !!data?.riotGameName;
@@ -95,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSteamLinked(false);
         setDotaProfile(null);
         setRiotData(null);
+        setUserProfile(null);
         if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/player/")) {
           try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
           router.push("/");
@@ -114,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     
-    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, logout }}>
+    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

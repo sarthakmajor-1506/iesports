@@ -17,6 +17,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Validate mandatory fields
+    if (!userData.fullName) {
+      return NextResponse.json({ error: "Full name is required. Please update your profile." }, { status: 400 });
+    }
+    if (!userData.phone && !userData.phoneNumber) {
+      return NextResponse.json({ error: "Phone number is required. Please log in with your phone number." }, { status: 400 });
+    }
+    if (!userData.discordId) {
+      return NextResponse.json({ error: "Discord account is required. Please connect Discord first." }, { status: 400 });
+    }
+
     // Check Riot ID is linked
     if (!userData.riotGameName) {
       return NextResponse.json({ error: "Connect your Riot ID first" }, { status: 400 });

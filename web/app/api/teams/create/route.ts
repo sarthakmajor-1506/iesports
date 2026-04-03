@@ -24,9 +24,12 @@ export async function POST(req: NextRequest) {
       .where("uid", "==", uid).get();
     if (!soloExisting.empty) return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
 
-    // Get user's Steam ID
+    // Get user doc and validate mandatory fields
     const userDoc = await adminDb.collection("users").doc(uid).get();
     const userData = userDoc.data();
+    if (!userData?.fullName) return NextResponse.json({ error: "Full name is required. Please update your profile." }, { status: 400 });
+    if (!userData?.phone && !userData?.phoneNumber) return NextResponse.json({ error: "Phone number is required. Please log in with your phone number." }, { status: 400 });
+    if (!userData?.discordId) return NextResponse.json({ error: "Discord account is required. Please connect Discord first." }, { status: 400 });
     if (!userData?.steamId) return NextResponse.json({ error: "Steam account not linked" }, { status: 400 });
 
     // Fetch rank from OpenDota
