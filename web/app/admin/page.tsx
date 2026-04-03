@@ -29,6 +29,8 @@ const FORMAT_OPTIONS: Record<string, { value: string; label: string }[]> = {
   ],
   dota2: [
     { value: "standard", label: "Standard" },
+    { value: "shuffle", label: "Shuffle" },
+    { value: "auction", label: "Auction" },
     { value: "solo", label: "Solo" },
   ],
 };
@@ -246,10 +248,10 @@ export default function AdminPanel() {
   // ─── Fetch tournaments ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!authenticated) return;
-    const unsub = onSnapshot(collection(db, "valorantTournaments"), (snap) => {
-      const all = snap.docs.map(d => ({
+    const unsub1 = onSnapshot(collection(db, "valorantTournaments"), (snap) => {
+      const valAll = snap.docs.map(d => ({
         id: d.id,
-        name: d.data().name || d.id,
+        name: `[VAL] ${d.data().name || d.id}`,
         status: d.data().status || "upcoming",
         teamCount: d.data().teamCount,
         slotsBooked: d.data().slotsBooked,
@@ -261,21 +263,54 @@ export default function AdminPanel() {
         bracketTeamCount: d.data().bracketTeamCount,
         groupStageRounds: d.data().groupStageRounds,
       }));
-      setTournaments(all.sort((a, b) => a.name.localeCompare(b.name)));
-      setTournamentId(prev => prev || (all.length > 0 ? all[0].id : ""));
+      setTournaments(prev => {
+        const dota = prev.filter(t => t.name.startsWith("[DOTA2]"));
+        const merged = [...valAll, ...dota].sort((a, b) => a.name.localeCompare(b.name));
+        return merged;
+      });
     });
-    return () => unsub();
+    const unsub2 = onSnapshot(collection(db, "tournaments"), (snap) => {
+      const dotaAll = snap.docs.map(d => ({
+        id: d.id,
+        name: `[DOTA2] ${d.data().name || d.id}`,
+        status: d.data().status || "upcoming",
+        teamCount: d.data().teamCount,
+        slotsBooked: d.data().slotsBooked,
+        totalSlots: d.data().totalSlots,
+        matchesPerRound: d.data().matchesPerRound,
+        bracketBestOf: d.data().bracketBestOf,
+        grandFinalBestOf: d.data().grandFinalBestOf,
+        bracketFormat: d.data().bracketFormat,
+        bracketTeamCount: d.data().bracketTeamCount,
+        groupStageRounds: d.data().groupStageRounds,
+      }));
+      setTournaments(prev => {
+        const val = prev.filter(t => t.name.startsWith("[VAL]"));
+        const merged = [...val, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
+        return merged;
+      });
+      setTournamentId(prev => prev || "");
+    });
+    return () => { unsub1(); unsub2(); };
   }, [authenticated]);
+
+  // ─── Determine collection for selected tournament ────────────────────────────
+  const getSelectedCollection = (): string => {
+    const t = tournaments.find(t => t.id === tournamentId);
+    if (t?.name.startsWith("[DOTA2]")) return "tournaments";
+    return "valorantTournaments";
+  };
 
   // ─── Fetch teams & matches ──────────────────────────────────────────────────
   useEffect(() => {
     if (!tournamentId || !authenticated) { setTeams([]); setMatches([]); return; }
+    const col = getSelectedCollection();
     const unsub1 = onSnapshot(
-      query(collection(db, "valorantTournaments", tournamentId, "teams"), orderBy("teamIndex")),
+      query(collection(db, col, tournamentId, "teams"), orderBy("teamIndex")),
       (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData)))
     );
     const unsub2 = onSnapshot(
-      collection(db, "valorantTournaments", tournamentId, "matches"),
+      collection(db, col, tournamentId, "matches"),
       (snap) => {
         const m = snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchData));
         setMatches(m.sort((a, b) => {
@@ -471,16 +506,18 @@ export default function AdminPanel() {
     try {
       await apiCall("/api/admin/create-tournament", body);
 
-      // Auto-seed dummy preview data
-      try {
-        await fetch("/api/valorant/seed-dummy-data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
-          body: JSON.stringify({ tournamentId: createdId }),
-        });
-        addLog(`✅ seed-dummy-data: Preview data generated for ${createdId}`);
-      } catch (e) {
-        addLog(`⚠️ seed-dummy-data: Could not auto-seed preview data (tournament was created)`);
+      // Auto-seed dummy preview data (Valorant only)
+      if (createGame === "valorant") {
+        try {
+          await fetch("/api/valorant/seed-dummy-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
+            body: JSON.stringify({ tournamentId: createdId }),
+          });
+          addLog(`✅ seed-dummy-data: Preview data generated for ${createdId}`);
+        } catch (e) {
+          addLog(`⚠️ seed-dummy-data: Could not auto-seed preview data (tournament was created)`);
+        }
       }
 
       setCreateName(""); setCreateId(""); setCreateDesc(""); setCreateRules("");
@@ -1568,7 +1605,7 @@ export default function AdminPanel() {
                   {showShareSection && (
                     <div style={{ padding: 16, borderTop: "1px solid #1e5c1e" }}>
                       <p style={{ fontSize: "0.65rem", color: "#666", marginBottom: 12, lineHeight: 1.5 }}>
-                        Set custom backgrounds for tournament share images. Leave blank to use the default Valorant theme.
+                        Set custom backgrounds for tournament share images. Leave blank to use the default theme.
                       </p>
                       <div>
                         <label style={smallLabel}>Tagline (appears on overview cards)</label>
