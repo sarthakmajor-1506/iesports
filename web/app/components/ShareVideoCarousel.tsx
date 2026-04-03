@@ -44,35 +44,57 @@ export default function ShareVideoCarousel({
   const current = SLIDES[slideIdx] || SLIDES[0];
 
   // Download static PNG from the existing API route
+  const [downloading, setDownloading] = useState(false);
   const downloadPng = useCallback(async () => {
+    if (downloading) return;
+    setDownloading(true);
     try {
       const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}`;
       const res = await fetch(src);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.download = `${(tournament.name || "tournament").replace(/\s+/g, "_")}_${current.type}.png`;
       a.href = url;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
-    } catch {}
-  }, [tournamentId, current.type, tournament.name]);
+      // Delay revoke so browser can start the download
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      console.error("Image download failed:", err);
+    } finally {
+      setDownloading(false);
+    }
+  }, [tournamentId, current.type, tournament.name, downloading]);
 
   // Copy image to clipboard
+  const [copying, setCopying] = useState(false);
   const copyImg = useCallback(async () => {
+    if (copying) return;
+    setCopying(true);
     try {
       const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}`;
       const res = await fetch(src);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
       const blob = await res.blob();
+      // clipboard.write needs image/png specifically
+      const pngBlob = blob.type === "image/png" ? blob : new Blob([await blob.arrayBuffer()], { type: "image/png" });
       await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
+        new ClipboardItem({ "image/png": pngBlob }),
       ]);
       onToast();
-    } catch {
-      navigator.clipboard.writeText(window.location.href);
+    } catch (err) {
+      console.error("Copy image failed:", err);
+      try { await navigator.clipboard.writeText(window.location.href); } catch {}
       onToast();
+    } finally {
+      setCopying(false);
     }
-  }, [tournamentId, current.type, onToast]);
+  }, [tournamentId, current.type, onToast, copying]);
 
   // Two-phase video recording:
   // Phase 1: Capture all frames as ImageBitmaps (slow but accurate)
@@ -305,8 +327,18 @@ export default function ShareVideoCarousel({
 
       {/* Actions */}
       <div className="vtd-share-carousel-actions">
-        <button className="vtd-share-img-btn dl" onClick={downloadPng}>
-          <Download size={11} /> Image
+        <button
+          className="vtd-share-img-btn dl"
+          onClick={downloadPng}
+          disabled={downloading}
+          style={downloading ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+        >
+          {downloading ? (
+            <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+          ) : (
+            <Download size={11} />
+          )}
+          {downloading ? "Downloading..." : "Image"}
         </button>
         <button
           className="vtd-share-img-btn dl"
@@ -321,8 +353,18 @@ export default function ShareVideoCarousel({
           )}
           {recording ? `${recordProgress}%` : "Video"}
         </button>
-        <button className="vtd-share-img-btn cp" onClick={copyImg}>
-          <Copy size={11} /> Copy
+        <button
+          className="vtd-share-img-btn cp"
+          onClick={copyImg}
+          disabled={copying}
+          style={copying ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+        >
+          {copying ? (
+            <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+          ) : (
+            <Copy size={11} />
+          )}
+          {copying ? "Copying..." : "Copy"}
         </button>
       </div>
     </div>
