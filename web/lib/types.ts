@@ -25,6 +25,16 @@ export type Tournament = {
   brackets: Record<Bracket, BracketData>;
   desc: string;
   rules: string[];
+  format?: "shuffle" | "auction" | "standard";
+  entryFee?: number;
+  bannerImage?: string;
+  schedule?: {
+    registrationOpens?: string;
+    registrationCloses?: string;
+    squadCreation?: string;
+    groupStageStart?: string;
+    tourneyStageStart?: string;
+  };
 };
 
 export type Team = {
