@@ -12,8 +12,8 @@ import { useMemo } from "react";
  *   5-6 teams → 8-team with byes (top 50% UB, bottom 50% LB)
  *   7-8 teams → Full 8-team double elim (top 4 UB, bottom 4 LB)
  *
- * Naming: "Upper Bracket" / "Lower Bracket"
- * Seeding: Top 50% standings → Upper Bracket, Bottom 50% → Lower Bracket
+ * Naming: "Upper Play-offs" / "Lower Play-offs"
+ * Seeding: Top 50% standings → Upper Play-offs, Bottom 50% → Lower Play-offs
  *          This rewards group stage performance — top performers start
  *          with the advantage of needing to lose twice to be eliminated.
  */
@@ -349,7 +349,7 @@ function BracketWrapper({ children, width, height, teamCount }: { children: Reac
       {/* Header */}
       <div style={{ display: "flex", gap: 16, padding: "0 24px 12px", fontFamily: "system-ui", alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.win, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-          ↗ Upper Bracket
+          ↗ Upper Play-offs
         </span>
         <span style={{ fontSize: "0.68rem", color: C.textMuted }}>
           {teamCount} teams · Double Elimination · Top 50% UB / Bottom 50% LB
@@ -410,14 +410,14 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={3}>
-      <ColHeader x={ubFinal.x + MATCH_W / 2} y={PAD} text="UPPER BRACKET FINAL" />
+      <ColHeader x={ubFinal.x + MATCH_W / 2} y={PAD} text="UPPER PLAY-OFFS FINAL" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
       <Connector x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
 
-      <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER BRACKET" color={C.accent} />
-      <ColHeader x={lbFinal.x + MATCH_W / 2} y={losersY - 14} text="LOWER BRACKET FINAL" />
+      <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER PLAY-OFFS" color={C.accent} />
+      <ColHeader x={lbFinal.x + MATCH_W / 2} y={losersY - 14} text="LOWER PLAY-OFFS FINAL" />
 
       <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
@@ -464,7 +464,7 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length || 4}>
-      <ColHeader x={ubSemi.x + MATCH_W / 2} y={PAD} text="UPPER BRACKET" />
+      <ColHeader x={ubSemi.x + MATCH_W / 2} y={PAD} text="UPPER PLAY-OFFS" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
       <Connector x1={ubSemi.x + MATCH_W} y1={ubSemi.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
@@ -473,7 +473,7 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
       <Connector x1={ubSemi.x + MATCH_W / 2} y1={ubSemi.y + MATCH_H} x2={lbF.x + MATCH_W / 4} y2={lbF.y} />
       <CDot x={ubSemi.x + MATCH_W / 2} y={ubSemi.y + MATCH_H} lower />
 
-      <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER BRACKET" color={C.accent} />
+      <SectionLine x1={PAD} x2={totalW - PAD} y={losersY - 30} label="↘ LOWER PLAY-OFFS" color={C.accent} />
       <ColHeader x={lbR1.x + MATCH_W / 2} y={losersY - 14} text="LOWER R1" />
       <ColHeader x={lbF.x + MATCH_W / 2} y={losersY - 14} text="LOWER FINAL" />
 
@@ -572,7 +572,7 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
       <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
-      <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
+      <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER PLAY-OFFS" color={C.accent} />
 
       <ColHeader x={colX(0) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R1" />
       <ColHeader x={colX(1) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R2" />

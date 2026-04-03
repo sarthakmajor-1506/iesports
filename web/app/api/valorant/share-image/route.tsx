@@ -1225,7 +1225,7 @@ export async function GET(req: NextRequest) {
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.steel, display: "flex" }}>{groupPool}</div>
           </div>
           <div style={{ flex: 1, padding: "16px 22px", background: `${CL.amber}0C`, border: `1px solid ${CL.amber}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>BRACKET STAGE</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>PLAY-OFF STAGE</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.amber, display: "flex" }}>{bracketPool}</div>
           </div>
         </div>
@@ -1259,7 +1259,7 @@ export async function GET(req: NextRequest) {
         n: "4",
       },
       {
-        lbl: "Bracket Stage",
+        lbl: "Play-off Stage",
         date: schedule.tourneyStageStart,
         color: CL.amber,
         n: "5",
@@ -1358,7 +1358,7 @@ export async function GET(req: NextRequest) {
       { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", color: CL.sage },
       { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, color: CL.lavender },
       { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, color: CL.steel },
-      { n: "4", lbl: "BRACKET STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: CL.amber },
+      { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: CL.amber },
       { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, color: CL.rose },
     ];
 

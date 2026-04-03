@@ -26,7 +26,7 @@ const TABS: { key: Tab; label: string; Icon: React.FC<{ size?: number; strokeWid
   { key: "teams",       label: "Teams",        Icon: Shield },
   { key: "standings",   label: "Standings",    Icon: Trophy },
   { key: "matches",     label: "Matches",      Icon: Swords },
-  { key: "brackets",    label: "Bracket",      Icon: GitBranch },
+  { key: "brackets",    label: "Play-offs",    Icon: GitBranch },
   { key: "leaderboard", label: "Leaderboard",  Icon: BarChart3 },
 ];
 
@@ -872,7 +872,7 @@ function ValorantTournamentDetailInner() {
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.35s" }}>
                   <div className="vtd-stat-tile-icon"><GitBranch size={24} color="#8A8880" /></div>
                   <div className="vtd-stat-tile-val">{tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</div>
-                  <div className="vtd-stat-tile-lbl">Bracket Type</div>
+                  <div className="vtd-stat-tile-lbl">Play-off Type</div>
                 </div>
               </div>
 
@@ -908,7 +908,7 @@ function ValorantTournamentDetailInner() {
                         {schedule.squadCreation && <TimelineItem label="Squad Creation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
                         {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "active" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "active" ? "ACTIVE" : undefined} />}
                         {schedule.groupStageEnd && <TimelineItem label="Group Stage Ends" date={schedule.groupStageEnd} status={new Date(schedule.groupStageEnd) <= new Date() ? "past" : "future"} />}
-                        {schedule.tourneyStageStart && <TimelineItem label="Bracket Stage" date={schedule.tourneyStageStart} status="future" />}
+                        {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
                       </div>
                     </div>
                   )}
@@ -919,7 +919,7 @@ function ValorantTournamentDetailInner() {
                       {[
                         { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#3b82f6" },
                         { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
-                        { label: "Bracket", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
+                        { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
                         { label: "→", sub: "", color: "#555550", isArrow: true },
                         { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#ff4655" },
                       ].map((s, i) => s.isArrow ? (
@@ -1062,7 +1062,7 @@ function ValorantTournamentDetailInner() {
                   )}
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
-                      <div className="vtd-section-header bracket">Bracket Fixtures</div>
+                      <div className="vtd-section-header bracket">Play-off Fixtures</div>
                       {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : (tournament?.bracketBestOf || 2)} />))}</div>); }); })()}
                     </div>
                   )}
@@ -1076,7 +1076,7 @@ function ValorantTournamentDetailInner() {
             <div className="vtd-tab-pane" ref={tabContentRef} style={{ animation: "vtd-fadein 0.3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#F0EEEA" }}>Elimination Bracket</h3>
+                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#F0EEEA" }}>Elimination Play-offs</h3>
                   <span style={{
                     fontSize: "0.6rem", fontWeight: 900, letterSpacing: "0.1em",
                     padding: "3px 10px", borderRadius: 100,

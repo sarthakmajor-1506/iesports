@@ -1166,7 +1166,7 @@ function RanksMapSlide({
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>BRACKET STAGE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>PLAY-OFF STAGE</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{bracketPool}</div>
         </div>
       </div>
@@ -1352,7 +1352,7 @@ function ScheduleSlide({
     { lbl: "Registration Closes", date: schedule.registrationCloses || t.registrationDeadline, color: C.amber, n: "2" },
     { lbl: "Squad Creation", date: schedule.squadCreation, color: C.lavender, n: "3" },
     { lbl: "Group Stage Starts", date: schedule.groupStageStart || t.startDate, color: C.steel, n: "4" },
-    { lbl: "Bracket Stage", date: schedule.tourneyStageStart, color: C.amber, n: "5" },
+    { lbl: "Play-off Stage", date: schedule.tourneyStageStart, color: C.amber, n: "5" },
     { lbl: "Tournament Ends", date: t.endDate, color: C.rose, n: "6" },
   ].filter((e) => e.date);
 
@@ -1452,7 +1452,7 @@ function FormatFlowSlide({
     { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", color: C.sage },
     { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, color: C.lavender },
     { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, color: C.steel },
-    { n: "4", lbl: "BRACKET STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: C.amber },
+    { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: C.amber },
     { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, color: C.rose },
   ];
 
