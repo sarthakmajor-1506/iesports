@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
         riotTier: d.riotTier || null,
         riotVerified: d.riotVerified || null,
         riotAvatar: d.riotAvatar || null,
+        riotScreenshotUrl: d.riotScreenshotUrl || null,
         // Steam
         steamId: d.steamId || null,
         steamName: d.steamName || null,

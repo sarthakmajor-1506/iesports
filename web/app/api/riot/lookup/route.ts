@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebaseAdmin";
 
 /**
  * POST /api/riot/lookup
  *
- * Body: { riotId: "GameName#TAG", region?: "ap" }
+ * Body: { riotId: "GameName#TAG", region?: "ap", uid?: string }
  *
  * Calls Henrik Dev API to fetch:
  *   1. Account data (name, tag, avatar, level, puuid)
@@ -37,7 +38,7 @@ function henrikFetch(path: string): Promise<Response> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { riotId, region = "ap" } = body;
+    const { riotId, region = "ap", uid } = body;
 
     if (!riotId || typeof riotId !== "string") {
       return NextResponse.json({ error: "Missing riotId" }, { status: 400 });
@@ -100,6 +101,19 @@ export async function POST(req: NextRequest) {
         { error: `Player "${gameName}#${tagLine}" not found.` },
         { status: 404 }
       );
+    }
+
+    // ── 1b. Uniqueness check — ensure puuid isn't linked to another account ──
+    if (uid && account.puuid) {
+      const existing = await adminDb.collection("users")
+        .where("riotPuuid", "==", account.puuid)
+        .limit(1)
+        .get();
+      if (!existing.empty && existing.docs[0].id !== uid) {
+        return NextResponse.json({
+          error: "This Riot ID is already linked to another iEsports account. Each Riot ID can only be used once."
+        }, { status: 409 });
+      }
     }
 
     // ── 2. Fetch MMR/rank data ───────────────────────────────────────────

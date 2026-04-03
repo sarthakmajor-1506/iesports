@@ -273,6 +273,23 @@ export default function DotaTournaments() {
           color: #555550;
           font-size: 0.9rem;
         }
+
+        @media (max-width: 700px) {
+          .dt-wrap { padding: 16px 16px 40px; }
+          .dt-card-body { gap: 12px; padding: 12px 14px; }
+          .dt-card-icon { width: 36px; height: 36px; }
+          .dt-card-icon img { width: 26px; height: 26px; }
+          .dt-cta-btn { padding: 7px 14px; font-size: 0.74rem; min-width: 100px; }
+        }
+        @media (max-width: 500px) {
+          .dt-wrap { padding: 12px 12px 36px; }
+          .dt-card { flex-direction: column; }
+          .dt-card-accent { width: 100%; height: 3px; }
+          .dt-card-body { flex-wrap: wrap; }
+          .dt-slots-wrap { width: 100%; min-width: unset; }
+          .dt-slots-text { text-align: left; }
+          .dt-cta-btn { width: 100%; }
+        }
       `}</style>
 
       <div className="dt-wrap">

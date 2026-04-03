@@ -221,6 +221,7 @@ export default function Home() {
         .ie-tourn-detail-link:hover { color:rgba(255,255,255,.65); }
         .ie-tourn-grid { display:flex; flex-direction:column; gap:28px; }
         @media (max-width:700px) { .ie-tourn-wrap { padding:36px 24px; flex-direction:column; } .ie-tourn-right { width:100%; } }
+        @media (max-width:480px) { .ie-tourn-wrap { padding:24px 16px; } .ie-section { padding:48px 14px; } .ie-tourn-title { font-size:1.3rem !important; } }
 
         /* Modal overlay */
         @keyframes riot-modal-in { from { opacity:0; transform:scale(.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }

@@ -436,7 +436,7 @@ export default function ConnectRiot() {
       const res = await fetch("/api/riot/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ riotId }),
+        body: JSON.stringify({ riotId, uid: user?.uid }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Player not found");

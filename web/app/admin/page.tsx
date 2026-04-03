@@ -10,7 +10,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
-interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
+interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; riotScreenshotUrl?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
 
 type AdminTab = "tournament" | "players" | "create";
@@ -64,6 +64,9 @@ export default function AdminPanel() {
   // ─── All Players ────────────────────────────────────────────────────────────
   const [allPlayers, setAllPlayers] = useState<PlayerData[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
+  const [riotFilter, setRiotFilter] = useState<"all" | "pending" | "verified" | "rejected">("all");
+  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
+  const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
 
   // ─── Log ────────────────────────────────────────────────────────────────────
   const [log, setLog] = useState<string[]>([]);
@@ -329,6 +332,11 @@ export default function AdminPanel() {
   const bracketDays = [...new Set(bracketMatches.map(m => m.matchDay))].sort((a, b) => a - b);
 
   const filteredPlayers = allPlayers.filter(p => {
+    if (riotFilter !== "all") {
+      if (riotFilter === "pending" && p.riotVerified !== "pending") return false;
+      if (riotFilter === "verified" && p.riotVerified !== "verified") return false;
+      if (riotFilter === "rejected" && p.riotVerified !== "rejected") return false;
+    }
     if (!playerSearch) return true;
     const q = playerSearch.toLowerCase();
     return (
@@ -338,7 +346,29 @@ export default function AdminPanel() {
       (p.uid?.toLowerCase().includes(q)) ||
       (p.phone?.includes(q))
     );
+  }).sort((a, b) => {
+    const order: Record<string, number> = { pending: 0, verified: 2, rejected: 3 };
+    const av = order[a.riotVerified || ""] ?? 1;
+    const bv = order[b.riotVerified || ""] ?? 1;
+    return av - bv;
   });
+
+  const handleVerifyRiot = async (uid: string, action: "verify" | "reject") => {
+    setVerifyingUid(uid);
+    try {
+      const res = await fetch("/api/admin/verify-riot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, uid, action }),
+      });
+      if (res.ok) {
+        setAllPlayers(prev => prev.map(p =>
+          p.uid === uid ? { ...p, riotVerified: action === "verify" ? "verified" : "rejected" } : p
+        ));
+      }
+    } catch (e) { console.error("Verify riot error:", e); }
+    setVerifyingUid(null);
+  };
 
   const filteredTournaments = allTournaments.filter(t => {
     if (createFilterGame === "all") return true;
@@ -589,10 +619,13 @@ export default function AdminPanel() {
         .adm-tourney-row { display: grid; grid-template-columns: 60px 2fr 0.8fr 0.8fr 0.8fr 60px; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
         .adm-tourney-row:hover { background: #1a1a1e; }
         .adm-tourney-header { font-weight: 800; color: #555; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; }
+        .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         @media (max-width: 700px) {
-          .adm-player-row { grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr; font-size: 0.68rem; }
+          .adm-content { padding: 16px 12px 40px; }
+          .adm-player-row { grid-template-columns: 1.5fr 1fr 1.2fr 0.6fr 0.6fr 0.6fr; font-size: 0.68rem; min-width: 520px; }
           .adm-tourney-row { grid-template-columns: 50px 1.5fr 0.7fr 0.7fr 50px; font-size: 0.68rem; }
           .adm-tourney-row > :nth-child(4) { display: none; }
+          .adm-tab { padding: 8px 16px; font-size: 0.8rem; }
         }
         .schedule-section { background: #0d2a15; border: 1.5px solid #1e5c2a; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
         .schedule-section-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #22c55e; display: block; margin-bottom: 10px; }
@@ -1151,41 +1184,111 @@ export default function AdminPanel() {
           {activeTab === "players" && (
             <div style={sectionStyle}>
               <span style={labelStyle}>All Registered Players ({allPlayers.length})</span>
-              <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
-                placeholder="Search by name, UID, discord, phone..." style={{ ...inputStyle, marginBottom: 16 }} />
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
+                  placeholder="Search by name, UID, discord, phone..." style={{ ...inputStyle, flex: 1, minWidth: 200, marginBottom: 0 }} />
+                <select value={riotFilter} onChange={e => setRiotFilter(e.target.value as any)}
+                  style={{ ...inputStyle, width: "auto", minWidth: 140, marginBottom: 0, cursor: "pointer" }}>
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="verified">Verified</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
               <div className="adm-player-row adm-player-header" style={{ borderBottom: "2px solid #2a2a2e" }}>
-                <div>Player</div><div>UID</div><div style={{ textAlign: "center" }}>Riot</div>
+                <div>Player</div><div>UID</div><div style={{ textAlign: "center" }}>Riot Verification</div>
                 <div style={{ textAlign: "center" }}>Steam</div><div style={{ textAlign: "center" }}>Discord</div>
                 <div style={{ textAlign: "center" }}>Phone</div>
               </div>
-              <div style={{ maxHeight: 500, overflowY: "auto" }}>
+              <div className="adm-table-scroll" style={{ maxHeight: 600, overflowY: "auto" }}>
                 {filteredPlayers.map(p => (
-                  <div key={p.uid} className="adm-player-row">
-                    <div>
-                      <div style={{ fontWeight: 700, color: "#e0e0e0" }}>
-                        {p.riotGameName || p.steamName || p.discordUsername || "Unknown"}
+                  <div key={p.uid}>
+                    <div className="adm-player-row" style={{ cursor: p.riotVerified === "pending" ? "pointer" : undefined }}
+                      onClick={() => p.riotVerified === "pending" && setExpandedPlayer(expandedPlayer === p.uid ? null : p.uid)}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: "#e0e0e0" }}>
+                          {p.riotGameName || p.steamName || p.discordUsername || "Unknown"}
+                        </div>
+                        <div style={{ fontSize: "0.62rem", color: "#555" }}>
+                          {p.riotRank || "No rank"}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "0.62rem", color: "#555" }}>
-                        {p.riotRank || "No rank"}
-                        {p.riotVerified === "verified" && <span style={{ color: "#22c55e", marginLeft: 4 }}>✓ Verified</span>}
-                        {p.riotVerified === "pending" && <span style={{ color: "#f59e0b", marginLeft: 4 }}>⏳ Pending</span>}
+                      <div style={{ fontSize: "0.64rem", color: "#666", fontFamily: "monospace", wordBreak: "break-all" }}>
+                        {p.uid}
+                      </div>
+                      <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+                        {p.riotVerified === "verified" && (
+                          <span style={{ color: "#22c55e", fontSize: "0.72rem", fontWeight: 700 }}>&#10003; Verified</span>
+                        )}
+                        {p.riotVerified === "pending" && (
+                          <>
+                            <span style={{ color: "#f59e0b", fontSize: "0.72rem", fontWeight: 700 }}>&#9203; Pending</span>
+                            <button onClick={e => { e.stopPropagation(); handleVerifyRiot(p.uid, "verify"); }}
+                              disabled={verifyingUid === p.uid}
+                              style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #22c55e", background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "0.64rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                              &#10003;
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); handleVerifyRiot(p.uid, "reject"); }}
+                              disabled={verifyingUid === p.uid}
+                              style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #ef4444", background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "0.64rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                              &#10007;
+                            </button>
+                          </>
+                        )}
+                        {p.riotVerified === "rejected" && (
+                          <span style={{ color: "#ef4444", fontSize: "0.72rem", fontWeight: 700 }}>&#10007; Rejected</span>
+                        )}
+                        {!p.riotVerified && !p.riotGameName && (
+                          <span style={{ color: "#555", fontSize: "0.72rem" }}>&#10007;</span>
+                        )}
+                        {!p.riotVerified && p.riotGameName && (
+                          <span style={{ color: "#888", fontSize: "0.72rem" }}>Linked</span>
+                        )}
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div className={`adm-check ${p.steamId ? "yes" : "no"}`}>{p.steamId ? "✓" : "✗"}</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div className={`adm-check ${p.discordId ? "yes" : "no"}`}>{p.discordId ? "✓" : "✗"}</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div className={`adm-check ${p.phone ? "yes" : "no"}`}>{p.phone ? "✓" : "✗"}</div>
                       </div>
                     </div>
-                    <div style={{ fontSize: "0.64rem", color: "#666", fontFamily: "monospace", wordBreak: "break-all" }}>
-                      {p.uid}
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div className={`adm-check ${p.riotGameName ? "yes" : "no"}`}>{p.riotGameName ? "✓" : "✗"}</div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div className={`adm-check ${p.steamId ? "yes" : "no"}`}>{p.steamId ? "✓" : "✗"}</div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div className={`adm-check ${p.discordId ? "yes" : "no"}`}>{p.discordId ? "✓" : "✗"}</div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div className={`adm-check ${p.phone ? "yes" : "no"}`}>{p.phone ? "✓" : "✗"}</div>
-                    </div>
+                    {/* Expanded screenshot preview for pending players */}
+                    {expandedPlayer === p.uid && p.riotVerified === "pending" && (
+                      <div style={{ padding: "12px 16px 16px", background: "#16161a", borderBottom: "1px solid #2a2a2e" }}>
+                        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+                          <div style={{ flex: "0 0 auto" }}>
+                            {p.riotScreenshotUrl ? (
+                              <a href={p.riotScreenshotUrl} target="_blank" rel="noopener noreferrer">
+                                <img src={p.riotScreenshotUrl} alt="Riot screenshot" style={{ maxWidth: 320, maxHeight: 240, borderRadius: 8, border: "1px solid #2a2a2e", cursor: "pointer" }} />
+                              </a>
+                            ) : (
+                              <div style={{ padding: "20px 32px", background: "#1a1a1e", borderRadius: 8, border: "1px solid #2a2a2e", color: "#555", fontSize: "0.78rem" }}>No screenshot uploaded</div>
+                            )}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 200 }}>
+                            <div style={{ fontSize: "0.72rem", color: "#888", marginBottom: 4 }}>Riot ID</div>
+                            <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e0e0e0", marginBottom: 10 }}>{p.riotGameName}#{p.riotTagLine}</div>
+                            <div style={{ fontSize: "0.72rem", color: "#888", marginBottom: 4 }}>Rank</div>
+                            <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e0e0e0", marginBottom: 16 }}>{p.riotRank || "Unknown"}</div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button onClick={() => handleVerifyRiot(p.uid, "verify")}
+                                disabled={verifyingUid === p.uid}
+                                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#22c55e", color: "#fff", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                {verifyingUid === p.uid ? "..." : "Verify"}
+                              </button>
+                              <button onClick={() => handleVerifyRiot(p.uid, "reject")}
+                                disabled={verifyingUid === p.uid}
+                                style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                {verifyingUid === p.uid ? "..." : "Reject"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {filteredPlayers.length === 0 && (

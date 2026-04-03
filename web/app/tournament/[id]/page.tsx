@@ -129,6 +129,7 @@ export default function TournamentPage() {
         .tp-reg-btn:hover { background: #2563EB; }
         .tp-reg-done { width: 100%; padding: 13px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.9rem; font-weight: 800; text-align: center; }
 
+        .tp-overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .tp-brackets { max-width: 1100px; margin: 0 auto; padding: 16px 30px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
         @media (max-width: 800px) { .tp-brackets { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .tp-brackets { grid-template-columns: 1fr 1fr; } }
@@ -169,6 +170,29 @@ export default function TournamentPage() {
         .tp-empty-icon { font-size: 2.5rem; }
         .tp-empty-title { font-size: 1rem; font-weight: 800; color: #e0e0da; }
         .tp-empty-sub { font-size: 0.82rem; color: #555550; }
+
+        @media (max-width: 700px) {
+          .tp-hero-inner { padding: 20px 16px; }
+          .tp-hero-title { font-size: 1.3rem; }
+          .tp-hero-desc { font-size: 0.82rem; margin-bottom: 14px; }
+          .tp-meta-item { padding: 0 12px 0 0; margin-right: 12px; }
+          .tp-meta-key { font-size: 0.56rem; }
+          .tp-meta-val { font-size: 0.78rem; }
+          .tp-panel { min-width: unset; }
+          .tp-tabs-wrap { padding: 16px 16px 0; }
+          .tp-tab { padding: 8px 14px; font-size: 0.8rem; }
+          .tp-brackets { padding: 12px 16px 0; }
+          .tp-overview-grid { grid-template-columns: 1fr; }
+          .tp-card { padding: 16px; }
+        }
+        @media (max-width: 480px) {
+          .tp-hero-inner { padding: 16px 12px; }
+          .tp-hero-title { font-size: 1.15rem; }
+          .tp-meta-item { padding: 0 10px 8px 0; margin-right: 10px; }
+          .tp-tab { padding: 7px 12px; font-size: 0.76rem; }
+          .tp-brackets { padding: 10px 12px 0; gap: 8px; }
+          .tp-breadcrumb-cur { max-width: 160px; }
+        }
       `}</style>
 
       <div className="tp-page">
@@ -289,7 +313,7 @@ export default function TournamentPage() {
 
           <div className="tp-tab-content">
             {activeTab === "Overview" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div className="tp-overview-grid">
                 <div className="tp-card">
                   <span className="tp-card-label">Tournament Format</span>
                   {[

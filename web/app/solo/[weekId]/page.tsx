@@ -83,7 +83,7 @@ function OverviewTab({ tournament, countdown }: { tournament: SoloTournament; co
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, alignItems: "start" }}>
+    <div className="solo-overview-grid" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, alignItems: "start" }}>
       {/* About */}
       <div style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 14, padding: "26px 28px" }}>
         <SectionLabel icon="📋" text="About" />
@@ -187,7 +187,7 @@ function InfoRow({ icon, label, value, highlight }: { icon: string; label: strin
 // ── Scoring tab ───────────────────────────────────────────────────────────────
 function ScoringTab({ prizePool }: { prizePool: string }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+    <div className="solo-scoring-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
       <div style={{ background: "#fff", border: "1px solid #E5E3DF", borderRadius: 14, padding: "26px 26px" }}>
         <SectionLabel icon="📐" text="How Score Is Computed" />
         <p style={{ fontSize: "0.84rem", color: "#888", margin: "14px 0 18px", lineHeight: 1.6 }}>
@@ -351,9 +351,9 @@ function LeaderboardTab({ players, user, prizePool, myScore, myRank, refreshing,
           <p>No players yet. Be the first to register!</p>
         </div>
       ) : (
-        <div style={{ background:"#fff", border:"1px solid #E5E3DF", borderRadius:14, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.05)" }}>
+        <div className="solo-table-scroll" style={{ background:"#fff", border:"1px solid #E5E3DF", borderRadius:14, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.05)" }}>
           {/* Table header */}
-          <div style={{ display:"grid", gridTemplateColumns:"52px 1fr 90px 80px 120px 32px", padding:"10px 20px", borderBottom:"1px solid #F2F1EE", background:"#F8F7F4" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"52px 1fr 90px 80px 120px 32px", padding:"10px 20px", borderBottom:"1px solid #F2F1EE", background:"#F8F7F4", minWidth:480 }}>
             {["Rank","Player","Score","Matches","Prize",""].map((h,i)=>(
               <span key={i} style={{ fontSize:"0.58rem", fontWeight:800, letterSpacing:"0.1em", textTransform:"uppercase", color:"#bbb" }}>{h}</span>
             ))}
@@ -372,7 +372,7 @@ function LeaderboardTab({ players, user, prizePool, myScore, myRank, refreshing,
               <div key={p.uid} style={{ borderBottom:"1px solid #F8F7F4" }}>
                 <div
                   onClick={() => toggle(p.uid)}
-                  style={{ display:"grid", gridTemplateColumns:"52px 1fr 90px 80px 120px 32px", padding:"12px 20px", alignItems:"center", cursor:isMe?"default":"pointer", background:isMe?"#f0fdf4":"transparent", borderLeft:`3px solid ${isMe?"#22c55e":"transparent"}` }}
+                  style={{ display:"grid", gridTemplateColumns:"52px 1fr 90px 80px 120px 32px", padding:"12px 20px", alignItems:"center", cursor:isMe?"default":"pointer", background:isMe?"#f0fdf4":"transparent", borderLeft:`3px solid ${isMe?"#22c55e":"transparent"}`, minWidth:480 }}
                   onMouseEnter={e=>{ if(!isMe)(e.currentTarget as HTMLElement).style.background="#F8F7F4"; }}
                   onMouseLeave={e=>{ if(!isMe)(e.currentTarget as HTMLElement).style.background="transparent"; }}
                 >
@@ -560,12 +560,33 @@ useEffect(() => {
 
   return (
     <>
-      <style>{`*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}@keyframes spin{to{transform:rotate(360deg);}}`}</style>
+      <style>{`
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .solo-hero-wrap { padding: 26px 40px; }
+        .solo-content-wrap { padding: 0 40px; }
+        .solo-tabs { display: flex; gap: 4px; margin-top: 22px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+        .solo-tabs::-webkit-scrollbar { display: none; }
+        .solo-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 768px) {
+          .solo-hero-wrap { padding: 20px 16px; }
+          .solo-content-wrap { padding: 0 16px; }
+          .solo-hero-right { min-width: unset !important; width: 100% !important; align-items: stretch !important; }
+          .solo-hero-right > div { text-align: left !important; }
+          .solo-overview-grid { grid-template-columns: 1fr !important; }
+          .solo-scoring-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 480px) {
+          .solo-hero-wrap { padding: 16px 12px; }
+          .solo-content-wrap { padding: 0 12px; }
+          .solo-hero-title { font-size: 1.3rem !important; }
+        }
+      `}</style>
       <div style={{ minHeight:"100vh", background:"#F8F7F4", color:"#111", fontFamily:"var(--font-geist-sans),system-ui,sans-serif" }}>
         <Navbar />
 
         {/* Hero */}
-        <div style={{ background:"#fff", borderBottom:"1px solid #E5E3DF", padding:"26px 40px" }}>
+        <div className="solo-hero-wrap" style={{ background:"#fff", borderBottom:"1px solid #E5E3DF" }}>
           <div style={{ maxWidth:1100, margin:"0 auto" }}>
             {/* Top row */}
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:20 }}>
@@ -583,14 +604,14 @@ useEffect(() => {
                   </span>
                   <span style={{ fontSize:".63rem", fontWeight:800, padding:"3px 10px", borderRadius:100, background:"#fff7ed", color:"#ea580c", border:"1px solid #fed7aa" }}>FREE</span>
                 </div>
-                <h1 style={{ fontSize:"1.7rem", fontWeight:900, color:"#111", letterSpacing:"-.02em", marginBottom:5 }}>{tournament.name}</h1>
+                <h1 className="solo-hero-title" style={{ fontSize:"1.7rem", fontWeight:900, color:"#111", letterSpacing:"-.02em", marginBottom:5 }}>{tournament.name}</h1>
                 <p style={{ fontSize:".82rem", color:"#888", lineHeight:1.5 }}>
                   Play ranked Dota 2 — your <strong>top 5</strong> matches during the tournament window are scored.
                 </p>
               </div>
 
               {/* Right: prize + score + CTA */}
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:10, minWidth:210 }}>
+              <div className="solo-hero-right" style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:10, minWidth:210 }}>
                 <div style={{ textAlign:"right" }}>
                   <div style={{ fontSize:".63rem", fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:"#bbb", marginBottom:3 }}>Prize Pool</div>
                   <div style={{ fontSize:"1.9rem", fontWeight:900, color:"#F05A28", lineHeight:1 }}>{prizePool}</div>
@@ -617,7 +638,7 @@ useEffect(() => {
             </div>
 
             {/* Tabs */}
-            <div style={{ display:"flex", gap:4, marginTop:22 }}>
+            <div className="solo-tabs">
               {TABS.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 18px", background:activeTab===t.key?"#F05A28":"transparent", color:activeTab===t.key?"#fff":"#888", border:activeTab===t.key?"1px solid #F05A28":"1px solid #E5E3DF", borderRadius:100, fontWeight:700, fontSize:".78rem", cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}>
                   <span>{t.icon}</span><span>{t.label}</span>
@@ -631,7 +652,7 @@ useEffect(() => {
         </div>
 
         {/* Tab content */}
-        <div style={{ maxWidth:1100, margin:"24px auto 60px", padding:"0 40px" }}>
+        <div className="solo-content-wrap" style={{ maxWidth:1100, margin:"24px auto 60px" }}>
           {activeTab==="overview"    && <OverviewTab   tournament={tournament} countdown={countdown} />}
           {activeTab==="scoring"     && <ScoringTab    prizePool={prizePool} />}
           {activeTab==="leaderboard" && <LeaderboardTab players={players} user={user} prizePool={prizePool} myScore={myScore} myRank={myRank} refreshing={refreshing} isRegistered={isRegistered} handleRefresh={handleRefresh} />}

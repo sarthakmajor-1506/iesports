@@ -51,6 +51,15 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify({ access_token: tokenData.access_token }),
     });
 
+    // Uniqueness check — ensure discordId isn't linked to another account
+    const existingDiscord = await adminDb.collection("users")
+      .where("discordId", "==", discordUser.id)
+      .limit(1)
+      .get();
+    if (!existingDiscord.empty && existingDiscord.docs[0].id !== uid) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=already_linked`);
+    }
+
     // Save to Firestore
     await adminDb.collection("users").doc(uid).set({
       discordId: discordUser.id,
