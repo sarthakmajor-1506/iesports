@@ -1,8 +1,27 @@
 import { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const runtime = "nodejs";
+
+// Pre-load logos as data URIs to avoid external HTTP fetches that hang Satori
+function loadLocalImage(filename: string): string {
+  try {
+    const filePath = join(process.cwd(), "public", filename);
+    const buf = readFileSync(filePath);
+    const ext = filename.endsWith(".png") ? "png" : "jpeg";
+    return `data:image/${ext};base64,${buf.toString("base64")}`;
+  } catch {
+    return "";
+  }
+}
+
+let cachedIeLogo = "";
+let cachedValLogo = "";
+function getIeLogo() { if (!cachedIeLogo) cachedIeLogo = loadLocalImage("ielogo.png"); return cachedIeLogo; }
+function getValLogo() { if (!cachedValLogo) cachedValLogo = loadLocalImage("valorantlogo.png"); return cachedValLogo; }
 
 function fmtDate(iso?: string) {
   if (!iso) return "TBD";
@@ -19,6 +38,7 @@ function fmtDate(iso?: string) {
 const S = 1080; // canvas size
 
 export async function GET(req: NextRequest) {
+  try {
   const { searchParams } = new URL(req.url);
   const tournamentId = searchParams.get("tournamentId");
   const type = searchParams.get("type") || "overview";
@@ -47,18 +67,29 @@ export async function GET(req: NextRequest) {
 
   // ── Background image resolution ──
   const bgUrlRaw: string | undefined =
-    t.shareImages?.[`${type}Bg`] || t.shareImages?.defaultBg;
+    t.shareImages?.[`${type}Bg`] || t.shareImages?.defaultBg || t.bannerImage;
   let bgSrc = "";
   if (bgUrlRaw) {
-    bgSrc = bgUrlRaw.startsWith("/")
-      ? `${process.env.NEXT_PUBLIC_APP_URL || "https://iesports.in"}${bgUrlRaw}`
-      : bgUrlRaw;
+    // Pre-fetch external images and convert to data URI so Satori doesn't hang
+    try {
+      const url = bgUrlRaw.startsWith("/")
+        ? `${process.env.NEXT_PUBLIC_APP_URL || "https://iesports.in"}${bgUrlRaw}`
+        : bgUrlRaw;
+      const imgRes = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (imgRes.ok) {
+        const buf = Buffer.from(await imgRes.arrayBuffer());
+        const ct = imgRes.headers.get("content-type") || "image/jpeg";
+        bgSrc = `data:${ct};base64,${buf.toString("base64")}`;
+      }
+    } catch {
+      // If fetch fails, skip bg image — don't let it crash the route
+      bgSrc = "";
+    }
   }
 
-  // ── Logo URLs (absolute, for Satori) ──
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://iesports.in";
-  const ieLogoUrl = `${appUrl}/ielogo.png`;
-  const valLogoUrl = `${appUrl}/valorantlogo.png`;
+  // ── Logo data URIs (loaded from filesystem, no HTTP fetch) ──
+  const ieLogoUrl = getIeLogo();
+  const valLogoUrl = getValLogo();
 
   // ── Graceful color palette ──
   const CL = {
@@ -1429,40 +1460,46 @@ export async function GET(req: NextRequest) {
   // RENDER
   // ═══════════════════════════════════════════════
 
+  const jsx = (
+    <div
+      style={{
+        width: S,
+        height: S,
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <Background />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          position: "relative",
+        }}
+      >
+        <TopBar label={type.toUpperCase()} />
+        {content}
+        <BottomBar />
+      </div>
+    </div>
+  );
+
   try {
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: S,
-            height: S,
-            display: "flex",
-            flexDirection: "column",
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <Background />
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              flex: 1,
-              position: "relative",
-            }}
-          >
-            <TopBar label={type.toUpperCase()} />
-            {content}
-            <BottomBar />
-          </div>
-        </div>
-      ),
-      { width: S, height: S },
-    );
+    const response = new ImageResponse(jsx, { width: S, height: S });
+    return response;
   } catch (e: any) {
+    console.error("[share-image] ImageResponse error:", e);
     return new Response(`Image generation failed: ${e.message}`, {
       status: 500,
     });
+  }
+
+  } catch (outerErr: any) {
+    console.error("[share-image] Unhandled route error:", outerErr);
+    return new Response(`Route error: ${outerErr.message}`, { status: 500 });
   }
 }
