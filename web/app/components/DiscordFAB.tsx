@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { navigateWithAppPriority, openDiscordLink } from "@/app/lib/mobileAuth";
 
 export default function DiscordFAB() {
   const { user } = useAuth();
@@ -30,7 +30,7 @@ export default function DiscordFAB() {
     if (user) {
       navigateWithAppPriority(`/api/auth/discord?uid=${user.uid}`);
     } else {
-      window.open("https://discord.com/channels/1475547966822682928/1475547967267143923", "_blank");
+      openDiscordLink("https://discord.com/channels/1475547966822682928/1475547967267143923");
     }
   };
 

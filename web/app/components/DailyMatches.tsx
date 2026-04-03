@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { navigateWithAppPriority, openDiscordLink } from "@/app/lib/mobileAuth";
 
 interface MatchPlayer {
   discordId: string;
@@ -105,11 +105,11 @@ function DiscordButton() {
 
   const handleClick = () => {
     if (discordLinked) {
-      window.open(DISCORD_SERVER_URL, "_blank");
+      openDiscordLink(DISCORD_SERVER_URL);
     } else if (user) {
       navigateWithAppPriority(`/api/auth/discord?uid=${user.uid}`);
     } else {
-      window.open(DISCORD_SERVER_URL, "_blank");
+      openDiscordLink(DISCORD_SERVER_URL);
     }
   };
 

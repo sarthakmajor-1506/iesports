@@ -227,6 +227,11 @@ export default function Home() {
         /* Modal overlay */
         @keyframes riot-modal-in { from { opacity:0; transform:scale(.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
 
+        /* Riot modal */
+        .ie-riot-overlay { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; }
+        .ie-riot-modal { background:#fff; border-radius:20px; padding:36px 32px; max-width:420px; width:100%; position:relative; box-shadow:0 24px 64px rgba(0,0,0,0.3); animation:riot-modal-in 0.2s ease; }
+        @media (max-width:600px) { .ie-riot-overlay { align-items:flex-end; padding:0; } .ie-riot-modal { border-radius:20px 20px 0 0; padding:28px 20px 36px; max-width:100%; animation:none; } }
+
         /* Footer */
         .ie-footer { background:#060608; color:rgba(255,255,255,.4); padding:40px 20px; text-align:center; }
         .ie-footer-brand { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:16px; }
@@ -235,6 +240,23 @@ export default function Home() {
         .ie-footer-links a { color:rgba(255,255,255,.38); font-size:.84rem; text-decoration:none; transition:color .2s; }
         .ie-footer-links a:hover { color:var(--accent); }
         .ie-footer-copy { font-size:.77rem; color:rgba(255,255,255,.18); }
+
+        /* ── Mobile-only improvements ── */
+        @media (max-width:600px) {
+          .ie-nav { padding:0 14px; height:54px; }
+          .ie-btn-steam { padding:7px 12px; font-size:.75rem; gap:6px; }
+          .ie-btn-steam img { width:18px !important; height:12px !important; }
+          .ie-trust { padding:14px 0; overflow:hidden; }
+          .ie-trust-items { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:0 14px; justify-content:flex-start; gap:16px; }
+          .ie-trust-items::-webkit-scrollbar { display:none; }
+          .ie-trust-item { flex-shrink:0; }
+          .ie-footer { padding:32px 16px; }
+          .ie-footer-links { gap:14px; }
+          .ie-footer-links a { font-size:.78rem; }
+        }
+        @media (max-width:380px) {
+          .ie-btn-steam { padding:6px 10px; font-size:.7rem; }
+        }
 
       `}</style>
 
@@ -489,18 +511,8 @@ export default function Home() {
 
       {/* ── RIOT RSO MODAL ── */}
       {riotModalOpen && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 1000,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 20,
-        }} onClick={(e) => { if (e.target === e.currentTarget) setRiotModalOpen(false); }}>
-          <div style={{
-            background: "#fff", borderRadius: 20, padding: "36px 32px",
-            maxWidth: 420, width: "100%", position: "relative",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
-            animation: "riot-modal-in 0.2s ease",
-          }}>
+        <div className="ie-riot-overlay" onClick={(e) => { if (e.target === e.currentTarget) setRiotModalOpen(false); }}>
+          <div className="ie-riot-modal">
             {/* Close button */}
             <button onClick={() => setRiotModalOpen(false)} style={{
               position: "absolute", top: 14, right: 14,
