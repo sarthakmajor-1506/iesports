@@ -312,13 +312,12 @@ export async function POST(req: NextRequest) {
       const totalDamageDealt = randInt(totalRoundsPlayed * 80, totalRoundsPlayed * 200);
       const agentCount = randInt(1, 3);
       const agents = Array.from({ length: agentCount }, () => pick(AGENTS)).filter((v, i, a) => a.indexOf(v) === i);
-      const playerName = pick(PLAYER_NAMES);
       const ref = adminDb.collection("valorantTournaments").doc(tournamentId).collection("leaderboard").doc(uid);
       lbBatch.set(ref, {
         uid,
-        name: playerName,
-        tag: String(randInt(1000, 9999)),
-        riotGameName: playerName,
+        name: "",
+        tag: "",
+        riotGameName: "",
         teamName,
         totalKills,
         totalDeaths,

@@ -9,11 +9,12 @@ import { useAuth } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
-  ChevronLeft, ChevronRight, Download, MessageCircle, Send,
+  MessageCircle,
   Coins, Target, Info, Zap, Camera, Link2, X,
 } from "lucide-react";
 
@@ -240,7 +241,6 @@ function ValorantTournamentDetailInner() {
     return TABS.some(tab => tab.key === t) ? t : "overview";
   });
   const [showShareCard, setShowShareCard] = useState(false);
-  const [shareSlide, setShareSlide] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -689,7 +689,7 @@ function ValorantTournamentDetailInner() {
                   </div>
                 )}
                 {regClosed && !isRegistered && isRegOpen && <span style={{ fontSize: "0.86rem", color: "#555550", fontWeight: 600 }}>Registration Closed</span>}
-                <button className="vtd-hero-share-btn" onClick={() => { setShareSlide(0); setShowShareCard(true); }} title="Share tournament">
+                <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
                 </button>
               </div>
@@ -1082,64 +1082,15 @@ function ValorantTournamentDetailInner() {
               <button className="vtd-share-close" onClick={() => setShowShareCard(false)}><X size={16} /></button>
             </div>
             <p style={{ fontSize: "0.75rem", color: "#555550", marginBottom: 16, marginTop: -8 }}>
-              6 ready-to-share images for Instagram, Stories & WhatsApp. Download or copy to share!
+              6 animated share slides for Instagram, Stories & WhatsApp. Download as image or record as video!
             </p>
 
-            {/* Carousel */}
-            {(() => {
-              const slides = [
-                { type: "overview",  label: "Tournament Overview", emoji: "🎯", desc: "Key stats & info" },
-                { type: "register",  label: "How to Register", emoji: "📝", desc: "3-step guide" },
-                { type: "teams",     label: "Team Structure", emoji: "👥", desc: "Format & roster" },
-                { type: "schedule",  label: "Schedule", emoji: "📅", desc: "Key dates" },
-                { type: "format",    label: "Tournament Format", emoji: "⚔️", desc: "Stages & rules" },
-                { type: "flow",      label: "Tournament Flow", emoji: "🗺️", desc: "Full journey" },
-              ];
-              const current = slides[shareSlide] || slides[0];
-              const src = `/api/valorant/share-image?tournamentId=${id}&type=${current.type}`;
-              const download = async () => {
-                try {
-                  const res = await fetch(src);
-                  const blob = await res.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.download = `${(tournament?.name || "tournament").replace(/\s+/g, "_")}_${current.type}.png`;
-                  a.href = url; a.click();
-                  URL.revokeObjectURL(url);
-                } catch {}
-              };
-              const copyImg = async () => {
-                try {
-                  const res = await fetch(src);
-                  const blob = await res.blob();
-                  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-                  setShowToast(true); setTimeout(() => setShowToast(false), 2000);
-                } catch {
-                  navigator.clipboard.writeText(window.location.href);
-                  setShowToast(true); setTimeout(() => setShowToast(false), 2000);
-                }
-              };
-              return (
-                <div className="vtd-share-carousel">
-                  <img className="vtd-share-carousel-img" src={src} alt={current.label} />
-                  <div className="vtd-share-carousel-nav">
-                    <button className="vtd-share-carousel-btn" disabled={shareSlide === 0} onClick={() => setShareSlide(s => Math.max(0, s - 1))}><ChevronLeft size={16} /></button>
-                    <div className="vtd-share-carousel-center">
-                      <span className="vtd-share-carousel-label">{current.emoji} {current.label}</span>
-                      <div style={{ fontSize: "0.65rem", color: "#555550", marginBottom: 4 }}>{current.desc}</div>
-                      <div className="vtd-share-carousel-dots">
-                        {slides.map((_, i) => (<div key={i} className={`vtd-share-carousel-dot${i === shareSlide ? " active" : ""}`} onClick={() => setShareSlide(i)} style={{ cursor: "pointer" }} />))}
-                      </div>
-                    </div>
-                    <button className="vtd-share-carousel-btn" disabled={shareSlide === slides.length - 1} onClick={() => setShareSlide(s => Math.min(slides.length - 1, s + 1))}><ChevronRight size={16} /></button>
-                  </div>
-                  <div className="vtd-share-carousel-actions">
-                    <button className="vtd-share-img-btn dl" onClick={download}><Download size={11} /> Download</button>
-                    <button className="vtd-share-img-btn cp" onClick={copyImg}><Copy size={11} /> Copy</button>
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Animated Remotion Carousel */}
+            <ShareVideoCarousel
+              tournament={tournament}
+              tournamentId={id as string}
+              onToast={() => { setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}
+            />
 
             {/* Social links + bottom */}
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -1154,7 +1105,7 @@ function ValorantTournamentDetailInner() {
                 <Copy size={15} /> Copy Link
               </button>
             </div>
-            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>1080×1080px — optimised for Instagram posts, Stories, and WhatsApp status</div>
+            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>1080x1080px animated slides — optimised for Instagram posts, Stories, and WhatsApp status</div>
 
             {/* Hidden ref for legacy html2canvas compat */}
             <div ref={shareCardRef} style={{ display: "none" }} />
