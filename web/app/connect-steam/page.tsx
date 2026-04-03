@@ -3,6 +3,7 @@
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { navigateWithAppPriority } from "../lib/mobileAuth";
 
 export default function ConnectSteam() {
   const { user, loading, steamLinked, logout } = useAuth();
@@ -68,7 +69,7 @@ export default function ConnectSteam() {
 
         {/* Connect Button */}
         <button
-          onClick={() => window.location.href = `/api/auth/steam?uid=${user.uid}`}
+          onClick={() => navigateWithAppPriority(`/api/auth/steam?uid=${user.uid}`)}
           style={{
             width: "100%", padding: "14px 20px",
             background: "linear-gradient(135deg, #1b2838, #2a475e)",

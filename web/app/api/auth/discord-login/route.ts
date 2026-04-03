@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/discord-login-callback`;
 
   const params = new URLSearchParams({
@@ -11,5 +11,10 @@ export async function GET() {
     state: "discord_login",
   });
 
-  return NextResponse.redirect(`https://discord.com/oauth2/authorize?${params}`);
+  const url = `https://discord.com/oauth2/authorize?${params}`;
+
+  if (req.nextUrl.searchParams.get("redirect") === "false") {
+    return NextResponse.json({ url });
+  }
+  return NextResponse.redirect(url);
 }

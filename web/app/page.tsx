@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { navigateWithAppPriority } from "./lib/mobileAuth";
 
 interface Tournament {
   id: string; name: string; game: string; month: string; status: string;
@@ -91,7 +92,7 @@ export default function Home() {
   }, []);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  const loginWithSteam = () => { window.location.href = "/api/auth/steam"; };
+  const loginWithSteam = () => { navigateWithAppPriority("/api/auth/steam"); };
 
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
@@ -533,7 +534,7 @@ export default function Home() {
                 <SteamIcon size={20} />
                 Sign in with Steam
               </button>
-              <button onClick={() => { setRiotModalOpen(false); window.location.href = "/api/auth/discord-login"; }} style={{
+              <button onClick={() => { setRiotModalOpen(false); navigateWithAppPriority("/api/auth/discord-login"); }} style={{
                 width: "100%", padding: "14px 20px",
                 background: "#5865F2",
                 border: "1px solid #4752C4", borderRadius: 12,

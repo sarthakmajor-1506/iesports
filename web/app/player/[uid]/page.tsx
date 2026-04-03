@@ -6,6 +6,7 @@ import Navbar from "@/app/components/Navbar";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProfileTab = "valorant" | "dota" | "account";
@@ -361,7 +362,7 @@ export default function PlayerProfile() {
                     {profile.steamId ? (
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => window.location.href = `/api/auth/steam?uid=${user?.uid}`}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`)}>Connect</button>
                     )}
                   </div>
 
@@ -381,7 +382,7 @@ export default function PlayerProfile() {
                     {profile.discordId ? (
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => window.location.href = `/api/auth/discord?uid=${user?.uid}`}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}`)}>Connect</button>
                     )}
                   </div>
 

@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDotaProfile(null);
         setRiotData(null);
         if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/player/")) {
+          try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
           router.push("/");
         }
       }

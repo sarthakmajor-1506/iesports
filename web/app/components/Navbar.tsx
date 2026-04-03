@@ -6,6 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -137,7 +138,7 @@ export default function Navbar() {
 
   const handleDiscordConnect = () => {
     if (!user) return;
-    window.location.href = `/api/auth/discord?uid=${user.uid}`;
+    navigateWithAppPriority(`/api/auth/discord?uid=${user.uid}`);
   };
 
   const clearRecaptcha = () => {
@@ -439,7 +440,7 @@ export default function Navbar() {
                 icon={hasSteam ? (steamData?.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg") : "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"}
                 name={steamData?.steamName}
                 label="Steam"
-                onClick={hasSteam ? undefined : () => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}
+                onClick={hasSteam ? undefined : () => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }}
               />
               <AccBadge
                 id="discord"
@@ -498,7 +499,7 @@ export default function Navbar() {
                   {!hasSteam && (
                     <div className="ie-dd-section">
                       <span className="ie-dd-label">Steam</span>
-                      <button className="ie-dd-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; setDropdownOpen(false); }} style={{ color: "#f87171" }}>
+                      <button className="ie-dd-btn" onClick={() => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
                         <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 18, height: 18, opacity: 0.5 }} />
                         Connect Steam
                         <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
@@ -608,7 +609,7 @@ export default function Navbar() {
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={() => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; }}>
+            <button className="ie-mobile-connect-btn" onClick={() => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }}>
               <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, opacity: 0.5 }} />
               Connect Steam
               <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>

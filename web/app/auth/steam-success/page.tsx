@@ -17,7 +17,11 @@ function SteamSuccessInner() {
       return;
     }
     signInWithCustomToken(auth, token)
-      .then(() => router.replace("/dota2"))
+      .then(() => {
+        let dest = "/dota2";
+        try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
+        router.replace(dest);
+      })
       .catch((e) => {
         console.error("signInWithCustomToken failed:", e.message);
         router.replace("/?error=steam_failed");

@@ -14,5 +14,10 @@ export async function GET(req: NextRequest) {
     state: uid,  // ← pass uid as state, no cookie needed
   });
 
-  return NextResponse.redirect(`https://discord.com/oauth2/authorize?${params}`);
+  const url = `https://discord.com/oauth2/authorize?${params}`;
+
+  if (req.nextUrl.searchParams.get("redirect") === "false") {
+    return NextResponse.json({ url });
+  }
+  return NextResponse.redirect(url);
 }

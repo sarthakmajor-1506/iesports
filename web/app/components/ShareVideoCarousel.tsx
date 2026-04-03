@@ -16,7 +16,8 @@ import {
 
 const SLIDES = [
   { type: "overview", label: "Tournament Overview", emoji: "\u{1F3AF}", desc: "Key stats & info" },
-  { type: "register", label: "How to Register", emoji: "\u{1F4DD}", desc: "3-step guide" },
+  { type: "register", label: "How to Register", emoji: "\u{1F4DD}", desc: "Solo registration" },
+  { type: "ranks", label: "Ranks & Maps", emoji: "\u{1F3AF}", desc: "Eligible ranks & map pool" },
   { type: "teams", label: "Team Structure", emoji: "\u{1F465}", desc: "Format & roster" },
   { type: "schedule", label: "Schedule", emoji: "\u{1F4C5}", desc: "Key dates & times" },
   { type: "format", label: "Format & Flow", emoji: "\u2694\uFE0F", desc: "Signup to champion" },

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import { Navbar } from "../../components/Navbar";
 import RegisterModal from "../../components/RegisterModal";
 import Link from "next/link";
@@ -261,7 +262,7 @@ export default function TournamentPage() {
                     <div className="tp-reg-done">✓ You're Registered</div>
                   ) : (
                     <button className="tp-reg-btn" onClick={() => {
-                      if (!steamLinked) window.location.href = `/api/auth/steam?uid=${user?.uid}`;
+                      if (!steamLinked) navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`);
                       else setShowRegister(true);
                     }}>
                       Register for Free →

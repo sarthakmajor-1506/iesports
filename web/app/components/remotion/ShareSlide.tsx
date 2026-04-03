@@ -42,6 +42,16 @@ export interface ShareSlideData {
     tagline?: string;
     highlightText?: string;
   };
+  eligibility?: {
+    minRank?: string;
+    maxRank?: string;
+    region?: string;
+    requireVerified?: boolean;
+  };
+  mapPool?: {
+    groupStage?: string;
+    tourneyStage?: string;
+  };
 }
 
 export interface ShareSlideProps {
@@ -804,7 +814,7 @@ function RegisterSlide({
           opacity: fade(frame, 22, 15),
         }}
       >
-        3 simple steps. Under 2 minutes. Completely free.
+        Solo registration. 3 simple steps. Completely free.
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40 }}>
@@ -908,6 +918,158 @@ function RegisterSlide({
         }}
       >
         All tournament communication happens on Discord
+      </div>
+    </div>
+  );
+}
+
+function RanksMapSlide({
+  t,
+  frame,
+  fps,
+}: {
+  t: ShareSlideData;
+  frame: number;
+  fps: number;
+}) {
+  const name = t.name || "Tournament";
+  const minRank = t.eligibility?.minRank || "Gold 2";
+  const maxRank = t.eligibility?.maxRank || "Immortal 2";
+
+  const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+
+  const groupPool = t.mapPool?.groupStage || "All Maps Veto";
+  const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        padding: "36px 60px",
+        justifyContent: "center",
+      }}
+    >
+      <Badge text="RANKS & MAPS" color={C.lavender} frame={frame} delay={10} fps={fps} />
+
+      <div
+        style={{
+          fontSize: 50,
+          fontWeight: 900,
+          color: "#fff",
+          lineHeight: 1.05,
+          letterSpacing: "-0.02em",
+          marginTop: 24,
+          marginBottom: 36,
+          opacity: fade(frame, 16, 15),
+          transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
+        }}
+      >
+        {name}
+      </div>
+
+      {/* Rank range */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 20,
+          padding: "20px 28px",
+          background: `linear-gradient(135deg, ${C.rose}0A, transparent)`,
+          border: `1.5px solid ${C.rose}20`,
+          borderRadius: 20,
+          marginBottom: 16,
+          opacity: fade(frame, 26, 12),
+          transform: `translateX(${interpolate(frame, [26, 41], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
+        }}
+      >
+        <Num n="R" color={C.rose} size={48} />
+        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.muted, letterSpacing: "0.1em" }}>
+            ELIGIBLE RANKS
+          </div>
+          <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", marginTop: 4 }}>
+            {minRank} — {maxRank}
+          </div>
+        </div>
+      </div>
+
+      {/* Competitive maps */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          padding: "20px 28px",
+          background: `linear-gradient(135deg, ${C.sky}0A, transparent)`,
+          border: `1.5px solid ${C.sky}20`,
+          borderRadius: 20,
+          marginBottom: 16,
+          opacity: fade(frame, 34, 12),
+          transform: `translateX(${interpolate(frame, [34, 49], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.muted, letterSpacing: "0.1em", marginBottom: 12 }}>
+          COMPETITIVE MAP POOL
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {COMP_MAPS.map((m, i) => {
+            const d = 40 + i * 3;
+            return (
+              <div
+                key={m}
+                style={{
+                  padding: "8px 20px",
+                  background: `${C.sky}14`,
+                  border: `1px solid ${C.sky}25`,
+                  borderRadius: 100,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "#fff",
+                  opacity: fade(frame, d, 8),
+                }}
+              >
+                {m}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Map pool rules */}
+      <div
+        style={{
+          display: "flex",
+          gap: 14,
+          opacity: fade(frame, 60, 12),
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            padding: "16px 22px",
+            background: `${C.steel}0A`,
+            border: `1px solid ${C.steel}20`,
+            borderRadius: 16,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>GROUP STAGE</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.steel }}>{groupPool}</div>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            padding: "16px 22px",
+            background: `${C.amber}0A`,
+            border: `1px solid ${C.amber}20`,
+            borderRadius: 16,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>BRACKET STAGE</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{bracketPool}</div>
+        </div>
       </div>
     </div>
   );
@@ -1090,10 +1252,9 @@ function ScheduleSlide({
     { lbl: "Registration Opens", date: schedule.registrationOpens, color: C.sage, n: "1" },
     { lbl: "Registration Closes", date: schedule.registrationCloses || t.registrationDeadline, color: C.amber, n: "2" },
     { lbl: "Squad Creation", date: schedule.squadCreation, color: C.lavender, n: "3" },
-    { lbl: "Tournament Starts", date: t.startDate, color: C.rose, n: "4" },
-    { lbl: "Group Stage", date: schedule.groupStageStart, color: C.steel, n: "5" },
-    { lbl: "Bracket Stage", date: schedule.tourneyStageStart, color: C.amber, n: "6" },
-    { lbl: "Tournament Ends", date: t.endDate, color: C.rose, n: "7" },
+    { lbl: "Group Stage Starts", date: schedule.groupStageStart || t.startDate, color: C.steel, n: "4" },
+    { lbl: "Bracket Stage", date: schedule.tourneyStageStart, color: C.amber, n: "5" },
+    { lbl: "Tournament Ends", date: t.endDate, color: C.rose, n: "6" },
   ].filter((e) => e.date);
 
   return (
@@ -1364,6 +1525,9 @@ export const ShareSlideComposition: React.FC<ShareSlideProps> = ({
       break;
     case "register":
       content = <RegisterSlide t={tournament} frame={frame} fps={fps} />;
+      break;
+    case "ranks":
+      content = <RanksMapSlide t={tournament} frame={frame} fps={fps} />;
       break;
     case "teams":
       content = <TeamsSlide t={tournament} frame={frame} fps={fps} />;

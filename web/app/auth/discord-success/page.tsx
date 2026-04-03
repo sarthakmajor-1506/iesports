@@ -17,7 +17,11 @@ function DiscordSuccessInner() {
       return;
     }
     signInWithCustomToken(auth, token)
-      .then(() => router.replace("/valorant"))
+      .then(() => {
+        let dest = "/valorant";
+        try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
+        router.replace(dest);
+      })
       .catch((e) => {
         console.error("signInWithCustomToken (Discord) failed:", e.message);
         router.replace("/?error=discord_failed");

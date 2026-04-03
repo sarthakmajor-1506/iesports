@@ -731,7 +731,7 @@ export async function GET(req: NextRequest) {
             display: "flex",
           }}
         >
-          3 simple steps. Under 2 minutes. Completely free.
+          Solo registration. 3 simple steps. Completely free.
         </div>
 
         {/* Steps */}
@@ -1116,8 +1116,55 @@ export async function GET(req: NextRequest) {
         </div>
       </div>
     );
+  } else if (type === "ranks") {
+    // ── CARD: RANKS & MAPS ──
+    const minRank = t.eligibility?.minRank || "Gold 2";
+    const maxRank = t.eligibility?.maxRank || "Immortal 2";
+    const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+    const groupPool = t.mapPool?.groupStage || "All Maps Veto";
+    const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
+
+    content = (
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 60px", justifyContent: "center" }}>
+        <Badge text="RANKS & MAPS" color={CL.lavender} />
+        <div style={{ fontSize: 50, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 24, marginBottom: 36, display: "flex" }}>
+          {name}
+        </div>
+
+        {/* Rank range */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "20px 28px", background: `linear-gradient(135deg, ${CL.rose}0C, transparent)`, border: `1.5px solid ${CL.rose}30`, borderRadius: 20, marginBottom: 16 }}>
+          <Num n="R" color={CL.rose} />
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: CL.muted, letterSpacing: "0.1em", display: "flex" }}>ELIGIBLE RANKS</div>
+            <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", marginTop: 4, display: "flex" }}>{minRank} — {maxRank}</div>
+          </div>
+        </div>
+
+        {/* Competitive maps */}
+        <div style={{ display: "flex", flexDirection: "column", padding: "20px 28px", background: `linear-gradient(135deg, ${CL.sky}0C, transparent)`, border: `1.5px solid ${CL.sky}30`, borderRadius: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: CL.muted, letterSpacing: "0.1em", marginBottom: 12, display: "flex" }}>COMPETITIVE MAP POOL</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {COMP_MAPS.map((m) => (
+              <div key={m} style={{ padding: "8px 20px", background: `${CL.sky}18`, border: `1px solid ${CL.sky}30`, borderRadius: 100, fontSize: 18, fontWeight: 800, color: "#fff", display: "flex" }}>{m}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Map pool rules */}
+        <div style={{ display: "flex", gap: 14 }}>
+          <div style={{ flex: 1, padding: "16px 22px", background: `${CL.steel}0C`, border: `1px solid ${CL.steel}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>GROUP STAGE</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: CL.steel, display: "flex" }}>{groupPool}</div>
+          </div>
+          <div style={{ flex: 1, padding: "16px 22px", background: `${CL.amber}0C`, border: `1px solid ${CL.amber}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>BRACKET STAGE</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: CL.amber, display: "flex" }}>{bracketPool}</div>
+          </div>
+        </div>
+      </div>
+    );
   } else if (type === "schedule") {
-    // ── CARD 4: SCHEDULE ──
+    // ── CARD: SCHEDULE ──
     const events = [
       {
         lbl: "Registration Opens",
@@ -1138,28 +1185,22 @@ export async function GET(req: NextRequest) {
         n: "3",
       },
       {
-        lbl: "Tournament Starts",
-        date: t.startDate,
-        color: CL.rose,
-        n: "4",
-      },
-      {
-        lbl: "Group Stage",
-        date: schedule.groupStageStart,
+        lbl: "Group Stage Starts",
+        date: schedule.groupStageStart || t.startDate,
         color: CL.steel,
-        n: "5",
+        n: "4",
       },
       {
         lbl: "Bracket Stage",
         date: schedule.tourneyStageStart,
         color: CL.amber,
-        n: "6",
+        n: "5",
       },
       {
         lbl: "Tournament Ends",
         date: t.endDate,
         color: CL.rose,
-        n: "7",
+        n: "6",
       },
     ].filter((e) => e.date);
 

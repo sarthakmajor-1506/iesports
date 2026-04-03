@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
 
   const relyingParty = new openid.RelyingParty(returnUrl, realm, true, true, []);
 
+  const noRedirect = req.nextUrl.searchParams.get("redirect") === "false";
+
   return new Promise<NextResponse>((resolve) => {
     relyingParty.authenticate(
       "https://steamcommunity.com/openid",
@@ -14,6 +16,8 @@ export async function GET(req: NextRequest) {
       (err, authUrl) => {
         if (err || !authUrl) {
           resolve(NextResponse.json({ error: "Steam auth failed" }, { status: 500 }));
+        } else if (noRedirect) {
+          resolve(NextResponse.json({ url: authUrl }));
         } else {
           resolve(NextResponse.redirect(authUrl));
         }
