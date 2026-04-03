@@ -12,6 +12,7 @@ import {
   linkWithCredential,
   ConfirmationResult,
 } from "firebase/auth";
+import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 
 const COUNTRIES = [
   { flag: "\u{1F1EE}\u{1F1F3}", code: "+91" },
@@ -223,7 +224,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       label: "Steam",
       met: hasSteam,
       actionLabel: "Connect Steam",
-      action: () => { window.location.href = `/api/auth/steam?uid=${user?.uid}`; },
+      action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); },
     });
   }
 
@@ -233,7 +234,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     label: "Discord",
     met: hasDiscord,
     actionLabel: "Connect Discord",
-    action: () => { window.location.href = `/api/auth/discord?uid=${user?.uid}`; },
+    action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname)}`); },
   });
 
   const unmetRequirements = requirements.filter(r => !r.met && !r.pending);
@@ -295,21 +296,22 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           fontSize: 20, cursor: "pointer", lineHeight: 1,
         }}>✕</button>
 
-        <p style={{ color: accentColor, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>REGISTER</p>
+        <p style={{ color: accentColor, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>🏆 REGISTER</p>
         <h2 style={{ fontSize: 18, fontWeight: 800, marginTop: 4, marginBottom: 16, color: "#fff" }}>{tournament.name}</h2>
 
         {/* ═══════ CONNECT STEP — shows when any requirements are missing ═══════ */}
         {actualStep === "connect" && (
           <div>
             {!showPhoneOtp && <div style={{
-              background: "#1a0808", border: "1px solid #7f1d1d", borderRadius: 10,
-              padding: "14px 16px", marginBottom: 20,
+              background: "linear-gradient(135deg, #1a0808, #0e0e0e)", border: "1px solid #7f1d1d", borderRadius: 12,
+              padding: "16px 18px", marginBottom: 20, position: "relative", overflow: "hidden",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626", animation: "reg-pulse 2s infinite" }} />
+              <div style={{ position: "absolute", top: -20, right: -10, fontSize: 60, opacity: 0.06 }}>📋</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 16 }}>📝</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fca5a5" }}>Complete All Requirements</span>
               </div>
-              <p style={{ fontSize: 12, color: "#991b1b", lineHeight: 1.6 }}>
+              <p style={{ fontSize: 12, color: "#b45050", lineHeight: 1.6 }}>
                 All fields below are mandatory to register for this tournament.
               </p>
             </div>}
@@ -400,8 +402,8 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
             {/* Full Name Input */}
             {!showPhoneOtp && <div style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: hasFullName ? "#166534" : "#555", marginBottom: 6, textTransform: "uppercase" as const }}>
-                {hasFullName ? "✓ " : ""}Full Name {!hasFullName && <span style={{ color: "#dc2626", fontSize: 9 }}>REQUIRED</span>}
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: hasFullName ? "#166534" : "#888", marginBottom: 6, textTransform: "uppercase" as const }}>
+                {hasFullName ? "✅ " : "👤 "}Full Name {!hasFullName && <span style={{ color: "#dc2626", fontSize: 9 }}>REQUIRED</span>}
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
@@ -435,73 +437,50 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {/* Connection Requirements */}
             {!showPhoneOtp && <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {requirements.filter(r => r.id !== "fullName").map(req => {
+                const emoji = req.id === "discord" ? "💬" : req.id === "phone" ? "📱" : req.id === "steam" ? "🎮" : req.id === "riot" ? "🎯" : "🔗";
                 if (req.met) {
-                  // Connected — green badge
                   return (
                     <div key={req.id} style={{
                       display: "flex", alignItems: "center", gap: 12,
-                      padding: "12px 16px", background: "#0a1a0a", borderRadius: 10,
+                      padding: "14px 16px", background: "linear-gradient(135deg, #0a1a0a, #0e1a0e)", borderRadius: 12,
                       border: "1px solid #166534",
                     }}>
-                      {req.id === "discord" ? (
-                        <svg width={20} height={20} viewBox="0 0 24 24" fill="#5865F2" style={{ flexShrink: 0 }}>
-                          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.114 18.1.132 18.114a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-                        </svg>
-                      ) : req.id === "phone" ? (
-                        <span style={{ fontSize: 18, flexShrink: 0, width: 20, textAlign: "center" as const }}>📱</span>
-                      ) : req.id === "steam" ? (
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, opacity: 0.8 }} />
-                      ) : req.id === "riot" ? (
-                        <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, opacity: 0.8 }} />
-                      ) : null}
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
                       <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#4ade80" }}>{req.label}</span>
-                      <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "3px 8px", borderRadius: 100, border: "1px solid #166534" }}>✓ Connected</span>
+                      <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "4px 10px", borderRadius: 100, border: "1px solid #166534" }}>✅ Connected</span>
                     </div>
                   );
                 }
                 if (req.pending) {
-                  // Pending (Riot only)
                   return (
                     <div key={req.id} style={{
                       display: "flex", alignItems: "center", gap: 12,
-                      padding: "12px 16px", background: "#1a1200", borderRadius: 10,
+                      padding: "14px 16px", background: "linear-gradient(135deg, #1a1200, #161000)", borderRadius: 12,
                       border: "1px solid #854d0e",
                     }}>
-                      <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, opacity: 0.8 }} />
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>⏳</span>
                       <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#fbbf24" }}>{req.label}</span>
-                      <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800, background: "#1a1200", padding: "3px 8px", borderRadius: 100, border: "1px solid #854d0e" }}>Pending</span>
+                      <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800, background: "#1a1200", padding: "4px 10px", borderRadius: 100, border: "1px solid #854d0e" }}>⏳ Pending</span>
                     </div>
                   );
                 }
-                // Not connected — action button
                 return (
                   <button key={req.id} onClick={req.action} style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 16px", background: "#111", borderRadius: 10,
-                    border: "1.5px solid #7f1d1d", cursor: "pointer", textAlign: "left" as const, width: "100%",
-                    transition: "all 0.15s",
+                    padding: "14px 16px", background: "#111", borderRadius: 12,
+                    border: "1.5px solid #333", cursor: "pointer", textAlign: "left" as const, width: "100%",
+                    transition: "all 0.2s ease",
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#dc2626"; e.currentTarget.style.background = "#1a1a1a"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#7f1d1d"; e.currentTarget.style.background = "#111"; }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = accentColor; e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.background = "#111"; e.currentTarget.style.transform = "translateY(0)"; }}
                   >
-                    {req.id === "discord" ? (
-                      <svg width={20} height={20} viewBox="0 0 24 24" fill="#5865F2" style={{ flexShrink: 0 }}>
-                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.114 18.1.132 18.114a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-                      </svg>
-                    ) : req.id === "phone" ? (
-                      <span style={{ fontSize: 18, flexShrink: 0, width: 20, textAlign: "center" as const }}>📱</span>
-                    ) : req.id === "steam" ? (
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, opacity: 0.7 }} />
-                    ) : req.id === "riot" ? (
-                      <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, opacity: 0.7 }} />
-                    ) : null}
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2 }}>{req.actionLabel || `Connect ${req.label}`}</p>
-                      <p style={{ fontSize: 11, color: "#555" }}>Required to register</p>
+                      <p style={{ fontSize: 11, color: "#666" }}>Required to register</p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "3px 8px", borderRadius: 100, background: "#7f1d1d", color: "#fca5a5" }}>Required</span>
-                      <span style={{ color: "#555", fontSize: 16 }}>→</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: "rgba(249,115,22,0.15)", color: accentColor, border: `1px solid ${accentColor}33` }}>Connect →</span>
                     </div>
                   </button>
                 );
@@ -515,18 +494,21 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               <button onClick={() => setStep(isShuffle ? "solo" : "choose")} style={{
                 width: "100%", padding: 14,
                 background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
-                border: "none", borderRadius: 8, color: "#fff",
+                border: "none", borderRadius: 10, color: "#fff",
                 fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 4,
+                boxShadow: `0 4px 20px ${accentColor}33`,
               }}>
-                Continue to Register →
+                🚀 Continue to Register
               </button>
             )}
 
             {/* Summary of what's still missing */}
             {!showPhoneOtp && !allRequirementsMet && unmetRequirements.length > 0 && (
-              <p style={{ fontSize: 11, color: "#555", textAlign: "center", marginTop: 8 }}>
-                {unmetRequirements.length} requirement{unmetRequirements.length > 1 ? "s" : ""} remaining
-              </p>
+              <div style={{ textAlign: "center", marginTop: 10, padding: "8px 12px", background: "#111", borderRadius: 8, border: "1px solid #222" }}>
+                <p style={{ fontSize: 12, color: "#888" }}>
+                  🔒 {unmetRequirements.length} requirement{unmetRequirements.length > 1 ? "s" : ""} remaining to unlock registration
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -591,37 +573,55 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <button onClick={() => setStep("create")} style={{
               padding: "18px 20px", background: "#111", border: "1px solid #222",
-              borderRadius: 10, color: "#fff", cursor: "pointer", textAlign: "left" as const,
+              borderRadius: 12, color: "#fff", cursor: "pointer", textAlign: "left" as const,
+              transition: "all 0.2s ease",
             }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = accentColor)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "#222")}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = accentColor; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#222"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
-              <p style={{ fontWeight: 700, fontSize: 15 }}>Create a Team</p>
-              <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>Be the captain, invite up to 4 friends with a code</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>👑</span>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15 }}>Create a Team</p>
+                  <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>Be the captain, invite up to 4 friends with a code</p>
+                </div>
+              </div>
             </button>
 
             <button onClick={() => setStep("join")} style={{
               padding: "18px 20px", background: "#111", border: "1px solid #222",
-              borderRadius: 10, color: "#fff", cursor: "pointer", textAlign: "left" as const,
+              borderRadius: 12, color: "#fff", cursor: "pointer", textAlign: "left" as const,
+              transition: "all 0.2s ease",
             }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "#3b82f6")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "#222")}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#222"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
-              <p style={{ fontWeight: 700, fontSize: 15 }}>Join a Team</p>
-              <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>Enter the 6-digit code your captain shared</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>🤝</span>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15 }}>Join a Team</p>
+                  <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>Enter the 6-digit code your captain shared</p>
+                </div>
+              </div>
             </button>
 
             <button onClick={handleSolo} disabled={loading} style={{
               padding: "18px 20px", background: "#111", border: "1px solid #222",
-              borderRadius: 10, color: "#fff", cursor: loading ? "default" : "pointer", textAlign: "left" as const,
+              borderRadius: 12, color: "#fff", cursor: loading ? "default" : "pointer", textAlign: "left" as const,
+              transition: "all 0.2s ease",
             }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "#22c55e")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "#222")}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#22c55e"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#222"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
-              <p style={{ fontWeight: 700, fontSize: 15 }}>Find Me a Team</p>
-              <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
-                {loading ? "Registering..." : "Register solo, we'll place you in a team by rank"}
-              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>🎲</span>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15 }}>Find Me a Team</p>
+                  <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+                    {loading ? "Registering..." : "Register solo, we'll place you in a team by rank"}
+                  </p>
+                </div>
+              </div>
             </button>
             {error && <p style={{ color: "#ef4444", fontSize: 13, textAlign: "center" }}>{error}</p>}
           </div>
@@ -675,9 +675,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
         {actualStep === "success" && (
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 48 }}>🎉</p>
+            <p style={{ fontSize: 56 }}>{teamCode ? "🎉" : "🏆"}</p>
             <h3 style={{ fontSize: 20, fontWeight: 800, marginTop: 12, color: "#fff" }}>
-              {teamCode ? "Team Created!" : "You're Registered!"}
+              {teamCode ? "⚔️ Team Created!" : "✨ You're Registered!"}
             </h3>
 
             {teamCode ? (

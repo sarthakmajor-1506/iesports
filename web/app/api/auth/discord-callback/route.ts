@@ -4,16 +4,18 @@ import { adminDb } from "@/lib/firebaseAdmin";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
-  const uid = searchParams.get("state");  // ← read uid from state
-  // DEBUG
-  console.log("=== CALLBACK HIT ===");
-  console.log("code:", code ? "present" : "MISSING");
-  console.log("uid from state:", uid);
-  console.log("full URL:", req.url);
-  // END DEBUG
+  const rawState = searchParams.get("state") || "";
+  const colonIdx = rawState.indexOf(":");
+  const uid = colonIdx > -1 ? rawState.slice(0, colonIdx) : rawState;
+  const returnTo = colonIdx > -1 ? rawState.slice(colonIdx + 1) : "";
+
   if (!code || !uid) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=error`);
   }
+
+  const successRedirect = returnTo
+    ? `${process.env.NEXT_PUBLIC_APP_URL}${returnTo}?discord=linked`
+    : `${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=linked`;
 
   try {
     const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
@@ -57,7 +59,10 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .get();
     if (!existingDiscord.empty && existingDiscord.docs[0].id !== uid) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=already_linked`);
+      const alreadyLinkedRedirect = returnTo
+        ? `${process.env.NEXT_PUBLIC_APP_URL}${returnTo}?discord=already_linked`
+        : `${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=already_linked`;
+      return NextResponse.redirect(alreadyLinkedRedirect);
     }
 
     // Save to Firestore
@@ -70,9 +75,12 @@ export async function GET(req: NextRequest) {
       discordConnectedAt: new Date(),
     }, { merge: true });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=linked`);
+    return NextResponse.redirect(successRedirect);
   } catch (e: any) {
     console.error("Discord callback error:", e.message);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=error`);
+    const errorRedirect = returnTo
+      ? `${process.env.NEXT_PUBLIC_APP_URL}${returnTo}?discord=error`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=error`;
+    return NextResponse.redirect(errorRedirect);
   }
 }

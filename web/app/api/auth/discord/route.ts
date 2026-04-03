@@ -6,12 +6,15 @@ export async function GET(req: NextRequest) {
 
   if (!uid) return NextResponse.json({ error: "Missing uid" }, { status: 400 });
 
+  const returnTo = searchParams.get("returnTo") || "";
+  const state = returnTo ? `${uid}:${returnTo}` : uid;
+
   const params = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/discord-callback`,
     response_type: "code",
     scope: "identify guilds.join",
-    state: uid,  // ← pass uid as state, no cookie needed
+    state,
   });
 
   const url = `https://discord.com/oauth2/authorize?${params}`;

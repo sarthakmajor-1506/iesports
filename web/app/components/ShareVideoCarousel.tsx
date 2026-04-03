@@ -222,6 +222,7 @@ export default function ShareVideoCarousel({
         }}
       >
         <Player
+          key={slideIdx}
           ref={playerRef}
           component={ShareSlideComposition}
           inputProps={{ tournament, type: current.type }}
@@ -230,6 +231,7 @@ export default function ShareVideoCarousel({
           compositionWidth={1080}
           compositionHeight={1080}
           autoPlay
+          loop
           style={{ width: "100%", height: "100%" }}
           controls={false}
         />
