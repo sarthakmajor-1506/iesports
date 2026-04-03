@@ -18,7 +18,7 @@ function SteamSuccessInner() {
     }
     signInWithCustomToken(auth, token)
       .then(() => {
-        let dest = "/dota2";
+        let dest = "/valorant";
         try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
         router.replace(dest);
       })

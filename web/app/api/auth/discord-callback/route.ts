@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   console.log("full URL:", req.url);
   // END DEBUG
   if (!code || !uid) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=error`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=error`);
   }
 
   try {
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .get();
     if (!existingDiscord.empty && existingDiscord.docs[0].id !== uid) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=already_linked`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=already_linked`);
     }
 
     // Save to Firestore
@@ -70,9 +70,9 @@ export async function GET(req: NextRequest) {
       discordConnectedAt: new Date(),
     }, { merge: true });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=linked`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=linked`);
   } catch (e: any) {
     console.error("Discord callback error:", e.message);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dota2?discord=error`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/valorant?discord=error`);
   }
 }

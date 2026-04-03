@@ -50,7 +50,7 @@ export default function Home() {
   const [heroImageIndex, setHeroImageIndex] = useState(0);
 
   useEffect(() => {
-    if (!loading && user) router.replace("/dota2");
+    if (!loading && user) router.replace("/valorant");
   }, [user, loading, router]);
 
   // Fetch featured tournaments via API route (uses Admin SDK, bypasses auth rules)

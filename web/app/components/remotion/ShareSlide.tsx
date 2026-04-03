@@ -41,7 +41,14 @@ export interface ShareSlideData {
   shareImages?: {
     tagline?: string;
     highlightText?: string;
+    defaultBg?: string;
+    overviewBg?: string;
+    registerBg?: string;
+    teamsBg?: string;
+    scheduleBg?: string;
+    formatBg?: string;
   };
+  bannerImage?: string;
   eligibility?: {
     minRank?: string;
     maxRank?: string;
@@ -113,12 +120,13 @@ function scaleIn(frame: number, start: number, fps: number) {
    SHARED BUILDING BLOCKS (animated)
    ═══════════════════════════════════════════════ */
 
-function AnimatedBackground({ frame }: { frame: number }) {
+function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: string }) {
   const breathe = Math.sin(frame * 0.035) * 0.12 + 1;
   const breathe2 = Math.sin(frame * 0.028 + 1) * 0.10 + 1;
   const dotOpacity = fade(frame, 0, 30);
   const lineRotate1 = -30 + Math.sin(frame * 0.018) * 2.5;
   const lineRotate2 = -30 + Math.cos(frame * 0.022) * 2;
+  const bgScale = 1 + Math.sin(frame * 0.012) * 0.03;
 
   return (
     <AbsoluteFill>
@@ -131,6 +139,30 @@ function AnimatedBackground({ frame }: { frame: number }) {
             "linear-gradient(155deg, #080612 0%, #120e1e 25%, #0c0a18 50%, #0a0814 75%, #070510 100%)",
         }}
       />
+      {/* Uploaded background image */}
+      {bgImage && (
+        <>
+          <Img
+            src={bgImage}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: fade(frame, 0, 30) * 0.35,
+              transform: `scale(${bgScale})`,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "linear-gradient(180deg, rgba(8,6,18,0.7) 0%, rgba(8,6,18,0.5) 40%, rgba(8,6,18,0.8) 100%)",
+            }}
+          />
+        </>
+      )}
       {/* Glow: top-left warm gold */}
       <div
         style={{
@@ -754,7 +786,7 @@ function OverviewSlide({
       {/* Stats row */}
       <div style={{ display: "flex", gap: 16 }}>
         <StatBox val={`${t.totalSlots || "?"}`} label="PLAYERS" color={C.rose} frame={frame} delay={42} fps={fps} />
-        <StatBox val={fmtDate(t.startDate)} label="STARTS" color={C.sky} frame={frame} delay={46} fps={fps} />
+        <StatBox val={fmtDate(t.schedule?.groupStageStart || t.startDate)} label="STARTS" color={C.sky} frame={frame} delay={46} fps={fps} />
         <StatBox val={fmtDate(t.endDate || t.registrationDeadline)} label="ENDS" color={C.lavender} frame={frame} delay={50} fps={fps} />
         <StatBox val={`${t.totalTeams || "?"}`} label="TEAMS" color={C.sage} frame={frame} delay={54} fps={fps} />
       </div>
@@ -933,13 +965,35 @@ function RanksMapSlide({
   fps: number;
 }) {
   const name = t.name || "Tournament";
-  const minRank = t.eligibility?.minRank || "Gold 2";
-  const maxRank = t.eligibility?.maxRank || "Immortal 2";
+  const minRank = t.eligibility?.minRank || "Gold";
+  const maxRank = t.eligibility?.maxRank || "Immortal";
 
   const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
 
   const groupPool = t.mapPool?.groupStage || "All Maps Veto";
   const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
+
+  // Valorant rank tier colors
+  const RANK_TIERS = [
+    { name: "Iron", color: "#6b6b6b" },
+    { name: "Bronze", color: "#a0522d" },
+    { name: "Silver", color: "#b0b0b0" },
+    { name: "Gold", color: "#e8b731" },
+    { name: "Platinum", color: "#2dd4bf" },
+    { name: "Diamond", color: "#b370d4" },
+    { name: "Ascendant", color: "#2dd45b" },
+    { name: "Immortal", color: "#e05672" },
+    { name: "Radiant", color: "#f5e642" },
+  ];
+
+  const getBaseRank = (r: string) => RANK_TIERS.find(rt => r.toLowerCase().startsWith(rt.name.toLowerCase()))?.name || r;
+  const minBase = getBaseRank(minRank);
+  const maxBase = getBaseRank(maxRank);
+  const minIdx = RANK_TIERS.findIndex(rt => rt.name === minBase);
+  const maxIdx = RANK_TIERS.findIndex(rt => rt.name === maxBase);
+  const ranksInRange = RANK_TIERS.slice(Math.max(0, minIdx), maxIdx + 1);
+  const minColor = RANK_TIERS.find(rt => rt.name === minBase)?.color || C.gold;
+  const maxColor = RANK_TIERS.find(rt => rt.name === maxBase)?.color || C.rose;
 
   return (
     <div
@@ -951,17 +1005,17 @@ function RanksMapSlide({
         justifyContent: "center",
       }}
     >
-      <Badge text="RANKS & MAPS" color={C.lavender} frame={frame} delay={10} fps={fps} />
+      <Badge text="ELIGIBLE RANKS" color={C.rose} frame={frame} delay={10} fps={fps} />
 
       <div
         style={{
-          fontSize: 50,
+          fontSize: 44,
           fontWeight: 900,
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 24,
-          marginBottom: 36,
+          marginTop: 20,
+          marginBottom: 24,
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
@@ -969,33 +1023,78 @@ function RanksMapSlide({
         {name}
       </div>
 
-      {/* Rank range */}
+      {/* ── Rank Range Card ── */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 20,
-          padding: "20px 28px",
-          background: `linear-gradient(135deg, ${C.rose}0A, transparent)`,
-          border: `1.5px solid ${C.rose}20`,
-          borderRadius: 20,
-          marginBottom: 16,
-          opacity: fade(frame, 26, 12),
-          transform: `translateX(${interpolate(frame, [26, 41], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
+          flexDirection: "column",
+          padding: "28px 32px",
+          background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`,
+          border: `1.5px solid ${maxColor}25`,
+          borderRadius: 24,
+          marginBottom: 20,
+          opacity: fade(frame, 24, 12),
+          transform: `translateX(${interpolate(frame, [24, 39], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
       >
-        <Num n="R" color={C.rose} size={48} />
-        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: C.muted, letterSpacing: "0.1em" }}>
-            ELIGIBLE RANKS
+        {/* Rank names: Gold → Immortal */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
+          <div style={{ fontSize: 38, fontWeight: 900, color: minColor, textShadow: `0 0 24px ${minColor}50` }}>
+            {minRank}
           </div>
-          <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", marginTop: 4 }}>
-            {minRank} — {maxRank}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em" }}>to</div>
+            <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1 }} />
           </div>
+          <div style={{ fontSize: 38, fontWeight: 900, color: maxColor, textShadow: `0 0 24px ${maxColor}50` }}>
+            {maxRank}
+          </div>
+        </div>
+
+        {/* Rank tier visual bar */}
+        <div style={{ display: "flex", gap: 6, width: "100%" }}>
+          {ranksInRange.map((rank, i) => {
+            const d = 32 + i * 5;
+            return (
+              <div
+                key={rank.name}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  opacity: fade(frame, d, 10),
+                  transform: `translateY(${slideY(frame, d, 12, 12)}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    height: 8,
+                    borderRadius: 4,
+                    background: `linear-gradient(90deg, ${rank.color}CC, ${rank.color})`,
+                    boxShadow: `0 0 16px ${rank.color}40`,
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: rank.color,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {rank.name.toUpperCase()}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Competitive maps */}
+      {/* ── Competitive maps ── */}
       <div
         style={{
           display: "flex",
@@ -1005,8 +1104,8 @@ function RanksMapSlide({
           border: `1.5px solid ${C.sky}20`,
           borderRadius: 20,
           marginBottom: 16,
-          opacity: fade(frame, 34, 12),
-          transform: `translateX(${interpolate(frame, [34, 49], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
+          opacity: fade(frame, 50, 12),
+          transform: `translateX(${interpolate(frame, [50, 65], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 800, color: C.muted, letterSpacing: "0.1em", marginBottom: 12 }}>
@@ -1014,7 +1113,7 @@ function RanksMapSlide({
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {COMP_MAPS.map((m, i) => {
-            const d = 40 + i * 3;
+            const d = 56 + i * 3;
             return (
               <div
                 key={m}
@@ -1036,12 +1135,12 @@ function RanksMapSlide({
         </div>
       </div>
 
-      {/* Map pool rules */}
+      {/* ── Map pool rules ── */}
       <div
         style={{
           display: "flex",
           gap: 14,
-          opacity: fade(frame, 60, 12),
+          opacity: fade(frame, 78, 12),
         }}
       >
         <div
@@ -1561,6 +1660,17 @@ export const ShareSlideComposition: React.FC<ShareSlideProps> = ({
       );
   }
 
+  const si = tournament.shareImages;
+  const bgMap: Record<string, string | undefined> = {
+    overview: si?.overviewBg,
+    register: si?.registerBg,
+    teams: si?.teamsBg,
+    schedule: si?.scheduleBg,
+    format: si?.formatBg,
+    ranks: si?.defaultBg,
+  };
+  const bgImage = bgMap[type] || si?.defaultBg || tournament.bannerImage;
+
   return (
     <AbsoluteFill
       style={{
@@ -1568,7 +1678,7 @@ export const ShareSlideComposition: React.FC<ShareSlideProps> = ({
         overflow: "hidden",
       }}
     >
-      <AnimatedBackground frame={frame} />
+      <AnimatedBackground frame={frame} bgImage={bgImage} />
       <div
         style={{
           display: "flex",

@@ -68,11 +68,10 @@ export default function DotaTournaments() {
           display: flex;
           align-items: center;
           gap: 8px;
-          background: #121215;
-          border: 1px solid #2A2A30;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
           border-radius: 100px;
           padding: 6px 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
         .dt-stat-num {
           font-size: 1rem;
@@ -84,51 +83,55 @@ export default function DotaTournaments() {
         .dt-stat-num.blue   { color: #60A5FA; }
         .dt-stat-label {
           font-size: 0.75rem;
-          color: #8A8880;
+          color: rgba(255,255,255,0.45);
           font-weight: 500;
         }
         .dt-stat-divider {
           width: 1px;
           height: 16px;
-          background: #2A2A30;
+          background: rgba(255,255,255,0.1);
         }
 
         /* ── Section label ── */
         .dt-section-label {
-          font-size: 0.68rem;
+          font-size: 0.66rem;
           font-weight: 800;
-          letter-spacing: 0.1em;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: #555550;
-          margin-bottom: 10px;
-          margin-top: 6px;
+          color: rgba(255,255,255,0.3);
+          margin-bottom: 12px;
+          margin-top: 8px;
         }
+
+        @keyframes dt-card-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ── Tournament card — compact ── */
         .dt-card {
-          background: #121215;
-          border: 1px solid #2A2A30;
-          border-radius: 12px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
           overflow: hidden;
           display: flex;
           align-items: stretch;
           cursor: pointer;
-          transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+          transition: all 0.25s ease;
           margin-bottom: 10px;
+          backdrop-filter: blur(8px);
+          animation: dt-card-up 0.35s ease both;
         }
         .dt-card:hover {
-          box-shadow: 0 6px 24px rgba(0,0,0,0.35);
-          transform: translateY(-1px);
-          border-color: #3a3a42;
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(59,130,246,0.15);
+          border-color: rgba(59,130,246,0.3);
         }
         .dt-card.ended {
-          opacity: 0.6;
+          opacity: 0.5;
         }
         .dt-card.registered {
-          border-color: rgba(34,197,94,0.3);
-          background: rgba(22,163,74,0.06);
+          border-color: rgba(34,197,94,0.35);
+          background: rgba(22,163,74,0.07);
         }
+        .dt-card.registered:hover { box-shadow: 0 8px 30px rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
 
         /* Left accent bar */
         .dt-card-accent {
@@ -147,12 +150,12 @@ export default function DotaTournaments() {
 
         /* Game icon area */
         .dt-card-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 10px;
+          width: 46px;
+          height: 46px;
+          border-radius: 12px;
           overflow: hidden;
           flex-shrink: 0;
-          background: #1a1a1f;
+          border: 1px solid rgba(255,255,255,0.08);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -186,12 +189,12 @@ export default function DotaTournaments() {
           font-weight: 700;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #555550;
+          color: rgba(255,255,255,0.35);
         }
         .dt-meta-val {
           font-size: 0.8rem;
           font-weight: 700;
-          color: #e0e0da;
+          color: rgba(255,255,255,0.8);
         }
         .dt-meta-val.prize { color: #3B82F6; }
         .dt-meta-val.green { color: #4ade80; }
@@ -206,7 +209,7 @@ export default function DotaTournaments() {
         }
         .dt-status-badge.upcoming  { background: rgba(59,130,246,0.12); color: #60A5FA; border: 1px solid rgba(59,130,246,0.3); }
         .dt-status-badge.ongoing   { background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-        .dt-status-badge.ended     { background: #1a1a1f; color: #555550;    border: 1px solid #2A2A30; }
+        .dt-status-badge.ended     { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.08); }
         .dt-status-badge.registered { background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
 
         /* Slot bar area */
@@ -224,7 +227,7 @@ export default function DotaTournaments() {
         .dt-slots-text strong { color: #F0EEEA; font-weight: 800; }
         .dt-slots-bar {
           height: 4px;
-          background: #1e1e22;
+          background: rgba(255,255,255,0.06);
           border-radius: 2px;
           overflow: hidden;
         }
@@ -260,9 +263,9 @@ export default function DotaTournaments() {
           border: 1px solid rgba(34,197,94,0.3);
         }
         .dt-cta-btn.ended-btn {
-          background: #18181C;
-          color: #8A8880;
-          border: 1px solid #2A2A30;
+          background: rgba(255,255,255,0.04);
+          color: rgba(255,255,255,0.4);
+          border: 1px solid rgba(255,255,255,0.08);
           cursor: default;
         }
 
@@ -270,7 +273,7 @@ export default function DotaTournaments() {
         .dt-empty {
           text-align: center;
           padding: 60px 0;
-          color: #555550;
+          color: rgba(255,255,255,0.3);
           font-size: 0.9rem;
         }
 

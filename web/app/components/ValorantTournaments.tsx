@@ -45,15 +45,12 @@ export default function ValorantTournaments() {
     try { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }); } catch { return iso; }
   };
 
-  const isRegistrationOpen = (t: ValorantTournament) => {
+  const getRegistrationState = (t: ValorantTournament): "open" | "not_yet" | "closed" => {
     const now = new Date();
-    // If there's an explicit registrationOpens date, use it
-    if (t.schedule?.registrationOpens) {
-      return now >= new Date(t.schedule.registrationOpens);
-    }
-    // Otherwise check deadline hasn't passed and tournament isn't ended
     const deadline = new Date(t.registrationDeadline);
-    return now <= deadline;
+    if (now > deadline) return "closed";
+    if (t.schedule?.registrationOpens && now < new Date(t.schedule.registrationOpens)) return "not_yet";
+    return "open";
   };
 
   if (tLoading) return (
@@ -108,19 +105,29 @@ export default function ValorantTournaments() {
         .vt-card-icon img { width: 100%; height: 100%; object-fit: cover; }
         .vt-card-info { flex: 1; min-width: 0; }
         .vt-card-name { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .vt-card-meta { display: flex; gap: 7px; margin-top: 5px; flex-wrap: wrap; align-items: center; }
+        .vt-card-meta { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+        .vt-meta-item { display: flex; flex-direction: column; }
+        .vt-meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+        .vt-meta-val { font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); }
+        .vt-meta-val.prize { color: #ff4655; }
+        .vt-meta-val.green { color: #4ade80; }
         .vt-card-chip { font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
         .vt-badge-auction { font-size: 0.62rem; font-weight: 800; color: #ff4655; background: rgba(255,70,85,0.1); border: 1px solid rgba(255,70,85,0.25); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
         .vt-badge-daily { font-size: 0.62rem; font-weight: 800; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
         .vt-card-right { display: flex; align-items: center; gap: 14px; padding-right: 20px; flex-shrink: 0; }
-        .vt-slots { text-align: right; min-width: 60px; }
-        .vt-slots-num { font-size: 1.1rem; font-weight: 800; color: #F0EEEA; }
-        .vt-slots-label { font-size: 0.62rem; color: rgba(255,255,255,0.3); font-weight: 500; }
+        .vt-slots { min-width: 100px; display: flex; flex-direction: column; gap: 5px; }
+        .vt-slots-text { font-size: 0.72rem; color: rgba(255,255,255,0.5); text-align: right; }
+        .vt-slots-text strong { color: #F0EEEA; font-weight: 800; }
+        .vt-slots-bar { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+        .vt-slots-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
 
         .vt-reg-btn { padding: 9px 22px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
         .vt-reg-btn:hover { background: #e63e4d; box-shadow: 0 0 20px rgba(255,70,85,0.4); transform: translateY(-1px); }
+
+        .vt-leaderboard-btn { padding: 9px 22px; background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.3); border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
+        .vt-leaderboard-btn:hover { background: rgba(96,165,250,0.2); box-shadow: 0 0 16px rgba(96,165,250,0.25); transform: translateY(-1px); }
 
         .vt-reg-done { padding: 8px 16px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; min-width: 130px; text-align: center; }
 
@@ -132,8 +139,8 @@ export default function ValorantTournaments() {
         .vt-empty-icon { font-size: 44px; margin-bottom: 12px; }
         .vt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
-        @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 13px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 38px; height: 38px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } }
-        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } }
+        @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 13px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 38px; height: 38px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } .vt-meta-item { display: none; } .vt-card-meta { gap: 6px; } .vt-card-meta .vt-meta-item:nth-child(-n+3) { display: flex; } }
+        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .vt-slots { min-width: unset; width: 100%; } .vt-slots-text { text-align: left; } .vt-card-meta .vt-meta-item { display: flex; } }
       `}</style>
 
       <div className="vt-wrap">
@@ -153,7 +160,7 @@ export default function ValorantTournaments() {
                 {tournaments.filter(t => t.status !== "ended").map((t) => {
                   const slotsLeft = t.totalSlots - t.slotsBooked;
                   const isRegistered = registeredIds.has(t.id);
-                  const regOpen = isRegistrationOpen(t);
+                  const regState = getRegistrationState(t);
                   return (
                     <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s` }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
                       <div className="vt-card-accent" style={{ background: "#ff4655" }} />
@@ -162,18 +169,40 @@ export default function ValorantTournaments() {
                         <div className="vt-card-info">
                           <div className="vt-card-name">{t.name}</div>
                           <div className="vt-card-meta">
-                            <span className="vt-card-chip">{formatDate(t.startDate)}</span>
-                            <span className="vt-card-chip">{t.entryFee === 0 ? "Free" : `₹${t.entryFee}`}</span>
-                            {t.format === "auction" && <span className="vt-badge-auction" title="Players are auctioned to captains after registration closes">Auction Format</span>}
+                            <div className="vt-meta-item">
+                              <span className="vt-meta-key">Prize</span>
+                              <span className="vt-meta-val prize">{t.prizePool || "TBD"}</span>
+                            </div>
+                            <div className="vt-meta-item">
+                              <span className="vt-meta-key">Entry</span>
+                              <span className="vt-meta-val">{t.entryFee === 0 ? "Free" : `₹${t.entryFee}`}</span>
+                            </div>
+                            <div className="vt-meta-item">
+                              <span className="vt-meta-key">Format</span>
+                              <span className="vt-meta-val">{t.format === "auction" ? "Auction" : t.format === "shuffle" ? "Shuffle" : "Standard"}</span>
+                            </div>
+                            <div className="vt-meta-item">
+                              <span className="vt-meta-key">Starts</span>
+                              <span className="vt-meta-val">{formatDate(t.startDate)}</span>
+                            </div>
+                            <div className="vt-meta-item">
+                              <span className="vt-meta-key">Deadline</span>
+                              <span className="vt-meta-val">{formatDate(t.registrationDeadline)}</span>
+                            </div>
                             {t.isDailyTournament && <span className="vt-badge-daily">Daily</span>}
                           </div>
                         </div>
                       </div>
                       <div className="vt-card-right">
-                        <div className="vt-slots"><div className="vt-slots-num">{slotsLeft}</div><div className="vt-slots-label">slots left</div></div>
+                        <div className="vt-slots">
+                          <div className="vt-slots-text"><strong>{slotsLeft}</strong> / {t.totalSlots} slots</div>
+                          <div className="vt-slots-bar"><div className="vt-slots-fill" style={{ width: `${Math.round((t.slotsBooked / t.totalSlots) * 100)}%`, background: t.slotsBooked / t.totalSlots > 0.8 ? "#ef4444" : t.slotsBooked / t.totalSlots > 0.5 ? "#f59e0b" : "#22c55e" }} /></div>
+                        </div>
                         {isRegistered ? (
                           <div className="vt-reg-done">✓ Registered</div>
-                        ) : !regOpen ? (
+                        ) : regState === "closed" ? (
+                          <button className="vt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=leaderboard`); }}>Leaderboard</button>
+                        ) : regState === "not_yet" ? (
                           <div className="vt-coming-soon">
                             <div className="vt-coming-soon-label">Coming Soon</div>
                             {t.schedule?.registrationOpens && (
@@ -199,7 +228,21 @@ export default function ValorantTournaments() {
                       <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
                       <div className="vt-card-info">
                         <div className="vt-card-name">{t.name}</div>
-                        <div className="vt-card-meta"><span className="vt-card-chip">{formatDate(t.startDate)}</span><span className="vt-card-chip">Ended</span></div>
+                        <div className="vt-card-meta">
+                          <div className="vt-meta-item">
+                            <span className="vt-meta-key">Prize</span>
+                            <span className="vt-meta-val">{t.prizePool || "TBD"}</span>
+                          </div>
+                          <div className="vt-meta-item">
+                            <span className="vt-meta-key">Format</span>
+                            <span className="vt-meta-val">{t.format === "auction" ? "Auction" : t.format === "shuffle" ? "Shuffle" : "Standard"}</span>
+                          </div>
+                          <div className="vt-meta-item">
+                            <span className="vt-meta-key">Date</span>
+                            <span className="vt-meta-val">{formatDate(t.startDate)}</span>
+                          </div>
+                          <span className="vt-card-chip">Ended</span>
+                        </div>
                       </div>
                     </div>
                   </div>

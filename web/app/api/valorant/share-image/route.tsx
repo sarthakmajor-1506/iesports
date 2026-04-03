@@ -658,7 +658,7 @@ export async function GET(req: NextRequest) {
             color={CL.rose}
           />
           <StatBox
-            val={fmtDate(t.startDate)}
+            val={fmtDate(t.schedule?.groupStageStart || t.startDate)}
             label="STARTS"
             color={CL.sky}
           />
@@ -1118,25 +1118,62 @@ export async function GET(req: NextRequest) {
     );
   } else if (type === "ranks") {
     // ── CARD: RANKS & MAPS ──
-    const minRank = t.eligibility?.minRank || "Gold 2";
-    const maxRank = t.eligibility?.maxRank || "Immortal 2";
+    const minRank = t.eligibility?.minRank || "Gold";
+    const maxRank = t.eligibility?.maxRank || "Immortal";
     const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
     const groupPool = t.mapPool?.groupStage || "All Maps Veto";
     const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
 
+    // Valorant rank tier colors
+    const RANK_TIERS = [
+      { name: "Iron", color: "#6b6b6b" },
+      { name: "Bronze", color: "#a0522d" },
+      { name: "Silver", color: "#b0b0b0" },
+      { name: "Gold", color: "#e8b731" },
+      { name: "Platinum", color: "#2dd4bf" },
+      { name: "Diamond", color: "#b370d4" },
+      { name: "Ascendant", color: "#2dd45b" },
+      { name: "Immortal", color: "#e05672" },
+      { name: "Radiant", color: "#f5e642" },
+    ];
+
+    const getBaseRank = (r: string) => RANK_TIERS.find(rt => r.toLowerCase().startsWith(rt.name.toLowerCase()))?.name || r;
+    const minBase = getBaseRank(minRank);
+    const maxBase = getBaseRank(maxRank);
+    const minIdx = RANK_TIERS.findIndex(rt => rt.name === minBase);
+    const maxIdx = RANK_TIERS.findIndex(rt => rt.name === maxBase);
+    const ranksInRange = RANK_TIERS.slice(Math.max(0, minIdx), maxIdx + 1);
+    const minColor = RANK_TIERS.find(rt => rt.name === minBase)?.color || CL.gold;
+    const maxColor = RANK_TIERS.find(rt => rt.name === maxBase)?.color || CL.rose;
+
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 60px", justifyContent: "center" }}>
-        <Badge text="RANKS & MAPS" color={CL.lavender} />
-        <div style={{ fontSize: 50, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 24, marginBottom: 36, display: "flex" }}>
+        <Badge text="ELIGIBLE RANKS" color={CL.rose} />
+        <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 20, marginBottom: 24, display: "flex" }}>
           {name}
         </div>
 
-        {/* Rank range */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "20px 28px", background: `linear-gradient(135deg, ${CL.rose}0C, transparent)`, border: `1.5px solid ${CL.rose}30`, borderRadius: 20, marginBottom: 16 }}>
-          <Num n="R" color={CL.rose} />
-          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: CL.muted, letterSpacing: "0.1em", display: "flex" }}>ELIGIBLE RANKS</div>
-            <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", marginTop: 4, display: "flex" }}>{minRank} — {maxRank}</div>
+        {/* Rank Range Card */}
+        <div style={{ display: "flex", flexDirection: "column", padding: "28px 32px", background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`, border: `1.5px solid ${maxColor}30`, borderRadius: 24, marginBottom: 20 }}>
+          {/* Rank names */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
+            <div style={{ fontSize: 38, fontWeight: 900, color: minColor, display: "flex" }}>{minRank}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1, display: "flex" }} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", display: "flex" }}>to</div>
+              <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1, display: "flex" }} />
+            </div>
+            <div style={{ fontSize: 38, fontWeight: 900, color: maxColor, display: "flex" }}>{maxRank}</div>
+          </div>
+
+          {/* Rank tier visual bar */}
+          <div style={{ display: "flex", gap: 6, width: "100%" }}>
+            {ranksInRange.map((rank) => (
+              <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                <div style={{ width: "100%", height: 8, borderRadius: 4, background: `linear-gradient(90deg, ${rank.color}CC, ${rank.color})`, display: "flex" }} />
+                <div style={{ fontSize: 12, fontWeight: 800, color: rank.color, letterSpacing: "0.08em", display: "flex" }}>{rank.name.toUpperCase()}</div>
+              </div>
+            ))}
           </div>
         </div>
 

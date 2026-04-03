@@ -54,7 +54,7 @@ export default function PlayerProfile() {
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ProfileTab>("valorant");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("account");
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
   // UPI state

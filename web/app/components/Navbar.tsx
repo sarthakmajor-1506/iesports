@@ -307,9 +307,9 @@ export default function Navbar() {
         .ie-nav-accent { height: 3px; transition: background 0.3s; }
         .ie-nav-row { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 62px; gap: 12px; }
         .ie-nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
-        .ie-nav-logo-name { font-size: 1.05rem; font-weight: 800; color: #F0EEEA; line-height: 1; }
-        .ie-nav-logo-name span { color: #3B82F6; }
-        .ie-nav-logo-sub { font-size: 0.58rem; color: #555550; letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+        .ie-nav-logo-name { font-size: 1.35rem; font-weight: 900; color: #F0EEEA; line-height: 1; letter-spacing: -0.02em; text-shadow: 0 0 20px rgba(59,130,246,0.3); }
+        .ie-nav-logo-name span { color: #3B82F6; text-shadow: 0 0 24px rgba(59,130,246,0.5); }
+        .ie-nav-logo-sub { font-size: 0.6rem; color: #6B6B65; letter-spacing: 0.16em; font-weight: 700; text-transform: uppercase; margin-top: 3px; }
         .ie-nav-tabs { display: flex; align-items: center; gap: 2px; flex: 1; justify-content: center; }
         .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #8A8880; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
         .ie-nav-tab:hover { background: #18181C; color: #bbb; }
@@ -406,7 +406,7 @@ export default function Navbar() {
         <div className="ie-nav-row">
 
           <div className="ie-nav-logo" onClick={() => router.push(activeGame?.path || "/valorant")}>
-            <Image src="/ielogo.png" alt="Indian Esports" width={36} height={36} style={{ borderRadius: 8 }} />
+            <Image src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
               <div className="ie-nav-logo-sub">Competitive Gaming</div>

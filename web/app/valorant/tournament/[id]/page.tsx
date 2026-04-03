@@ -748,7 +748,18 @@ function ValorantTournamentDetailInner() {
                     Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
                   </div>
                 )}
-                {regClosed && !isRegistered && isRegOpen && <span style={{ fontSize: "0.86rem", color: "#555550", fontWeight: 600 }}>Registration Closed</span>}
+                {regClosed && !isRegistered && isRegOpen && (
+                  <button
+                    onClick={() => setActiveTab("leaderboard")}
+                    style={{
+                      padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                      border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                      fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                  >Leaderboard</button>
+                )}
                 <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
                 </button>
