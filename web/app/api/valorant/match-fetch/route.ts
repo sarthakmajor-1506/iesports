@@ -17,7 +17,7 @@ import { FieldValue } from "firebase-admin/firestore";
  * 6. Standings + Buchholz update when series completes
  * 7. Auto-resolve next round TBD matches when all round matches complete
  *
- * Required: tournamentId, adminKey, matchDocId, valorantMatchId, gameNumber (1|2), region
+ * Required: tournamentId, adminKey, matchDocId, valorantMatchId, gameNumber (1-5), region
  * Optional: excludedPuuids (string[]) — subs to skip in leaderboard
  */
 export async function POST(req: NextRequest) {
@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
     if (adminKey !== process.env.ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (gameNumber !== 1 && gameNumber !== 2) {
-      return NextResponse.json({ error: "gameNumber must be 1 or 2" }, { status: 400 });
+    if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 5) {
+      return NextResponse.json({ error: "gameNumber must be 1-5" }, { status: 400 });
     }
 
     const henrikKey = process.env.HENRIK_API_KEY;
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     // 6. BUILD GAME DATA + UPDATE MATCH DOC (IMMEDIATELY)
     // ═══════════════════════════════════════════════════════════════════════════
-    const gameKey = gameNumber === 1 ? "game1" : "game2";
+    const gameKey = `game${gameNumber}`;
 
     const gameData = {
       valorantMatchId,
@@ -284,47 +284,50 @@ export async function POST(req: NextRequest) {
 
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 7. CHECK IF SERIES IS COMPLETE (BOTH GAMES FETCHED)
+    // 7. CHECK IF SERIES IS COMPLETE (dynamic BO — all games fetched)
     // ═══════════════════════════════════════════════════════════════════════════
-    const otherGameKey = gameNumber === 1 ? "game2" : "game1";
-    const otherGameData = existingMatch[otherGameKey];
+    // Determine BO from tournament settings
+    const tournamentDoc = await tournamentRef.get();
+    const tData = tournamentDoc.data() || {};
+    let bo = 2; // default
+    if (existingMatch.bracketType === "grand_final") bo = tData.grandFinalBestOf || 3;
+    else if (existingMatch.isBracket) bo = tData.bracketBestOf || 2;
+    else bo = tData.matchesPerRound || 2;
+
     let seriesComplete = false;
     let team1SeriesScore = 0;
     let team2SeriesScore = 0;
 
-    if (otherGameData && otherGameData.status === "completed") {
-      // Both games now fetched — compute series score
+    // Collect winners for all games (including the one we just fetched)
+    let completedGames = 0;
+    for (let g = 1; g <= bo; g++) {
+      let gWinner: string | null = null;
+      if (g === gameNumber) {
+        gWinner = gameWinner;
+        if (gameWinner) completedGames++;
+      } else {
+        const gData = existingMatch[`game${g}`];
+        gWinner = existingMatch[`game${g}Winner`] || gData?.winner || null;
+        if (gData?.status === "completed") completedGames++;
+        else gWinner = null;
+      }
+      if (gWinner === "team1") team1SeriesScore++;
+      else if (gWinner === "team2") team2SeriesScore++;
+    }
+
+    // Series completes when all BO games are fetched, or a team has clinched (won majority)
+    const winsNeeded = Math.ceil(bo / 2);
+    if (completedGames === bo || team1SeriesScore >= winsNeeded || team2SeriesScore >= winsNeeded) {
       seriesComplete = true;
-
-      const g1Winner = gameNumber === 1 ? gameWinner : (existingMatch.game1Winner || otherGameData.winner);
-      const g2Winner = gameNumber === 2 ? gameWinner : (existingMatch.game2Winner || otherGameData.winner);
-
-      if (g1Winner === "team1") team1SeriesScore++;
-      else if (g1Winner === "team2") team2SeriesScore++;
-
-      if (g2Winner === "team1") team1SeriesScore++;
-      else if (g2Winner === "team2") team2SeriesScore++;
-
       updatePayload.team1Score = team1SeriesScore;
       updatePayload.team2Score = team2SeriesScore;
       updatePayload.status = "completed";
       updatePayload.completedAt = new Date().toISOString();
       updatePayload.seriesAutoComputed = true;
     } else if (gameWinner) {
-      // Only one game fetched — update partial series score
-      // Show the game we have, other game is still 0
-      const currentG1Winner = gameNumber === 1 ? gameWinner : existingMatch.game1Winner;
-      const currentG2Winner = gameNumber === 2 ? gameWinner : existingMatch.game2Winner;
-
-      let partial1 = 0, partial2 = 0;
-      if (currentG1Winner === "team1") partial1++;
-      else if (currentG1Winner === "team2") partial2++;
-      if (currentG2Winner === "team1") partial1++;
-      else if (currentG2Winner === "team2") partial2++;
-
-      updatePayload.team1Score = partial1;
-      updatePayload.team2Score = partial2;
-      // Don't set status to completed — series still pending
+      // Partial update — show running tally
+      updatePayload.team1Score = team1SeriesScore;
+      updatePayload.team2Score = team2SeriesScore;
       updatePayload.status = existingMatch.status === "pending" ? "live" : existingMatch.status;
     }
 

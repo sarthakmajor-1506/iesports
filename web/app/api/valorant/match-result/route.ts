@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, matchId, team1Score, team2Score } = await req.json();
+    const { tournamentId, adminKey, matchId, team1Score, team2Score, bestOf } = await req.json();
 
     if (!tournamentId || !adminKey || !matchId) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -13,11 +13,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const bo = bestOf || 2;
     const s1 = parseInt(team1Score);
     const s2 = parseInt(team2Score);
 
-    if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0 || s1 + s2 > 2 || s1 > 2 || s2 > 2) {
-      return NextResponse.json({ error: "Invalid scores. Each team can win 0-2 maps, total must be <= 2." }, { status: 400 });
+    if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0 || s1 + s2 > bo || s1 > bo || s2 > bo) {
+      return NextResponse.json({ error: `Invalid scores. Each team can win 0-${bo} maps, total must be <= ${bo}.` }, { status: 400 });
     }
 
     const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);

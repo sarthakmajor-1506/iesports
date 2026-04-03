@@ -52,10 +52,10 @@ function getTeamTag(name: string): string {
   return m ? m[1] : getTeamInitials(name);
 }
 
-function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatch, tournamentId, isBracket = false }: {
+function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatch, tournamentId, isBracket = false, bestOf = 2 }: {
   m: any; teamMembers: Record<string, any[]>; teamLogoMap: Record<string, string>;
   expandedMatch: string | null; setExpandedMatch: (id: string | null) => void;
-  tournamentId: string; isBracket?: boolean;
+  tournamentId: string; isBracket?: boolean; bestOf?: number;
 }) {
   const isComplete = m.status === "completed";
   const isLive = m.status === "live";
@@ -65,10 +65,14 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
   const t1Members = teamMembers[m.team1Id] || [];
   const t2Members = teamMembers[m.team2Id] || [];
   const isExpanded = expandedMatch === m.id;
-  const g1 = m.game1 || m.games?.game1;
-  const g2 = m.game2 || m.games?.game2;
-  const hasGameData = g1?.playerStats || g2?.playerStats;
-  const scheduledStr = m.scheduledTime ? new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+  const games: any[] = [];
+  for (let i = 1; i <= bestOf; i++) {
+    games.push(m[`game${i}`] || m.games?.[`game${i}`] || null);
+  }
+  const hasGameData = games.some(g => g?.playerStats);
+  const scheduledDate = m.scheduledTime ? new Date(m.scheduledTime) : null;
+  const scheduledTime = scheduledDate ? scheduledDate.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+  const scheduledDay = scheduledDate ? scheduledDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
   const bracketAccent = "#f59e0b";
 
   return (
@@ -83,7 +87,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           <span className="vtd-mc-index-num" style={isBracket ? { color: bracketAccent, fontSize: "0.55rem" } : {}}>
             {isBracket ? (m.bracketLabel || "").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 4) : `M${m.matchIndex || ""}`}
           </span>
-          <span className="vtd-mc-index-fmt" style={isBracket ? { background: "rgba(245,158,11,0.12)", color: bracketAccent } : {}}>BO2</span>
+          <span className="vtd-mc-index-fmt" style={isBracket ? { background: "rgba(245,158,11,0.12)", color: bracketAccent } : {}}>BO{bestOf}</span>
         </div>
         <div className="vtd-mc-team">
           <div className="vtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
@@ -119,13 +123,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             </>
           ) : (
             <>
-              <div className="vtd-mc-score-box">
-                <span className="s" style={{ color: "#555550" }}>–</span><span className="dash">:</span><span className="s" style={{ color: "#555550" }}>–</span>
-              </div>
+              {scheduledTime ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: isBracket ? bracketAccent : "#ff4655" }}>{scheduledTime}</div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "rgba(255,255,255,0.35)" }}>{scheduledDay}</div>
+                </div>
+              ) : (
+                <div className="vtd-mc-score-box">
+                  <span className="s" style={{ color: "#555550" }}>–</span><span className="dash">:</span><span className="s" style={{ color: "#555550" }}>–</span>
+                </div>
+              )}
               <span className="vtd-mc-status-badge" style={{ background: "#1a1a1f", color: "#555550" }}>{isBracket ? "Pending" : "Upcoming"}</span>
             </>
           )}
-          {scheduledStr && <div style={{ fontSize: "0.62rem", color: "#555550", marginTop: 2 }}>{scheduledStr}</div>}
+          {(isComplete || isLive) && scheduledDay && <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{scheduledDay} · {scheduledTime}</div>}
         </div>
         <div className="vtd-mc-team right">
           <div className="vtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
@@ -146,9 +157,10 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div style={{ textAlign: "center", padding: "16px 0", color: "#555550", fontSize: "0.82rem" }}>Match hasn't been played yet. Game details will appear here after the match.</div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <GameDetailCard game={g1} gameNum={1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
-                <GameDetailCard game={g2} gameNum={2} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 3)}, 1fr)`, gap: 12 }}>
+                {games.map((g, i) => (
+                  <GameDetailCard key={i} game={g} gameNum={i + 1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+                ))}
               </div>
               <div style={{ marginTop: 10, textAlign: "center" }}>
                 <Link href={`/valorant/match/${tournamentId}/${m.id}`} style={{ fontSize: "0.72rem", fontWeight: 700, color: "#ff4655", textDecoration: "none", padding: "6px 18px", border: "1px solid #ff4655", borderRadius: 100, display: "inline-block", transition: "all 0.15s" }}>View Full Match Details →</Link>
@@ -385,6 +397,12 @@ function ValorantTournamentDetailInner() {
   const groupMatches = matches.filter((m: any) => !m.isBracket);
   const bracketMatches = matches.filter((m: any) => m.isBracket);
 
+  // ── Detect tournament champion from grand final ──
+  const grandFinal = bracketMatches.find((m: any) => m.bracketType === "grand_final" && m.status === "completed");
+  const championTeamId = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Id : grandFinal.team2Id) : null;
+  const championTeamName = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Name : grandFinal.team2Name) : null;
+  const championMembers = championTeamId ? (teamMembers[championTeamId] || []) : [];
+
   return (
     <>
       <style>{`
@@ -587,7 +605,7 @@ function ValorantTournamentDetailInner() {
 
         /* ── Share modal ── */
         .vtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
-        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; max-width: 440px; width: 100%; }
+        .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; max-width: 528px; width: 100%; }
         .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #F0EEEA; display: flex; align-items: center; gap: 10px; }
         .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
@@ -680,6 +698,44 @@ function ValorantTournamentDetailInner() {
         </div>
 
         <div className="vtd-content">
+
+          {/* ═══ CHAMPION BANNER ═══ */}
+          {championTeamName && (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,70,85,0.06) 50%, rgba(255,215,0,0.08) 100%)",
+              border: "1px solid rgba(255,215,0,0.25)",
+              borderRadius: 14,
+              padding: "20px 24px",
+              marginBottom: 20,
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 0%, rgba(255,215,0,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
+              <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#ffd700", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Tournament Champion</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#F0EEEA", lineHeight: 1.2 }}>{championTeamName}</div>
+              {championMembers.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                  {championMembers.map((p: any, i: number) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, padding: "4px 12px 4px 4px" }}>
+                      {p.riotAvatar ? (
+                        <img src={p.riotAvatar} alt="" style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid rgba(255,215,0,0.3)" }} />
+                      ) : (
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(255,215,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "#ffd700" }}>{(p.riotGameName || "?")[0]}</div>
+                      )}
+                      <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "#F0EEEA" }}>{p.riotGameName || "Player"}</span>
+                      {p.riotTagLine && <span style={{ fontSize: "0.66rem", color: "#8A8880" }}>#{p.riotTagLine}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {grandFinal && (
+                <div style={{ fontSize: "0.72rem", color: "#8A8880", marginTop: 10, fontWeight: 600 }}>
+                  Grand Final: {grandFinal.team1Name} {grandFinal.team1Score} - {grandFinal.team2Score} {grandFinal.team2Name}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ═══ TAB BAR ═══ */}
           <div className="vtd-tabs-wrap">
@@ -930,13 +986,13 @@ function ValorantTournamentDetailInner() {
                   {groupMatches.length > 0 && (
                     <div>
                       <div className="vtd-section-header group">Group Stage Fixtures</div>
-                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">Round {day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length} matches</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} />))}</div>)); })()}
+                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">Round {day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length} matches</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
                     </div>
                   )}
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
                       <div className="vtd-section-header bracket">Bracket Fixtures</div>
-                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} />))}</div>); }); })()}
+                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : (tournament?.bracketBestOf || 2)} />))}</div>); }); })()}
                     </div>
                   )}
                 </>
@@ -967,12 +1023,16 @@ function ValorantTournamentDetailInner() {
                   matches={bracketMatches.filter((m: any) => m.bracketType !== "lower")}
                   bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
                   standings={standings}
+                  bracketBestOf={tournament.bracketBestOf || 2}
+                  grandFinalBestOf={tournament.grandFinalBestOf || 3}
                 />
               ) : (
                 <DoubleBracket
                   matches={bracketMatches}
                   bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
                   standings={standings}
+                  bracketBestOf={tournament.bracketBestOf || 2}
+                  grandFinalBestOf={tournament.grandFinalBestOf || 3}
                 />
               )}
             </div>
@@ -1022,17 +1082,18 @@ function ValorantTournamentDetailInner() {
               <button className="vtd-share-close" onClick={() => setShowShareCard(false)}><X size={16} /></button>
             </div>
             <p style={{ fontSize: "0.75rem", color: "#555550", marginBottom: 16, marginTop: -8 }}>
-              5 ready-to-share images for social media. Click Download to save, or Copy to clipboard.
+              6 ready-to-share images for Instagram, Stories & WhatsApp. Download or copy to share!
             </p>
 
             {/* Carousel */}
             {(() => {
               const slides = [
-                { type: "overview",  label: "Tournament Overview" },
-                { type: "register",  label: "How to Register" },
-                { type: "teams",     label: "Team Structure" },
-                { type: "schedule",  label: "Schedule" },
-                { type: "format",    label: "Tournament Format" },
+                { type: "overview",  label: "Tournament Overview", emoji: "🎯", desc: "Key stats & info" },
+                { type: "register",  label: "How to Register", emoji: "📝", desc: "3-step guide" },
+                { type: "teams",     label: "Team Structure", emoji: "👥", desc: "Format & roster" },
+                { type: "schedule",  label: "Schedule", emoji: "📅", desc: "Key dates" },
+                { type: "format",    label: "Tournament Format", emoji: "⚔️", desc: "Stages & rules" },
+                { type: "flow",      label: "Tournament Flow", emoji: "🗺️", desc: "Full journey" },
               ];
               const current = slides[shareSlide] || slides[0];
               const src = `/api/valorant/share-image?tournamentId=${id}&type=${current.type}`;
@@ -1064,7 +1125,8 @@ function ValorantTournamentDetailInner() {
                   <div className="vtd-share-carousel-nav">
                     <button className="vtd-share-carousel-btn" disabled={shareSlide === 0} onClick={() => setShareSlide(s => Math.max(0, s - 1))}><ChevronLeft size={16} /></button>
                     <div className="vtd-share-carousel-center">
-                      <span className="vtd-share-carousel-label">{current.label}</span>
+                      <span className="vtd-share-carousel-label">{current.emoji} {current.label}</span>
+                      <div style={{ fontSize: "0.65rem", color: "#555550", marginBottom: 4 }}>{current.desc}</div>
                       <div className="vtd-share-carousel-dots">
                         {slides.map((_, i) => (<div key={i} className={`vtd-share-carousel-dot${i === shareSlide ? " active" : ""}`} onClick={() => setShareSlide(i)} style={{ cursor: "pointer" }} />))}
                       </div>
@@ -1092,7 +1154,7 @@ function ValorantTournamentDetailInner() {
                 <Copy size={15} /> Copy Link
               </button>
             </div>
-            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>Images are 1080×1080 — optimised for Instagram, Stories, and WhatsApp</div>
+            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>1080×1080px — optimised for Instagram posts, Stories, and WhatsApp status</div>
 
             {/* Hidden ref for legacy html2canvas compat */}
             <div ref={shareCardRef} style={{ display: "none" }} />

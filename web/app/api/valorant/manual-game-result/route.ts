@@ -4,7 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, matchDocId, game1Winner, game2Winner, reason } = await req.json();
+    const body = await req.json();
+    const { tournamentId, adminKey, matchDocId, reason, bestOf } = body;
 
     if (!tournamentId || !adminKey || !matchDocId) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -13,12 +14,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Extract game winners dynamically: game1Winner, game2Winner, ..., gameNWinner
+    const bo = bestOf || 2;
     const validValues = ["team1", "team2", "draw", null, undefined];
-    if (!validValues.includes(game1Winner) || !validValues.includes(game2Winner)) {
-      return NextResponse.json({ error: "game1Winner/game2Winner must be 'team1', 'team2', 'draw', or null" }, { status: 400 });
+    const gameWinners: (string | null)[] = [];
+    let hasAnyResult = false;
+
+    for (let i = 1; i <= bo; i++) {
+      const val = body[`game${i}Winner`] ?? null;
+      if (!validValues.includes(val)) {
+        return NextResponse.json({ error: `game${i}Winner must be 'team1', 'team2', 'draw', or null` }, { status: 400 });
+      }
+      gameWinners.push(val);
+      if (val) hasAnyResult = true;
     }
 
-    if (!game1Winner && !game2Winner) {
+    if (!hasAnyResult) {
       return NextResponse.json({ error: "At least one game result must be provided" }, { status: 400 });
     }
 
@@ -38,11 +49,10 @@ export async function POST(req: NextRequest) {
     let team1Maps = 0;
     let team2Maps = 0;
 
-    if (game1Winner === "team1") team1Maps++;
-    else if (game1Winner === "team2") team2Maps++;
-
-    if (game2Winner === "team1") team1Maps++;
-    else if (game2Winner === "team2") team2Maps++;
+    for (const w of gameWinners) {
+      if (w === "team1") team1Maps++;
+      else if (w === "team2") team2Maps++;
+    }
 
     const updatePayload: any = {
       team1Score: team1Maps,
@@ -50,16 +60,20 @@ export async function POST(req: NextRequest) {
       status: "completed",
       completedAt: new Date().toISOString(),
       manualResult: true,
+      bestOf: bo,
       ...(reason ? { resultReason: reason } : {}),
-      ...(game1Winner ? {
-        game1: { manualResult: true, winner: game1Winner, mapName: reason || "Manual", ...(reason ? { reason } : {}) },
-        game1Winner,
-      } : {}),
-      ...(game2Winner ? {
-        game2: { manualResult: true, winner: game2Winner, mapName: reason || "Manual", ...(reason ? { reason } : {}) },
-        game2Winner,
-      } : {}),
     };
+
+    // Write each game's data
+    for (let i = 0; i < bo; i++) {
+      const w = gameWinners[i];
+      if (w) {
+        const gKey = `game${i + 1}`;
+        updatePayload[gKey] = { manualResult: true, winner: w, mapName: reason || "Manual", ...(reason ? { reason } : {}), status: "completed" };
+        updatePayload[`games.${gKey}`] = updatePayload[gKey];
+        updatePayload[`${gKey}Winner`] = w;
+      }
+    }
 
     await matchRef.update(updatePayload);
 
@@ -282,12 +296,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const gameResults: Record<string, string> = {};
+    for (let i = 0; i < bo; i++) {
+      gameResults[`game${i + 1}Winner`] = gameWinners[i] || "not played";
+    }
+
     return NextResponse.json({
       success: true,
       matchDocId,
+      bestOf: bo,
       seriesScore: `${team1Maps}-${team2Maps}`,
-      game1Winner: game1Winner || "not played",
-      game2Winner: game2Winner || "not played",
+      ...gameResults,
       reason: reason || "manual entry",
       standingsUpdated,
       autoResolved,
