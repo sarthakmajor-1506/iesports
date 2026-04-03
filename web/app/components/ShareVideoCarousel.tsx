@@ -30,12 +30,14 @@ interface ShareVideoCarouselProps {
   tournament: ShareSlideData;
   tournamentId: string;
   onToast: () => void;
+  game?: "valorant" | "dota2";
 }
 
 export default function ShareVideoCarousel({
   tournament,
   tournamentId,
   onToast,
+  game = "valorant",
 }: ShareVideoCarouselProps) {
   const [slideIdx, setSlideIdx] = useState(0);
   const [recording, setRecording] = useState(false);
@@ -49,7 +51,7 @@ export default function ShareVideoCarousel({
     if (downloading) return;
     setDownloading(true);
     try {
-      const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}`;
+      const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}&game=${game}`;
       const res = await fetch(src);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const blob = await res.blob();
@@ -77,7 +79,7 @@ export default function ShareVideoCarousel({
     if (copying) return;
     setCopying(true);
     try {
-      const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}`;
+      const src = `/api/valorant/share-image?tournamentId=${tournamentId}&type=${current.type}&game=${game}`;
       const res = await fetch(src);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const blob = await res.blob();
@@ -227,7 +229,6 @@ export default function ShareVideoCarousel({
           fps={FPS}
           compositionWidth={1080}
           compositionHeight={1080}
-          loop
           autoPlay
           style={{ width: "100%", height: "100%" }}
           controls={false}

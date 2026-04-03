@@ -150,7 +150,7 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              opacity: fade(frame, 0, 30) * 0.35,
+              opacity: fade(frame, 0, 30) * 0.6,
               transform: `scale(${bgScale})`,
             }}
           />
@@ -158,7 +158,7 @@ function AnimatedBackground({ frame, bgImage }: { frame: number; bgImage?: strin
             style={{
               position: "absolute",
               inset: 0,
-              background: "linear-gradient(180deg, rgba(10,15,42,0.7) 0%, rgba(10,15,42,0.5) 40%, rgba(10,15,42,0.8) 100%)",
+              background: "linear-gradient(180deg, rgba(10,15,42,0.45) 0%, rgba(10,15,42,0.3) 40%, rgba(10,15,42,0.6) 100%)",
             }}
           />
         </>

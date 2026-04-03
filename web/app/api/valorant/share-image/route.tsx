@@ -42,12 +42,14 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const tournamentId = searchParams.get("tournamentId");
   const type = searchParams.get("type") || "overview";
+  const game = searchParams.get("game") || "valorant";
+  const collectionName = game === "dota2" ? "tournaments" : "valorantTournaments";
 
   if (!tournamentId)
     return new Response("tournamentId required", { status: 400 });
 
   const snap = await adminDb
-    .collection("valorantTournaments")
+    .collection(collectionName)
     .doc(tournamentId)
     .get();
   if (!snap.exists) return new Response("Not found", { status: 404 });
@@ -159,7 +161,7 @@ export async function GET(req: NextRequest) {
             width: S,
             height: S,
             background:
-              "linear-gradient(180deg, rgba(10,15,42,0.70) 0%, rgba(10,15,42,0.88) 60%, rgba(10,15,42,0.95) 100%)",
+              "linear-gradient(180deg, rgba(10,15,42,0.45) 0%, rgba(10,15,42,0.55) 60%, rgba(10,15,42,0.70) 100%)",
             display: "flex",
           }}
         />

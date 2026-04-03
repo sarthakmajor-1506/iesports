@@ -8,11 +8,13 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
+  MessageCircle, Camera,
   Coins, Target, Info, Zap, X,
 } from "lucide-react";
 
@@ -239,8 +241,10 @@ function DotaTournamentDetailInner() {
     const t = searchParams.get("tab") as Tab;
     return TABS.some(tab => tab.key === t) ? t : "overview";
   });
+  const [showShareCard, setShowShareCard] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("Link copied!");
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
@@ -524,6 +528,30 @@ function DotaTournamentDetailInner() {
         @keyframes dtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes dtspin { to { transform: rotate(360deg); } }
 
+        /* ── Share modal ── */
+        .dtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
+        .dtd-share-modal { background: #0a0e18; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; max-width: 528px; width: 100%; }
+        .dtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .dtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #E6E6E6; display: flex; align-items: center; gap: 10px; }
+        .dtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
+        .dtd-share-close:hover { background: rgba(59,130,246,0.12); color: #3B82F6; }
+        .vtd-share-carousel { position: relative; width: 100%; }
+        .vtd-share-carousel-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+        .vtd-share-carousel-btn { width: 36px; height: 36px; border-radius: 100px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8A8880; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+        .vtd-share-carousel-btn:hover { background: rgba(59,130,246,0.12); color: #3B82F6; }
+        .vtd-share-carousel-btn:disabled { opacity: 0.3; cursor: default; }
+        .vtd-share-carousel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #E6E6E6; }
+        .vtd-share-carousel-dots { display: flex; gap: 5px; }
+        .vtd-share-carousel-dot { width: 6px; height: 6px; border-radius: 100px; background: rgba(255,255,255,0.15); transition: all 0.2s; }
+        .vtd-share-carousel-dot.active { background: #3B82F6; width: 16px; }
+        .vtd-share-carousel-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .vtd-share-img-btn { padding: 10px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; flex: 1; }
+        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #3B82F6, #2563EB); color: #fff; }
+        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(59,130,246,0.35); }
+        .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
+        .vtd-share-img-btn.cp:hover { background: rgba(59,130,246,0.10); color: #3B82F6; }
+
         /* ── Responsive ── */
         @media (max-width: 1100px) { .dtd-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 900px) { .dtd-teams-grid { grid-template-columns: repeat(2, 1fr); } .dtd-tier-columns { flex-wrap: wrap; } .dtd-tier-col { min-width: calc(50% - 8px); flex: 0 0 calc(50% - 8px); } }
@@ -555,6 +583,7 @@ function DotaTournamentDetailInner() {
           .dtd-card { padding: 16px; border-radius: 14px; }
           .dtd-stat-tile { padding: 14px 10px; border-radius: 12px; }
           .dtd-stat-tile-val { font-size: 1.15rem; }
+          .dtd-share-modal { padding: 20px; border-radius: 16px; }
         }
         @media (max-width: 400px) {
           .dtd-hero-content { padding: 0 12px 20px; min-height: 300px; }
@@ -614,7 +643,7 @@ function DotaTournamentDetailInner() {
                     style={{ padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
                   >Leaderboard</button>
                 )}
-                <button className="dtd-hero-share-btn" onClick={() => { navigator.clipboard.writeText(window.location.href); setToastMsg("Link copied!"); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }} title="Share tournament">
+                <button className="dtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
                 </button>
               </div>
@@ -1001,6 +1030,47 @@ function DotaTournamentDetailInner() {
 
       {showToast && (
         <div className="dtd-toast"><CheckCheck size={16} /> {toastMsg}</div>
+      )}
+
+      {/* ═══ SHARE CARD MODAL ═══ */}
+      {showShareCard && (
+        <div className="dtd-share-overlay" onClick={e => { if (e.target === e.currentTarget) setShowShareCard(false); }}>
+          <div className="dtd-share-modal">
+            <div className="dtd-share-modal-head">
+              <div className="dtd-share-modal-title"><Share2 size={18} /> Share Tournament</div>
+              <button className="dtd-share-close" onClick={() => setShowShareCard(false)}><X size={16} /></button>
+            </div>
+            <p style={{ fontSize: "0.75rem", color: "#555550", marginBottom: 16, marginTop: -8 }}>
+              6 animated share slides for Instagram, Stories & WhatsApp. Download as image or record as video!
+            </p>
+
+            {/* Animated Remotion Carousel */}
+            <ShareVideoCarousel
+              tournament={tournament}
+              tournamentId={id as string}
+              game="dota2"
+              onToast={() => { setToastMsg("Copied!"); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}
+            />
+
+            {/* Social links + bottom */}
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — Dota 2 Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+" Entry"}\n\nRegister: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <MessageCircle size={15} /> WhatsApp
+              </a>
+              <a href="https://www.instagram.com/iesports.in/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(225,48,108,0.1)", border: "1px solid rgba(225,48,108,0.3)", color: "#E1306C", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Camera size={15} /> Instagram
+              </a>
+              <button style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#8A8880", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => { navigator.clipboard.writeText(window.location.href); setToastMsg("Link copied!"); setShowToast(true); setTimeout(() => setShowToast(false), 2000); }}>
+                <Copy size={15} /> Copy Link
+              </button>
+            </div>
+            <div style={{ marginTop: 8, fontSize: "0.65rem", color: "#555550", textAlign: "center" }}>1080x1080px animated slides — optimised for Instagram posts, Stories, and WhatsApp status</div>
+
+            {/* Hidden ref for legacy html2canvas compat */}
+            <div ref={shareCardRef} style={{ display: "none" }} />
+          </div>
+        </div>
       )}
     </>
   );
