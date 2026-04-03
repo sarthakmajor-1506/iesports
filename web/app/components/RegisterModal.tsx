@@ -1,10 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  linkWithCredential,
+  ConfirmationResult,
+} from "firebase/auth";
+
+const COUNTRIES = [
+  { flag: "\u{1F1EE}\u{1F1F3}", code: "+91" },
+  { flag: "\u{1F1FA}\u{1F1F8}", code: "+1" },
+  { flag: "\u{1F1EC}\u{1F1E7}", code: "+44" },
+  { flag: "\u{1F1E6}\u{1F1EA}", code: "+971" },
+  { flag: "\u{1F1F8}\u{1F1EC}", code: "+65" },
+  { flag: "\u{1F1E6}\u{1F1FA}", code: "+61" },
+];
 
 type Props = {
   tournament: any;
@@ -30,6 +46,100 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [fullNameSaved, setFullNameSaved] = useState(!!userProfile?.fullName);
   const router = useRouter();
 
+  // ── Phone OTP state ──────────────────────────────────────────────────────
+  const [showPhoneOtp, setShowPhoneOtp] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<"phone" | "otp">("phone");
+  const [phoneNum, setPhoneNum] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [verificationId, setVerificationId] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
+  const [phoneDone, setPhoneDone] = useState(false);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearRecaptcha = () => {
+    try { recaptchaRef.current?.clear(); } catch {}
+    recaptchaRef.current = null;
+    const el = document.getElementById("reg-recaptcha");
+    if (el) el.innerHTML = "";
+  };
+
+  useEffect(() => {
+    return () => { clearRecaptcha(); if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  const startTimer = () => {
+    setResendTimer(30);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setResendTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; });
+    }, 1000);
+  };
+
+  const sendOtp = async () => {
+    const digits = phoneNum.replace(/\D/g, "");
+    if (digits.length < 8) { setPhoneError("Please enter a valid phone number."); return; }
+    try {
+      setPhoneLoading(true); setPhoneError("");
+      clearRecaptcha();
+      recaptchaRef.current = new RecaptchaVerifier(auth, "reg-recaptcha", {
+        size: "invisible", callback: () => {}, "expired-callback": () => { clearRecaptcha(); },
+      });
+      const result: ConfirmationResult = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
+      setVerificationId(result.verificationId);
+      setPhoneStep("otp"); startTimer();
+      setTimeout(() => otpRefs.current[0]?.focus(), 150);
+    } catch (e: any) {
+      clearRecaptcha();
+      setPhoneError(e.message || "Error sending OTP. Please try again.");
+    } finally { setPhoneLoading(false); }
+  };
+
+  const verifyOtpStr = async (code: string) => {
+    if (code.length < 6) { setPhoneError("Please enter the 6-digit OTP."); return; }
+    if (!verificationId) { setPhoneError("Session expired. Go back and try again."); return; }
+    if (!user) { setPhoneError("Not logged in. Please refresh."); return; }
+    try {
+      setPhoneLoading(true); setPhoneError("");
+      const credential = PhoneAuthProvider.credential(verificationId, code);
+      await linkWithCredential(user, credential);
+      await updateDoc(doc(db, "users", user.uid), { phone: `${countryCode}${phoneNum.replace(/\D/g, "")}` });
+      setPhoneDone(true);
+      setShowPhoneOtp(false);
+      clearRecaptcha();
+    } catch (e: any) {
+      if (e.code === "auth/invalid-verification-code") setPhoneError("Invalid OTP. Please try again.");
+      else if (e.code === "auth/code-expired") setPhoneError("OTP expired. Go back and request a new one.");
+      else if (e.code === "auth/provider-already-linked") setPhoneError("A phone is already linked to this account.");
+      else if (e.code === "auth/credential-already-in-use") setPhoneError("This number belongs to another account.");
+      else setPhoneError(e.message || "Verification failed. Please try again.");
+    } finally { setPhoneLoading(false); }
+  };
+
+  const handleOtpChange = (i: number, val: string) => {
+    const d = val.replace(/\D/g, "").slice(-1);
+    const n = [...otp]; n[i] = d; setOtp(n);
+    if (d && i < 5) otpRefs.current[i + 1]?.focus();
+    if (n.every(x => x) && d) setTimeout(() => verifyOtpStr(n.join("")), 100);
+  };
+
+  const handleOtpKeyDown = (i: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus();
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (p.length === 6) {
+      setOtp(p.split("")); e.preventDefault();
+      setTimeout(() => { otpRefs.current[5]?.focus(); verifyOtpStr(p); }, 50);
+    }
+  };
+
   const isValorant = game === "valorant";
   const isShuffle = isValorant && tournament?.format === "shuffle";
   const accentColor = isValorant ? "#3CCBFF" : "#f97316";
@@ -42,7 +152,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const hasRiot = riotStatus === "verified";
   const riotPending = riotStatus === "pending";
   const hasDiscord = !!userProfile?.discordId || !!user?.discordId || !!dotaProfile?.discordId;
-  const hasPhone = !!userProfile?.phone || !!user?.phoneNumber;
+  const hasPhone = !!userProfile?.phone || !!user?.phoneNumber || phoneDone;
   const hasFullName = fullNameSaved && fullName.trim().length >= 2;
 
   // Keep fullName in sync if userProfile loads after mount
@@ -93,8 +203,8 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     id: "phone",
     label: "Phone Number",
     met: hasPhone,
-    actionLabel: "Log in with phone",
-    action: () => router.push("/"),
+    actionLabel: "Connect Phone Number",
+    action: () => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); },
   });
 
   // Game-specific account
@@ -191,7 +301,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         {/* ═══════ CONNECT STEP — shows when any requirements are missing ═══════ */}
         {actualStep === "connect" && (
           <div>
-            <div style={{
+            {!showPhoneOtp && <div style={{
               background: "#1a0808", border: "1px solid #7f1d1d", borderRadius: 10,
               padding: "14px 16px", marginBottom: 20,
             }}>
@@ -202,12 +312,94 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               <p style={{ fontSize: 12, color: "#991b1b", lineHeight: 1.6 }}>
                 All fields below are mandatory to register for this tournament.
               </p>
-            </div>
+            </div>}
 
             <style>{`@keyframes reg-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
 
+            <div id="reg-recaptcha" />
+
+            {/* ── Inline Phone OTP Flow ── */}
+            {showPhoneOtp && (
+              <div style={{ marginBottom: 16 }}>
+                {phoneStep === "phone" && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <p style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>Connect Phone Number</p>
+                      <button onClick={() => setShowPhoneOtp(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                    </div>
+                    <p style={{ fontSize: 12, color: "#888", marginBottom: 14, lineHeight: 1.5 }}>We'll send a 6-digit OTP to verify your number.</p>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      <select value={countryCode} onChange={e => setCountryCode(e.target.value)} style={{
+                        flex: "0 0 88px", padding: "10px 6px", border: "1.5px solid #333", borderRadius: 8,
+                        fontSize: 13, background: "#111", color: "#fff", fontFamily: "inherit",
+                      }}>
+                        {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                      </select>
+                      <input ref={phoneRef} type="tel" inputMode="numeric" placeholder="9876543210"
+                        value={phoneNum} onChange={e => setPhoneNum(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        onKeyDown={e => { if (e.key === "Enter") sendOtp(); }} maxLength={10}
+                        style={{
+                          flex: 1, padding: "10px 14px", border: "1.5px solid #333", borderRadius: 8,
+                          fontSize: 14, background: "#111", color: "#fff", outline: "none",
+                        }}
+                      />
+                    </div>
+                    {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
+                    <button onClick={sendOtp} disabled={phoneLoading} style={{
+                      width: "100%", padding: 12, background: phoneLoading ? "#333" : "#3B82F6",
+                      border: "none", borderRadius: 100, color: "#fff", fontWeight: 700, fontSize: 14,
+                      cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
+                    }}>
+                      {phoneLoading ? "Sending OTP..." : "Send OTP →"}
+                    </button>
+                  </>
+                )}
+                {phoneStep === "otp" && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <button onClick={() => { setPhoneStep("phone"); setPhoneError(""); setOtp(["","","","","",""]); clearRecaptcha(); setVerificationId(""); }} style={{ background: "none", border: "none", color: "#3B82F6", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>← Back</button>
+                      <button onClick={() => setShowPhoneOtp(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                    </div>
+                    <p style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Enter OTP</p>
+                    <p style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>6-digit code sent to {countryCode} {phoneNum}</p>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "space-between", marginBottom: 8 }} onPaste={handleOtpPaste}>
+                      {otp.map((digit, i) => (
+                        <input key={i} ref={el => { otpRefs.current[i] = el; }}
+                          type="tel" inputMode="numeric" maxLength={1} value={digit}
+                          onChange={e => handleOtpChange(i, e.target.value)}
+                          onKeyDown={e => handleOtpKeyDown(i, e)}
+                          style={{
+                            width: 44, height: 50, textAlign: "center" as const, border: "1.5px solid #333",
+                            borderRadius: 8, fontSize: 20, fontWeight: 700, fontFamily: "inherit",
+                            background: "#111", color: "#fff", outline: "none",
+                          }}
+                          onFocus={e => { e.currentTarget.style.borderColor = "#3B82F6"; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = "#333"; }}
+                        />
+                      ))}
+                    </div>
+                    {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
+                    <button onClick={() => verifyOtpStr(otp.join(""))} disabled={phoneLoading} style={{
+                      width: "100%", padding: 12, background: phoneLoading ? "#333" : "#3B82F6",
+                      border: "none", borderRadius: 100, color: "#fff", fontWeight: 700, fontSize: 14,
+                      cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit", marginTop: 4,
+                    }}>
+                      {phoneLoading ? "Verifying..." : "Verify & Link"}
+                    </button>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                      <button disabled={resendTimer > 0} onClick={() => { setOtp(["","","","","",""]); setPhoneError(""); clearRecaptcha(); setVerificationId(""); sendOtp(); }} style={{
+                        background: "none", border: "none", color: resendTimer > 0 ? "#555" : "#3B82F6",
+                        fontSize: 12, fontWeight: 600, cursor: resendTimer > 0 ? "default" : "pointer", fontFamily: "inherit",
+                      }}>Resend OTP</button>
+                      {resendTimer > 0 && <span style={{ fontSize: 12, color: "#555" }}>Resend in {resendTimer}s</span>}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Full Name Input */}
-            <div style={{ marginBottom: 14 }}>
+            {!showPhoneOtp && <div style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: hasFullName ? "#166534" : "#555", marginBottom: 6, textTransform: "uppercase" as const }}>
                 {hasFullName ? "✓ " : ""}Full Name {!hasFullName && <span style={{ color: "#dc2626", fontSize: 9 }}>REQUIRED</span>}
               </p>
@@ -238,10 +430,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               {fullName.trim().length > 0 && fullName.trim().length < 2 && (
                 <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Name must be at least 2 characters</p>
               )}
-            </div>
+            </div>}
 
             {/* Connection Requirements */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            {!showPhoneOtp && <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {requirements.filter(r => r.id !== "fullName").map(req => {
                 if (req.met) {
                   // Connected — green badge
@@ -314,12 +506,12 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   </button>
                 );
               })}
-            </div>
+            </div>}
 
-            {error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+            {!showPhoneOtp && error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
             {/* Continue button — only when ALL requirements met */}
-            {allRequirementsMet && (
+            {!showPhoneOtp && allRequirementsMet && (
               <button onClick={() => setStep(isShuffle ? "solo" : "choose")} style={{
                 width: "100%", padding: 14,
                 background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
@@ -331,7 +523,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             )}
 
             {/* Summary of what's still missing */}
-            {!allRequirementsMet && unmetRequirements.length > 0 && (
+            {!showPhoneOtp && !allRequirementsMet && unmetRequirements.length > 0 && (
               <p style={{ fontSize: 11, color: "#555", textAlign: "center", marginTop: 8 }}>
                 {unmetRequirements.length} requirement{unmetRequirements.length > 1 ? "s" : ""} remaining
               </p>
