@@ -30,7 +30,7 @@ interface UserProfile {
   riotRank?: string; riotTier?: number; riotPuuid?: string; riotVerified?: string;
   discordUsername?: string; discordId?: string;
   steamName?: string; steamId?: string; steamAvatar?: string;
-  phone?: string; upiId?: string;
+  phone?: string; upiId?: string; displayName?: string;
 }
 
 interface MatchHistoryItem {
@@ -62,6 +62,12 @@ export default function PlayerProfile() {
   const [upiSaving, setUpiSaving] = useState(false);
   const [upiSaved, setUpiSaved] = useState(false);
 
+  // Display name state
+  const [nameInput, setNameInput] = useState("");
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
+
   useEffect(() => {
     if (!uid) return;
     const load = async () => {
@@ -80,6 +86,7 @@ export default function PlayerProfile() {
           discordUsername: d.discordUsername, discordId: d.discordId,
           steamName: d.steamName, steamId: d.steamId, steamAvatar: d.steamAvatar,
           phone: d.phone, upiId: undefined, // loaded separately for owner only
+          displayName: d.displayName,
         });
 
         // Load private owner-only fields via client SDK
@@ -89,6 +96,7 @@ export default function PlayerProfile() {
             const od = ownerDoc.data();
             setProfile(prev => prev ? { ...prev, phone: od.phone || null, upiId: od.upiId || null } : prev);
             if (od.upiId) setUpiInput(od.upiId);
+            if (od.displayName) setNameInput(od.displayName);
           }
         }
 
@@ -156,6 +164,17 @@ export default function PlayerProfile() {
     load();
   }, [uid, isOwnProfile]);
 
+  const saveName = async () => {
+    if (!user || !nameInput.trim()) return;
+    setNameSaving(true);
+    await updateDoc(doc(db, "users", user.uid), { displayName: nameInput.trim() });
+    setProfile(prev => prev ? { ...prev, displayName: nameInput.trim() } : prev);
+    setNameSaving(false);
+    setNameEditing(false);
+    setNameSaved(true);
+    setTimeout(() => setNameSaved(false), 2500);
+  };
+
   const saveUpi = async () => {
     if (!user || !upiInput.trim()) return;
     setUpiSaving(true);
@@ -165,7 +184,7 @@ export default function PlayerProfile() {
     setTimeout(() => setUpiSaved(false), 2500);
   };
 
-  const displayName = profile?.riotGameName || profile?.discordUsername || profile?.steamName || "Unknown";
+  const displayName = profile?.displayName || profile?.riotGameName || profile?.discordUsername || profile?.steamName || "Unknown";
   const displayTag = profile?.riotTagLine || "";
   const vStats = globalStats?.valorant;
   const totalGames = vStats?.matchesPlayed || 0;
@@ -204,7 +223,42 @@ export default function PlayerProfile() {
                 <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
               )}
               <div className="pp-header-info">
-                <h1 className="pp-name">{displayName}{displayTag && <span className="pp-tag">#{displayTag}</span>}</h1>
+                {nameEditing ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      placeholder="Enter your name"
+                      maxLength={30}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setNameEditing(false); }}
+                      style={{
+                        padding: "6px 12px", background: "#111", border: "1px solid #333",
+                        borderRadius: 8, color: "#fff", fontSize: "1.1rem", fontWeight: 800,
+                        outline: "none", width: 200, fontFamily: "inherit",
+                      }}
+                    />
+                    <button onClick={saveName} disabled={nameSaving} style={{
+                      padding: "6px 14px", background: "#3CCBFF", color: "#fff", border: "none",
+                      borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                    }}>{nameSaving ? "..." : "Save"}</button>
+                    <button onClick={() => setNameEditing(false)} style={{
+                      padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid #333",
+                      borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                    }}>Cancel</button>
+                  </div>
+                ) : (
+                  <h1 className="pp-name">
+                    {displayName}{displayTag && <span className="pp-tag">#{displayTag}</span>}
+                    {isOwnProfile && (
+                      <button onClick={() => { setNameInput(profile?.displayName || ""); setNameEditing(true); }} style={{
+                        background: "transparent", border: "none", color: "#555550", cursor: "pointer",
+                        fontSize: "0.7rem", marginLeft: 8, padding: "2px 6px", verticalAlign: "middle",
+                      }} title="Edit display name">✏️</button>
+                    )}
+                    {nameSaved && <span style={{ fontSize: "0.65rem", color: "#4ade80", marginLeft: 8, fontWeight: 600 }}>Saved!</span>}
+                  </h1>
+                )}
                 <div className="pp-rank">{profile.riotRank || "Unranked"}</div>
                 {isOwnProfile && (
                   <div style={{ fontSize: "0.62rem", color: "#555550", marginTop: 4, fontWeight: 700, letterSpacing: "0.06em" }}>

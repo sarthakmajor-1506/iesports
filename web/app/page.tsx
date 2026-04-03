@@ -205,7 +205,7 @@ export default function Home() {
         .ie-tourn-wrap { background:linear-gradient(135deg,#08090c 0%,#10121a 50%,#08090c 100%); border-radius:24px; padding:44px; display:flex; align-items:flex-start; gap:32px; box-shadow:0 16px 48px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.04); }
         .ie-tourn-left { flex:1; }
         .ie-tourn-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3); color:var(--accent-light); font-size:.68rem; font-weight:700; padding:4px 12px; border-radius:100px; margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em; }
-        .ie-tourn-badge.val { background:rgba(60,203,255,.15); border-color:rgba(60,203,255,.3); color:#3CCBFF; }
+        .ie-tourn-badge.val { background:rgba(255,70,85,.15); border-color:rgba(255,70,85,.3); color:#ff4655; }
         .ie-tourn-title { font-size:clamp(1.3rem,3.5vw,2rem); font-weight:900; color:#fff; line-height:1.1; margin-bottom:8px; }
         .ie-tourn-desc { font-size:.87rem; color:rgba(255,255,255,.42); line-height:1.6; margin-bottom:24px; max-width:480px; }
         .ie-tourn-meta { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
@@ -217,7 +217,7 @@ export default function Home() {
         .ie-slots-fill { height:100%; border-radius:3px; transition:width .6s; }
         .ie-btn-register { background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:15px 36px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:52px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; transition:opacity .2s; }
         .ie-btn-register:hover { opacity:.88; }
-        .ie-btn-register.val { background:linear-gradient(135deg,#3CCBFF,#2A9FCC); border-color:#3CCBFF; }
+        .ie-btn-register.val { background:linear-gradient(135deg,#ff4655,#cc2233); border-color:#ff4655; }
         .ie-tourn-detail-link { display:block; text-align:center; margin-top:10px; font-size:.82rem; color:rgba(255,255,255,.32); text-decoration:none; transition:color .2s; }
         .ie-tourn-detail-link:hover { color:rgba(255,255,255,.65); }
         .ie-tourn-grid { display:flex; flex-direction:column; gap:28px; }
@@ -260,7 +260,7 @@ export default function Home() {
             <SteamIcon size={22} />
             STEAM
           </button>
-          <button className="ie-btn-steam" onClick={() => setRiotModalOpen(true)} style={{ background: "linear-gradient(135deg, #3CCBFF, #2A9FCC)", borderColor: "#3CCBFF" }}>
+          <button className="ie-btn-steam" onClick={() => setRiotModalOpen(true)} style={{ background: "linear-gradient(135deg, #ff4655, #cc2233)", borderColor: "#ff4655" }}>
             <img src="/riot-games.png" alt="Riot" width={35} height={22} style={{ display: "block", borderRadius: 3 }} />
             RIOT
           </button>
@@ -294,7 +294,7 @@ export default function Home() {
               <SteamIcon size={20} />
               Sign in with Steam
             </button>
-            <button className="ie-btn-primary" onClick={() => setRiotModalOpen(true)} style={{ background: "linear-gradient(135deg, #3CCBFF, #2A9FCC)", borderColor: "#3CCBFF", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
+            <button className="ie-btn-primary" onClick={() => setRiotModalOpen(true)} style={{ background: "linear-gradient(135deg, #ff4655, #cc2233)", borderColor: "#ff4655", boxShadow: "0 4px 22px rgba(255,70,85,.4)" }}>
               <img src="/riot-games.png" alt="Riot" width={20} height={20} style={{ display: "block", borderRadius: 3 }} />
               Sign in with Riot
             </button>
@@ -438,7 +438,7 @@ export default function Home() {
               {featuredValTournament && (
                 <div className="ie-tourn-wrap">
                   <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#3CCBFF" }} /> Registration Open</div>
+                    <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#ff4655" }} /> Registration Open</div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
                     <div className="ie-tourn-desc">{featuredValTournament.desc}</div>
                     <div className="ie-tourn-meta">
@@ -453,10 +453,10 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="ie-tourn-right">
-                    <div className="ie-slots-num" style={{ color: "#3CCBFF" }}>{valSlotsLeft}</div>
+                    <div className="ie-slots-num" style={{ color: "#ff4655" }}>{valSlotsLeft}</div>
                     <div className="ie-slots-label">slots remaining</div>
                     <div className="ie-slots-bar">
-                      <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#3CCBFF" }} />
+                      <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
                     </div>
                     <button className="ie-btn-register val" onClick={() => setRiotModalOpen(true)}>
                       <img src="/riot-games.png" alt="Riot" width={18} height={18} style={{ display: "block", borderRadius: 3 }} />

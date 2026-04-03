@@ -12,6 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
     const d = userDoc.data()!;
     return NextResponse.json({
       uid,
+      displayName: d.displayName || null,
       riotGameName: d.riotGameName || null,
       riotTagLine: d.riotTagLine || null,
       riotAvatar: d.riotAvatar || null,

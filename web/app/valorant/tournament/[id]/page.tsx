@@ -279,6 +279,7 @@ function ValorantTournamentDetailInner() {
   const [toastMsg, setToastMsg] = useState("Link copied!");
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
@@ -304,6 +305,25 @@ function ValorantTournamentDetailInner() {
   useEffect(() => { if (!tournament) return; const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline)); tick(); const i = setInterval(tick, 60000); return () => clearInterval(i); }, [tournament]);
 
   const getUserTeam = () => { if (!user) return null; return teams.find((t: any) => (t.members || []).some((m: any) => m.uid === user.uid)); };
+
+  const handleUnregister = async () => {
+    if (!user || !id) return;
+    if (!confirm("Are you sure you want to unregister from this tournament?")) return;
+    setUnregLoading(true);
+    try {
+      const res = await fetch("/api/valorant/unregister", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+    } catch (e: any) {
+      alert(e.message || "Failed to unregister");
+    } finally {
+      setUnregLoading(false);
+    }
+  };
 
   const handleUpdateTeamName = async (teamId: string) => {
     if (!newTeamName.trim() || newTeamName.trim().length < 2) { setTeamNameError("Team name must be at least 2 characters"); return; }
@@ -761,7 +781,23 @@ function ValorantTournamentDetailInner() {
               )}
               <div className="vtd-hero-actions">
                 {canRegister && <button className="vtd-reg-btn" onClick={() => setShowRegister(true)}>Register Now →</button>}
-                {isRegistered && <div className="vtd-reg-done">✓ You're Registered</div>}
+                {isRegistered && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="vtd-reg-done">✓ Registered</div>
+                    {!regClosed && !tournament?.bracketsComputed && tournament?.status === "upcoming" && (
+                      <button
+                        onClick={handleUnregister}
+                        disabled={unregLoading}
+                        style={{
+                          padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#f87171",
+                          border: "1px solid rgba(239,68,68,0.3)", borderRadius: 100, fontSize: "0.82rem",
+                          fontWeight: 700, cursor: unregLoading ? "default" : "pointer", fontFamily: "inherit",
+                          transition: "all 0.15s", opacity: unregLoading ? 0.6 : 1,
+                        }}
+                      >{unregLoading ? "Withdrawing..." : "Withdraw"}</button>
+                    )}
+                  </div>
+                )}
                 {!isRegOpen && !isRegistered && (
                   <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
                     Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
@@ -967,29 +1003,29 @@ function ValorantTournamentDetailInner() {
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
                 ) : (() => {
+                  const tierMap: Record<number, number> = { 5: 1, 4: 1, 3: 2, 2: 3, 1: 4 };
                   const tierColors: Record<number, { bg: string; border: string; text: string }> = {
-                    5: { bg: "rgba(255,197,61,0.10)", border: "rgba(255,197,61,0.30)", text: "#FFC53D" },
-                    4: { bg: "rgba(184,77,255,0.10)", border: "rgba(184,77,255,0.30)", text: "#B84DFF" },
-                    3: { bg: "rgba(60,203,255,0.10)", border: "rgba(60,203,255,0.30)", text: "#3CCBFF" },
-                    2: { bg: "rgba(138,136,128,0.08)", border: "rgba(138,136,128,0.20)", text: "#8A8880" },
-                    1: { bg: "rgba(138,136,128,0.08)", border: "rgba(138,136,128,0.20)", text: "#8A8880" },
+                    1: { bg: "rgba(200,155,60,0.10)", border: "rgba(200,155,60,0.30)", text: "#C89B3C" },
+                    2: { bg: "rgba(79,163,255,0.10)", border: "rgba(79,163,255,0.30)", text: "#4FA3FF" },
+                    3: { bg: "rgba(59,255,125,0.10)", border: "rgba(59,255,125,0.30)", text: "#3BFF7D" },
+                    4: { bg: "rgba(160,32,45,0.10)", border: "rgba(160,32,45,0.30)", text: "#A0202D" },
                   };
                   const grouped: Record<number, any[]> = {};
                   players.forEach((p: any) => {
-                    const tier = p.skillLevel || 1;
+                    const tier = tierMap[p.skillLevel || 1] || 4;
                     if (!grouped[tier]) grouped[tier] = [];
                     grouped[tier].push(p);
                   });
-                  const sortedTiers = Object.keys(grouped).map(Number).sort((a, b) => b - a);
+                  const sortedTiers = Object.keys(grouped).map(Number).sort((a, b) => a - b);
                   return (
                     <div className="vtd-tier-columns">
                       {sortedTiers.map((tier) => {
-                        const colors = tierColors[tier] || tierColors[1];
+                        const colors = tierColors[tier] || tierColors[4];
                         const tierPlayers = grouped[tier];
                         return (
                           <div key={tier} className="vtd-tier-col">
                             <div className="vtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
-                              <span>Skill {tier}</span>
+                              <span>Tier {tier}</span>
                               <span className="vtd-tier-header-count">{tierPlayers.length}</span>
                             </div>
                             {tierPlayers.map((p: any) => (
@@ -1047,7 +1083,7 @@ function ValorantTournamentDetailInner() {
                           <div key={m.uid || i} className="vtd-team-box-member">
                             {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
                             <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}</div></div>
-                            <span className="vtd-team-box-member-skill">Skill {m.skillLevel}</span>
+                            <span className="vtd-team-box-member-skill" style={{ color: ({ 5: "#C89B3C", 4: "#C89B3C", 3: "#4FA3FF", 2: "#3BFF7D", 1: "#A0202D" } as Record<number, string>)[m.skillLevel || 1] || "#A0202D" }}>Tier {({ 5: 1, 4: 1, 3: 2, 2: 3, 1: 4 } as Record<number, number>)[m.skillLevel || 1] || 4}</span>
                           </div>
                         ))}
                       </div>
