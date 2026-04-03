@@ -1003,7 +1003,6 @@ function ValorantTournamentDetailInner() {
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
                 ) : (() => {
-                  const tierMap: Record<number, number> = { 5: 1, 4: 1, 3: 2, 2: 3, 1: 4 };
                   const tierColors: Record<number, { bg: string; border: string; text: string }> = {
                     1: { bg: "rgba(200,155,60,0.10)", border: "rgba(200,155,60,0.30)", text: "#C89B3C" },
                     2: { bg: "rgba(79,163,255,0.10)", border: "rgba(79,163,255,0.30)", text: "#4FA3FF" },
@@ -1012,7 +1011,7 @@ function ValorantTournamentDetailInner() {
                   };
                   const grouped: Record<number, any[]> = {};
                   players.forEach((p: any) => {
-                    const tier = tierMap[p.skillLevel || 1] || 4;
+                    const tier = (p.skillLevel >= 1 && p.skillLevel <= 4) ? p.skillLevel : 4;
                     if (!grouped[tier]) grouped[tier] = [];
                     grouped[tier].push(p);
                   });
@@ -1083,7 +1082,7 @@ function ValorantTournamentDetailInner() {
                           <div key={m.uid || i} className="vtd-team-box-member">
                             {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
                             <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}</div></div>
-                            <span className="vtd-team-box-member-skill" style={{ color: ({ 5: "#C89B3C", 4: "#C89B3C", 3: "#4FA3FF", 2: "#3BFF7D", 1: "#A0202D" } as Record<number, string>)[m.skillLevel || 1] || "#A0202D" }}>Tier {({ 5: 1, 4: 1, 3: 2, 2: 3, 1: 4 } as Record<number, number>)[m.skillLevel || 1] || 4}</span>
+                            <span className="vtd-team-box-member-skill" style={{ color: ({ 1: "#C89B3C", 2: "#4FA3FF", 3: "#3BFF7D", 4: "#A0202D" } as Record<number, string>)[m.skillLevel] || "#A0202D" }}>Tier {m.skillLevel || 4}</span>
                           </div>
                         ))}
                       </div>

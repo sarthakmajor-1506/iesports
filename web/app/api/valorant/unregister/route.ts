@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { recalcTiers } from "@/lib/recalcTiers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,6 +53,9 @@ export async function POST(req: NextRequest) {
     await userRef.update({
       registeredValorantTournaments: FieldValue.arrayRemove(tournamentId),
     });
+
+    // Recalculate tiers for remaining players
+    await recalcTiers(tournamentId);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

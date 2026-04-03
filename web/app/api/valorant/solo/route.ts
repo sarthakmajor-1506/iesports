@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { recalcTiers } from "@/lib/recalcTiers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,16 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
-    // ── Compute skill level from rank ──────────────────────────────────────
-    const riotRank = userData.riotRank || "";
-    const baseTier = riotRank.split(" ")[0];
-    const skillLevels: Record<string, number> = {
-      "Iron": 1, "Bronze": 1, "Silver": 1, "Gold": 1,
-      "Platinum": 2, "Diamond": 3, "Ascendant": 4, "Immortal": 5, "Radiant": 5,
-    };
-    const skillLevel = skillLevels[baseTier] ?? 1;
-
-    // ── Write to soloPlayers subcollection ──────────────────────────────────
+    // ── Write to soloPlayers subcollection (skillLevel set to 1 temporarily) ─
     await adminDb
       .collection("valorantTournaments")
       .doc(tournamentId)
@@ -73,7 +65,7 @@ export async function POST(req: NextRequest) {
         riotAvatar: userData.riotAvatar || "",
         riotRank: userData.riotRank || "",
         riotTier: userData.riotTier || 0,
-        skillLevel,
+        skillLevel: 1,
         bracket: null,
         registeredAt: new Date().toISOString(),
       });
@@ -88,9 +80,11 @@ export async function POST(req: NextRequest) {
       registeredValorantTournaments: FieldValue.arrayUnion(tournamentId),
     });
 
+    // ── Recalculate tiers for all players based on quantiles ──────────────
+    await recalcTiers(tournamentId);
+
     return NextResponse.json({
       success: true,
-      skillLevel,
       riotVerified,
       warning: riotVerified === "pending"
         ? "Your Riot ID is pending verification. Registration accepted but may require verification before tournament starts."
