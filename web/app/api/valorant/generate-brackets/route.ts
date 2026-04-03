@@ -92,7 +92,11 @@ export async function POST(req: NextRequest) {
     // ── Parse timing ─────────────────────────────────────────────────────────
     const [startHour, startMin] = (startTime || "18:00").split(":").map(Number);
     const baseDate = startDate || new Date().toISOString().split("T")[0];
-    const MATCH_SPACING_MS = 90 * 60 * 1000;
+    const tData = tDoc.data()!;
+    const bracketBO = tData.bracketBestOf || 2;
+    const grandFinalBO = tData.grandFinalBestOf || 3;
+    const GAME_SPACING_MS = 60 * 60 * 1000; // 1 hour between each game
+    const MATCH_SPACING_MS = bracketBO * GAME_SPACING_MS; // match spacing = BO × 1 hour
 
     // Calculate the next matchDay after group stage
     const allMatches = await tournamentRef.collection("matches").get();
@@ -116,6 +120,7 @@ export async function POST(req: NextRequest) {
       timeOffset: number,
       t1: TeamSeed,
       t2: TeamSeed,
+      numGames: number = bracketBO,
     ) => {
       const roundDate = new Date(`${baseDate}T${String(startHour).padStart(2, "0")}:${String(startMin).padStart(2, "0")}:00+05:30`);
       roundDate.setDate(roundDate.getDate() + (day - nextDay));
@@ -141,9 +146,12 @@ export async function POST(req: NextRequest) {
           team2Score: 0,
           status: t1.teamId === "BYE" || t2.teamId === "BYE" ? "bye" : "pending",
           scheduledTime,
-          games: {
-            game1: { status: "pending", scheduledTime, winner: null, valorantMatchId: null, mapName: null, playerStats: null },
-          },
+          games: Object.fromEntries(
+            Array.from({ length: numGames }, (_, g) => [
+              `game${g + 1}`,
+              { status: "pending", scheduledTime: new Date(new Date(scheduledTime).getTime() + g * GAME_SPACING_MS).toISOString(), winner: null, valorantMatchId: null, mapName: null, playerStats: null },
+            ])
+          ),
           winnerGoesTo: null,
           loserGoesTo: null,
           createdAt: new Date().toISOString(),
@@ -158,7 +166,7 @@ export async function POST(req: NextRequest) {
       bracketSize = 2;
       bracketMatches.push(makeMatchData(
         "grand-final", "Grand Final", "grand_final", 1, nextDay, 0,
-        seededTeams[0], seededTeams[1],
+        seededTeams[0], seededTeams[1], grandFinalBO,
       ));
 
     } else if (numAdvancing === 3) {
@@ -186,7 +194,7 @@ export async function POST(req: NextRequest) {
       // Day 3: Grand Final
       bracketMatches.push(makeMatchData(
         "grand-final", "Grand Final", "grand_final", 1, nextDay + 2, 0,
-        TBD, TBD,
+        TBD, TBD, grandFinalBO,
       ));
 
     } else if (numAdvancing === 4) {
@@ -223,7 +231,7 @@ export async function POST(req: NextRequest) {
       // Day 3: Grand Final (UB winner vs LB Final winner)
       bracketMatches.push(makeMatchData(
         "grand-final", "Grand Final", "grand_final", 1, nextDay + 2, 0,
-        TBD, TBD,
+        TBD, TBD, grandFinalBO,
       ));
 
       // Set routing
@@ -279,7 +287,7 @@ export async function POST(req: NextRequest) {
       bracketMatches.push(makeMatchData("lb-final", "Lower Bracket Final", "losers", 4, nextDay + 3, 0, TBD, TBD)); // [8]
 
       // Day 5: Grand Final
-      bracketMatches.push(makeMatchData("grand-final", "Grand Final", "grand_final", 1, nextDay + 4, 0, TBD, TBD)); // [9]
+      bracketMatches.push(makeMatchData("grand-final", "Grand Final", "grand_final", 1, nextDay + 4, 0, TBD, TBD, grandFinalBO)); // [9]
 
       // ── Set routing ────────────────────────────────────────────────────────
       // UB R1 winners → UB Final

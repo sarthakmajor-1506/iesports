@@ -81,9 +81,13 @@ export async function POST(req: NextRequest) {
     const [startHour, startMin] = (startTime || "18:00").split(":").map(Number);
     const baseDate = startDate || new Date().toISOString().split("T")[0];
 
+    const tData = tDoc.data()!;
+    const gamesPerMatch = tData.matchesPerRound || 2; // BO count from tournament settings
+    const GAME_SPACING_MS = 60 * 60 * 1000; // 1 hour between each game
+    const MATCH_SPACING_MS = gamesPerMatch * GAME_SPACING_MS; // match spacing = numGames × 1 hour
+
     const numTeams = teams.length;
     const matchesPerRound = Math.floor(numTeams / 2);
-    const MATCH_SPACING_MS = 90 * 60 * 1000; // 1.5 hours in ms
 
     // ── Generate Round 1: Random pairings ────────────────────────────────────
     const shuffled = [...teams].sort(() => Math.random() - 0.5);
@@ -125,10 +129,12 @@ export async function POST(req: NextRequest) {
             team2Score: 0,
             status: "pending",
             scheduledTime,
-            games: {
-              game1: { status: "pending", scheduledTime, winner: null, valorantMatchId: null, mapName: null, playerStats: null },
-              game2: { status: "pending", scheduledTime: new Date(new Date(scheduledTime).getTime() + 40 * 60 * 1000).toISOString(), winner: null, valorantMatchId: null, mapName: null, playerStats: null },
-            },
+            games: Object.fromEntries(
+              Array.from({ length: gamesPerMatch }, (_, g) => [
+                `game${g + 1}`,
+                { status: "pending", scheduledTime: new Date(new Date(scheduledTime).getTime() + g * GAME_SPACING_MS).toISOString(), winner: null, valorantMatchId: null, mapName: null, playerStats: null },
+              ])
+            ),
             createdAt: new Date().toISOString(),
           };
 
@@ -156,10 +162,12 @@ export async function POST(req: NextRequest) {
             status: "pending",
             isTBD: true, // flag to know this needs resolving
             scheduledTime,
-            games: {
-              game1: { status: "pending", scheduledTime, winner: null, valorantMatchId: null, mapName: null, playerStats: null },
-              game2: { status: "pending", scheduledTime: new Date(new Date(scheduledTime).getTime() + 40 * 60 * 1000).toISOString(), winner: null, valorantMatchId: null, mapName: null, playerStats: null },
-            },
+            games: Object.fromEntries(
+              Array.from({ length: gamesPerMatch }, (_, g) => [
+                `game${g + 1}`,
+                { status: "pending", scheduledTime: new Date(new Date(scheduledTime).getTime() + g * GAME_SPACING_MS).toISOString(), winner: null, valorantMatchId: null, mapName: null, playerStats: null },
+              ])
+            ),
             createdAt: new Date().toISOString(),
           };
 
