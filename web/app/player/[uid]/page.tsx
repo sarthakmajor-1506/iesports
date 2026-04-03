@@ -470,14 +470,14 @@ const baseStyles = `
   .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
   .pp-header-left { display: flex; align-items: center; gap: 16px; }
   .pp-avatar { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; border: 2px solid #2A2A30; }
-  .pp-avatar-init { width: 72px; height: 72px; border-radius: 14px; background: linear-gradient(135deg, #ff4655 0%, #c62c3a 100%); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; }
+  .pp-avatar-init { width: 72px; height: 72px; border-radius: 14px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; }
   .pp-name { font-size: 1.5rem; font-weight: 900; color: #F0EEEA; margin: 0; }
   .pp-tag { color: #555550; font-weight: 400; font-size: 1.1rem; }
-  .pp-rank { font-size: 0.82rem; color: #ff4655; font-weight: 700; margin-top: 2px; }
+  .pp-rank { font-size: 0.82rem; color: #3CCBFF; font-weight: 700; margin-top: 2px; }
 
   .pp-stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
   .pp-stat-card { background: #121215; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px 16px; text-align: center; }
-  .pp-stat-primary { border-color: #ff4655; background: rgba(255,70,85,0.06); }
+  .pp-stat-primary { border-color: #3CCBFF; background: rgba(60,203,255,0.06); }
   .pp-stat-value { font-size: 1.6rem; font-weight: 900; color: #F0EEEA; }
   .pp-stat-green { color: #4ade80; }
   .pp-stat-red { color: #f87171; }
@@ -485,7 +485,7 @@ const baseStyles = `
 
   .pp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #2A2A30; margin-bottom: 24px; }
   .pp-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #555550; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
-  .pp-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
+  .pp-tab.active { color: #3CCBFF; border-bottom-color: #3CCBFF; }
   .pp-tab-private { margin-left: auto; }
   .pp-tab-private.active { color: #60a5fa; border-bottom-color: #60a5fa; }
 
@@ -510,12 +510,12 @@ const baseStyles = `
   .pp-match-header:hover { background: #18181C; }
   .pp-match-meta { display: flex; flex-direction: column; min-width: 120px; }
   .pp-match-tournament { font-size: 0.62rem; font-weight: 700; color: #555550; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
-  .pp-match-round { font-size: 0.72rem; font-weight: 800; color: #ff4655; }
+  .pp-match-round { font-size: 0.72rem; font-weight: 800; color: #3CCBFF; }
   .pp-match-teams { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; }
   .pp-match-team { font-size: 0.82rem; font-weight: 700; color: #e0e0da; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pp-match-score { font-size: 0.92rem; font-weight: 900; color: #F0EEEA; min-width: 50px; text-align: center; }
   .pp-match-expand { font-size: 10px; color: #3a3a42; transition: transform 0.2s; }
-  .pp-match-expand.open { transform: rotate(180deg); color: #ff4655; }
+  .pp-match-expand.open { transform: rotate(180deg); color: #3CCBFF; }
 
   .pp-match-detail { padding: 0 16px 12px; }
   .pp-game-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; }

@@ -1350,7 +1350,7 @@ function ScheduleSlide({
   const events = [
     { lbl: "Registration Opens", date: schedule.registrationOpens, color: C.sage, n: "1" },
     { lbl: "Registration Closes", date: schedule.registrationCloses || t.registrationDeadline, color: C.amber, n: "2" },
-    { lbl: "Squad Creation", date: schedule.squadCreation, color: C.lavender, n: "3" },
+    { lbl: "Team Formation", date: schedule.squadCreation, color: C.lavender, n: "3" },
     { lbl: "Group Stage Starts", date: schedule.groupStageStart || t.startDate, color: C.steel, n: "4" },
     { lbl: "Play-off Stage", date: schedule.tourneyStageStart, color: C.amber, n: "5" },
     { lbl: "Tournament Ends", date: t.endDate, color: C.rose, n: "6" },

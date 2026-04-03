@@ -251,7 +251,7 @@ export default function ShareVideoCarousel({
           >
             <Loader2
               size={28}
-              style={{ color: "#ff4655", animation: "spin 1s linear infinite" }}
+              style={{ color: "#3CCBFF", animation: "spin 1s linear infinite" }}
             />
             <div style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>
               {recordProgress < 85 ? "Capturing frames..." : "Encoding video..."}
@@ -271,7 +271,7 @@ export default function ShareVideoCarousel({
                   width: `${recordProgress}%`,
                   height: "100%",
                   borderRadius: 2,
-                  background: "linear-gradient(90deg, #ff4655, #8b5cf6)",
+                  background: "linear-gradient(90deg, #3CCBFF, #8b5cf6)",
                   transition: "width 0.3s ease",
                 }}
               />

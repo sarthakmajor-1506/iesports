@@ -555,7 +555,7 @@ export default function AdminPanel() {
               style={{ width: "100%", padding: 12, border: "1.5px solid #2a2a2e", borderRadius: 10, fontSize: "0.95rem", marginBottom: 12, outline: "none", boxSizing: "border-box", background: "#1a1a1e", color: "#e0e0e0" }}
             />
             <button onClick={() => { if (adminKey) setAuthenticated(true); }}
-              style={{ width: "100%", padding: 12, background: "#ff4655", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer" }}>
+              style={{ width: "100%", padding: 12, background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer" }}>
               Authenticate →
             </button>
           </div>
@@ -570,7 +570,7 @@ export default function AdminPanel() {
   const sectionStyle: React.CSSProperties = { background: "#141416", border: "1px solid #2a2a2e", borderRadius: 14, padding: "20px 24px", marginBottom: 16 };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#666", marginBottom: 14 };
   const inputStyle: React.CSSProperties = { width: "100%", padding: 10, border: "1.5px solid #2a2a2e", borderRadius: 8, fontSize: "0.88rem", outline: "none", boxSizing: "border-box" as const, marginBottom: 8, background: "#1a1a1e", color: "#e0e0e0" };
-  const btnStyle: React.CSSProperties = { padding: "10px 20px", background: "#ff4655", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", opacity: loading ? 0.6 : 1 };
+  const btnStyle: React.CSSProperties = { padding: "10px 20px", background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", opacity: loading ? 0.6 : 1 };
   const btnSecondary: React.CSSProperties = { ...btnStyle, background: "#e0e0e0", color: "#111" };
   const btnWarning: React.CSSProperties = { ...btnStyle, background: "#f59e0b" };
   const btnDanger: React.CSSProperties = { ...btnStyle, background: "#dc2626" };
@@ -582,7 +582,7 @@ export default function AdminPanel() {
 
   const gameBadgeStyle = (game: string): React.CSSProperties => {
     const colors: Record<string, { bg: string; color: string; border: string }> = {
-      valorant: { bg: "#2a1215", color: "#ff4655", border: "#5c1f28" },
+      valorant: { bg: "#2a1215", color: "#3CCBFF", border: "#5c1f28" },
       dota2: { bg: "#2a1e0d", color: "#ea580c", border: "#5c3a14" },
       cs2: { bg: "#0d1a2a", color: "#3b82f6", border: "#1e3a5f" },
     };
@@ -601,7 +601,7 @@ export default function AdminPanel() {
         .adm-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #2a2a2e; margin-bottom: 20px; overflow-x: auto; }
         .adm-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #666; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; white-space: nowrap; }
         .adm-tab:hover { color: #aaa; }
-        .adm-tab.active { color: #ff4655; border-bottom-color: #ff4655; }
+        .adm-tab.active { color: #3CCBFF; border-bottom-color: #3CCBFF; }
         .adm-match-card { background: #1a1a1e; border: 1px solid #2a2a2e; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; font-size: 0.78rem; }
         .adm-match-day { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; color: #555; text-transform: uppercase; }
         .adm-match-teams { flex: 1; font-weight: 600; color: #ccc; }
@@ -696,7 +696,7 @@ export default function AdminPanel() {
                         { arrow: `→ ${advance} advance` },
                         { label: "Bracket", sub: `${bFormat} · BO${bBo}`, color: "#f59e0b" },
                         { arrow: "→ Finals" },
-                        { label: "Grand Final", sub: `BO${gfBo}`, color: "#ff4655" },
+                        { label: "Grand Final", sub: `BO${gfBo}`, color: "#3CCBFF" },
                       ].map((s: any, i: number) => s.arrow ? (
                         <div key={i} style={{ fontSize: "0.6rem", color: "#555", fontWeight: 700, padding: "0 4px" }}>{s.arrow}</div>
                       ) : (
@@ -737,7 +737,7 @@ export default function AdminPanel() {
                       }}>
                       Regenerate Preview Data
                     </button>
-                    <button disabled={loading} style={{ padding: "7px 14px", background: "#1a0505", border: "1px solid #ff465544", color: "#ff4655", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                    <button disabled={loading} style={{ padding: "7px 14px", background: "#1a0505", border: "1px solid #3CCBFF44", color: "#3CCBFF", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
                       onClick={async () => {
                         if (!confirm("This will delete ALL dummy (isDummy=true) teams, matches, and leaderboard entries. Continue?")) return;
                         setLoading(true);
@@ -999,7 +999,7 @@ export default function AdminPanel() {
                   {(() => {
                     const selMatch = matches.find(m => m.id === fetchMatchDocId);
                     const bo = getMatchBo(selMatch);
-                    const gameColors = ["#ff4655", "#60a5fa", "#4ade80", "#f59e0b", "#c084fc"];
+                    const gameColors = ["#3CCBFF", "#60a5fa", "#4ade80", "#f59e0b", "#c084fc"];
                     const gameBgs = ["#2a1215", "#0d1a2a", "#0d2a18", "#2a2008", "#1d0d2a"];
                     const gameBorders = ["#5c1f28", "#1e3a5f", "#1e5f3a", "#5f4e1e", "#3a1e5f"];
                     return (<>
@@ -1099,7 +1099,7 @@ export default function AdminPanel() {
                   <span style={labelStyle}>Group Stage Fixtures</span>
                   {matchDays.map(day => (
                     <div key={day} style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#ff4655", letterSpacing: "0.1em", marginBottom: 8 }}>
+                      <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3CCBFF", letterSpacing: "0.1em", marginBottom: 8 }}>
                         ROUND {day}
                       </div>
                       {groupMatches.filter(m => m.matchDay === day).map(m => (
@@ -1411,7 +1411,7 @@ export default function AdminPanel() {
                         style={{ ...inputStyle, background: "#111", color: "#555", cursor: "not-allowed" }} type="datetime-local" />
                     </div>
                     <div>
-                      <label style={{ ...smallLabel, color: "#22c55e" }}>Squad Creation</label>
+                      <label style={{ ...smallLabel, color: "#22c55e" }}>Team Formation</label>
                       <input value={createSquadCreation} onChange={e => setCreateSquadCreation(e.target.value)} style={inputStyle} type="datetime-local" />
                     </div>
                     <div>{/* Spacer */}</div>
@@ -1497,7 +1497,7 @@ export default function AdminPanel() {
                           Group Stage: <span style={{ color: "#60a5fa" }}>{createGroupRounds || 3} rounds</span> · BO<span style={{ color: "#60a5fa" }}>{createMatchesPerRound || 2}</span><br />
                           → Top <span style={{ color: "#f59e0b" }}>{createBracketTeamCount || "50%"}</span> teams advance<br />
                           Bracket: <span style={{ color: "#f59e0b" }}>{createBracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</span> · BO<span style={{ color: "#f59e0b" }}>{createBracketBestOf || 2}</span><br />
-                          Grand Final: BO<span style={{ color: "#ff4655" }}>{createGrandFinalBestOf || 3}</span>
+                          Grand Final: BO<span style={{ color: "#3CCBFF" }}>{createGrandFinalBestOf || 3}</span>
                         </div>
                       )}
                     </div>
@@ -1599,7 +1599,7 @@ export default function AdminPanel() {
                 {/* ── Auction-specific fields ── */}
                 {createGame === "valorant" && createFormat === "auction" && (
                   <div style={{ marginTop: 12, padding: 16, background: "#2a1215", borderRadius: 10, border: "1px solid #5c1f28" }}>
-                    <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#ff4655", display: "block", marginBottom: 10 }}>Auction Settings</span>
+                    <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#3CCBFF", display: "block", marginBottom: 10 }}>Auction Settings</span>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={smallLabel}>Max Teams</label>

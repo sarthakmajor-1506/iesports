@@ -36,18 +36,18 @@ export default function Valorant() {
         }
         .val-bg-grid {
           position: absolute; inset: 0;
-          background-image: linear-gradient(rgba(255,70,85,0.04) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(255,70,85,0.04) 1px, transparent 1px);
+          background-image: linear-gradient(rgba(60,203,255,0.04) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(60,203,255,0.04) 1px, transparent 1px);
           background-size: 64px 64px;
         }
         .val-bg-glow1 {
           position: absolute; width: 600px; height: 600px; top: -200px; right: -100px;
-          background: radial-gradient(circle, rgba(255,70,85,0.1) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(60,203,255,0.1) 0%, transparent 70%);
           animation: val-glow-drift1 12s ease-in-out infinite alternate;
         }
         .val-bg-glow2 {
           position: absolute; width: 500px; height: 500px; bottom: 20%; left: -150px;
-          background: radial-gradient(circle, rgba(255,70,85,0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(60,203,255,0.07) 0%, transparent 70%);
           animation: val-glow-drift2 15s ease-in-out infinite alternate;
         }
         @keyframes val-glow-drift1 {
@@ -91,7 +91,7 @@ export default function Valorant() {
         .val-hero-logo { width: 52px; height: 52px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; }
         .val-hero-text { flex: 1; }
         .val-hero-title { font-size: 2.4rem; font-weight: 900; color: #fff; letter-spacing: -0.03em; line-height: 1.1; }
-        .val-hero-title span { color: #ff4655; }
+        .val-hero-title span { color: #3CCBFF; }
         .val-hero-sub { font-size: 0.86rem; color: rgba(255,255,255,0.55); margin-top: 5px; font-weight: 500; }
 
         /* ── Riot ID banners ── */
@@ -110,7 +110,7 @@ export default function Valorant() {
         .val-banner-box.gray {
           background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7);
         }
-        .val-banner-link { color: #ff4655; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        .val-banner-link { color: #3CCBFF; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap; }
         .val-banner-link:hover { text-decoration: underline; }
 
         /* ── Tabs ── */
@@ -132,10 +132,10 @@ export default function Valorant() {
         }
         .val-tab:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
         .val-tab.active {
-          background: #ff4655; color: #fff;
-          box-shadow: 0 0 20px rgba(255,70,85,0.35);
+          background: #3CCBFF; color: #fff;
+          box-shadow: 0 0 20px rgba(60,203,255,0.35);
         }
-        .val-tab.active:hover { background: #e03a48; }
+        .val-tab.active:hover { background: #30B5E6; }
 
         /* ── Coming soon ── */
         .val-coming-soon {
@@ -190,7 +190,7 @@ export default function Valorant() {
             )}
             {!riotData?.riotLinked && (
               <div className="val-banner-box gray">
-                <Trophy size={14} style={{ color: "#ff4655", flexShrink: 0 }} />
+                <Trophy size={14} style={{ color: "#3CCBFF", flexShrink: 0 }} />
                 <span>Connect your Riot ID to register for tournaments.</span>
                 <span className="val-banner-link" onClick={() => router.push("/connect-riot")}>Connect now →</span>
               </div>

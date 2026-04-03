@@ -18,10 +18,10 @@ import { auth } from "@/lib/firebase";
 import Image from "next/image";
 
 const games = [
-  { id: "dota2",    name: "Dota 2",   path: "/dota2",    color: "#3B82F6", glow: "rgba(59,130,246,0.2)",  icon: "/dota2logo.png",    active: true  },
-  { id: "valorant", name: "Valorant", path: "/valorant", color: "#ff4655", glow: "rgba(255,70,85,0.2)",  icon: "/valorantlogo.png", active: true },
-  { id: "cs2",      name: "CS:Go",    path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/csgologo.png",     active: false },
-  { id: "cod",      name: "COD",      path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg",     active: false },
+  { id: "dota2",    name: "DOTA",             path: "/dota2",    color: "#3B82F6", glow: "rgba(59,130,246,0.2)",  icon: "/dota2logo.png",    active: true  },
+  { id: "valorant", name: "VALORANT",        path: "/valorant", color: "#3CCBFF", glow: "rgba(60,203,255,0.2)",  icon: "/valorantlogo.png", active: true },
+  { id: "cs2",      name: "COUNTER-STRIKE 2", path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/csgologo.png",     active: false },
+  { id: "cod",      name: "COD",              path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg",     active: false },
 ];
 
 const COUNTRIES = [
@@ -632,11 +632,11 @@ export default function Navbar() {
           {riotStatus === "verified" ? (
             <div className="ie-mobile-row">
               <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
-              <span style={{ flex: 1, fontWeight: 600, color: "#ff4655" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
+              <span style={{ flex: 1, fontWeight: 600, color: "#3CCBFF" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "rgba(255,70,85,0.3)", background: "rgba(255,70,85,0.06)", color: "#ff4655" }}>
+            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "rgba(60,203,255,0.3)", background: "rgba(60,203,255,0.06)", color: "#3CCBFF" }}>
               <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 3, opacity: 0.6 }} />
               Connect Riot ID
               <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>

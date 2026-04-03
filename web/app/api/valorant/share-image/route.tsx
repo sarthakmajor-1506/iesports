@@ -1247,7 +1247,7 @@ export async function GET(req: NextRequest) {
         n: "2",
       },
       {
-        lbl: "Squad Creation",
+        lbl: "Team Formation",
         date: schedule.squadCreation,
         color: CL.lavender,
         n: "3",

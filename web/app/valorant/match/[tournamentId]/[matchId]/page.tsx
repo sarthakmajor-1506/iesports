@@ -166,7 +166,7 @@ export default function MatchDetail() {
 
               {/* Team 1 Scoreboard */}
               <div className="md-team-section">
-                <div className="md-team-label" style={{ color: "#ff4655" }}>
+                <div className="md-team-label" style={{ color: "#3CCBFF" }}>
                   {match.team1Name}
                   {activeGameData.winner === "team1" && <span className="md-team-winner">WINNER</span>}
                 </div>
@@ -283,7 +283,7 @@ const styles = `
   .md-loading { text-align: center; padding: 80px 20px; color: #555550; }
 
   .md-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: #555550; margin-bottom: 20px; }
-  .md-breadcrumb-link { color: #ff4655; text-decoration: none; font-weight: 600; }
+  .md-breadcrumb-link { color: #3CCBFF; text-decoration: none; font-weight: 600; }
   .md-breadcrumb-link:hover { text-decoration: underline; }
   .md-breadcrumb-sep { color: #2A2A30; }
 
@@ -291,7 +291,7 @@ const styles = `
   .md-header-team { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 120px; }
   .md-header-team-left { align-items: flex-start; }
   .md-header-team-right { align-items: flex-end; }
-  .md-header-team-logo { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #ff4655, #c62c3a); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; }
+  .md-header-team-logo { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #3CCBFF, #2A9FCC); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; }
   .md-header-team-right .md-header-team-logo { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
   .md-header-team-name { font-size: 0.88rem; font-weight: 800; color: #e0e0da; text-align: center; max-width: 160px; }
   .md-header-center { text-align: center; }
@@ -306,7 +306,7 @@ const styles = `
 
   .md-game-tabs { display: flex; gap: 12px; margin-bottom: 20px; }
   .md-game-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; background: #121215; border: 1.5px solid #2A2A30; border-radius: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-  .md-game-tab.active { border-color: #ff4655; background: rgba(255,70,85,0.06); }
+  .md-game-tab.active { border-color: #3CCBFF; background: rgba(60,203,255,0.06); }
   .md-game-tab.done .md-game-tab-num::after { content: " ✓"; color: #4ade80; }
   .md-game-tab-num { font-size: 0.72rem; font-weight: 800; color: #e0e0da; text-transform: uppercase; letter-spacing: 0.08em; }
   .md-game-tab-info { font-size: 0.78rem; font-weight: 600; color: #8A8880; }
@@ -332,7 +332,7 @@ const styles = `
   .md-stats-cell { font-size: 0.82rem; color: #e0e0da; }
   .md-stats-player { font-weight: 700; }
   .md-player-link { color: #e0e0da; text-decoration: none; }
-  .md-player-link:hover { color: #ff4655; }
+  .md-player-link:hover { color: #3CCBFF; }
   .md-player-tag { color: #3a3a42; font-weight: 400; font-size: 0.72rem; }
   .md-stats-agent { font-size: 0.72rem; color: #8A8880; }
   .md-stats-k { color: #4ade80; font-weight: 700; }

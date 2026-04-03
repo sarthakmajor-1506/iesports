@@ -57,7 +57,7 @@ export default function ValorantTournaments() {
     <>
       <style>{`
         @keyframes vt-sk-pulse { 0%,100%{background-position:-200% 0} 50%{background-position:200% 0} }
-        .vt-sk { background: linear-gradient(90deg,rgba(255,70,85,0.04) 0%,rgba(255,70,85,0.1) 40%,rgba(255,70,85,0.04) 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:16px; }
+        .vt-sk { background: linear-gradient(90deg,rgba(60,203,255,0.04) 0%,rgba(60,203,255,0.1) 40%,rgba(60,203,255,0.04) 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:16px; }
       `}</style>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 30px 48px" }}>
         <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
@@ -80,7 +80,7 @@ export default function ValorantTournaments() {
         .vt-stats { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
         .vt-stat-pill { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 6px 16px; }
         .vt-stat-num { font-size: 1rem; font-weight: 800; color: #F0EEEA; }
-        .vt-stat-num.red { color: #ff4655; }
+        .vt-stat-num.red { color: #3CCBFF; }
         .vt-stat-num.green { color: #4ade80; }
         .vt-stat-num.blue { color: #60A5FA; }
         .vt-stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.45); font-weight: 500; }
@@ -94,7 +94,7 @@ export default function ValorantTournaments() {
           transition: all 0.25s ease; margin-bottom: 10px; backdrop-filter: blur(8px);
           animation: vt-card-up 0.35s ease both;
         }
-        .vt-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(255,70,85,0.15); border-color: rgba(255,70,85,0.3); }
+        .vt-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(60,203,255,0.15); border-color: rgba(60,203,255,0.3); }
         .vt-card.ended { opacity: 0.5; }
         .vt-card.registered { border-color: rgba(34,197,94,0.35); background: rgba(22,163,74,0.07); }
         .vt-card.registered:hover { box-shadow: 0 8px 30px rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
@@ -109,11 +109,11 @@ export default function ValorantTournaments() {
         .vt-meta-item { display: flex; flex-direction: column; }
         .vt-meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.35); }
         .vt-meta-val { font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); }
-        .vt-meta-val.prize { color: #ff4655; }
+        .vt-meta-val.prize { color: #3CCBFF; }
         .vt-meta-val.green { color: #4ade80; }
         .vt-card-chip { font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
-        .vt-badge-auction { font-size: 0.62rem; font-weight: 800; color: #ff4655; background: rgba(255,70,85,0.1); border: 1px solid rgba(255,70,85,0.25); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
+        .vt-badge-auction { font-size: 0.62rem; font-weight: 800; color: #3CCBFF; background: rgba(60,203,255,0.1); border: 1px solid rgba(60,203,255,0.25); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
         .vt-badge-daily { font-size: 0.62rem; font-weight: 800; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; padding: 2px 10px; white-space: nowrap; }
 
         .vt-card-right { display: flex; align-items: center; gap: 14px; padding-right: 20px; flex-shrink: 0; }
@@ -123,8 +123,8 @@ export default function ValorantTournaments() {
         .vt-slots-bar { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
         .vt-slots-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
 
-        .vt-reg-btn { padding: 9px 22px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
-        .vt-reg-btn:hover { background: #e63e4d; box-shadow: 0 0 20px rgba(255,70,85,0.4); transform: translateY(-1px); }
+        .vt-reg-btn { padding: 9px 22px; background: #3CCBFF; color: #fff; border: none; border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
+        .vt-reg-btn:hover { background: #30B5E6; box-shadow: 0 0 20px rgba(60,203,255,0.4); transform: translateY(-1px); }
 
         .vt-leaderboard-btn { padding: 9px 22px; background: rgba(96,165,250,0.12); color: #60A5FA; border: 1px solid rgba(96,165,250,0.3); border-radius: 100px; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.15s; white-space: nowrap; min-width: 130px; text-align: center; }
         .vt-leaderboard-btn:hover { background: rgba(96,165,250,0.2); box-shadow: 0 0 16px rgba(96,165,250,0.25); transform: translateY(-1px); }
@@ -163,7 +163,7 @@ export default function ValorantTournaments() {
                   const regState = getRegistrationState(t);
                   return (
                     <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s` }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
-                      <div className="vt-card-accent" style={{ background: "#ff4655" }} />
+                      <div className="vt-card-accent" style={{ background: "#3CCBFF" }} />
                       <div className="vt-card-body">
                         <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
                         <div className="vt-card-info">
@@ -195,7 +195,7 @@ export default function ValorantTournaments() {
                       </div>
                       <div className="vt-card-right">
                         <div className="vt-slots">
-                          <div className="vt-slots-text"><strong>{slotsLeft}</strong> / {t.totalSlots} slots</div>
+                          <div className="vt-slots-text"><strong>{t.slotsBooked}</strong> / {t.totalSlots} filled</div>
                           <div className="vt-slots-bar"><div className="vt-slots-fill" style={{ width: `${Math.round((t.slotsBooked / t.totalSlots) * 100)}%`, background: t.slotsBooked / t.totalSlots > 0.8 ? "#ef4444" : t.slotsBooked / t.totalSlots > 0.5 ? "#f59e0b" : "#22c55e" }} /></div>
                         </div>
                         {isRegistered ? (

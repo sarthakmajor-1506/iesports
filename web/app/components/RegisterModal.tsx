@@ -27,7 +27,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
   const isValorant = game === "valorant";
   const isShuffle = isValorant && tournament?.format === "shuffle";
-  const accentColor = isValorant ? "#ff4655" : "#f97316";
+  const accentColor = isValorant ? "#3CCBFF" : "#f97316";
 
   const isProfilePrivate = !isValorant && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
 
@@ -45,7 +45,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     if (!hasRiot && !riotPending) {
       missingAccounts.push({
         id: "riot", label: "Riot ID", icon: "/riot-games.png",
-        action: () => router.push("/connect-riot"), color: "#ff4655",
+        action: () => router.push("/connect-riot"), color: "#3CCBFF",
       });
     }
   } else {
@@ -220,7 +220,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {hasRequiredAccounts && missingAccounts.every(a => a.id === "discord") && (
               <button onClick={() => setStep(isShuffle ? "solo" : "choose")} style={{
                 width: "100%", padding: 14,
-                background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#cc1a2a" : "#ea580c"})`,
+                background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
                 border: "none", borderRadius: 8, color: "#fff",
                 fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 4,
               }}>
@@ -287,7 +287,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
             <button onClick={handleSolo} disabled={loading} style={{
               width: "100%", padding: 14,
-              background: loading ? "#991b1b" : `linear-gradient(135deg, ${accentColor}, #cc1a2a)`,
+              background: loading ? "#991b1b" : `linear-gradient(135deg, ${accentColor}, #2A9FCC)`,
               border: "none", borderRadius: 8, color: "#fff",
               fontWeight: 700, fontSize: 15, cursor: loading ? "default" : "pointer",
             }}>

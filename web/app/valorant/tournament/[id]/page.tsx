@@ -82,7 +82,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         cursor: "pointer",
         ...(isBracket ? { borderColor: "rgba(245,158,11,0.2)" } : {}),
         ...(isLive ? { borderColor: "rgba(34,197,94,0.25)" } : {}),
-        ...(isExpanded ? { borderColor: isBracket ? "rgba(245,158,11,0.5)" : "rgba(255,70,85,0.25)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
+        ...(isExpanded ? { borderColor: isBracket ? "rgba(245,158,11,0.5)" : "rgba(60,203,255,0.25)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
       }} onClick={() => setExpandedMatch(isExpanded ? null : m.id)}>
         <div className="vtd-mc-index">
           <span className="vtd-mc-index-num" style={isBracket ? { color: bracketAccent, fontSize: "0.55rem" } : {}}>
@@ -126,7 +126,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <>
               {scheduledTime ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: isBracket ? bracketAccent : "#ff4655" }}>{scheduledTime}</div>
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: isBracket ? bracketAccent : "#3CCBFF" }}>{scheduledTime}</div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "rgba(255,255,255,0.35)" }}>{scheduledDay}</div>
                 </div>
               ) : (
@@ -149,7 +149,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="vtd-mc-avatars">{t2Members.map((p: any, i: number) => p.riotAvatar ? <img key={i} src={p.riotAvatar} alt="" /> : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>)}</div>
           </div>
         </div>
-        <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#ff4655") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
+        <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#3CCBFF") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
       </div>
 
       {isExpanded && (
@@ -164,7 +164,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                 ))}
               </div>
               <div style={{ marginTop: 10, textAlign: "center" }}>
-                <Link href={`/valorant/match/${tournamentId}/${m.id}`} style={{ fontSize: "0.72rem", fontWeight: 700, color: "#ff4655", textDecoration: "none", padding: "6px 18px", border: "1px solid #ff4655", borderRadius: 100, display: "inline-block", transition: "all 0.15s" }}>View Full Match Details →</Link>
+                <Link href={`/valorant/match/${tournamentId}/${m.id}`} style={{ fontSize: "0.72rem", fontWeight: 700, color: "#3CCBFF", textDecoration: "none", padding: "6px 18px", border: "1px solid #3CCBFF", borderRadius: 100, display: "inline-block", transition: "all 0.15s" }}>View Full Match Details →</Link>
               </div>
             </>
           )}
@@ -194,9 +194,9 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
         <Share2 size={12} /> Share
       </button>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 200, background: "rgba(10,16,24,0.97)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 8, minWidth: 188, boxShadow: "0 12px 40px rgba(0,0,0,0.6)", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 200, background: "rgba(10,15,42,0.97)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 8, minWidth: 188, boxShadow: "0 12px 40px rgba(0,0,0,0.6)", overflow: "hidden" }}>
           <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,70,85,0.15)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(60,203,255,0.15)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`);
@@ -205,7 +205,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
             <Link2 size={14} /> Copy Link
           </button>
           <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,70,85,0.15)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(60,203,255,0.15)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             onClick={async () => {
               if (!tabContentRef.current) return;
@@ -356,20 +356,20 @@ function ValorantTournamentDetailInner() {
   };
 
   if (authLoading || tLoading) return (
-    <div style={{ minHeight: "100vh", background: "#0a1018", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
       <style>{`
         @keyframes vtd-sk-pulse { 0%,100% { background-position: -200% 0; } 50% { background-position: 200% 0; } }
         @keyframes vtspin { to { transform: rotate(360deg); } }
-        .vtd-sk { background: linear-gradient(90deg, rgba(255,70,85,0.04) 0%, rgba(255,70,85,0.12) 40%, rgba(255,70,85,0.04) 80%); background-size: 200% 100%; animation: vtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
+        .vtd-sk { background: linear-gradient(90deg, rgba(60,203,255,0.04) 0%, rgba(60,203,255,0.12) 40%, rgba(60,203,255,0.04) 80%); background-size: 200% 100%; animation: vtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
         .vtd-sk-dark { background: linear-gradient(90deg, #0d151e 0%, #162030 40%, #0d151e 80%); background-size: 200% 100%; animation: vtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
       `}</style>
       {/* Navbar placeholder */}
-      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(255,70,85,0.12)" }} />
+      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(60,203,255,0.12)" }} />
       {/* Hero skeleton */}
-      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(255,70,85,0.14) 0%, #0a1018 60%)", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,70,85,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,70,85,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(60,203,255,0.14) 0%, #0A0F2A 60%)", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(60,203,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(60,203,255,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div style={{ position: "absolute", bottom: 40, left: 32, right: 32 }}>
-          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(255,70,85,0.3)", marginBottom: 16 }} />
+          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(60,203,255,0.3)", marginBottom: 16 }} />
           <div className="vtd-sk" style={{ width: "62%", height: 46, marginBottom: 12, borderRadius: 12 }} />
           <div className="vtd-sk" style={{ width: "40%", height: 18, marginBottom: 20, borderRadius: 6 }} />
           <div style={{ display: "flex", gap: 10 }}>
@@ -444,56 +444,56 @@ function ValorantTournamentDetailInner() {
         *, *::before, *::after { box-sizing: border-box; }
 
         /* ── Animated background ── */
-        .vtd-bg { position: fixed; inset: 0; z-index: 0; background: #0a1018; overflow: hidden; pointer-events: none; }
-        .vtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(255,70,85,0.10) 60deg, transparent 120deg, rgba(255,70,85,0.07) 200deg, transparent 260deg, rgba(15,5,8,0.8) 360deg); animation: vtd-bg-rot 28s linear infinite; }
-        .vtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(255,70,85,0.14) 0%, rgba(255,70,85,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: vtd-bg-drift1 18s ease-in-out infinite; }
-        .vtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(255,70,85,0.10) 0%, rgba(255,70,85,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: vtd-bg-drift2 24s ease-in-out infinite; }
+        .vtd-bg { position: fixed; inset: 0; z-index: 0; background: #0A0F2A; overflow: hidden; pointer-events: none; }
+        .vtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(60,203,255,0.10) 60deg, transparent 120deg, rgba(60,203,255,0.07) 200deg, transparent 260deg, rgba(10,15,42,0.8) 360deg); animation: vtd-bg-rot 28s linear infinite; }
+        .vtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.14) 0%, rgba(60,203,255,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: vtd-bg-drift1 18s ease-in-out infinite; }
+        .vtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.10) 0%, rgba(60,203,255,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: vtd-bg-drift2 24s ease-in-out infinite; }
         .vtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%); bottom: 30%; left: 60%; animation: vtd-bg-drift2 30s ease-in-out infinite reverse; }
-        .vtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,70,85,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,70,85,0.06) 1px, transparent 1px); background-size: 60px 60px; }
+        .vtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(60,203,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(60,203,255,0.06) 1px, transparent 1px); background-size: 60px 60px; }
         @keyframes vtd-bg-rot { to { transform: rotate(360deg); } }
         @keyframes vtd-bg-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(80px,-60px) scale(1.15); } 66% { transform: translate(-40px,70px) scale(0.9); } }
         @keyframes vtd-bg-drift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-100px,-80px); } }
 
         /* ── Page ── */
-        .vtd-page { min-height: 100vh; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #F0EEEA; position: relative; z-index: 1; }
+        .vtd-page { min-height: 100vh; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #E6E6E6; position: relative; z-index: 1; }
 
         /* ── Hero ── */
         .vtd-hero { position: relative; min-height: 460px; overflow: hidden; display: flex; align-items: flex-end; }
         .vtd-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; filter: brightness(0.35) saturate(1.2); }
-        .vtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(255,70,85,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,16,24,0.3) 0%, rgba(10,16,24,0.7) 60%, rgba(10,16,24,1) 100%); }
+        .vtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(60,203,255,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,15,42,0.3) 0%, rgba(10,15,42,0.7) 60%, rgba(10,15,42,1) 100%); }
         .vtd-hero-agent { position: absolute; right: -20px; bottom: 0; height: 90%; z-index: 2; opacity: 0.15; pointer-events: none; animation: vtd-agent-float 4s ease-in-out infinite alternate; filter: saturate(0.5); }
         @keyframes vtd-agent-float { from { transform: translateY(0px); } to { transform: translateY(-14px); } }
         .vtd-hero-content { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .vtd-hero-inner { flex: 1; }
-        .vtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #ff4655; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .vtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #ff4655; }
-        .vtd-hero-title { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900; color: #F0EEEA; line-height: 1.05; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) both; letter-spacing: -0.03em; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
-        .vtd-hero-desc { font-size: 1rem; color: rgba(240,238,234,0.65); margin-top: 10px; max-width: 560px; line-height: 1.6; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.08s both; }
+        .vtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #3CCBFF; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .vtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #3CCBFF; }
+        .vtd-hero-title { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900; color: #E6E6E6; line-height: 1.05; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) both; letter-spacing: -0.03em; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+        .vtd-hero-desc { font-size: 1rem; color: rgba(230,230,230,0.65); margin-top: 10px; max-width: 560px; line-height: 1.6; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.08s both; }
         .vtd-hero-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; animation: vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.16s both; flex-wrap: wrap; }
         .vtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
-        .vtd-hero-share-btn:hover { background: rgba(255,70,85,0.25); border-color: rgba(255,70,85,0.5); transform: scale(1.05); }
+        .vtd-hero-share-btn:hover { background: rgba(60,203,255,0.25); border-color: rgba(60,203,255,0.5); transform: scale(1.05); }
         @keyframes vtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ── Content wrapper ── */
         .vtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
 
         /* ── Registration bar ── */
-        .vtd-reg-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 18px 24px; background: rgba(18,18,21,0.85); border: 1px solid rgba(255,70,85,0.15); border-radius: 16px; flex-wrap: wrap; backdrop-filter: blur(12px); animation: vtd-slide-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
+        .vtd-reg-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 18px 24px; background: rgba(18,18,21,0.85); border: 1px solid rgba(60,203,255,0.15); border-radius: 16px; flex-wrap: wrap; backdrop-filter: blur(12px); animation: vtd-slide-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
         .vtd-reg-info { display: flex; flex-direction: column; gap: 3px; }
-        .vtd-reg-slots { font-size: 1.1rem; font-weight: 900; color: #F0EEEA; }
+        .vtd-reg-slots { font-size: 1.1rem; font-weight: 900; color: #E6E6E6; }
         .vtd-reg-countdown { font-size: 0.82rem; color: #8A8880; }
-        .vtd-reg-btn { padding: 12px 32px; background: linear-gradient(135deg, #ff4655, #c62c3a); color: #fff; border: none; border-radius: 100px; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s; box-shadow: 0 4px 20px rgba(255,70,85,0.35); }
-        .vtd-reg-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,70,85,0.5); }
+        .vtd-reg-btn { padding: 12px 32px; background: linear-gradient(135deg, #3CCBFF, #2A9FCC); color: #fff; border: none; border-radius: 100px; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s; box-shadow: 0 4px 20px rgba(60,203,255,0.35); }
+        .vtd-reg-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(60,203,255,0.5); }
         .vtd-reg-done { padding: 12px 28px; background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 0.9rem; font-weight: 700; }
         @keyframes vtd-slide-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ── Tab bar ── */
-        .vtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,16,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,70,85,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        .vtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,15,42,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(60,203,255,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
         .vtd-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .vtd-tabs::-webkit-scrollbar { display: none; }
         .vtd-tab { min-height: 52px; padding: 0 20px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; flex-shrink: 0; }
-        .vtd-tab:hover { background: rgba(255,70,85,0.08); color: rgba(255,255,255,0.75); border-color: rgba(255,70,85,0.2); }
-        .vtd-tab.active { background: #ff4655; color: #fff; border-color: #ff4655; box-shadow: 0 0 20px rgba(255,70,85,0.35), 0 4px 16px rgba(255,70,85,0.25); }
+        .vtd-tab:hover { background: rgba(60,203,255,0.08); color: rgba(255,255,255,0.75); border-color: rgba(60,203,255,0.2); }
+        .vtd-tab.active { background: #3CCBFF; color: #fff; border-color: #3CCBFF; box-shadow: 0 0 20px rgba(60,203,255,0.35), 0 4px 16px rgba(60,203,255,0.25); }
         .vtd-tab-count { font-size: 0.68rem; font-weight: 700; opacity: 0.75; background: rgba(0,0,0,0.2); padding: 1px 7px; border-radius: 100px; }
 
         /* ── Tab content animation ── */
@@ -503,7 +503,7 @@ function ValorantTournamentDetailInner() {
         /* ── Cards ── */
         .vtd-card { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 28px 32px; margin-bottom: 18px; backdrop-filter: blur(12px); transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .vtd-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-        .vtd-card-label { display: block; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #ff4655; margin-bottom: 18px; }
+        .vtd-card-label { display: block; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #3CCBFF; margin-bottom: 18px; }
 
         /* ── Overview ── */
         .vtd-overview-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
@@ -513,10 +513,10 @@ function ValorantTournamentDetailInner() {
         .vtd-stat-tile { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 20px 18px; text-align: center; backdrop-filter: blur(10px); transition: transform 0.2s, box-shadow 0.2s; animation: vtd-fade-up 0.4s ease-out both; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .vtd-stat-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.4); }
         .vtd-stat-tile-icon { display: flex; justify-content: center; margin-bottom: 10px; opacity: 0.7; }
-        .vtd-stat-tile-val { font-size: 1.4rem; font-weight: 900; color: #F0EEEA; line-height: 1.1; }
+        .vtd-stat-tile-val { font-size: 1.4rem; font-weight: 900; color: #E6E6E6; line-height: 1.1; }
         .vtd-stat-tile-lbl { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #555550; margin-top: 5px; }
-        .vtd-stat-tile.red { border-color: rgba(255,70,85,0.2); background: rgba(255,70,85,0.06); }
-        .vtd-stat-tile.red .vtd-stat-tile-val { color: #ff4655; }
+        .vtd-stat-tile.red { border-color: rgba(60,203,255,0.2); background: rgba(60,203,255,0.06); }
+        .vtd-stat-tile.red .vtd-stat-tile-val { color: #3CCBFF; }
         .vtd-stat-tile.gold .vtd-stat-tile-val { color: #fbbf24; }
         .vtd-stat-tile.gold { border-color: rgba(251,191,36,0.2); background: rgba(251,191,36,0.05); }
         .vtd-stat-tile.blue .vtd-stat-tile-val { color: #60a5fa; }
@@ -532,20 +532,20 @@ function ValorantTournamentDetailInner() {
         .vtd-tl-dot.past { background: #22c55e; }
         .vtd-tl-dot.active { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
         .vtd-tl-dot.future { background: #2A2A30; }
-        .vtd-tl-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #ff4655; }
+        .vtd-tl-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #3CCBFF; }
         .vtd-tl-date { font-size: 0.82rem; color: #8A8880; margin-top: 3px; }
         .vtd-tl-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; margin-left: 8px; }
 
         /* ── Rules ── */
         .vtd-rule { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: flex-start; }
         .vtd-rule:last-child { border-bottom: none; }
-        .vtd-rule-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; border-radius: 50%; background: rgba(255,70,85,0.15); border: 1px solid rgba(255,70,85,0.4); font-size: 0.65rem; font-weight: 900; color: #ff4655; margin-top: 1px; }
+        .vtd-rule-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; border-radius: 50%; background: rgba(60,203,255,0.15); border: 1px solid rgba(60,203,255,0.4); font-size: 0.65rem; font-weight: 900; color: #3CCBFF; margin-top: 1px; }
         .vtd-rule-text { font-size: 0.88rem; color: #8A8880; line-height: 1.6; }
         .vtd-rules-scroll { max-height: 400px; overflow-y: auto; padding-right: 4px; }
         .vtd-rules-scroll::-webkit-scrollbar { width: 4px; }
         .vtd-rules-scroll::-webkit-scrollbar-track { background: transparent; }
-        .vtd-rules-scroll::-webkit-scrollbar-thumb { background: rgba(255,70,85,0.35); border-radius: 4px; }
-        .vtd-rules-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,70,85,0.6); }
+        .vtd-rules-scroll::-webkit-scrollbar-thumb { background: rgba(60,203,255,0.35); border-radius: 4px; }
+        .vtd-rules-scroll::-webkit-scrollbar-thumb:hover { background: rgba(60,203,255,0.6); }
 
         /* ── Empty states ── */
         .vtd-empty { text-align: center; padding: 70px 20px; }
@@ -553,14 +553,31 @@ function ValorantTournamentDetailInner() {
         .vtd-empty-title { font-size: 1rem; font-weight: 700; color: #8A8880; margin-bottom: 4px; display: block; }
         .vtd-empty-sub { font-size: 0.86rem; color: #555550; display: block; margin-top: 6px; }
 
-        /* ── Players grid ── */
+        /* ── Players tier columns ── */
+        .vtd-tier-columns { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+        .vtd-tier-columns::-webkit-scrollbar { height: 4px; }
+        .vtd-tier-columns::-webkit-scrollbar-track { background: transparent; }
+        .vtd-tier-columns::-webkit-scrollbar-thumb { background: rgba(60,203,255,0.35); border-radius: 4px; }
+        .vtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
+        .vtd-tier-header { padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; }
+        .vtd-tier-header-count { font-size: 0.72rem; font-weight: 600; opacity: 0.7; }
+        .vtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; }
+        .vtd-tier-player:hover { transform: scale(1.02); border-color: rgba(60,203,255,0.35); box-shadow: 0 0 0 1px rgba(60,203,255,0.15), 0 8px 24px rgba(0,0,0,0.4); }
+        .vtd-tier-player-avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.08); }
+        .vtd-tier-player-avatar-init { width: 36px; height: 36px; border-radius: 8px; background: rgba(60,203,255,0.1); border: 1.5px solid rgba(60,203,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3CCBFF; flex-shrink: 0; }
+        .vtd-tier-player-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .vtd-tier-player-name { font-size: 0.85rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vtd-tier-player-name .tag { color: #555550; font-weight: 400; }
+        .vtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; flex-shrink: 0; }
+
+        /* ── Legacy players grid (keep for backward compat) ── */
         .vtd-players-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .vtd-player-box { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 22px; display: flex; align-items: center; gap: 16px; transition: all 0.2s ease; }
-        .vtd-player-box:hover { transform: scale(1.02); border-color: rgba(255,70,85,0.35); box-shadow: 0 0 0 1px rgba(255,70,85,0.15), 0 8px 24px rgba(0,0,0,0.4); }
+        .vtd-player-box:hover { transform: scale(1.02); border-color: rgba(60,203,255,0.35); box-shadow: 0 0 0 1px rgba(60,203,255,0.15), 0 8px 24px rgba(0,0,0,0.4); }
         .vtd-player-avatar-lg { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.08); }
-        .vtd-player-avatar-init { width: 60px; height: 60px; border-radius: 12px; background: rgba(255,70,85,0.1); border: 2px solid rgba(255,70,85,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: #ff4655; flex-shrink: 0; }
+        .vtd-player-avatar-init { width: 60px; height: 60px; border-radius: 12px; background: rgba(60,203,255,0.1); border: 2px solid rgba(60,203,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: #3CCBFF; flex-shrink: 0; }
         .vtd-player-info { flex: 1; min-width: 0; }
-        .vtd-player-name-lg { font-size: 0.95rem; font-weight: 800; color: #F0EEEA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vtd-player-name-lg { font-size: 0.95rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .vtd-player-name-lg .tag { color: #555550; font-weight: 400; }
         .vtd-player-rank-lg { font-size: 0.76rem; color: #8A8880; margin-top: 3px; }
         .vtd-player-skill-lg { font-size: 0.65rem; font-weight: 800; padding: 3px 10px; border-radius: 100px; margin-top: 8px; display: inline-block; }
@@ -568,12 +585,12 @@ function ValorantTournamentDetailInner() {
         /* ── Teams grid ── */
         .vtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
         .vtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.2s ease; }
-        .vtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(255,70,85,0.2); }
-        .vtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #ff4655; background: rgba(255,70,85,0.1); border: 1px solid rgba(255,70,85,0.25); padding: 3px 10px; border-radius: 100px; }
+        .vtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(60,203,255,0.2); }
+        .vtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #3CCBFF; background: rgba(60,203,255,0.1); border: 1px solid rgba(60,203,255,0.25); padding: 3px 10px; border-radius: 100px; }
         .vtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-        .vtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #ff4655 0%, #c62c3a 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
+        .vtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
         .vtd-team-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .vtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #F0EEEA; }
+        .vtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
         .vtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
         .vtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
         .vtd-team-box-member { display: flex; align-items: center; gap: 10px; }
@@ -584,10 +601,10 @@ function ValorantTournamentDetailInner() {
         .vtd-team-box-member-skill { margin-left: auto; font-size: 0.62rem; color: #555550; font-weight: 600; }
         .vtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.74rem; color: #555550; }
         .vtd-team-edit-btn { padding: 5px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; color: #8A8880; font-family: inherit; transition: all 0.15s; }
-        .vtd-team-edit-btn:hover { border-color: #ff4655; color: #ff4655; }
-        .vtd-team-edit-input { width: 100%; padding: 8px 12px; border: 1.5px solid #ff4655; border-radius: 8px; font-size: 0.84rem; outline: none; font-family: inherit; background: rgba(10,10,12,0.8); color: #F0EEEA; }
+        .vtd-team-edit-btn:hover { border-color: #3CCBFF; color: #3CCBFF; }
+        .vtd-team-edit-input { width: 100%; padding: 8px 12px; border: 1.5px solid #3CCBFF; border-radius: 8px; font-size: 0.84rem; outline: none; font-family: inherit; background: rgba(10,10,12,0.8); color: #E6E6E6; }
         .vtd-team-edit-actions { display: flex; gap: 6px; margin-top: 6px; }
-        .vtd-team-edit-save { padding: 6px 16px; background: #ff4655; color: #fff; border: none; border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .vtd-team-edit-save { padding: 6px 16px; background: #3CCBFF; color: #fff; border: none; border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
         .vtd-team-edit-cancel { padding: 6px 16px; background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 
         /* ── Tables ── */
@@ -596,7 +613,7 @@ function ValorantTournamentDetailInner() {
         .vtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
         .vtd-standings-table tr:last-child td { border-bottom: none; }
         .vtd-standings-table tbody tr { transition: background 0.15s; }
-        .vtd-standings-table tbody tr:hover { background: rgba(255,70,85,0.04); }
+        .vtd-standings-table tbody tr:hover { background: rgba(60,203,255,0.04); }
 
         /* ── Match headers ── */
         .vtd-section-header { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid; }
@@ -604,22 +621,22 @@ function ValorantTournamentDetailInner() {
         .vtd-section-header.bracket { color: #f59e0b; border-color: rgba(245,158,11,0.3); }
         .vtd-match-day-header { font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; margin: 22px 0 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px; }
         .vtd-match-day-header:first-child { margin-top: 0; }
-        .vtd-match-day-header .day-num { color: #ff4655; }
+        .vtd-match-day-header .day-num { color: #3CCBFF; }
         .vtd-match-day-header.bracket-round .day-num { color: #f59e0b; }
 
         /* ── Match cards ── */
         .vtd-mc { display: flex; align-items: center; background: rgba(18,18,21,0.75); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; margin-bottom: 8px; overflow: hidden; transition: all 0.2s ease; min-height: 68px; backdrop-filter: blur(6px); }
-        .vtd-mc:hover { border-color: rgba(255,70,85,0.25); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .vtd-mc:hover { border-color: rgba(60,203,255,0.25); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .vtd-mc-index { width: 44px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 0; border-right: 1px solid rgba(255,255,255,0.05); }
         .vtd-mc-index-num { font-size: 0.68rem; font-weight: 800; color: #555550; }
-        .vtd-mc-index-fmt { font-size: 0.54rem; font-weight: 800; color: #ff4655; background: rgba(255,70,85,0.1); padding: 2px 5px; border-radius: 4px; }
+        .vtd-mc-index-fmt { font-size: 0.54rem; font-weight: 800; color: #3CCBFF; background: rgba(60,203,255,0.1); padding: 2px 5px; border-radius: 4px; }
         .vtd-mc-team { flex: 1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-width: 0; }
         .vtd-mc-team.right { flex-direction: row-reverse; text-align: right; }
-        .vtd-mc-team-logo { width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(135deg, #ff4655 0%, #c62c3a 100%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex-shrink: 0; overflow: hidden; }
+        .vtd-mc-team-logo { width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex-shrink: 0; overflow: hidden; }
         .vtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .vtd-mc-team-info { flex: 1; min-width: 0; }
-        .vtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #ff4655; text-transform: uppercase; }
-        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #F0EEEA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #3CCBFF; text-transform: uppercase; }
+        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .vtd-mc-avatars { display: flex; gap: 0; margin-top: 4px; }
         .vtd-mc-avatars img, .vtd-mc-avatars .vtd-mc-av-init { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(18,18,21,0.9); margin-left: -4px; object-fit: cover; }
         .vtd-mc-avatars img:first-child, .vtd-mc-avatars .vtd-mc-av-init:first-child { margin-left: 0; }
@@ -627,7 +644,7 @@ function ValorantTournamentDetailInner() {
         .vtd-mc-team.right .vtd-mc-avatars { justify-content: flex-end; }
         .vtd-mc-center { min-width: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 4px; flex-shrink: 0; }
         .vtd-mc-score-box { display: flex; align-items: center; gap: 6px; font-size: 1.15rem; font-weight: 900; }
-        .vtd-mc-score-box .s { min-width: 22px; text-align: center; color: #F0EEEA; }
+        .vtd-mc-score-box .s { min-width: 22px; text-align: center; color: #E6E6E6; }
         .vtd-mc-score-box .s.win { color: #4ade80; }
         .vtd-mc-score-box .s.loss { color: #f87171; }
         .vtd-mc-score-box .s.draw { color: #f59e0b; }
@@ -646,24 +663,24 @@ function ValorantTournamentDetailInner() {
         .vtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
         .vtd-share-modal { background: #0f1923; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; max-width: 528px; width: 100%; }
         .vtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #F0EEEA; display: flex; align-items: center; gap: 10px; }
+        .vtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #E6E6E6; display: flex; align-items: center; gap: 10px; }
         .vtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
         .vtd-share-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .vtd-share-carousel { position: relative; width: 100%; }
-        .vtd-share-carousel-img { width: 100%; aspect-ratio: 1/1; background: #0a1018; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); }
+        .vtd-share-carousel-img { width: 100%; aspect-ratio: 1/1; background: #0A0F2A; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); }
         .vtd-share-carousel-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
         .vtd-share-carousel-btn { width: 36px; height: 36px; border-radius: 100px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8A8880; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
         .vtd-share-carousel-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
         .vtd-share-carousel-btn:disabled { opacity: 0.3; cursor: default; }
         .vtd-share-carousel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #F0EEEA; }
+        .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #E6E6E6; }
         .vtd-share-carousel-dots { display: flex; gap: 5px; }
         .vtd-share-carousel-dot { width: 6px; height: 6px; border-radius: 100px; background: rgba(255,255,255,0.15); transition: all 0.2s; }
-        .vtd-share-carousel-dot.active { background: #ff4655; width: 16px; }
+        .vtd-share-carousel-dot.active { background: #3CCBFF; width: 16px; }
         .vtd-share-carousel-actions { display: flex; gap: 8px; margin-top: 12px; }
         .vtd-share-img-btn { padding: 10px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; flex: 1; }
-        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #ff4655, #c62c3a); color: #fff; }
-        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(255,70,85,0.35); }
+        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #3CCBFF, #2A9FCC); color: #fff; }
+        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(60,203,255,0.35); }
         .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
         .vtd-share-img-btn.cp:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
@@ -673,7 +690,7 @@ function ValorantTournamentDetailInner() {
 
         /* ── Responsive ── */
         @media (max-width: 1100px) { .vtd-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 900px) { .vtd-players-grid { grid-template-columns: repeat(2, 1fr); } .vtd-teams-grid { grid-template-columns: repeat(2, 1fr); } .vtd-hero-agent { opacity: 0.08; } }
+        @media (max-width: 900px) { .vtd-players-grid { grid-template-columns: repeat(2, 1fr); } .vtd-teams-grid { grid-template-columns: repeat(2, 1fr); } .vtd-hero-agent { opacity: 0.08; } .vtd-tier-columns { flex-wrap: wrap; } .vtd-tier-col { min-width: calc(50% - 8px); flex: 0 0 calc(50% - 8px); } }
         @media (max-width: 800px) {
           .vtd-hero { min-height: 340px; }
           .vtd-hero-content { padding: 0 16px 24px; min-height: 340px; }
@@ -689,6 +706,8 @@ function ValorantTournamentDetailInner() {
           .vtd-stat-tiles { grid-template-columns: repeat(2, 1fr); }
           .vtd-players-grid { grid-template-columns: 1fr; }
           .vtd-teams-grid { grid-template-columns: 1fr; }
+          .vtd-tier-columns { flex-wrap: wrap; }
+          .vtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .vtd-mc-team { padding: 8px 10px; gap: 8px; }
           .vtd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
           .vtd-tab { min-height: 46px; padding: 0 14px; font-size: 0.82rem; gap: 6px; }
@@ -773,7 +792,7 @@ function ValorantTournamentDetailInner() {
           {/* ═══ CHAMPION BANNER ═══ */}
           {championTeamName && (
             <div style={{
-              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,70,85,0.06) 50%, rgba(255,215,0,0.08) 100%)",
+              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(60,203,255,0.06) 50%, rgba(255,215,0,0.08) 100%)",
               border: "1px solid rgba(255,215,0,0.25)",
               borderRadius: 14,
               padding: "20px 24px",
@@ -784,7 +803,7 @@ function ValorantTournamentDetailInner() {
             }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 0%, rgba(255,215,0,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
               <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#ffd700", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Tournament Champion</div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#F0EEEA", lineHeight: 1.2 }}>{championTeamName}</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#E6E6E6", lineHeight: 1.2 }}>{championTeamName}</div>
               {championMembers.length > 0 && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                   {championMembers.map((p: any, i: number) => (
@@ -794,7 +813,7 @@ function ValorantTournamentDetailInner() {
                       ) : (
                         <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(255,215,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "#ffd700" }}>{(p.riotGameName || "?")[0]}</div>
                       )}
-                      <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "#F0EEEA" }}>{p.riotGameName || "Player"}</span>
+                      <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "#E6E6E6" }}>{p.riotGameName || "Player"}</span>
                       {p.riotTagLine && <span style={{ fontSize: "0.66rem", color: "#8A8880" }}>#{p.riotTagLine}</span>}
                     </div>
                   ))}
@@ -823,7 +842,7 @@ function ValorantTournamentDetailInner() {
           </div>
           {/* Slots info strip */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, padding: "10px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, fontSize: "0.82rem", color: "#8A8880", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#F0EEEA" }}>{slotsLeft > 0 ? slotsLeft : 0}</strong> slots left · {tournament.slotsBooked}/{tournament.totalSlots} registered</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} filled</span>
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
           </div>
 
@@ -833,7 +852,7 @@ function ValorantTournamentDetailInner() {
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>
-                  <div className="vtd-stat-tile-icon"><Zap size={24} color="#ff4655" /></div>
+                  <div className="vtd-stat-tile-icon"><Zap size={24} color="#3CCBFF" /></div>
                   <div className="vtd-stat-tile-val">{tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>
                   <div className="vtd-stat-tile-lbl">Format</div>
                 </div>
@@ -905,7 +924,7 @@ function ValorantTournamentDetailInner() {
                       <div className="vtd-timeline">
                         {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
                         {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
-                        {schedule.squadCreation && <TimelineItem label="Squad Creation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
+                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
                         {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "active" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "active" ? "ACTIVE" : undefined} />}
                         {schedule.groupStageEnd && <TimelineItem label="Group Stage Ends" date={schedule.groupStageEnd} status={new Date(schedule.groupStageEnd) <= new Date() ? "past" : "future"} />}
                         {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
@@ -921,7 +940,7 @@ function ValorantTournamentDetailInner() {
                         { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
                         { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
                         { label: "→", sub: "", color: "#555550", isArrow: true },
-                        { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#ff4655" },
+                        { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#3CCBFF" },
                       ].map((s, i) => s.isArrow ? (
                         <div key={i} style={{ color: "#555550", fontSize: "1.2rem", flexShrink: 0 }}>{s.label}</div>
                       ) : (
@@ -947,22 +966,49 @@ function ValorantTournamentDetailInner() {
                 </div>
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
-                ) : (
-                  <div className="vtd-players-grid">
-                    {players.map((p: any) => (
-                      <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                        <div className="vtd-player-box">
-                          {p.riotAvatar ? <img className="vtd-player-avatar-lg" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
-                          <div className="vtd-player-info">
-                            <div className="vtd-player-name-lg">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></div>
-                            <div className="vtd-player-rank-lg">{p.riotRank || "Unranked"}</div>
-                            <span className="vtd-player-skill-lg" style={{ background: p.skillLevel >= 4 ? "rgba(146,64,14,0.15)" : p.skillLevel >= 3 ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)", color: p.skillLevel >= 4 ? "#fbbf24" : p.skillLevel >= 3 ? "#818cf8" : "#8A8880", border: `1px solid ${p.skillLevel >= 4 ? "rgba(251,191,36,0.3)" : p.skillLevel >= 3 ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.08)"}` }}>Skill {p.skillLevel || 1}</span>
+                ) : (() => {
+                  const tierColors: Record<number, { bg: string; border: string; text: string }> = {
+                    5: { bg: "rgba(255,197,61,0.10)", border: "rgba(255,197,61,0.30)", text: "#FFC53D" },
+                    4: { bg: "rgba(184,77,255,0.10)", border: "rgba(184,77,255,0.30)", text: "#B84DFF" },
+                    3: { bg: "rgba(60,203,255,0.10)", border: "rgba(60,203,255,0.30)", text: "#3CCBFF" },
+                    2: { bg: "rgba(138,136,128,0.08)", border: "rgba(138,136,128,0.20)", text: "#8A8880" },
+                    1: { bg: "rgba(138,136,128,0.08)", border: "rgba(138,136,128,0.20)", text: "#8A8880" },
+                  };
+                  const grouped: Record<number, any[]> = {};
+                  players.forEach((p: any) => {
+                    const tier = p.skillLevel || 1;
+                    if (!grouped[tier]) grouped[tier] = [];
+                    grouped[tier].push(p);
+                  });
+                  const sortedTiers = Object.keys(grouped).map(Number).sort((a, b) => b - a);
+                  return (
+                    <div className="vtd-tier-columns">
+                      {sortedTiers.map((tier) => {
+                        const colors = tierColors[tier] || tierColors[1];
+                        const tierPlayers = grouped[tier];
+                        return (
+                          <div key={tier} className="vtd-tier-col">
+                            <div className="vtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
+                              <span>Skill {tier}</span>
+                              <span className="vtd-tier-header-count">{tierPlayers.length}</span>
+                            </div>
+                            {tierPlayers.map((p: any) => (
+                              <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                                <div className="vtd-tier-player">
+                                  {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
+                                  <div className="vtd-tier-player-info">
+                                    <span className="vtd-tier-player-name">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></span>
+                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}</span>
+                                  </div>
+                                </div>
+                              </Link>
+                            ))}
                           </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -981,7 +1027,7 @@ function ValorantTournamentDetailInner() {
                         <div className="vtd-team-logo" style={{ position: "relative", cursor: (isMyTeam && !team.teamLogoSet && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (isMyTeam && !team.teamLogoSet && !logoUploading) logoInputRef.current?.click(); }}>
                           {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
                           {isMyTeam && !team.teamLogoSet && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
-                          {logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 18, height: 18, border: "2px solid #555", borderTopColor: "#ff4655", borderRadius: "50%", animation: "vtspin 0.8s linear infinite" }} /></div>)}
+                          {logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 18, height: 18, border: "2px solid #555", borderTopColor: "#3CCBFF", borderRadius: "50%", animation: "vtspin 0.8s linear infinite" }} /></div>)}
                         </div>
                         <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(team.id, f); }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1034,8 +1080,8 @@ function ValorantTournamentDetailInner() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#ff4655" }}>Pts</th><th>BH</th></tr></thead>
-                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#ff4655" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#ff4655" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th></tr></thead>
+                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#3CCBFF" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
                     </table>
                   </div>
                 )}
@@ -1076,13 +1122,13 @@ function ValorantTournamentDetailInner() {
             <div className="vtd-tab-pane" ref={tabContentRef} style={{ animation: "vtd-fadein 0.3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#F0EEEA" }}>Elimination Play-offs</h3>
+                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#E6E6E6" }}>Elimination Play-offs</h3>
                   <span style={{
                     fontSize: "0.6rem", fontWeight: 900, letterSpacing: "0.1em",
                     padding: "3px 10px", borderRadius: 100,
-                    background: tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.12)" : "rgba(255,70,85,0.12)",
-                    border: `1px solid ${tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.35)" : "rgba(255,70,85,0.35)"}`,
-                    color: tournament.bracketFormat === "single_elimination" ? "#f59e0b" : "#ff4655",
+                    background: tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.12)" : "rgba(60,203,255,0.12)",
+                    border: `1px solid ${tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.35)" : "rgba(60,203,255,0.35)"}`,
+                    color: tournament.bracketFormat === "single_elimination" ? "#f59e0b" : "#3CCBFF",
                   }}>
                     {tournament.bracketFormat === "single_elimination" ? "SINGLE ELIMINATION" : "DOUBLE ELIMINATION"}
                   </span>
@@ -1122,8 +1168,8 @@ function ValorantTournamentDetailInner() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Player</th><th>Agent(s)</th><th>Maps</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th style={{ color: "#ff4655" }}>K/D</th><th>ACS</th><th>HS%</th><th>DMG</th></tr></thead>
-                      <tbody>{leaderboard.map((p: any, i: number) => { const acs = Math.round((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1)); return (<tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}><td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#ff4655" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td><td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td><td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td><td>{p.matchesPlayed || 0}</td><td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td><td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td><td>{p.totalAssists || 0}</td><td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td><td style={{ fontWeight: 700 }}>{acs}</td><td>{p.hsPercent || 0}%</td><td style={{ fontSize: "0.82rem", color: "#8A8880" }}>{p.totalDamageDealt || 0}</td></tr>); })}</tbody>
+                      <thead><tr><th>#</th><th>Player</th><th>Agent(s)</th><th>Maps</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th style={{ color: "#3CCBFF" }}>K/D</th><th>ACS</th><th>HS%</th><th>DMG</th></tr></thead>
+                      <tbody>{leaderboard.map((p: any, i: number) => { const acs = Math.round((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1)); return (<tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}><td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3CCBFF" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td><td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td><td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td><td>{p.matchesPlayed || 0}</td><td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td><td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td><td>{p.totalAssists || 0}</td><td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td><td style={{ fontWeight: 700 }}>{acs}</td><td>{p.hsPercent || 0}%</td><td style={{ fontSize: "0.82rem", color: "#8A8880" }}>{p.totalDamageDealt || 0}</td></tr>); })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
                       <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Players ranked by Average Combat Score (ACS = total score / rounds played), then K/D ratio as tiebreaker.
@@ -1199,7 +1245,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   if (!game) return (
     <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "12px 14px", opacity: 0.5 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#ff4655" : "#3b82f6" }}>Game {gameNum}</span>
+        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#3CCBFF" : "#3b82f6" }}>Game {gameNum}</span>
       </div>
       <div style={{ textAlign: "center", padding: "12px 0", color: "#555550", fontSize: "0.78rem" }}>No data</div>
     </div>
@@ -1218,7 +1264,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   return (
     <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#ff4655" : "#3b82f6" }}>Game {gameNum}</span>
+        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#3CCBFF" : "#3b82f6" }}>Game {gameNum}</span>
         <span style={{ fontSize: "0.72rem", color: "#8A8880", fontWeight: 600 }}>{mapName}</span>
         {isPlayed ? <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span> : <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#1a1a1f", color: "#555550" }}>Pending</span>}
       </div>
@@ -1249,7 +1295,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
               <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
               <span style={{ flex: 1, fontWeight: 600, color: t1Won ? "#4ade80" : "#e0e0da", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name || s.riotGameName || "Player"}</span>
               <span style={{ fontWeight: 700, color: "#8A8880", minWidth: 60, textAlign: "right" as const }}>{s.kills ?? 0}/{s.deaths ?? 0}/{s.assists ?? 0}</span>
-              <span style={{ fontWeight: 700, color: "#ff4655", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
+              <span style={{ fontWeight: 700, color: "#3CCBFF", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
             </div>
           ))}
           {t1Stats.length > 0 && t2Stats.length > 0 && <div style={{ height: 1, background: "#2A2A30", margin: "6px 0" }} />}
@@ -1258,7 +1304,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
               <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
               <span style={{ flex: 1, fontWeight: 600, color: t2Won ? "#4ade80" : "#e0e0da", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name || s.riotGameName || "Player"}</span>
               <span style={{ fontWeight: 700, color: "#8A8880", minWidth: 60, textAlign: "right" as const }}>{s.kills ?? 0}/{s.deaths ?? 0}/{s.assists ?? 0}</span>
-              <span style={{ fontWeight: 700, color: "#ff4655", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
+              <span style={{ fontWeight: 700, color: "#3CCBFF", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
             </div>
           ))}
         </div>
