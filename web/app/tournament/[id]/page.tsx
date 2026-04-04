@@ -150,17 +150,62 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#3B82F6") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
       </div>
 
-      {isExpanded && (
-        <div style={{ background: "#18181C", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "14px 16px" }}>
-          {!isComplete && !isLive ? (
-            <div style={{ textAlign: "center", padding: "16px 0", color: "#555550", fontSize: "0.82rem" }}>Match hasn't been played yet. Game details will appear here after the match.</div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "16px 0", color: "#555550", fontSize: "0.82rem" }}>
-              {m.team1Name} {m.team1Score} - {m.team2Score} {m.team2Name}
+      {isExpanded && (() => {
+        const t1Sorted = [...(t1Members.length > 0 ? t1Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
+        const t2Sorted = [...(t2Members.length > 0 ? t2Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
+        return (
+        <div style={{ background: "#18181C", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "18px 16px", overflow: "hidden" }}>
+          {/* Animated 5v5 Player Lineup */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Team 1 Players */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              {t1Sorted.map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)", borderRadius: 8, animation: `dtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
+                  {p.steamAvatar ? (
+                    <img src={p.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(59,130,246,0.3)" }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.steamName || "?")[0]}</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
+                    {p.dotaMMR ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.dotaMMR} MMR</div> : null}
+                  </div>
+                </div>
+              ))}
             </div>
+            {/* VS Badge */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0, animation: "dtd-vs-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 900, color: "#fff", animation: "dtd-glow-pulse 2s ease-in-out infinite" }}>VS</div>
+              {isComplete && <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#4ade80", marginTop: 2 }}>{m.team1Score} - {m.team2Score}</div>}
+            </div>
+            {/* Team 2 Players */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              {t2Sorted.map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)", borderRadius: 8, flexDirection: "row-reverse", animation: `dtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
+                  {p.steamAvatar ? (
+                    <img src={p.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(59,130,246,0.3)" }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.steamName || "?")[0]}</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
+                    {p.dotaMMR ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.dotaMMR} MMR</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Match result or pending message */}
+          {isComplete ? (
+            <div style={{ textAlign: "center", padding: "10px 0 0", color: "#4ade80", fontSize: "0.75rem", fontWeight: 700 }}>
+              {t1Win ? m.team1Name : t2Win ? m.team2Name : "Draw"} {t1Win || t2Win ? "wins" : ""} {m.team1Score} - {m.team2Score}
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "10px 0 0", color: "#555550", fontSize: "0.72rem" }}>Match hasn&apos;t been played yet</div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -473,19 +518,22 @@ function DotaTournamentDetailInner() {
         /* ── Animated background ── */
         .dtd-bg { position: fixed; inset: 0; z-index: 0; background: #0a0e18; overflow: hidden; pointer-events: none; }
         .dtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(59,130,246,0.10) 60deg, transparent 120deg, rgba(59,130,246,0.07) 200deg, transparent 260deg, rgba(10,14,24,0.8) 360deg); animation: dtd-bg-rot 28s linear infinite; }
-        .dtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: dtd-bg-drift1 18s ease-in-out infinite; }
-        .dtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, rgba(59,130,246,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: dtd-bg-drift2 24s ease-in-out infinite; }
-        .dtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 70%); bottom: 30%; left: 60%; animation: dtd-bg-drift2 30s ease-in-out infinite reverse; }
-        .dtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px); background-size: 60px 60px; }
+        .dtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: dtd-bg-drift1 22s ease-in-out infinite; }
+        .dtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, rgba(59,130,246,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: dtd-bg-drift2 28s ease-in-out infinite; }
+        .dtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(96,165,250,0.08) 0%, transparent 70%); bottom: 30%; left: 60%; animation: dtd-bg-drift3 34s ease-in-out infinite; }
+        .dtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px); background-size: 60px 60px; animation: dtd-grid-shimmer 8s ease-in-out infinite; }
         @keyframes dtd-bg-rot { to { transform: rotate(360deg); } }
-        @keyframes dtd-bg-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(80px,-60px) scale(1.15); } 66% { transform: translate(-40px,70px) scale(0.9); } }
-        @keyframes dtd-bg-drift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-100px,-80px); } }
+        @keyframes dtd-bg-drift1 { 0% { transform: translate(0,0) scale(1); opacity: 0.7; } 25% { transform: translate(80px,-60px) scale(1.15); opacity: 1; } 50% { transform: translate(120px,40px) scale(0.95); opacity: 0.8; } 75% { transform: translate(-40px,70px) scale(1.08); opacity: 0.9; } 100% { transform: translate(0,0) scale(1); opacity: 0.7; } }
+        @keyframes dtd-bg-drift2 { 0% { transform: translate(0,0) scale(1); opacity: 0.6; } 33% { transform: translate(-100px,-80px) scale(1.12); opacity: 1; } 66% { transform: translate(-60px,60px) scale(0.92); opacity: 0.75; } 100% { transform: translate(0,0) scale(1); opacity: 0.6; } }
+        @keyframes dtd-bg-drift3 { 0% { transform: translate(0,0) scale(1); opacity: 0.5; } 20% { transform: translate(60px,-90px) scale(1.2); opacity: 0.9; } 40% { transform: translate(-80px,-40px) scale(0.85); opacity: 0.6; } 60% { transform: translate(-40px,80px) scale(1.1); opacity: 1; } 80% { transform: translate(70px,30px) scale(0.95); opacity: 0.7; } 100% { transform: translate(0,0) scale(1); opacity: 0.5; } }
+        @keyframes dtd-grid-shimmer { 0%,100% { opacity: 0.4; } 50% { opacity: 0.7; } }
 
         .dtd-page { min-height: 100vh; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #E6E6E6; position: relative; z-index: 1; }
 
         /* ── Hero ── */
         .dtd-hero { position: relative; min-height: 460px; overflow: hidden; display: flex; align-items: flex-end; }
-        .dtd-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; filter: brightness(0.35) saturate(1.2); }
+        .dtd-hero-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; object-position: center 20%; z-index: 0; filter: brightness(0.35) saturate(1.2); animation: dtd-hero-kb 16s ease-in-out infinite alternate; will-change: transform; }
+        @keyframes dtd-hero-kb { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.04) translate(-1%, -0.8%); } 100% { transform: scale(1.02) translate(0.8%, -0.4%); } }
         .dtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(59,130,246,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,14,24,0.3) 0%, rgba(10,14,24,0.7) 60%, rgba(10,14,24,1) 100%); }
         .dtd-hero-content { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .dtd-hero-inner { flex: 1; }
@@ -652,6 +700,9 @@ function DotaTournamentDetailInner() {
 
         @keyframes dtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes dtspin { to { transform: rotate(360deg); } }
+        @keyframes dtd-player-reveal { from { opacity: 0; transform: translateY(16px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes dtd-vs-pop { 0% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes dtd-glow-pulse { 0%,100% { box-shadow: 0 0 8px rgba(59,130,246,0.3); } 50% { box-shadow: 0 0 18px rgba(59,130,246,0.6); } }
 
         /* ── Share modal ── */
         .dtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
@@ -752,7 +803,7 @@ function DotaTournamentDetailInner() {
 
         {/* ═══ HERO ═══ */}
         <div className="dtd-hero">
-          <img className="dtd-hero-bg" src={tournament.bannerImage || "/dota2image3.jpeg"} alt="" aria-hidden="true" />
+          <img className="dtd-hero-bg" src={tournament.bannerImage || "/dota2poster3.png"} alt="" aria-hidden="true" />
           <div className="dtd-hero-overlay" />
           <div className="dtd-hero-content">
             <div className="dtd-hero-inner">
@@ -928,18 +979,6 @@ function DotaTournamentDetailInner() {
                   )}
                 </div>
                 <div>
-                  {Object.keys(schedule).length > 0 && (
-                    <div className="dtd-card">
-                      <span className="dtd-card-label"><Calendar size={12} style={{ display: "inline", marginRight: 6 }} />Schedule</span>
-                      <div className="dtd-timeline">
-                        {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
-                        {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
-                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
-                        {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "ongoing" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "ongoing" ? "ACTIVE" : undefined} />}
-                        {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
-                      </div>
-                    </div>
-                  )}
                   <div className="dtd-card">
                     <span className="dtd-card-label"><GitBranch size={12} style={{ display: "inline", marginRight: 6 }} />Tournament Flow</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -959,6 +998,18 @@ function DotaTournamentDetailInner() {
                       ))}
                     </div>
                   </div>
+                  {Object.keys(schedule).length > 0 && (
+                    <div className="dtd-card">
+                      <span className="dtd-card-label"><Calendar size={12} style={{ display: "inline", marginRight: 6 }} />Schedule</span>
+                      <div className="dtd-timeline">
+                        {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
+                        {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
+                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
+                        {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "ongoing" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "ongoing" ? "ACTIVE" : undefined} />}
+                        {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

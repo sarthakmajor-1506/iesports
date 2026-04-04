@@ -152,13 +152,59 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#3CCBFF") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
       </div>
 
-      {isExpanded && (
-        <div style={{ background: "#18181C", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "14px 16px" }}>
+      {isExpanded && (() => {
+        const riotRankOrder: Record<string, number> = { "Iron": 1, "Bronze": 2, "Silver": 3, "Gold": 4, "Platinum": 5, "Diamond": 6, "Ascendant": 7, "Immortal": 8, "Radiant": 9 };
+        const getRiotSortVal = (p: any) => { if (p.riotTier) return p.riotTier; const base = (p.riotRank || "").split(" ")[0]; return riotRankOrder[base] || 0; };
+        const t1Sorted = [...(t1Members.length > 0 ? t1Members : Array.from({ length: 5 }, (_, i) => ({ riotGameName: `Player ${i + 1}`, riotAvatar: "", riotRank: "" })))].sort((a: any, b: any) => getRiotSortVal(b) - getRiotSortVal(a));
+        const t2Sorted = [...(t2Members.length > 0 ? t2Members : Array.from({ length: 5 }, (_, i) => ({ riotGameName: `Player ${i + 1}`, riotAvatar: "", riotRank: "" })))].sort((a: any, b: any) => getRiotSortVal(b) - getRiotSortVal(a));
+        return (
+        <div style={{ background: "#18181C", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "18px 16px", overflow: "hidden" }}>
+          {/* Animated 5v5 Player Lineup */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Team 1 Players */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              {t1Sorted.map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(60,203,255,0.06)", border: "1px solid rgba(60,203,255,0.12)", borderRadius: 8, animation: `vtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
+                  {p.riotAvatar ? (
+                    <img src={p.riotAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(60,203,255,0.3)" }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3CCBFF, #2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.riotGameName || "?")[0]}</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
+                    {p.riotRank ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.riotRank}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* VS Badge */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0, animation: "vtd-vs-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #3CCBFF, #2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 900, color: "#fff", animation: "vtd-glow-pulse 2s ease-in-out infinite" }}>VS</div>
+              {isComplete && <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#4ade80", marginTop: 2 }}>{m.team1Score} - {m.team2Score}</div>}
+            </div>
+            {/* Team 2 Players */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              {t2Sorted.map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(60,203,255,0.06)", border: "1px solid rgba(60,203,255,0.12)", borderRadius: 8, flexDirection: "row-reverse", animation: `vtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
+                  {p.riotAvatar ? (
+                    <img src={p.riotAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(60,203,255,0.3)" }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3CCBFF, #2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.riotGameName || "?")[0]}</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
+                    {p.riotRank ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.riotRank}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Game details or pending message */}
           {!isComplete && !isLive && !hasGameData ? (
-            <div style={{ textAlign: "center", padding: "16px 0", color: "#555550", fontSize: "0.82rem" }}>Match hasn't been played yet. Game details will appear here after the match.</div>
+            <div style={{ textAlign: "center", padding: "10px 0 0", color: "#555550", fontSize: "0.72rem" }}>Match hasn&apos;t been played yet</div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 3)}, 1fr)`, gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 3)}, 1fr)`, gap: 12, marginTop: 14 }}>
                 {games.map((g, i) => (
                   <GameDetailCard key={i} game={g} gameNum={i + 1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
                 ))}
@@ -169,7 +215,8 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             </>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -549,23 +596,24 @@ function ValorantTournamentDetailInner() {
         /* ── Animated background ── */
         .vtd-bg { position: fixed; inset: 0; z-index: 0; background: #0A0F2A; overflow: hidden; pointer-events: none; }
         .vtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(60,203,255,0.10) 60deg, transparent 120deg, rgba(60,203,255,0.07) 200deg, transparent 260deg, rgba(10,15,42,0.8) 360deg); animation: vtd-bg-rot 28s linear infinite; }
-        .vtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.14) 0%, rgba(60,203,255,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: vtd-bg-drift1 18s ease-in-out infinite; }
-        .vtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.10) 0%, rgba(60,203,255,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: vtd-bg-drift2 24s ease-in-out infinite; }
-        .vtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%); bottom: 30%; left: 60%; animation: vtd-bg-drift2 30s ease-in-out infinite reverse; }
-        .vtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(60,203,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(60,203,255,0.06) 1px, transparent 1px); background-size: 60px 60px; }
+        .vtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.14) 0%, rgba(60,203,255,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: vtd-bg-drift1 22s ease-in-out infinite; }
+        .vtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(60,203,255,0.10) 0%, rgba(60,203,255,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: vtd-bg-drift2 28s ease-in-out infinite; }
+        .vtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%); bottom: 30%; left: 60%; animation: vtd-bg-drift3 34s ease-in-out infinite; }
+        .vtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(60,203,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(60,203,255,0.06) 1px, transparent 1px); background-size: 60px 60px; animation: vtd-grid-shimmer 8s ease-in-out infinite; }
         @keyframes vtd-bg-rot { to { transform: rotate(360deg); } }
-        @keyframes vtd-bg-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(80px,-60px) scale(1.15); } 66% { transform: translate(-40px,70px) scale(0.9); } }
-        @keyframes vtd-bg-drift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-100px,-80px); } }
+        @keyframes vtd-bg-drift1 { 0% { transform: translate(0,0) scale(1); opacity: 0.7; } 25% { transform: translate(80px,-60px) scale(1.15); opacity: 1; } 50% { transform: translate(120px,40px) scale(0.95); opacity: 0.8; } 75% { transform: translate(-40px,70px) scale(1.08); opacity: 0.9; } 100% { transform: translate(0,0) scale(1); opacity: 0.7; } }
+        @keyframes vtd-bg-drift2 { 0% { transform: translate(0,0) scale(1); opacity: 0.6; } 33% { transform: translate(-100px,-80px) scale(1.12); opacity: 1; } 66% { transform: translate(-60px,60px) scale(0.92); opacity: 0.75; } 100% { transform: translate(0,0) scale(1); opacity: 0.6; } }
+        @keyframes vtd-bg-drift3 { 0% { transform: translate(0,0) scale(1); opacity: 0.5; } 20% { transform: translate(60px,-90px) scale(1.2); opacity: 0.9; } 40% { transform: translate(-80px,-40px) scale(0.85); opacity: 0.6; } 60% { transform: translate(-40px,80px) scale(1.1); opacity: 1; } 80% { transform: translate(70px,30px) scale(0.95); opacity: 0.7; } 100% { transform: translate(0,0) scale(1); opacity: 0.5; } }
+        @keyframes vtd-grid-shimmer { 0%,100% { opacity: 0.4; } 50% { opacity: 0.7; } }
 
         /* ── Page ── */
         .vtd-page { min-height: 100vh; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #E6E6E6; position: relative; z-index: 1; }
 
         /* ── Hero ── */
         .vtd-hero { position: relative; min-height: 460px; overflow: hidden; display: flex; align-items: flex-end; }
-        .vtd-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; filter: brightness(0.35) saturate(1.2); }
+        .vtd-hero-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; object-position: center 20%; z-index: 0; filter: brightness(0.35) saturate(1.2); animation: vtd-hero-kb 16s ease-in-out infinite alternate; will-change: transform; }
+        @keyframes vtd-hero-kb { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.04) translate(-1%, -0.8%); } 100% { transform: scale(1.02) translate(0.8%, -0.4%); } }
         .vtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(60,203,255,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,15,42,0.3) 0%, rgba(10,15,42,0.7) 60%, rgba(10,15,42,1) 100%); }
-        .vtd-hero-agent { position: absolute; right: -20px; bottom: 0; height: 90%; z-index: 2; opacity: 0.15; pointer-events: none; animation: vtd-agent-float 4s ease-in-out infinite alternate; filter: saturate(0.5); }
-        @keyframes vtd-agent-float { from { transform: translateY(0px); } to { transform: translateY(-14px); } }
         .vtd-hero-content { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .vtd-hero-inner { flex: 1; }
         .vtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #3CCBFF; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
@@ -791,10 +839,13 @@ function ValorantTournamentDetailInner() {
         /* ── Animations ── */
         @keyframes vtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes vtspin { to { transform: rotate(360deg); } }
+        @keyframes vtd-player-reveal { from { opacity: 0; transform: translateY(16px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes vtd-vs-pop { 0% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes vtd-glow-pulse { 0%,100% { box-shadow: 0 0 8px rgba(60,203,255,0.3); } 50% { box-shadow: 0 0 18px rgba(60,203,255,0.6); } }
 
         /* ── Responsive ── */
         @media (max-width: 1100px) { .vtd-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 900px) { .vtd-players-grid { grid-template-columns: repeat(2, 1fr); } .vtd-teams-grid { grid-template-columns: repeat(2, 1fr); } .vtd-hero-agent { opacity: 0.08; } .vtd-tier-columns { flex-wrap: wrap; } .vtd-tier-col { min-width: calc(50% - 8px); flex: 0 0 calc(50% - 8px); } }
+        @media (max-width: 900px) { .vtd-players-grid { grid-template-columns: repeat(2, 1fr); } .vtd-teams-grid { grid-template-columns: repeat(2, 1fr); } .vtd-tier-columns { flex-wrap: wrap; } .vtd-tier-col { min-width: calc(50% - 8px); flex: 0 0 calc(50% - 8px); } }
         @media (max-width: 800px) {
           .vtd-hero { min-height: 340px; }
           .vtd-hero-content { padding: 0 16px 24px; min-height: 340px; }
@@ -804,7 +855,7 @@ function ValorantTournamentDetailInner() {
           .vtd-mc-avatars { display: none; }
           .vtd-mc-team-name { font-size: 0.78rem; }
           .vtd-card { padding: 20px; }
-          .vtd-hero-agent { display: none; }
+
         }
         @media (max-width: 600px) {
           .vtd-stat-tiles { grid-template-columns: repeat(2, 1fr); }
@@ -872,7 +923,6 @@ function ValorantTournamentDetailInner() {
         {/* ═══ HERO ═══ */}
         <div className="vtd-hero">
           <img className="vtd-hero-bg" src={tournament.bannerImage || "/valorantimg3.jpg"} alt="" aria-hidden="true" />
-          <img className="vtd-hero-agent" src="/valorant-agents.jpg" alt="" aria-hidden="true" />
           <div className="vtd-hero-overlay" />
           <div className="vtd-hero-content">
             <div className="vtd-hero-inner">
@@ -1075,19 +1125,6 @@ function ValorantTournamentDetailInner() {
                   )}
                 </div>
                 <div>
-                  {Object.keys(schedule).length > 0 && (
-                    <div className="vtd-card">
-                      <span className="vtd-card-label"><Calendar size={12} style={{ display: "inline", marginRight: 6 }} />Schedule</span>
-                      <div className="vtd-timeline">
-                        {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
-                        {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
-                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
-                        {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "active" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "active" ? "ACTIVE" : undefined} />}
-                        {schedule.groupStageEnd && <TimelineItem label="Group Stage Ends" date={schedule.groupStageEnd} status={new Date(schedule.groupStageEnd) <= new Date() ? "past" : "future"} />}
-                        {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
-                      </div>
-                    </div>
-                  )}
                   {/* Tournament flow diagram */}
                   <div className="vtd-card">
                     <span className="vtd-card-label"><GitBranch size={12} style={{ display: "inline", marginRight: 6 }} />Tournament Flow</span>
@@ -1108,6 +1145,19 @@ function ValorantTournamentDetailInner() {
                       ))}
                     </div>
                   </div>
+                  {Object.keys(schedule).length > 0 && (
+                    <div className="vtd-card">
+                      <span className="vtd-card-label"><Calendar size={12} style={{ display: "inline", marginRight: 6 }} />Schedule</span>
+                      <div className="vtd-timeline">
+                        {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
+                        {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
+                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
+                        {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "active" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "active" ? "ACTIVE" : undefined} />}
+                        {schedule.groupStageEnd && <TimelineItem label="Group Stage Ends" date={schedule.groupStageEnd} status={new Date(schedule.groupStageEnd) <= new Date() ? "past" : "future"} />}
+                        {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

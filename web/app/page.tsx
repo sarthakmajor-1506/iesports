@@ -22,7 +22,7 @@ const HOW_IT_WORKS = [
 const HERO_IMAGES = [
   "/dota2poster3.png",
   "/valorantimg3.jpg",
-  "/dota2image3.jpeg",
+  "/dota2poster3.png",
   "/valorant-agents.jpg",
   ];
 
@@ -131,12 +131,14 @@ export default function Home() {
 
         /* Hero */
         .ie-hero { position:relative; overflow:hidden; width:100%; min-height:580px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:80px 20px 60px; }
-        .ie-hero-bg-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; transition:opacity 1s ease-in-out; }
-        .ie-hero-bg-img.active { opacity:1; }
-        .ie-hero-bg-img.inactive { opacity:0; }
+        .ie-hero-bg-img { position:absolute; inset:-8%; width:116%; height:116%; object-fit:cover; object-position:center 20%; z-index:0; pointer-events:none; transition:opacity 1.2s ease-in-out; }
+        .ie-hero-bg-img.active { opacity:1; animation:ie-hero-kb 12s ease-in-out infinite alternate; }
+        .ie-hero-bg-img.inactive { opacity:0; animation:none; }
+        @keyframes ie-hero-kb { 0% { transform:scale(1) translate(0,0); } 50% { transform:scale(1.06) translate(-1.5%,-1%); } 100% { transform:scale(1.03) translate(1%,-0.5%); } }
         .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:none; }
         .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.82) 0%,rgba(0,0,0,.58) 45%,rgba(0,0,0,.9) 100%); }
-        .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 70%); pointer-events:none; z-index:2; }
+        .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 70%); pointer-events:none; z-index:2; animation:ie-glow-breathe 6s ease-in-out infinite; }
+        @keyframes ie-glow-breathe { 0%,100% { opacity:0.7; transform:translateX(-50%) scale(1); } 50% { opacity:1; transform:translateX(-50%) scale(1.12); } }
         .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; }
         .ie-hero-logo { margin-bottom:12px; display:flex; justify-content:center; }
         .ie-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(59,130,246,.16); border:1px solid rgba(59,130,246,.38); color:var(--accent-light); font-size:.72rem; font-weight:700; padding:5px 14px; border-radius:100px; margin-bottom:12px; letter-spacing:.06em; text-transform:uppercase; }
@@ -363,7 +365,7 @@ export default function Home() {
           </div>
           <div className="ie-games-grid">
             {[
-              { name: "Dota 2",         tag: "Live Now",    src: "/dota2image3.jpeg",   soon: false },
+              { name: "Dota 2",         tag: "Live Now",    src: "/dota2poster3.png",   soon: false },
               { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false },
               { name: "Counter Strike", tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true  },
               { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true  },

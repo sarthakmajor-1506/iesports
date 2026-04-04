@@ -41,22 +41,27 @@ export default function Valorant() {
           background-size: 64px 64px;
         }
         .val-bg-glow1 {
-          position: absolute; width: 600px; height: 600px; top: -200px; right: -100px;
-          background: radial-gradient(circle, rgba(60,203,255,0.1) 0%, transparent 70%);
-          animation: val-glow-drift1 12s ease-in-out infinite alternate;
+          position: absolute; width: 700px; height: 700px; top: -200px; right: -100px;
+          background: radial-gradient(circle, rgba(60,203,255,0.12) 0%, rgba(60,203,255,0.03) 45%, transparent 70%);
+          animation: val-glow-drift1 20s ease-in-out infinite;
         }
         .val-bg-glow2 {
-          position: absolute; width: 500px; height: 500px; bottom: 20%; left: -150px;
-          background: radial-gradient(circle, rgba(60,203,255,0.07) 0%, transparent 70%);
-          animation: val-glow-drift2 15s ease-in-out infinite alternate;
+          position: absolute; width: 550px; height: 550px; bottom: 20%; left: -150px;
+          background: radial-gradient(circle, rgba(60,203,255,0.09) 0%, rgba(60,203,255,0.02) 45%, transparent 70%);
+          animation: val-glow-drift2 26s ease-in-out infinite;
         }
         @keyframes val-glow-drift1 {
-          0% { transform: translate(0, 0) scale(1); }
-          100% { transform: translate(-60px, 80px) scale(1.15); }
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.7; }
+          25%  { transform: translate(-80px, 60px) scale(1.18); opacity: 1; }
+          50%  { transform: translate(-30px, 120px) scale(0.95); opacity: 0.8; }
+          75%  { transform: translate(50px, 40px) scale(1.1); opacity: 0.9; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
         }
         @keyframes val-glow-drift2 {
-          0% { transform: translate(0, 0) scale(1); }
-          100% { transform: translate(80px, -60px) scale(1.1); }
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.6; }
+          33%  { transform: translate(100px, -70px) scale(1.15); opacity: 1; }
+          66%  { transform: translate(40px, -120px) scale(0.9); opacity: 0.7; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
         }
 
         /* ── Page content (above bg) ── */
@@ -68,14 +73,15 @@ export default function Valorant() {
           display: flex; align-items: flex-end;
         }
         .val-hero-img {
-          position: absolute; inset: 0; width: 100%; height: 100%;
-          object-fit: cover; z-index: 0;
-          animation: heroKenBurns 10s ease-in-out infinite alternate;
+          position: absolute; inset: -6%; width: 112%; height: 112%;
+          object-fit: cover; object-position: center 20%; z-index: 0;
+          animation: val-hero-kb 14s ease-in-out infinite alternate;
           will-change: transform;
         }
-        @keyframes heroKenBurns {
-          0%   { transform: scale(1)    translateX(0);  }
-          100% { transform: scale(1.08) translateX(-2%); }
+        @keyframes val-hero-kb {
+          0%   { transform: scale(1) translate(0, 0); }
+          50%  { transform: scale(1.05) translate(-1.5%, -0.5%); }
+          100% { transform: scale(1.02) translate(1%, -1%); }
         }
         .val-hero-overlay {
           position: absolute; inset: 0; z-index: 1;

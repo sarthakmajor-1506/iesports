@@ -99,8 +99,12 @@ export default function ShareVideoCarousel({
   }, [tournamentId, current.type, onToast, copying]);
 
   // Two-phase video recording:
-  // Phase 1: Capture all frames as ImageBitmaps (slow but accurate)
-  // Phase 2: Encode at constant framerate using captureStream(0) + requestFrame()
+  // Phase 1: Capture keyframes (every CAPTURE_STEP-th frame) as ImageBitmaps — ~5x fewer html2canvas calls
+  // Phase 2: Encode at full framerate by holding each capture for CAPTURE_STEP encoded frames
+  const CAPTURE_STEP = 5; // capture every 5th frame → 30 captures instead of 150
+  const CAPTURE_COUNT = Math.ceil(DURATION_FRAMES / CAPTURE_STEP);
+  const ENCODE_SIZE = 720; // encode at 720p instead of 1080p for speed
+
   const recordVideo = useCallback(async () => {
     if (recording) return;
     setRecording(true);
@@ -113,22 +117,24 @@ export default function ShareVideoCarousel({
 
       player.pause();
       const html2canvas = (await import("html2canvas")).default;
+      const el = container as HTMLElement;
+      const captureScale = ENCODE_SIZE / el.clientWidth;
 
-      // ── Phase 1: Capture every frame as an ImageBitmap ──
+      // ── Phase 1: Capture keyframes ──
       const frameBitmaps: ImageBitmap[] = [];
 
-      for (let f = 0; f < DURATION_FRAMES; f++) {
-        player.seekTo(f);
+      for (let k = 0; k < CAPTURE_COUNT; k++) {
+        const f = k * CAPTURE_STEP;
+        player.seekTo(Math.min(f, DURATION_FRAMES - 1));
 
-        // Wait for React to commit the render (double-rAF is more reliable than setTimeout)
         await new Promise<void>((r) =>
           requestAnimationFrame(() => requestAnimationFrame(() => r()))
         );
 
-        const captured = await html2canvas(container as HTMLElement, {
-          width: (container as HTMLElement).clientWidth,
-          height: (container as HTMLElement).clientHeight,
-          scale: 1080 / (container as HTMLElement).clientWidth,
+        const captured = await html2canvas(el, {
+          width: el.clientWidth,
+          height: el.clientHeight,
+          scale: captureScale,
           backgroundColor: "#08060e",
           logging: false,
           useCORS: true,
@@ -136,16 +142,15 @@ export default function ShareVideoCarousel({
 
         const bitmap = await createImageBitmap(captured);
         frameBitmaps.push(bitmap);
-        setRecordProgress(Math.round(((f + 1) / DURATION_FRAMES) * 85));
+        setRecordProgress(Math.round(((k + 1) / CAPTURE_COUNT) * 85));
       }
 
-      // ── Phase 2: Encode at constant framerate ──
+      // ── Phase 2: Encode at full framerate ──
       const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1080;
+      canvas.width = ENCODE_SIZE;
+      canvas.height = ENCODE_SIZE;
       const ctx = canvas.getContext("2d")!;
 
-      // captureStream(0) = manual frame push via requestFrame()
       const stream = canvas.captureStream(0);
       const track = stream.getVideoTracks()[0];
 
@@ -153,7 +158,7 @@ export default function ShareVideoCarousel({
         mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
           ? "video/webm;codecs=vp9"
           : "video/webm",
-        videoBitsPerSecond: 8_000_000,
+        videoBitsPerSecond: 4_000_000,
       });
 
       const chunks: Blob[] = [];
@@ -168,27 +173,25 @@ export default function ShareVideoCarousel({
 
       recorder.start();
 
-      for (let i = 0; i < frameBitmaps.length; i++) {
-        ctx.clearRect(0, 0, 1080, 1080);
-        ctx.drawImage(frameBitmaps[i], 0, 0, 1080, 1080);
+      // Write DURATION_FRAMES encoded frames, holding each bitmap for CAPTURE_STEP frames
+      for (let i = 0; i < DURATION_FRAMES; i++) {
+        const bitmapIdx = Math.min(Math.floor(i / CAPTURE_STEP), frameBitmaps.length - 1);
+        ctx.clearRect(0, 0, ENCODE_SIZE, ENCODE_SIZE);
+        ctx.drawImage(frameBitmaps[bitmapIdx], 0, 0, ENCODE_SIZE, ENCODE_SIZE);
 
-        // Push this exact frame to the stream
         if ("requestFrame" in track) {
           (track as any).requestFrame();
         }
 
-        // Hold for exactly one frame duration so MediaRecorder encodes at constant fps
         await new Promise((r) => setTimeout(r, 1000 / FPS));
-        setRecordProgress(85 + Math.round(((i + 1) / frameBitmaps.length) * 15));
+        setRecordProgress(85 + Math.round(((i + 1) / DURATION_FRAMES) * 15));
       }
 
       recorder.stop();
       const blob = await done;
 
-      // Cleanup bitmaps
       frameBitmaps.forEach((b) => b.close());
 
-      // Download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.download = `${(tournament.name || "tournament").replace(/\s+/g, "_")}_${current.type}.webm`;
@@ -196,7 +199,6 @@ export default function ShareVideoCarousel({
       a.click();
       URL.revokeObjectURL(url);
 
-      // Resume playback
       player.seekTo(0);
       player.play();
     } catch (err) {
