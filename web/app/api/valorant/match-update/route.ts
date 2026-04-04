@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
     const guildId = process.env.DISCORD_GUILD_ID || process.env.DISCORD_SERVER_ID;
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const voiceCategoryId = process.env.VOICE_CATEGORY_ID;
-    const notifyChannelId = process.env.VALORANT_CHANNEL_ID
+    const notifyChannelId = process.env.Valorant_lobby
       || process.env.LOBBY_CONTROL_CHANNEL_ID
       || process.env.RESULTS_CHANNEL_ID;
 

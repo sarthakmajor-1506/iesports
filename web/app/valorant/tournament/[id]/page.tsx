@@ -943,13 +943,18 @@ function ValorantTournamentDetailInner() {
                 {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                   <>
                     <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
-                    {user && (
-                      <button
-                        onClick={toggleWaitlist}
-                        disabled={waitlistLoading}
-                        style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                      >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Notify Me"}</button>
-                    )}
+                    <button
+                      onClick={() => {
+                        if (!user) {
+                          try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
+                          window.open("/api/auth/discord-login", "_blank");
+                          return;
+                        }
+                        toggleWaitlist();
+                      }}
+                      disabled={waitlistLoading}
+                      style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                    >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Notify Me"}</button>
                   </>
                 )}
                 {isRegistered && (

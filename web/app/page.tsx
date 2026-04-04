@@ -365,12 +365,12 @@ export default function Home() {
           </div>
           <div className="ie-games-grid">
             {[
-              { name: "Dota 2",         tag: "Live Now",    src: "/dota2poster3.png",   soon: false },
-              { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false },
-              { name: "Counter Strike", tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true  },
-              { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true  },
+              { name: "Dota 2",         tag: "Live Now",    src: "/dota2poster3.png",   soon: false, href: "/dota2" },
+              { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false, href: "/valorant" },
+              { name: "Counter Strike", tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true,  href: "" },
+              { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true,  href: "" },
             ].map(g => (
-              <div className="ie-game-card" key={g.name}>
+              <div className="ie-game-card" key={g.name} onClick={() => { if (g.href) router.push(g.href); }}>
                 <Image className="ie-game-card-img" src={g.src} alt={g.name} fill sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw" style={{ objectFit: "cover" }} loading="lazy" />
                 <div className="ie-game-overlay" />
                 <div className="ie-game-info">
@@ -426,7 +426,7 @@ export default function Home() {
             <div className="ie-tourn-grid">
               {/* Dota 2 Tournament */}
               {featuredTournament && (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${featuredTournament.id}`)} style={{ cursor: "pointer" }}>
+                <div className="ie-tourn-wrap" onClick={() => router.push("/dota2")} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
                     <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
                     <div className="ie-tourn-title">{featuredTournament.name}</div>
@@ -448,7 +448,7 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
                     </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push("/dota2"); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
                       View Tournament →
                     </button>
                   </div>
@@ -457,7 +457,7 @@ export default function Home() {
 
               {/* Valorant Tournament */}
               {featuredValTournament && (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer" }}>
+                <div className="ie-tourn-wrap" onClick={() => router.push("/valorant")} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
                     <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#ff4655" }} /> Registration Open</div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
@@ -479,7 +479,7 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
                     </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push("/valorant"); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
                       View Tournament →
                     </button>
                   </div>
