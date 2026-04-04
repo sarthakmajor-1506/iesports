@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Structure / design fields (all games) ─────────────────────────────────
-    const numFields = ["groupStageRounds", "matchesPerRound", "bracketBestOf", "grandFinalBestOf", "eliminationBestOf", "bracketTeamCount", "totalTeams", "playersPerTeam", "upperBracketTeams", "lowerBracketTeams"];
+    const numFields = ["groupStageRounds", "matchesPerRound", "bracketBestOf", "lbFinalBestOf", "grandFinalBestOf", "eliminationBestOf", "bracketTeamCount", "totalTeams", "playersPerTeam", "upperBracketTeams", "lowerBracketTeams"];
     for (const f of numFields) {
       if (fields[f] !== undefined && fields[f] !== null && fields[f] !== "") {
         tournamentData[f] = Number(fields[f]);
