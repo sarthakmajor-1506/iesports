@@ -434,7 +434,7 @@ export default function Home() {
                         { icon: "🎮", label: featuredTournament.game },
                         { icon: "🏆", label: featuredTournament.prizePool },
                         { icon: "🎟️", label: featuredTournament.entry },
-                        { icon: "📅", label: featuredTournament.startDate },
+                        { icon: "📅", label: featuredTournament.startDate?.includes("T") ? new Date(featuredTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredTournament.startDate },
                       ].map(c => (
                         <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
                       ))}
