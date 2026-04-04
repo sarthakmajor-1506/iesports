@@ -1,0 +1,57 @@
+## Vercel Web Analytics Installation
+
+Successfully installed and configured Vercel Web Analytics for this Next.js project.
+
+### Changes Made:
+
+**1. Installed Package:**
+   - Added `@vercel/analytics` v2.0.1 to project dependencies
+   - Used npm (the project's package manager) to install the package
+
+**2. Updated Files:**
+
+   **web/app/layout.tsx:**
+   - Added import: `import { Analytics } from "@vercel/analytics/next"`
+   - Added `<Analytics />` component inside the `<body>` tag, after the Suspense wrapper
+   - Follows the official Vercel documentation for Next.js App Router setup
+
+   **web/package.json:**
+   - Added `@vercel/analytics` to the dependencies section
+
+   **web/package-lock.json:**
+   - Updated with the new dependency and its sub-dependencies
+
+### Implementation Details:
+
+- **Framework:** Next.js 16.1.6 (App Router)
+- **Package Version:** @vercel/analytics v2.0.1
+- **Installation Method:** Followed the official Vercel Analytics quickstart guide from https://vercel.com/docs/analytics/quickstart
+- **Integration Point:** Root layout file (app/layout.tsx) as per Next.js App Router best practices
+
+### Verification:
+
+✓ Package successfully installed
+✓ Analytics component properly imported and added to layout
+✓ No linting errors introduced in modified files
+✓ package.json and package-lock.json updated correctly
+✓ Preserved existing code structure and patterns
+
+### Notes:
+
+- The Analytics component is placed after the Suspense wrapper to ensure proper loading
+- The component will automatically track page views and web vitals when deployed to Vercel
+- No additional configuration is required - analytics will work automatically on Vercel deployments
+- The build error encountered (`Service account object must contain a string "project_id" property`) is a pre-existing Firebase configuration issue unrelated to the Analytics integration
+
+### Next Steps:
+
+When deployed to Vercel, the Analytics component will automatically:
+1. Track page views across the application
+2. Collect Web Vitals metrics (LCP, FID, CLS, etc.)
+3. Send analytics data to your Vercel project dashboard
+
+You can verify the integration is working by:
+1. Deploying the application to Vercel
+2. Visiting pages on the deployed site
+3. Checking the browser's Network tab for requests to Vercel Analytics endpoints
+4. Viewing analytics data in your Vercel project dashboard under the Analytics section
