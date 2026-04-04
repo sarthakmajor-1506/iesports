@@ -13,7 +13,7 @@ interface Tournament {
 }
 
 const HOW_IT_WORKS = [
-  { icon: "🔗", title: "Connect & Join",    desc: "Link your Steam account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
+  { icon: "🔗", title: "Connect & Join",    desc: "Link your Steam or Discord account once. Then browse tournaments and register, no repeated setup needed.", color: "#3b82f6" },
   { icon: "⚔️", title: "Multiple Modes", desc: "Play 5v5 team tournaments in your rank bracket, or climb the leaderboard solo on your own schedule.", color: "#f97316" },
   { icon: "📊", title: "Automated Results", desc: "We track your match results automatically. Just play your game as usual, no manual reporting.", color: "#8b5cf6" },
   { icon: "🏆", title: "Get Rewarded",      desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
@@ -424,7 +424,7 @@ export default function Home() {
             <div className="ie-tourn-grid">
               {/* Dota 2 Tournament */}
               {featuredTournament && (
-                <div className="ie-tourn-wrap">
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${featuredTournament.id}`)} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
                     <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
                     <div className="ie-tourn-title">{featuredTournament.name}</div>
@@ -446,17 +446,16 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
                     </div>
-                    <button className="ie-btn-register" onClick={loginWithSteam}>
-                      <SteamIcon size={18} /> Sign in with Steam to Register
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                      View Tournament →
                     </button>
-                    <a href={`/tournament/${featuredTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
                   </div>
                 </div>
               )}
 
               {/* Valorant Tournament */}
               {featuredValTournament && (
-                <div className="ie-tourn-wrap">
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
                     <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#ff4655" }} /> Registration Open</div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
@@ -478,16 +477,29 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
                     </div>
-                    <button className="ie-btn-register val" onClick={() => setRiotModalOpen(true)}>
-                      <img src="/riot-games.png" alt="Riot" width={18} height={18} style={{ display: "block", borderRadius: 3 }} />
-                      Sign in with Riot to Register
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                      View Tournament →
                     </button>
-                    <a href={`/valorant/tournament/${featuredValTournament.id}`} className="ie-tourn-detail-link">View full details & rules →</a>
                   </div>
                 </div>
               )}
             </div>
           )}
+          <div style={{ textAlign: "center", marginTop: 36 }}>
+            <button onClick={() => router.push("/valorant")} style={{
+              display: "inline-flex", alignItems: "center", gap: 10,
+              background: "linear-gradient(135deg, #3B82F6, #2563EB)", color: "#fff",
+              border: "none", borderRadius: 100, padding: "16px 40px",
+              fontSize: "1.05rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 24px rgba(59,130,246,0.35)", transition: "opacity 0.2s, transform 0.1s",
+            }}
+              onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; }}
+              onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+            >
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Browse All Tournaments
+            </button>
+          </div>
         </div>
       </section>
 
