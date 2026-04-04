@@ -370,7 +370,7 @@ export default function Navbar() {
         .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
         .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
-        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } }
+        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } .ie-signin-btn { display: none !important; } }
 
         .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #2A2A30; background: #121215; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
         .ie-hamburger span { display: block; width: 18px; height: 2px; background: #8A8880; border-radius: 2px; transition: all 0.2s; transform-origin: center; }
@@ -423,7 +423,7 @@ export default function Navbar() {
         <div className="ie-nav-accent" style={{ background: activeGame?.color || "#3B82F6" }} />
         <div className="ie-nav-row">
 
-          <div className="ie-nav-logo" onClick={() => router.push(activeGame?.path || "/valorant")}>
+          <div className="ie-nav-logo" onClick={() => router.push("/")}>
             <Image src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
@@ -451,6 +451,8 @@ export default function Navbar() {
           </div>
 
           <div className="ie-nav-right">
+            {user ? (
+            <>
             <div className="ie-accounts-row2">
               <AccBadge
                 id="steam"
@@ -597,6 +599,44 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            </>
+            ) : (
+            <>
+              <button
+                className="ie-signin-btn"
+                onClick={() => window.open("/api/auth/discord-login", "_blank")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "rgba(88,101,242,0.15)", color: "#818cf8",
+                  border: "1px solid rgba(88,101,242,0.35)", borderRadius: 100,
+                  padding: "8px 18px", fontSize: "0.84rem", fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(88,101,242,0.25)"; }}
+                onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(88,101,242,0.15)"; }}
+              >
+                <DiscordIcon size={16} color="#818cf8" /> Sign In
+              </button>
+              <button
+                className="ie-signin-btn"
+                onClick={() => window.open("/api/auth/steam", "_blank")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "linear-gradient(135deg,#1b2838,#2a475e)", color: "#fff",
+                  border: "1px solid #3d6b8c", borderRadius: 100,
+                  padding: "8px 16px", fontSize: "0.84rem", fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit", transition: "opacity 0.2s",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.85"; }}
+                onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+              >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" width={16} height={16} style={{ display: "block" }} />
+                Steam
+              </button>
+            </>
+            )}
 
             <button className="ie-hamburger" onClick={() => setMobileMenuOpen(p => !p)} aria-label="Toggle menu">
               <span style={{ transform: mobileMenuOpen ? "rotate(45deg) translate(5px, 5px)" : "none" }} />
@@ -620,6 +660,8 @@ export default function Navbar() {
           })}
           <div className="ie-mobile-divider" />
 
+          {user ? (
+          <>
           {hasSteam ? (
             <div className="ie-mobile-row">
               <img src={steamData.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e" }} />
@@ -676,6 +718,20 @@ export default function Navbar() {
           <button className="ie-mobile-logout" onClick={async () => { await logout(); }}>
             <span style={{ fontSize: 16 }}>🚪</span> Logout
           </button>
+          </>
+          ) : (
+          <>
+            <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/discord-login", "_blank")}
+              style={{ background: "rgba(88,101,242,0.1)", borderColor: "rgba(88,101,242,0.35)", color: "#818cf8" }}>
+              <DiscordIcon size={20} color="#818cf8" /> Sign in with Discord
+            </button>
+            <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/steam", "_blank")}
+              style={{ background: "linear-gradient(135deg,#1b2838,#2a475e)", borderColor: "#3d6b8c", color: "#fff" }}>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20 }} />
+              Sign in with Steam
+            </button>
+          </>
+          )}
         </div>
 
         {pathname?.startsWith("/dota") && steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (

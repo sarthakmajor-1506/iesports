@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
+import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
@@ -13,6 +14,7 @@ export default function MatchDetail() {
   const params = useParams();
   const tournamentId = params.tournamentId as string;
   const matchId = params.matchId as string;
+  const { user, loading: authLoading } = useAuth();
 
   const [match, setMatch] = useState<any>(null);
   const [tournament, setTournament] = useState<any>(null);
@@ -52,6 +54,27 @@ export default function MatchDetail() {
     };
     load();
   }, [tournamentId, matchId]);
+
+  if (!authLoading && !user) return (
+    <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "var(--font-geist-sans),system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
+      <Navbar />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚔️</div>
+        <h2 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 8 }}>Sign in to view match details</h2>
+        <p style={{ fontSize: "0.88rem", color: "#8A8880", marginBottom: 28, maxWidth: 400, lineHeight: 1.6 }}>Create an account or sign in to see match scorecards, player stats and game results.</p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <button onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.open("/api/auth/discord-login", "_blank"); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(88,101,242,0.15)", color: "#818cf8", border: "1px solid rgba(88,101,242,0.35)", borderRadius: 100, padding: "12px 28px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Sign in with Discord
+          </button>
+          <button onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.open("/api/auth/steam", "_blank"); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#1b2838,#2a475e)", color: "#fff", border: "1px solid #3d6b8c", borderRadius: 100, padding: "12px 28px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" width={18} height={18} style={{ display: "block" }} /> Sign in with Steam
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (

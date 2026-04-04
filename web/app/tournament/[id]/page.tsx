@@ -326,7 +326,46 @@ function DotaTournamentDetailInner() {
   const [matches, setMatches] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(doc(db, "tournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); setTLoading(false); }); return () => unsub(); }, [id]);
+  // Initial data load via API (works for everyone, including unauthenticated)
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/tournaments/detail?id=${id}&game=dota2`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.tournament) setTournament(data.tournament);
+        if (data.players) setPlayers(data.players);
+        if (data.teams) setTeams(data.teams);
+        if (data.standings) {
+          const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
+          setStandings(sorted);
+        }
+        if (data.matches) {
+          const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
+          setMatches(sorted);
+        }
+        if (data.leaderboard) {
+          const sorted = [...data.leaderboard].sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0));
+          setLeaderboard(sorted);
+        }
+        setTLoading(false);
+      })
+      .catch(() => setTLoading(false));
+  }, [id]);
+
+  // Real-time updates for logged-in users via onSnapshot
+  useEffect(() => {
+    if (!id || !user) return;
+    const unsubs: (() => void)[] = [];
+    unsubs.push(onSnapshot(doc(db, "tournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); }));
+    unsubs.push(onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }));
+    unsubs.push(onSnapshot(query(collection(db, "tournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
+    unsubs.push(onSnapshot(collection(db, "tournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }));
+    unsubs.push(onSnapshot(collection(db, "tournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }));
+    unsubs.push(onSnapshot(collection(db, "tournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0)); setLeaderboard(list); }));
+    return () => unsubs.forEach(u => u());
+  }, [id, user]);
+
+  // Registration check for logged-in users
   useEffect(() => {
     if (!user || !id) return;
     const checkReg = async () => {
@@ -356,14 +395,9 @@ function DotaTournamentDetailInner() {
       setOnWaitlist(data.onWaitlist);
     } catch (e: any) { alert(e.message || "Could not update waitlist"); } finally { setWaitlistLoading(false); }
   };
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); }); return () => unsub(); }, [id]);
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "tournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }); return () => unsub(); }, [id]);
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }); return () => unsub(); }, [id]);
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0)); setLeaderboard(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!tournament) return; const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline)); tick(); const i = setInterval(tick, 60000); return () => clearInterval(i); }, [tournament]);
 
-  if (authLoading || tLoading) return (
+  if (tLoading) return (
     <div style={{ minHeight: "100vh", background: "#0a0e18", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
       <style>{`
         @keyframes dtd-sk-pulse { 0%,100% { background-position: -200% 0; } 50% { background-position: 200% 0; } }
@@ -732,7 +766,11 @@ function DotaTournamentDetailInner() {
                   <button
                     style={{ padding: "12px 32px", background: "linear-gradient(135deg, #3B82F6, #2563EB)", color: "#fff", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(59,130,246,0.35)" }}
                     onClick={() => {
-                      if (!user) { router.push("/"); return; }
+                      if (!user) {
+                        try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
+                        window.open("/api/auth/discord-login", "_blank");
+                        return;
+                      }
                       if (!steamLinked) { navigateWithAppPriority(`/api/auth/steam?uid=${user.uid}`); return; }
                       setShowRegister(true);
                     }}

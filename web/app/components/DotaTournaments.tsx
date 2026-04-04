@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { getDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -15,15 +15,13 @@ export default function DotaTournaments() {
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const q = query(collection(db, "tournaments"), where("game", "==", "dota2"));
-    const unsub = onSnapshot(q, (snap) => {
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Tournament[];
-      const ended = all.filter((t) => t.status === "ended").sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 1);
-      const upcoming = all.filter((t) => t.status === "upcoming" || t.status === "ongoing").sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3);
-      setTournaments([...ended, ...upcoming]);
-      setTLoading(false);
-    });
-    return () => unsub();
+    fetch("/api/tournaments/list?game=dota2")
+      .then(r => r.json())
+      .then(data => {
+        setTournaments(data.tournaments || []);
+        setTLoading(false);
+      })
+      .catch(() => setTLoading(false));
   }, []);
 
   useEffect(() => {

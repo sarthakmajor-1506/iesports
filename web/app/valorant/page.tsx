@@ -11,7 +11,7 @@ type ValorantTab = "tournaments" | "solo";
 export default function Valorant() {
   const [valTab, setValTab] = useState<ValorantTab>("tournaments");
   const [mounted, setMounted] = useState(false);
-  const { riotData } = useAuth();
+  const { user, riotData } = useAuth();
   const router = useRouter();
 
   useEffect(() => { const t = setTimeout(() => setMounted(true), 50); return () => clearTimeout(t); }, []);
@@ -182,17 +182,23 @@ export default function Valorant() {
           </div>
 
           <div className={`val-banner${mounted ? " show" : ""}`}>
-            {riotData?.riotLinked && riotData?.riotVerified === "pending" && (
+            {user && riotData?.riotLinked && riotData?.riotVerified === "pending" && (
               <div className="val-banner-box gray" style={{ opacity: 0.7 }}>
                 <Clock size={14} style={{ flexShrink: 0, color: "#8A8880" }} />
                 <span style={{ color: "#8A8880" }}>Nothing needed from you — our system is verifying your Riot ID. This usually takes under 24 hours.</span>
               </div>
             )}
-            {!riotData?.riotLinked && (
+            {user && !riotData?.riotLinked && (
               <div className="val-banner-box gray">
                 <Trophy size={14} style={{ color: "#3CCBFF", flexShrink: 0 }} />
                 <span>Connect your Riot ID to register for tournaments.</span>
                 <span className="val-banner-link" onClick={() => router.push("/connect-riot")}>Connect now →</span>
+              </div>
+            )}
+            {!user && (
+              <div className="val-banner-box gray">
+                <Trophy size={14} style={{ color: "#3CCBFF", flexShrink: 0 }} />
+                <span>Sign in to register for tournaments and compete.</span>
               </div>
             )}
           </div>

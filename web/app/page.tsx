@@ -100,8 +100,6 @@ export default function Home() {
   const valSlotsLeft = featuredValTournament ? featuredValTournament.totalSlots - featuredValTournament.slotsBooked : null;
   const valSlotPct   = featuredValTournament ? Math.round((featuredValTournament.slotsBooked / featuredValTournament.totalSlots) * 100) : 0;
 
-  if (loading) return null;
-
   return (
     <>
       <style>{`
@@ -312,18 +310,18 @@ export default function Home() {
           <h1>Compete on<br /><span className="accent">Indian Esports</span></h1>
           <p className="ie-hero-sub">Play what you love. Compete in your rank bracket in totally free community events. Win with skills.</p>
           <div className="ie-hero-cta">
-            <button className="ie-btn-primary" onClick={loginWithSteam}>
-              <SteamIcon size={20} />
+            <button className="ie-btn-primary" onClick={() => router.push("/valorant")} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Browse Tournaments
+            </button>
+            <button className="ie-btn-secondary" onClick={loginWithSteam}>
+              <SteamIcon size={18} />
               Sign in with Steam
             </button>
-            <button className="ie-btn-primary" onClick={() => setRiotModalOpen(true)} style={{ background: "linear-gradient(135deg, #ff4655, #cc2233)", borderColor: "#ff4655", boxShadow: "0 4px 22px rgba(255,70,85,.4)" }}>
-              <img src="/riot-games.png" alt="Riot" width={20} height={20} style={{ display: "block", borderRadius: 3 }} />
+            <button className="ie-btn-secondary" onClick={() => setRiotModalOpen(true)}>
+              <img src="/riot-games.png" alt="Riot" width={18} height={18} style={{ display: "block", borderRadius: 3 }} />
               Sign in with Riot
             </button>
-            <a href="#how-it-works" className="ie-btn-secondary">
-              Learn More
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-            </a>
           </div>
         </div>
         <div className="ie-hero-stats">

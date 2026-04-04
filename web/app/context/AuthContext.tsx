@@ -62,12 +62,14 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
-// Pages that don't need auth — /auth/steam-success MUST be here
-// so AuthContext doesn't redirect away before signInWithCustomToken completes
-const PUBLIC_PATHS = ["/", "/login", "/auth/steam-success", "/auth/discord-success"];
+// Pages that strictly require authentication (redirects unauthenticated users to /)
+const AUTH_REQUIRED_PATHS = ["/connect-steam", "/connect-riot", "/dashboard"];
+const AUTH_REQUIRED_PREFIXES = ["/solo/"];
 
-// Pages that need auth but not Steam
-const STEAM_EXEMPT_PATHS = ["/connect-steam", "/connect-riot"];
+function requiresAuth(pathname: string): boolean {
+  if (AUTH_REQUIRED_PATHS.includes(pathname)) return true;
+  return AUTH_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -130,10 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (u) {
         const { hasSteam } = await syncUserData(u);
-        if (!PUBLIC_PATHS.includes(pathname)) {
-          if (hasSteam && pathname === "/connect-steam") {
-            router.push("/valorant");
-          }
+        // If user already has Steam linked and is on connect-steam, redirect to game page
+        if (hasSteam && pathname === "/connect-steam") {
+          router.push("/valorant");
         }
       } else {
         setSteamLinked(false);
@@ -141,7 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRiotData(null);
         setUserProfile(null);
         setDiscordConnections([]);
-        if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/player/")) {
+        // Only redirect from pages that strictly require authentication
+        if (requiresAuth(pathname)) {
           try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
           router.push("/");
         }
