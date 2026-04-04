@@ -101,11 +101,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Snake draft shuffle ─────────────────────────────────────────────────
-    const sorted = [...players].sort((a, b) => {
-      if (b.skillLevel !== a.skillLevel) return b.skillLevel - a.skillLevel;
-      return b.riotTier - a.riotTier;
-    });
+    // ── Snake draft shuffle (by riotTier — highest rank first) ───────────────
+    const sorted = [...players].sort((a, b) => b.riotTier - a.riotTier);
 
     const teams: {
       teamIndex: number;
@@ -124,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     for (const player of sorted) {
       teams[idx].members.push(player);
-      teams[idx].totalSkill += player.skillLevel;
+      teams[idx].totalSkill += player.riotTier;
 
       if (forward) {
         idx++;

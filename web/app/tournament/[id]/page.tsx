@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
@@ -272,21 +272,21 @@ function DotaTournamentDetailInner() {
   }, [user, id]);
   useEffect(() => {
     if (!user || !id) return;
-    getDoc(doc(db, "tournaments", id, "waitlist", user.uid)).then(snap => setOnWaitlist(snap.exists()));
+    user.getIdToken().then(token =>
+      fetch(`/api/waitlist?tournamentId=${id}&game=dota`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(d => setOnWaitlist(!!d.onWaitlist))
+    ).catch(() => {});
   }, [user, id]);
   const toggleWaitlist = async () => {
     if (!user || !id) return;
     setWaitlistLoading(true);
     try {
-      const ref = doc(db, "tournaments", id, "waitlist", user.uid);
-      if (onWaitlist) {
-        await deleteDoc(ref);
-        setOnWaitlist(false);
-      } else {
-        await setDoc(ref, { uid: user.uid, displayName: user.displayName || "", phone: userProfile?.phone || "", addedAt: new Date().toISOString() });
-        setOnWaitlist(true);
-      }
-    } catch {} finally { setWaitlistLoading(false); }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/waitlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ tournamentId: id, game: "dota" }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setOnWaitlist(data.onWaitlist);
+    } catch (e: any) { alert(e.message || "Could not update waitlist"); } finally { setWaitlistLoading(false); }
   };
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "tournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
@@ -886,7 +886,7 @@ function DotaTournamentDetailInner() {
                     <div className="dtd-tier-columns">
                       {sortedBrackets.map((bracket) => {
                         const colors = bracketColors[bracket] || bracketColors.herald_guardian;
-                        const bracketPlayers = grouped[bracket];
+                        const bracketPlayers = grouped[bracket].sort((a: any, b: any) => (b.dotaRankTier || 0) - (a.dotaRankTier || 0));
                         return (
                           <div key={bracket} className="dtd-tier-col">
                             <div className="dtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>

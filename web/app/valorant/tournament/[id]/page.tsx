@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
@@ -303,21 +303,21 @@ function ValorantTournamentDetailInner() {
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "soloPlayers"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); if (user) setIsRegistered(list.some((p: any) => p.uid === user.uid)); }); return () => unsub(); }, [id, user]);
   useEffect(() => {
     if (!user || !id) return;
-    getDoc(doc(db, "valorantTournaments", id, "waitlist", user.uid)).then(snap => setOnWaitlist(snap.exists()));
+    user.getIdToken().then(token =>
+      fetch(`/api/waitlist?tournamentId=${id}&game=valorant`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(d => setOnWaitlist(!!d.onWaitlist))
+    ).catch(() => {});
   }, [user, id]);
   const toggleWaitlist = async () => {
     if (!user || !id) return;
     setWaitlistLoading(true);
     try {
-      const ref = doc(db, "valorantTournaments", id, "waitlist", user.uid);
-      if (onWaitlist) {
-        await deleteDoc(ref);
-        setOnWaitlist(false);
-      } else {
-        await setDoc(ref, { uid: user.uid, displayName: user.displayName || "", phone: userProfile?.phone || "", addedAt: new Date().toISOString() });
-        setOnWaitlist(true);
-      }
-    } catch {} finally { setWaitlistLoading(false); }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/waitlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ tournamentId: id, game: "valorant" }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setOnWaitlist(data.onWaitlist);
+    } catch (e: any) { alert(e.message || "Could not update waitlist"); } finally { setWaitlistLoading(false); }
   };
   useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "valorantTournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }); return () => unsub(); }, [id]);
@@ -1053,37 +1053,45 @@ function ValorantTournamentDetailInner() {
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
                 ) : (() => {
-                  const tierColors: Record<number, { bg: string; border: string; text: string }> = {
-                    1: { bg: "rgba(200,155,60,0.10)", border: "rgba(200,155,60,0.30)", text: "#C89B3C" },
-                    2: { bg: "rgba(79,163,255,0.10)", border: "rgba(79,163,255,0.30)", text: "#4FA3FF" },
-                    3: { bg: "rgba(59,255,125,0.10)", border: "rgba(59,255,125,0.30)", text: "#3BFF7D" },
-                    4: { bg: "rgba(160,32,45,0.10)", border: "rgba(160,32,45,0.30)", text: "#A0202D" },
+                  const rankOrder = ["Radiant", "Immortal", "Ascendant", "Diamond", "Platinum", "Gold", "Silver", "Bronze", "Iron", "Unranked"];
+                  const rankColors: Record<string, { bg: string; border: string; text: string }> = {
+                    Radiant:   { bg: "rgba(255,255,170,0.08)", border: "rgba(255,255,170,0.25)", text: "#FFFFAA" },
+                    Immortal:  { bg: "rgba(191,64,83,0.10)",   border: "rgba(191,64,83,0.30)",   text: "#BF4053" },
+                    Ascendant: { bg: "rgba(27,123,73,0.10)",   border: "rgba(27,123,73,0.30)",   text: "#1B9B59" },
+                    Diamond:   { bg: "rgba(180,137,198,0.10)", border: "rgba(180,137,198,0.30)", text: "#B489C6" },
+                    Platinum:  { bg: "rgba(73,180,180,0.10)",  border: "rgba(73,180,180,0.30)",  text: "#49B4B4" },
+                    Gold:      { bg: "rgba(236,183,66,0.10)",  border: "rgba(236,183,66,0.30)",  text: "#ECB742" },
+                    Silver:    { bg: "rgba(180,185,191,0.08)", border: "rgba(180,185,191,0.25)", text: "#B4B9BF" },
+                    Bronze:    { bg: "rgba(165,120,93,0.10)",  border: "rgba(165,120,93,0.30)",  text: "#A5785D" },
+                    Iron:      { bg: "rgba(110,110,110,0.10)", border: "rgba(110,110,110,0.30)", text: "#8A8A8A" },
+                    Unranked:  { bg: "rgba(85,85,85,0.10)",    border: "rgba(85,85,85,0.30)",    text: "#777" },
                   };
-                  const grouped: Record<number, any[]> = {};
+                  const grouped: Record<string, any[]> = {};
                   players.forEach((p: any) => {
-                    const tier = (p.skillLevel >= 1 && p.skillLevel <= 4) ? p.skillLevel : 4;
-                    if (!grouped[tier]) grouped[tier] = [];
-                    grouped[tier].push(p);
+                    const baseRank = (p.riotRank || "").split(" ")[0];
+                    const key = rankOrder.includes(baseRank) ? baseRank : "Unranked";
+                    if (!grouped[key]) grouped[key] = [];
+                    grouped[key].push(p);
                   });
-                  const sortedTiers = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+                  const sortedRanks = rankOrder.filter(r => grouped[r]?.length);
                   return (
                     <div className="vtd-tier-columns">
-                      {sortedTiers.map((tier) => {
-                        const colors = tierColors[tier] || tierColors[4];
-                        const tierPlayers = grouped[tier];
+                      {sortedRanks.map((rank) => {
+                        const colors = rankColors[rank];
+                        const rankPlayers = grouped[rank].sort((a: any, b: any) => (b.riotTier || 0) - (a.riotTier || 0));
                         return (
-                          <div key={tier} className="vtd-tier-col">
+                          <div key={rank} className="vtd-tier-col">
                             <div className="vtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
-                              <span>Tier {tier}</span>
-                              <span className="vtd-tier-header-count">{tierPlayers.length}</span>
+                              <span>{rank}</span>
+                              <span className="vtd-tier-header-count">{rankPlayers.length}</span>
                             </div>
-                            {tierPlayers.map((p: any) => (
+                            {rankPlayers.map((p: any) => (
                               <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                                 <div className="vtd-tier-player">
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
                                     <span className="vtd-tier-player-name">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></span>
-                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}</span>
+                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}{p.riotTier ? ` (${p.riotTier})` : ""}</span>
                                   </div>
                                 </div>
                               </Link>
@@ -1123,7 +1131,7 @@ function ValorantTournamentDetailInner() {
                               <div className="vtd-team-edit-actions"><button className="vtd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="vtd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
                           ) : (
-                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Skill: {team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#f87171", marginTop: 4 }}>{logoError}</div>}</>
+                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#f87171", marginTop: 4 }}>{logoError}</div>}</>
                           )}
                         </div>
                       </div>
@@ -1131,8 +1139,7 @@ function ValorantTournamentDetailInner() {
                         {(team.members || []).map((m: any, i: number) => (
                           <div key={m.uid || i} className="vtd-team-box-member">
                             {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
-                            <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}</div></div>
-                            <span className="vtd-team-box-member-skill" style={{ color: ({ 1: "#C89B3C", 2: "#4FA3FF", 3: "#3BFF7D", 4: "#A0202D" } as Record<number, string>)[m.skillLevel] || "#A0202D" }}>Tier {m.skillLevel || 4}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}{m.riotTier ? ` (${m.riotTier})` : ""}</div></div>
                           </div>
                         ))}
                       </div>
