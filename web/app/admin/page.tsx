@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/app/components/Navbar";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "firebase/firestore";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,6 +76,14 @@ export default function AdminPanel() {
 
   // ─── Shuffle ────────────────────────────────────────────────────────────────
   const [teamCount, setTeamCount] = useState("2");
+
+  // ─── Registered Players (pre-shuffle) ──────────────────────────────────────
+  const [regPlayers, setRegPlayers] = useState<any[]>([]);
+  const [regPlayersLoading, setRegPlayersLoading] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, any>>({});
+  const [savingPlayer, setSavingPlayer] = useState<string | null>(null);
+  const [playerSortBy, setPlayerSortBy] = useState<"rank" | "name" | "skill">("rank");
 
   // ─── Swiss Pairings ─────────────────────────────────────────────────────────
   const [totalRounds, setTotalRounds] = useState("5");
@@ -235,6 +243,53 @@ export default function AdminPanel() {
       setLoading(false);
     }
   }, [adminKey]);
+
+  // ─── Fetch registered players for selected tournament ─────────────────────
+  const fetchRegPlayers = useCallback(async () => {
+    if (!tournamentId) return;
+    setRegPlayersLoading(true);
+    try {
+      const col = getSelectedCollection();
+      const subCol = col === "tournaments" ? "players" : "soloPlayers";
+      const snap = await getDocs(collection(db, col, tournamentId, subCol));
+      const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Batch-fetch user docs for full details
+      const enriched = await Promise.all(players.map(async (p: any) => {
+        try {
+          const uSnap = await getDoc(doc(db, "users", p.uid || p.id));
+          const u = uSnap.data() || {};
+          return { ...p, _user: u };
+        } catch { return { ...p, _user: {} }; }
+      }));
+
+      enriched.sort((a: any, b: any) => (b.riotTier || b._user?.riotTier || 0) - (a.riotTier || a._user?.riotTier || 0));
+      setRegPlayers(enriched);
+    } catch (e: any) {
+      addLog(`❌ Fetch players: ${e.message}`);
+    } finally { setRegPlayersLoading(false); }
+  }, [tournamentId]);
+
+  const savePlayerEdit = async (uid: string) => {
+    if (!tournamentId || !editValues[uid]) return;
+    setSavingPlayer(uid);
+    try {
+      const col = getSelectedCollection();
+      const res = await fetch("/api/admin/update-player", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, tournamentId, collection: col, uid, updates: editValues[uid] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      addLog(`✅ Updated ${uid}: ${JSON.stringify(data.updated)}`);
+      setEditingPlayer(null);
+      setEditValues(prev => { const copy = { ...prev }; delete copy[uid]; return copy; });
+      await fetchRegPlayers(); // refresh
+    } catch (e: any) {
+      addLog(`❌ Update player: ${e.message}`);
+    } finally { setSavingPlayer(null); }
+  };
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
@@ -796,6 +851,141 @@ export default function AdminPanel() {
                   </div>
                 </div>
               )}
+
+              {/* ═══ REGISTERED PLAYERS (pre-shuffle) ═══ */}
+              <div style={{ ...sectionStyle, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <span style={{ ...labelStyle, marginBottom: 0 }}>Registered Players {regPlayers.length > 0 && <span style={{ color: "#3CCBFF" }}>({regPlayers.length})</span>}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <select
+                      value={playerSortBy}
+                      onChange={e => {
+                        const sort = e.target.value as "rank" | "name" | "skill";
+                        setPlayerSortBy(sort);
+                        setRegPlayers(prev => [...prev].sort((a: any, b: any) => {
+                          if (sort === "rank") return (b.riotTier || b._user?.riotTier || 0) - (a.riotTier || a._user?.riotTier || 0);
+                          if (sort === "skill") return (a.skillLevel || 99) - (b.skillLevel || 99);
+                          return (a.riotGameName || a._user?.riotGameName || "").localeCompare(b.riotGameName || b._user?.riotGameName || "");
+                        }));
+                      }}
+                      style={{ ...inputStyle, width: "auto", marginBottom: 0, padding: "6px 10px", fontSize: "0.72rem" }}
+                    >
+                      <option value="rank">Sort: Rank</option>
+                      <option value="skill">Sort: Skill Tier</option>
+                      <option value="name">Sort: Name</option>
+                    </select>
+                    <button onClick={fetchRegPlayers} disabled={regPlayersLoading || !tournamentId} style={{ ...btnStyle, padding: "6px 14px", fontSize: "0.72rem" }}>
+                      {regPlayersLoading ? "Loading..." : "Load Players"}
+                    </button>
+                  </div>
+                </div>
+
+                {regPlayers.length > 0 && (
+                  <div style={{ maxHeight: 500, overflowY: "auto", border: "1px solid #2a2a2e", borderRadius: 10 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" }}>
+                      <thead>
+                        <tr style={{ background: "#1a1a1e", position: "sticky", top: 0, zIndex: 1 }}>
+                          <th style={{ padding: "8px 10px", textAlign: "left", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>#</th>
+                          <th style={{ padding: "8px 10px", textAlign: "left", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>PLAYER</th>
+                          <th style={{ padding: "8px 10px", textAlign: "left", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>RANK</th>
+                          <th style={{ padding: "8px 10px", textAlign: "center", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>TIER</th>
+                          <th style={{ padding: "8px 10px", textAlign: "center", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>SKILL</th>
+                          <th style={{ padding: "8px 10px", textAlign: "left", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>DISCORD</th>
+                          <th style={{ padding: "8px 10px", textAlign: "left", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>PHONE</th>
+                          <th style={{ padding: "8px 10px", textAlign: "center", color: "#666", fontWeight: 700, fontSize: "0.65rem", letterSpacing: "0.08em" }}>ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regPlayers.map((p: any, idx: number) => {
+                          const uid = p.uid || p.id;
+                          const isEditing = editingPlayer === uid;
+                          const ev = editValues[uid] || {};
+                          const riotName = p.riotGameName || p._user?.riotGameName || "—";
+                          const riotTag = p.riotTagLine || p._user?.riotTagLine || "";
+                          const riotRank = p.riotRank || p._user?.riotRank || "Unranked";
+                          const riotTier = p.riotTier ?? p._user?.riotTier ?? 0;
+                          const skillLevel = p.skillLevel ?? "—";
+                          const discord = p._user?.discordUsername || "—";
+                          const phone = p._user?.phone || "—";
+                          const fullName = p._user?.fullName || "—";
+                          const isSaving = savingPlayer === uid;
+                          const tierColor = riotTier >= 21 ? "#ff4654" : riotTier >= 15 ? "#b388ff" : riotTier >= 9 ? "#ffd740" : "#888";
+
+                          return (
+                            <tr key={uid} style={{ borderBottom: "1px solid #222", background: isEditing ? "rgba(60,203,255,0.04)" : "transparent" }}>
+                              <td style={{ padding: "8px 10px", color: "#555" }}>{idx + 1}</td>
+                              <td style={{ padding: "8px 10px" }}>
+                                <div style={{ color: "#e0e0e0", fontWeight: 700 }}>{riotName}<span style={{ color: "#666" }}>#{riotTag}</span></div>
+                                <div style={{ fontSize: "0.65rem", color: "#555" }}>{fullName} · {uid.slice(0, 12)}...</div>
+                              </td>
+                              <td style={{ padding: "8px 10px" }}>
+                                {isEditing ? (
+                                  <input
+                                    value={ev.riotRank ?? riotRank}
+                                    onChange={e => setEditValues(prev => ({ ...prev, [uid]: { ...prev[uid], riotRank: e.target.value } }))}
+                                    style={{ ...inputStyle, marginBottom: 0, padding: "4px 8px", fontSize: "0.74rem", width: 120 }}
+                                  />
+                                ) : (
+                                  <span style={{ color: tierColor, fontWeight: 700 }}>{riotRank}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    value={ev.riotTier ?? riotTier}
+                                    onChange={e => setEditValues(prev => ({ ...prev, [uid]: { ...prev[uid], riotTier: parseInt(e.target.value) || 0 } }))}
+                                    style={{ ...inputStyle, marginBottom: 0, padding: "4px 6px", fontSize: "0.74rem", width: 55, textAlign: "center" }}
+                                    min={0} max={27}
+                                  />
+                                ) : (
+                                  <span style={{ color: tierColor, fontWeight: 800 }}>{riotTier}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                <span style={{
+                                  display: "inline-block", padding: "2px 8px", borderRadius: 100, fontSize: "0.68rem", fontWeight: 800,
+                                  background: skillLevel === 1 ? "rgba(255,70,84,0.12)" : skillLevel === 2 ? "rgba(179,136,255,0.12)" : skillLevel === 3 ? "rgba(255,215,64,0.12)" : "rgba(136,136,136,0.12)",
+                                  color: skillLevel === 1 ? "#ff4654" : skillLevel === 2 ? "#b388ff" : skillLevel === 3 ? "#ffd740" : "#888",
+                                  border: `1px solid ${skillLevel === 1 ? "rgba(255,70,84,0.3)" : skillLevel === 2 ? "rgba(179,136,255,0.3)" : skillLevel === 3 ? "rgba(255,215,64,0.3)" : "rgba(136,136,136,0.2)"}`,
+                                }}>T{skillLevel}</span>
+                              </td>
+                              <td style={{ padding: "8px 10px", color: "#888", fontSize: "0.7rem" }}>{discord}</td>
+                              <td style={{ padding: "8px 10px", color: "#888", fontSize: "0.7rem" }}>{phone}</td>
+                              <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                {isEditing ? (
+                                  <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                                    <button
+                                      onClick={() => savePlayerEdit(uid)}
+                                      disabled={isSaving}
+                                      style={{ padding: "4px 10px", background: "#22c55e", color: "#fff", border: "none", borderRadius: 6, fontSize: "0.68rem", fontWeight: 700, cursor: "pointer", opacity: isSaving ? 0.6 : 1 }}
+                                    >{isSaving ? "..." : "Save"}</button>
+                                    <button
+                                      onClick={() => { setEditingPlayer(null); setEditValues(prev => { const c = { ...prev }; delete c[uid]; return c; }); }}
+                                      style={{ padding: "4px 8px", background: "#333", color: "#aaa", border: "none", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer" }}
+                                    >Cancel</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setEditingPlayer(uid)}
+                                    style={{ padding: "4px 10px", background: "rgba(60,203,255,0.1)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.25)", borderRadius: 6, fontSize: "0.68rem", fontWeight: 700, cursor: "pointer" }}
+                                  >Edit</button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {regPlayers.length === 0 && !regPlayersLoading && (
+                  <p style={{ fontSize: "0.72rem", color: "#555", textAlign: "center", padding: "16px 0" }}>
+                    Select a tournament and click "Load Players" to see registered players.
+                  </p>
+                )}
+              </div>
 
               <div className="adm-grid">
                 {/* ═══ 1. SHUFFLE TEAMS ═══ */}
