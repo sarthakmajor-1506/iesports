@@ -7,7 +7,7 @@ import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "fi
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
+interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
 interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; riotScreenshotUrl?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
@@ -160,6 +160,7 @@ export default function AdminPanel() {
   const [createBracketFormat, setCreateBracketFormat] = useState("double_elimination");
   const [createBracketBestOf, setCreateBracketBestOf] = useState("2");
   const [createGrandFinalBestOf, setCreateGrandFinalBestOf] = useState("3");
+  const [createLbFinalBestOf, setCreateLbFinalBestOf] = useState("");
   const [createEliminationBestOf, setCreateEliminationBestOf] = useState("2");
   const [createBracketTeamCount, setCreateBracketTeamCount] = useState("");
   const [createBannerImage, setCreateBannerImage] = useState("");
@@ -198,6 +199,7 @@ export default function AdminPanel() {
     const t = tournaments.find(t => t.id === tournamentId) as any;
     if (!match || !t) return 2;
     if (match.bracketType === "grand_final") return t.grandFinalBestOf || 3;
+    if (match.id === "lb-final" && t.lbFinalBestOf) return t.lbFinalBestOf;
     if (match.isBracket) return t.bracketBestOf || 2;
     return t.matchesPerRound || 2;
   };
@@ -314,6 +316,7 @@ export default function AdminPanel() {
         matchesPerRound: d.data().matchesPerRound,
         bracketBestOf: d.data().bracketBestOf,
         grandFinalBestOf: d.data().grandFinalBestOf,
+        lbFinalBestOf: d.data().lbFinalBestOf,
         bracketFormat: d.data().bracketFormat,
         bracketTeamCount: d.data().bracketTeamCount,
         groupStageRounds: d.data().groupStageRounds,
@@ -335,6 +338,7 @@ export default function AdminPanel() {
         matchesPerRound: d.data().matchesPerRound,
         bracketBestOf: d.data().bracketBestOf,
         grandFinalBestOf: d.data().grandFinalBestOf,
+        lbFinalBestOf: d.data().lbFinalBestOf,
         bracketFormat: d.data().bracketFormat,
         bracketTeamCount: d.data().bracketTeamCount,
         groupStageRounds: d.data().groupStageRounds,
@@ -535,6 +539,7 @@ export default function AdminPanel() {
     body.bracketFormat = createBracketFormat || "double_elimination";
     if (createBracketBestOf) body.bracketBestOf = parseInt(createBracketBestOf) || 2;
     if (createGrandFinalBestOf) body.grandFinalBestOf = parseInt(createGrandFinalBestOf) || 3;
+    if (createLbFinalBestOf) body.lbFinalBestOf = parseInt(createLbFinalBestOf);
     if (createEliminationBestOf) body.eliminationBestOf = parseInt(createEliminationBestOf) || 2;
     if (createBracketTeamCount) body.bracketTeamCount = parseInt(createBracketTeamCount);
     if (createBannerImage) body.bannerImage = createBannerImage;
@@ -1709,6 +1714,10 @@ export default function AdminPanel() {
                           <input value={createBracketBestOf} onChange={e => setCreateBracketBestOf(e.target.value)} style={inputStyle} type="number" min="1" max="5" placeholder="2" />
                         </div>
                         <div>
+                          <label style={smallLabel}>LB Final BO</label>
+                          <input value={createLbFinalBestOf} onChange={e => setCreateLbFinalBestOf(e.target.value)} style={inputStyle} type="number" min="1" max="5" placeholder="Same as bracket" />
+                        </div>
+                        <div>
                           <label style={smallLabel}>Grand Final BO</label>
                           <input value={createGrandFinalBestOf} onChange={e => setCreateGrandFinalBestOf(e.target.value)} style={inputStyle} type="number" min="1" max="7" placeholder="3" />
                         </div>
@@ -1734,6 +1743,7 @@ export default function AdminPanel() {
                           Group Stage: <span style={{ color: "#60a5fa" }}>{createGroupRounds || 3} rounds</span> · BO<span style={{ color: "#60a5fa" }}>{createMatchesPerRound || 2}</span><br />
                           → Top <span style={{ color: "#f59e0b" }}>{createBracketTeamCount || "50%"}</span> teams advance<br />
                           Bracket: <span style={{ color: "#f59e0b" }}>{createBracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</span> · BO<span style={{ color: "#f59e0b" }}>{createBracketBestOf || 2}</span><br />
+                          LB Final: BO<span style={{ color: "#f59e0b" }}>{createLbFinalBestOf || createBracketBestOf || 2}</span><br />
                           Grand Final: BO<span style={{ color: "#3CCBFF" }}>{createGrandFinalBestOf || 3}</span>
                         </div>
                       )}

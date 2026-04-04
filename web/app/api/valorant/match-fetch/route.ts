@@ -291,6 +291,7 @@ export async function POST(req: NextRequest) {
     const tData = tournamentDoc.data() || {};
     let bo = 2; // default
     if (existingMatch.bracketType === "grand_final") bo = tData.grandFinalBestOf || 3;
+    else if (existingMatch.id === "lb-final" && tData.lbFinalBestOf) bo = tData.lbFinalBestOf;
     else if (existingMatch.isBracket) bo = tData.bracketBestOf || 2;
     else bo = tData.matchesPerRound || 2;
 

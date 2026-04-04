@@ -57,6 +57,7 @@ interface Props {
   bracketSize: number;
   standings?: StandingEntry[];
   bracketBestOf?: number;
+  lbFinalBestOf?: number;
   grandFinalBestOf?: number;
 }
 
@@ -308,7 +309,8 @@ function ColHeader({ x, y, text: t, accent = false }: { x: number; y: number; te
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
-export default function DoubleBracket({ matches, bracketSize, standings = [], bracketBestOf = 2, grandFinalBestOf = 3 }: Props) {
+export default function DoubleBracket({ matches, bracketSize, standings = [], bracketBestOf = 2, lbFinalBestOf, grandFinalBestOf = 3 }: Props) {
+  const lbFinalBO = lbFinalBestOf ?? bracketBestOf;
   const matchMap = useMemo(() => {
     const m: Record<string, BracketMatch> = {};
     matches.forEach(match => { m[match.id] = match; });
@@ -328,10 +330,10 @@ export default function DoubleBracket({ matches, bracketSize, standings = [], br
   const teamCount = seededTeams.length || bracketSize;
 
   // Determine effective bracket type
-  if (teamCount <= 2) return <Bracket2 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} grandFinalBestOf={grandFinalBestOf} />;
-  if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} grandFinalBestOf={grandFinalBestOf} />;
-  if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} grandFinalBestOf={grandFinalBestOf} />;
-  return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} grandFinalBestOf={grandFinalBestOf} />;
+  if (teamCount <= 2) return <Bracket2 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
+  if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
+  if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
+  return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -365,7 +367,7 @@ function BracketWrapper({ children, width, height, teamCount }: { children: Reac
 // ═══════════════════════════════════════════════════════════════════════════════
 // 2-TEAM: Just Grand Final
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; grandFinalBestOf: number }) {
+function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
   const gf = { x: PAD, y: PAD + 30 };
   const totalW = PAD + MATCH_W + PAD;
   const totalH = gf.y + MATCH_H + PAD + 20;
@@ -385,7 +387,7 @@ function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3-TEAM: UB Final (#1 vs #2) → LB Final (UB loser vs #3) → Grand Final
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; grandFinalBestOf: number }) {
+function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubFinal = { x: colX(0), y: PAD + 30 };
@@ -426,7 +428,7 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
       <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={bracketBestOf} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} />
       <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
 
       <text x={lbFinal.x + MATCH_W + 10} y={lbFinal.y + MATCH_H / 2 + 4}
@@ -440,7 +442,7 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4-TEAM BRACKET — 50/50 SPLIT
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; grandFinalBestOf: number }) {
+function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubSemi = { x: colX(0), y: PAD + 30 };
@@ -485,7 +487,7 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 
       <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} bestOf={bracketBestOf} />
       <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={bracketBestOf} />
+      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={lbFinalBestOf} />
       <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
 
       <text x={ubSemi.x + MATCH_W + 10} y={ubSemi.y + MATCH_H / 2 - 4}
@@ -503,7 +505,7 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
 // ═══════════════════════════════════════════════════════════════════════════════
 // 8-TEAM BRACKET — 50/50 SPLIT
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; grandFinalBestOf: number }) {
+function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubR1Y = (i: number) => PAD + 30 + i * (MATCH_H + ROW_GAP);
@@ -605,7 +607,7 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, grandFinalBestOf
       <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} bestOf={bracketBestOf} />
       <MatchCard match={mLBR2_2} x={lbR2[1].x} y={lbR2[1].y} bestOf={bracketBestOf} />
       <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={bracketBestOf} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} />
 
       <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
 

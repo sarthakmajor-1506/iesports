@@ -351,7 +351,7 @@ function ValorantTournamentDetailInner() {
   };
   useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "valorantTournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }); return () => unsub(); }, [id]);
-  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }); return () => unsub(); }, [id]);
+  useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!tournament) return; const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline)); tick(); const i = setInterval(tick, 60000); return () => clearInterval(i); }, [tournament]);
 
   const getUserTeam = () => { if (!user) return null; return teams.find((t: any) => (t.members || []).some((m: any) => m.uid === user.uid)); };
@@ -1056,7 +1056,7 @@ function ValorantTournamentDetailInner() {
                         { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#3b82f6" },
                         { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
                         { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
-                        { label: "→", sub: "", color: "#555550", isArrow: true },
+                        { label: "→", sub: `LB Final BO${tournament.lbFinalBestOf || tournament.bracketBestOf || 2}`, color: "#555550", isArrow: true },
                         { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#3CCBFF" },
                       ].map((s, i) => s.isArrow ? (
                         <div key={i} style={{ color: "#555550", fontSize: "1.2rem", flexShrink: 0 }}>{s.label}</div>
@@ -1240,7 +1240,7 @@ function ValorantTournamentDetailInner() {
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
                       <div className="vtd-section-header bracket">Play-off Fixtures</div>
-                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : (tournament?.bracketBestOf || 2)} />))}</div>); }); })()}
+                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />))}</div>); }); })()}
                     </div>
                   )}
                 </>
@@ -1272,6 +1272,7 @@ function ValorantTournamentDetailInner() {
                   bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
                   standings={standings}
                   bracketBestOf={tournament.bracketBestOf || 2}
+                  lbFinalBestOf={tournament.lbFinalBestOf}
                   grandFinalBestOf={tournament.grandFinalBestOf || 3}
                 />
               ) : (
@@ -1280,6 +1281,7 @@ function ValorantTournamentDetailInner() {
                   bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
                   standings={standings}
                   bracketBestOf={tournament.bracketBestOf || 2}
+                  lbFinalBestOf={tournament.lbFinalBestOf}
                   grandFinalBestOf={tournament.grandFinalBestOf || 3}
                 />
               )}

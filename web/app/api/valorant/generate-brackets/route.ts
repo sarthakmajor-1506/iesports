@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     const baseDate = startDate || new Date().toISOString().split("T")[0];
     const tData = tDoc.data()!;
     const bracketBO = tData.bracketBestOf || 2;
+    const lbFinalBO = tData.lbFinalBestOf || bracketBO;
     const grandFinalBO = tData.grandFinalBestOf || 3;
     const GAME_SPACING_MS = 60 * 60 * 1000; // 1 hour between each game
     const MATCH_SPACING_MS = bracketBO * GAME_SPACING_MS; // match spacing = BO × 1 hour
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
       // Day 2: Lower Bracket Final (UB loser vs #3 seed)
       bracketMatches.push(makeMatchData(
         "lb-final", "Lower Bracket Final", "losers", 1, nextDay + 1, 0,
-        TBD, seededTeams[2], // TBD = UB loser, #3 starts here
+        TBD, seededTeams[2], lbFinalBO, // TBD = UB loser, #3 starts here
       ));
       bracketMatches[1].data.winnerGoesTo = "grand-final";
 
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
       // Day 2: LB Final (UB loser vs LB R1 winner)
       bracketMatches.push(makeMatchData(
         "lb-final", "Lower Bracket Final", "losers", 2, nextDay + 1, 0,
-        TBD, TBD,
+        TBD, TBD, lbFinalBO,
       ));
 
       // Day 3: Grand Final (UB winner vs LB Final winner)
@@ -284,7 +285,7 @@ export async function POST(req: NextRequest) {
       bracketMatches.push(makeMatchData("lb-semi", "Lower Bracket Semi", "losers", 3, nextDay + 2, 0, TBD, TBD)); // [7]
 
       // Day 4: LB Final (LB Semi winner vs UB Final loser)
-      bracketMatches.push(makeMatchData("lb-final", "Lower Bracket Final", "losers", 4, nextDay + 3, 0, TBD, TBD)); // [8]
+      bracketMatches.push(makeMatchData("lb-final", "Lower Bracket Final", "losers", 4, nextDay + 3, 0, TBD, TBD, lbFinalBO)); // [8]
 
       // Day 5: Grand Final
       bracketMatches.push(makeMatchData("grand-final", "Grand Final", "grand_final", 1, nextDay + 4, 0, TBD, TBD, grandFinalBO)); // [9]
