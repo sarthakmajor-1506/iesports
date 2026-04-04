@@ -183,9 +183,9 @@ export default function Valorant() {
 
           <div className={`val-banner${mounted ? " show" : ""}`}>
             {riotData?.riotLinked && riotData?.riotVerified === "pending" && (
-              <div className="val-banner-box amber">
-                <Clock size={14} style={{ flexShrink: 0 }} />
-                <span>Your Riot ID is pending verification — usually under 24 hours. You can still browse tournaments.</span>
+              <div className="val-banner-box gray" style={{ opacity: 0.7 }}>
+                <Clock size={14} style={{ flexShrink: 0, color: "#8A8880" }} />
+                <span style={{ color: "#8A8880" }}>Nothing needed from you — our system is verifying your Riot ID. This usually takes under 24 hours.</span>
               </div>
             )}
             {!riotData?.riotLinked && (

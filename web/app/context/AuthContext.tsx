@@ -31,6 +31,13 @@ type UserProfile = {
   steamId: string;
 };
 
+type DiscordConnection = {
+  type: string;
+  name: string;
+  id: string;
+  verified: boolean;
+};
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
@@ -38,6 +45,8 @@ type AuthContextType = {
   dotaProfile: DotaProfile | null;
   riotData: RiotData | null;
   userProfile: UserProfile | null;
+  discordConnections: DiscordConnection[];
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -48,6 +57,8 @@ const AuthContext = createContext<AuthContextType>({
   dotaProfile: null,
   riotData: null,
   userProfile: null,
+  discordConnections: [],
+  refreshUser: async () => {},
   logout: async () => {},
 });
 
@@ -65,56 +76,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dotaProfile, setDotaProfile] = useState<DotaProfile | null>(null);
   const [riotData, setRiotData] = useState<RiotData | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [discordConnections, setDiscordConnections] = useState<DiscordConnection[]>([]);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Shared helper to sync user state from Firestore
+  const syncUserData = async (u: User) => {
+    const snap = await getDoc(doc(db, "users", u.uid));
+    const data = snap.data();
+    const hasSteam = !!data?.steamId;
+    setSteamLinked(hasSteam);
+
+    setDotaProfile({
+      dotaRankTier: data?.dotaRankTier ?? null,
+      dotaBracket: data?.dotaBracket ?? null,
+      dotaMMR: data?.dotaMMR ?? null,
+      smurfRiskScore: data?.smurfRiskScore ?? null,
+    });
+
+    setUserProfile({
+      fullName: data?.fullName || "",
+      phone: data?.phone || u.phoneNumber || "",
+      discordId: data?.discordId || "",
+      discordUsername: data?.discordUsername || "",
+      steamId: data?.steamId || "",
+    });
+
+    const hasRiot = !!data?.riotGameName;
+    setRiotData({
+      riotLinked: hasRiot,
+      riotVerified: hasRiot ? (data?.riotVerified || "pending") : "unlinked",
+      riotGameName: data?.riotGameName || "",
+      riotTagLine: data?.riotTagLine || "",
+      riotAvatar: data?.riotAvatar || "",
+      riotRank: data?.riotRank || "",
+      riotTier: data?.riotTier || 0,
+    });
+
+    setDiscordConnections(data?.discordConnections || []);
+
+    return { hasSteam, pathname };
+  };
+
+  // Public method to re-read user data (after linking accounts etc.)
+  const refreshUser = async () => {
+    if (!user) return;
+    await syncUserData(user);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
 
       if (u) {
-        const snap = await getDoc(doc(db, "users", u.uid));
-        const data = snap.data();
-        const hasSteam = !!data?.steamId;
-        setSteamLinked(hasSteam);
-
-        setDotaProfile({
-          dotaRankTier: data?.dotaRankTier ?? null,
-          dotaBracket: data?.dotaBracket ?? null,
-          dotaMMR: data?.dotaMMR ?? null,
-          smurfRiskScore: data?.smurfRiskScore ?? null,
-        });
-
-        setUserProfile({
-          fullName: data?.fullName || "",
-          phone: data?.phone || u.phoneNumber || "",
-          discordId: data?.discordId || "",
-          discordUsername: data?.discordUsername || "",
-          steamId: data?.steamId || "",
-        });
-
-        const hasRiot = !!data?.riotGameName;
-        setRiotData({
-          riotLinked: hasRiot,
-          riotVerified: hasRiot ? (data?.riotVerified || "pending") : "unlinked",
-          riotGameName: data?.riotGameName || "",
-          riotTagLine: data?.riotTagLine || "",
-          riotAvatar: data?.riotAvatar || "",
-          riotRank: data?.riotRank || "",
-          riotTier: data?.riotTier || 0,
-        });
+        const { hasSteam } = await syncUserData(u);
         if (!PUBLIC_PATHS.includes(pathname)) {
-          // If user has Steam linked and is still on /connect-steam, redirect to dashboard
           if (hasSteam && pathname === "/connect-steam") {
             router.push("/valorant");
           }
-          // Don't redirect from /connect-riot — it's accessible to any logged-in user
         }
       } else {
         setSteamLinked(false);
         setDotaProfile(null);
         setRiotData(null);
         setUserProfile(null);
+        setDiscordConnections([]);
         if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/player/")) {
           try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
           router.push("/");
@@ -128,13 +154,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const logout = async () => {
+    // Clear discord prompt dismissal so it shows fresh on next login
+    if (user) {
+      try { sessionStorage.removeItem(`discord_prompt_dismissed_${user.uid}`); } catch {}
+    }
     await signOut(auth);
     router.push("/");
   };
 
   return (
     
-    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, logout }}>
+    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

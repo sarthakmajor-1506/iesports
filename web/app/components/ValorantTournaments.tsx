@@ -177,7 +177,7 @@ export default function ValorantTournaments() {
                           <div className="vt-card-meta">
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Prize</span>
-                              <span className="vt-meta-val prize">{t.prizePool || "TBD"}</span>
+                              <span className="vt-meta-val prize">{t.prizePool ? (String(t.prizePool).match(/^[₹Rs]/) ? t.prizePool : `₹${t.prizePool}`) : "TBD"}</span>
                             </div>
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Entry</span>
@@ -237,7 +237,7 @@ export default function ValorantTournaments() {
                         <div className="vt-card-meta">
                           <div className="vt-meta-item">
                             <span className="vt-meta-key">Prize</span>
-                            <span className="vt-meta-val">{t.prizePool || "TBD"}</span>
+                            <span className="vt-meta-val">{t.prizePool ? (String(t.prizePool).match(/^[₹Rs]/) ? t.prizePool : `₹${t.prizePool}`) : "TBD"}</span>
                           </div>
                           <div className="vt-meta-item">
                             <span className="vt-meta-key">Format</span>

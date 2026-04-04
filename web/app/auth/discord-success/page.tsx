@@ -17,7 +17,9 @@ function DiscordSuccessInner() {
       return;
     }
     signInWithCustomToken(auth, token)
-      .then(() => {
+      .then((cred) => {
+        // Clear discord prompt dismissal so it shows fresh after login
+        try { sessionStorage.removeItem(`discord_prompt_dismissed_${cred.user.uid}`); } catch {}
         let dest = "/valorant";
         try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
         router.replace(dest);

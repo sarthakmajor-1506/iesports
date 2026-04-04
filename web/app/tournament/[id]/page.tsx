@@ -380,9 +380,9 @@ function DotaTournamentDetailInner() {
 
         /* ── Tab bar ── */
         .dtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(59,130,246,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
-        .dtd-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
-        .dtd-tabs::-webkit-scrollbar { display: none; }
-        .dtd-tab { min-height: 52px; padding: 0 20px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; flex-shrink: 0; }
+        .dtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
+        .dtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
+        .dtd-tab-label { display: inline; }
         .dtd-tab:hover { background: rgba(59,130,246,0.08); color: rgba(255,255,255,0.75); border-color: rgba(59,130,246,0.2); }
         .dtd-tab.active { background: #3B82F6; color: #fff; border-color: #3B82F6; box-shadow: 0 0 20px rgba(59,130,246,0.35), 0 4px 16px rgba(59,130,246,0.25); }
         .dtd-tab-count { font-size: 0.68rem; font-weight: 700; opacity: 0.75; background: rgba(0,0,0,0.2); padding: 1px 7px; border-radius: 100px; }
@@ -572,7 +572,9 @@ function DotaTournamentDetailInner() {
           .dtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .dtd-mc-team { padding: 8px 10px; gap: 8px; }
           .dtd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
-          .dtd-tab { min-height: 46px; padding: 0 14px; font-size: 0.82rem; gap: 6px; }
+          .dtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
+          .dtd-tab-label { display: none; }
+          .dtd-tab-count { display: none; }
           .dtd-hero-title { font-size: 1.6rem; }
           .dtd-hero-desc { font-size: 0.88rem; }
           .dtd-hero-actions { gap: 8px; }
@@ -589,7 +591,7 @@ function DotaTournamentDetailInner() {
           .dtd-hero-content { padding: 0 12px 20px; min-height: 300px; }
           .dtd-content { padding: 0 12px 32px; }
           .dtd-tabs-wrap { margin-left: -12px; margin-right: -12px; padding: 6px 12px; }
-          .dtd-tab { min-height: 40px; padding: 0 10px; font-size: 0.76rem; }
+          .dtd-tab { min-height: 38px; padding: 0 4px; font-size: 0.7rem; }
           .dtd-hero-title { font-size: 1.4rem; }
           .dtd-stat-tiles { gap: 8px; }
         }
@@ -606,6 +608,22 @@ function DotaTournamentDetailInner() {
 
       <div className="dtd-page">
         <Navbar />
+
+        {/* Back button */}
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 30px 0" }}>
+          <button onClick={() => router.back()} style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 100, padding: "6px 16px", fontSize: "0.78rem", fontWeight: 700,
+            color: "#8A8880", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0EEEA"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#8A8880"; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+        </div>
 
         {/* ═══ HERO ═══ */}
         <div className="dtd-hero">
@@ -683,9 +701,9 @@ function DotaTournamentDetailInner() {
           <div className="dtd-tabs-wrap">
             <div className="dtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }}>
-                  <t.Icon size={18} strokeWidth={activeTab === t.key ? 2.5 : 2} />
-                  <span>{t.label}</span>
+                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }} title={t.label}>
+                  <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
+                  <span className="dtd-tab-label">{t.label}</span>
                   {t.key === "players" && players.length > 0 && <span className="dtd-tab-count">{players.length}</span>}
                   {t.key === "teams" && teams.length > 0 && <span className="dtd-tab-count">{teams.length}</span>}
                 </button>

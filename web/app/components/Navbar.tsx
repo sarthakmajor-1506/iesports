@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
+import DiscordAccountsPrompt, { triggerDiscordPrompt, hasDiscordAccount } from "./DiscordAccountsPrompt";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
@@ -44,7 +45,7 @@ const DiscordIcon = ({ size = 16, color = "currentColor" }: { size?: number; col
 type PhoneStep = "phone" | "otp";
 
 export default function Navbar() {
-  const { user, logout, riotData } = useAuth();
+  const { user, logout, riotData, steamLinked, discordConnections } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -136,9 +137,25 @@ export default function Navbar() {
 
   const unlinkedCount = [!hasSteam, !discordLinked, riotStatus === "unlinked", !hasPhone].filter(Boolean).length;
 
+  // Intercept Connect Steam/Riot — show Discord prompt if Discord has the account
+  const handleConnectSteam = () => {
+    if (hasDiscordAccount(discordConnections, "steam", hasSteam)) {
+      triggerDiscordPrompt();
+    } else {
+      window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank");
+    }
+  };
+  const handleConnectRiot = () => {
+    if (hasDiscordAccount(discordConnections, "riot", riotStatus !== "unlinked")) {
+      triggerDiscordPrompt();
+    } else {
+      window.open("/connect-riot", "_blank");
+    }
+  };
+
   const handleDiscordConnect = () => {
     if (!user) return;
-    navigateWithAppPriority(`/api/auth/discord?uid=${user.uid}`);
+    window.open(`/api/auth/discord?uid=${user.uid}`, "_blank");
   };
 
   const clearRecaptcha = () => {
@@ -301,6 +318,7 @@ export default function Navbar() {
 
   return (
     <>
+      {user && <DiscordAccountsPrompt />}
       <style>{`
         * { box-sizing: border-box; }
         .ie-navbar { position: sticky; top: 0; z-index: 100; background: rgba(10,10,12,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #2A2A30; font-family: var(--font-geist-sans), system-ui, sans-serif; }
@@ -440,7 +458,7 @@ export default function Navbar() {
                 icon={hasSteam ? (steamData?.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg") : "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"}
                 name={steamData?.steamName}
                 label="Steam"
-                onClick={hasSteam ? undefined : () => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }}
+                onClick={hasSteam ? undefined : handleConnectSteam}
               />
               <AccBadge
                 id="discord"
@@ -457,7 +475,7 @@ export default function Navbar() {
                 icon={riotData?.riotAvatar || "/riot-games.png"}
                 name={riotData?.riotGameName ? `${riotData.riotGameName}#${riotData.riotTagLine}` : undefined}
                 label="Riot ID"
-                onClick={() => router.push("/connect-riot")}
+                onClick={handleConnectRiot}
               />
             </div>
 
@@ -499,7 +517,7 @@ export default function Navbar() {
                   {!hasSteam && (
                     <div className="ie-dd-section">
                       <span className="ie-dd-label">Steam</span>
-                      <button className="ie-dd-btn" onClick={() => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
+                      <button className="ie-dd-btn" onClick={() => { handleConnectSteam(); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
                         <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 18, height: 18, opacity: 0.5 }} />
                         Connect Steam
                         <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
@@ -540,7 +558,7 @@ export default function Navbar() {
                         <span style={{ fontSize: "0.62rem", color: "#fbbf24", fontWeight: 800, background: "rgba(251,191,36,0.12)", padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
                       </div>
                     ) : (
-                      <button className="ie-dd-btn" onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
+                      <button className="ie-dd-btn" onClick={() => { handleConnectRiot(); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
                         <img src="/riot-games.png" alt="" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.5 }} />
                         Connect Riot ID
                         <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
@@ -609,7 +627,7 @@ export default function Navbar() {
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={() => { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }}>
+            <button className="ie-mobile-connect-btn" onClick={handleConnectSteam}>
               <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, opacity: 0.5 }} />
               Connect Steam
               <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
@@ -636,7 +654,7 @@ export default function Navbar() {
               <span className="ie-verified-badge">✓</span>
             </div>
           ) : (
-            <button className="ie-mobile-connect-btn" onClick={() => router.push("/connect-riot")} style={{ borderColor: "rgba(60,203,255,0.3)", background: "rgba(60,203,255,0.06)", color: "#3CCBFF" }}>
+            <button className="ie-mobile-connect-btn" onClick={handleConnectRiot} style={{ borderColor: "rgba(60,203,255,0.3)", background: "rgba(60,203,255,0.06)", color: "#3CCBFF" }}>
               <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 3, opacity: 0.6 }} />
               Connect Riot ID
               <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>

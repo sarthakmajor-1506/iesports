@@ -59,6 +59,23 @@ export async function GET(req: NextRequest) {
       ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
       : null;
 
+    // ── 2b. Fetch Discord connected accounts (Steam, Riot, Twitch, etc.)
+    let discordConnections: { type: string; name: string; id: string; verified: boolean }[] = [];
+    try {
+      const connRes = await fetch("https://discord.com/api/users/@me/connections", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (connRes.ok) {
+        const rawConns = await connRes.json();
+        discordConnections = (rawConns || []).map((c: any) => ({
+          type: c.type,
+          name: c.name,
+          id: c.id,
+          verified: !!c.verified,
+        }));
+      }
+    } catch {}
+
     // ── 3. Find or create Firebase user ──────────────────────────────────
     let firebaseUid: string;
 
@@ -76,6 +93,7 @@ export async function GET(req: NextRequest) {
       await adminDb.collection("users").doc(firebaseUid).update({
         discordUsername: discordUser.username,
         discordAvatar,
+        ...(discordConnections.length > 0 ? { discordConnections } : {}),
       });
     } else {
       // New user — create Firebase Auth entry + Firestore doc
@@ -108,6 +126,7 @@ export async function GET(req: NextRequest) {
         dotaBracket: null,
         dotaMMR: null,
         smurfRiskScore: 0,
+        ...(discordConnections.length > 0 ? { discordConnections } : {}),
       }, { merge: true }); // merge:true so we don't overwrite if doc exists
     }
 

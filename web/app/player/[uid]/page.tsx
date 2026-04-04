@@ -7,6 +7,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { triggerDiscordPrompt, hasDiscordAccount } from "@/app/components/DiscordAccountsPrompt";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProfileTab = "valorant" | "dota" | "account";
@@ -24,11 +25,17 @@ interface GlobalStats {
   dota?: any;
 }
 
+interface DiscordConnection {
+  type: string; name: string; id: string; verified: boolean;
+}
+
 interface UserProfile {
   uid: string;
+  fullName?: string;
   riotGameName?: string; riotTagLine?: string; riotAvatar?: string;
   riotRank?: string; riotTier?: number; riotPuuid?: string; riotVerified?: string;
   discordUsername?: string; discordId?: string;
+  discordConnections?: DiscordConnection[];
   steamName?: string; steamId?: string; steamAvatar?: string;
   phone?: string; upiId?: string; displayName?: string;
 }
@@ -47,7 +54,7 @@ export default function PlayerProfile() {
   const params = useParams();
   const router = useRouter();
   const uid = params.uid as string;
-  const { user } = useAuth();
+  const { user, steamLinked, riotData: authRiotData, discordConnections } = useAuth();
   const isOwnProfile = !!user && user.uid === uid;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -68,6 +75,12 @@ export default function PlayerProfile() {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
 
+  // Full name state
+  const [fullNameInput, setFullNameInput] = useState("");
+  const [fullNameEditing, setFullNameEditing] = useState(false);
+  const [fullNameSaving, setFullNameSaving] = useState(false);
+  const [fullNameSaved, setFullNameSaved] = useState(false);
+
   useEffect(() => {
     if (!uid) return;
     const load = async () => {
@@ -80,10 +93,11 @@ export default function PlayerProfile() {
 
         setProfile({
           uid,
+          fullName: d.fullName,
           riotGameName: d.riotGameName, riotTagLine: d.riotTagLine,
           riotAvatar: d.riotAvatar, riotRank: d.riotRank,
           riotTier: d.riotTier, riotPuuid: d.riotPuuid, riotVerified: d.riotVerified,
-          discordUsername: d.discordUsername, discordId: d.discordId,
+          discordUsername: d.discordUsername, discordId: d.discordId, discordConnections: d.discordConnections,
           steamName: d.steamName, steamId: d.steamId, steamAvatar: d.steamAvatar,
           phone: d.phone, upiId: undefined, // loaded separately for owner only
           displayName: d.displayName,
@@ -94,9 +108,10 @@ export default function PlayerProfile() {
           const ownerDoc = await getDoc(doc(db, "users", uid));
           if (ownerDoc.exists()) {
             const od = ownerDoc.data();
-            setProfile(prev => prev ? { ...prev, phone: od.phone || null, upiId: od.upiId || null } : prev);
+            setProfile(prev => prev ? { ...prev, phone: od.phone || null, upiId: od.upiId || null, fullName: od.fullName || prev.fullName || null } : prev);
             if (od.upiId) setUpiInput(od.upiId);
             if (od.displayName) setNameInput(od.displayName);
+            if (od.fullName) setFullNameInput(od.fullName);
           }
         }
 
@@ -175,6 +190,17 @@ export default function PlayerProfile() {
     setTimeout(() => setNameSaved(false), 2500);
   };
 
+  const saveFullName = async () => {
+    if (!user || !fullNameInput.trim() || fullNameInput.trim().length < 2) return;
+    setFullNameSaving(true);
+    await updateDoc(doc(db, "users", user.uid), { fullName: fullNameInput.trim() });
+    setProfile(prev => prev ? { ...prev, fullName: fullNameInput.trim() } : prev);
+    setFullNameSaving(false);
+    setFullNameEditing(false);
+    setFullNameSaved(true);
+    setTimeout(() => setFullNameSaved(false), 2500);
+  };
+
   const saveUpi = async () => {
     if (!user || !upiInput.trim()) return;
     setUpiSaving(true);
@@ -213,6 +239,22 @@ export default function PlayerProfile() {
       <div className="pp-page">
         <Navbar />
         <div className="pp-content">
+
+          {/* Back button */}
+          <div style={{ marginBottom: 16 }}>
+            <button onClick={() => router.back()} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 100, padding: "6px 16px", fontSize: "0.78rem", fontWeight: 700,
+              color: "#8A8880", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0EEEA"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#8A8880"; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+              Back
+            </button>
+          </div>
 
           {/* ═══ HEADER ═══ */}
           <div className="pp-header">
@@ -397,6 +439,53 @@ export default function PlayerProfile() {
           {/* ═══ ACCOUNT TAB (private — own profile only) ═══ */}
           {activeTab === "account" && isOwnProfile && (
             <>
+              {/* Full Name */}
+              <div className="pp-section">
+                <span className="pp-section-label">Full Name</span>
+                <p style={{ fontSize: "0.82rem", color: "#8A8880", marginBottom: 16, marginTop: 0 }}>
+                  Your full name is used for tournament rosters, match results, and prize payouts.
+                </p>
+                {fullNameEditing ? (
+                  <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+                    <input
+                      value={fullNameInput}
+                      onChange={e => setFullNameInput(e.target.value)}
+                      placeholder="Enter your full name"
+                      maxLength={50}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === "Enter") saveFullName(); if (e.key === "Escape") setFullNameEditing(false); }}
+                      style={{
+                        flex: 1, background: "#18181C", border: "1px solid #2A2A30", borderRadius: 10,
+                        padding: "10px 14px", fontSize: "0.88rem", color: "#F0EEEA", fontFamily: "inherit",
+                        outline: "none",
+                      }}
+                    />
+                    <button onClick={saveFullName} disabled={fullNameSaving || fullNameInput.trim().length < 2} style={{
+                      padding: "10px 20px", borderRadius: 10, background: "rgba(96,165,250,0.12)", color: "#60a5fa",
+                      border: "1px solid rgba(96,165,250,0.3)", fontSize: "0.84rem", fontWeight: 800,
+                      cursor: fullNameSaving ? "default" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                      opacity: fullNameInput.trim().length < 2 ? 0.5 : 1,
+                    }}>{fullNameSaving ? "Saving..." : "Save"}</button>
+                    <button onClick={() => setFullNameEditing(false)} style={{
+                      padding: "10px 14px", background: "transparent", color: "#555", border: "1px solid #333",
+                      borderRadius: 10, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                    }}>Cancel</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: "1rem", fontWeight: 700, color: profile?.fullName ? "#F0EEEA" : "#555550" }}>
+                      {profile?.fullName || "Not set"}
+                    </span>
+                    <button onClick={() => { setFullNameInput(profile?.fullName || ""); setFullNameEditing(true); }} style={{
+                      padding: "5px 14px", borderRadius: 100, background: "rgba(96,165,250,0.1)",
+                      color: "#60a5fa", border: "1px solid rgba(96,165,250,0.3)", fontSize: "0.72rem",
+                      fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                    }}>{profile?.fullName ? "Edit" : "Add"}</button>
+                  </div>
+                )}
+                {fullNameSaved && <span style={{ fontSize: "0.72rem", color: "#4ade80", marginTop: 8, display: "block", fontWeight: 600 }}>Saved!</span>}
+              </div>
+
               {/* Connected Accounts */}
               <div className="pp-section">
                 <span className="pp-section-label">Connected Accounts</span>
@@ -416,7 +505,10 @@ export default function PlayerProfile() {
                     {profile.steamId ? (
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`)}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => {
+                        if (hasDiscordAccount(discordConnections, "steam", steamLinked)) { triggerDiscordPrompt(); }
+                        else { window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); }
+                      }}>Connect</button>
                     )}
                   </div>
 
@@ -436,7 +528,7 @@ export default function PlayerProfile() {
                     {profile.discordId ? (
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}`)}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => window.open(`/api/auth/discord?uid=${user?.uid}`, "_blank")}>Connect</button>
                     )}
                   </div>
 
@@ -456,7 +548,10 @@ export default function PlayerProfile() {
                     ) : profile.riotVerified === "pending" ? (
                       <span className="pp-acc-badge pp-acc-pending">⏳ Pending</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => router.push("/connect-riot")}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => {
+                        if (hasDiscordAccount(discordConnections, "riot", !!authRiotData?.riotLinked)) { triggerDiscordPrompt(); }
+                        else { window.open("/connect-riot", "_blank"); }
+                      }}>Connect</button>
                     )}
                   </div>
 
@@ -478,6 +573,36 @@ export default function PlayerProfile() {
 
                 </div>
               </div>
+
+              {/* Discord Linked Accounts */}
+              {profile.discordConnections && profile.discordConnections.length > 0 && (
+                <div className="pp-section">
+                  <span className="pp-section-label">Discord Linked Accounts</span>
+                  <p style={{ fontSize: "0.82rem", color: "#8A8880", marginBottom: 16, marginTop: 0 }}>
+                    Accounts connected to your Discord profile.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {profile.discordConnections.map((conn, i) => {
+                      const typeLabel: Record<string, string> = { steam: "Steam", riotgames: "Riot Games", twitch: "Twitch", youtube: "YouTube", twitter: "Twitter", github: "GitHub", spotify: "Spotify", xbox: "Xbox", playstation: "PlayStation", epicgames: "Epic Games", battlenet: "Battle.net" };
+                      const typeColor: Record<string, string> = { steam: "#1b2838", riotgames: "#ff4655", twitch: "#9146ff", youtube: "#ff0000", twitter: "#1da1f2", github: "#fff", spotify: "#1db954", xbox: "#107c10", playstation: "#003087", epicgames: "#fff", battlenet: "#00AEFF" };
+                      return (
+                        <div key={`${conn.type}-${i}`} className="pp-acc-row">
+                          <div className="pp-acc-left">
+                            <span style={{ fontSize: 18, width: 22, textAlign: "center", display: "inline-block", color: typeColor[conn.type] || "#8A8880" }}>
+                              {conn.type === "steam" ? "\u{1F3AE}" : conn.type === "riotgames" ? "\u{1F3AF}" : conn.type === "twitch" ? "\u{1F4FA}" : conn.type === "youtube" ? "\u{25B6}\uFE0F" : conn.type === "twitter" ? "\u{1F426}" : conn.type === "github" ? "\u{1F4BB}" : conn.type === "spotify" ? "\u{1F3B5}" : "\u{1F517}"}
+                            </span>
+                            <div>
+                              <div className="pp-acc-name">{typeLabel[conn.type] || conn.type}</div>
+                              <div className="pp-acc-detail">{conn.name}</div>
+                            </div>
+                          </div>
+                          {conn.verified && <span className="pp-acc-badge pp-acc-linked">{"\u2713"} Verified</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* UPI Payment */}
               <div className="pp-section">

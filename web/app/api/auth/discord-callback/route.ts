@@ -65,6 +65,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(alreadyLinkedRedirect);
     }
 
+    // Fetch Discord connected accounts (Steam, Riot, Twitch, etc.)
+    let discordConnections: { type: string; name: string; id: string; verified: boolean }[] = [];
+    try {
+      const connRes = await fetch("https://discord.com/api/users/@me/connections", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (connRes.ok) {
+        const rawConns = await connRes.json();
+        discordConnections = (rawConns || []).map((c: any) => ({
+          type: c.type,
+          name: c.name,
+          id: c.id,
+          verified: !!c.verified,
+        }));
+      }
+    } catch {}
+
     // Save to Firestore
     await adminDb.collection("users").doc(uid).set({
       discordId: discordUser.id,
@@ -73,6 +90,7 @@ export async function GET(req: NextRequest) {
         ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
         : null,
       discordConnectedAt: new Date(),
+      ...(discordConnections.length > 0 ? { discordConnections } : {}),
     }, { merge: true });
 
     return NextResponse.redirect(successRedirect);

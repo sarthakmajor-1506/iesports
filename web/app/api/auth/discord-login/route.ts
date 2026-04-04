@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     client_id: process.env.DISCORD_CLIENT_ID!,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "identify guilds.join",
+    scope: "identify guilds.join connections",
     state: "discord_login",
   });
 

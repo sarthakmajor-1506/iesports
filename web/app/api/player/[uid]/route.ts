@@ -12,6 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
     const d = userDoc.data()!;
     return NextResponse.json({
       uid,
+      fullName: d.fullName || null,
       displayName: d.displayName || null,
       riotGameName: d.riotGameName || null,
       riotTagLine: d.riotTagLine || null,
@@ -27,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       steamAvatar: d.steamAvatar || null,
       phone: d.phone ? "redacted" : null,   // never expose raw phone to public
       upiId: null,                           // never expose UPI publicly
+      discordConnections: d.discordConnections || [],
       registeredValorantTournaments: d.registeredValorantTournaments || [],
     });
   } catch (e) {

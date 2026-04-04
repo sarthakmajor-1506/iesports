@@ -92,7 +92,7 @@ export default function Home() {
   }, []);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  const loginWithSteam = () => { navigateWithAppPriority("/api/auth/steam"); };
+  const loginWithSteam = () => { window.open("/api/auth/steam", "_blank"); };
 
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
@@ -328,7 +328,7 @@ export default function Home() {
         </div>
         <div className="ie-hero-stats">
           {[
-            { num: "₹1L", suffix: "+", label: "Prize Pool"   },
+            { num: "₹50k", suffix: "+", label: "Prize Pool"   },
             { num: "4",   suffix: "",  label: "Games"        },
             { num: "2",   suffix: "",  label: "Modes"        },
             { num: "UPI", suffix: "",  label: "Fast Payouts" },
@@ -546,7 +546,7 @@ export default function Home() {
                 <SteamIcon size={20} />
                 Sign in with Steam
               </button>
-              <button onClick={() => { setRiotModalOpen(false); navigateWithAppPriority("/api/auth/discord-login"); }} style={{
+              <button onClick={() => { setRiotModalOpen(false); window.open("/api/auth/discord-login", "_blank"); }} style={{
                 width: "100%", padding: "14px 20px",
                 background: "#5865F2",
                 border: "1px solid #4752C4", borderRadius: 12,

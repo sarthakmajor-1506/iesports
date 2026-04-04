@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import {
   RecaptchaVerifier,
@@ -147,13 +147,25 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
   const isProfilePrivate = !isValorant && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
 
-  // ── Account connection status ────────────────────────────────────────────
-  const hasSteam = !!dotaProfile?.steamId || !!user?.steamId || !!userProfile?.steamId;
-  const riotStatus = riotData?.riotVerified || "unlinked";
+  // ── Re-check linked accounts when user returns from another tab ────────
+  const [localDiscord, setLocalDiscord] = useState(false);
+  const [localSteam, setLocalSteam] = useState(false);
+  const [localRiot, setLocalRiot] = useState<string | null>(null);
+  const [localPhone, setLocalPhone] = useState(false);
+
+  // ── Discord connected accounts (Steam/Riot found on Discord) ──────────
+  type DiscordConn = { type: string; name: string; id: string; verified: boolean };
+  const [discordConns, setDiscordConns] = useState<DiscordConn[]>([]);
+  const [linkingFromDiscord, setLinkingFromDiscord] = useState<string | null>(null); // "steam" | "riot" | null
+  const [linkFromDiscordError, setLinkFromDiscordError] = useState("");
+
+  // ── Account connection status (includes local refresh from tab-switch) ──
+  const hasSteam = !!dotaProfile?.steamId || !!user?.steamId || !!userProfile?.steamId || localSteam;
+  const riotStatus = localRiot || riotData?.riotVerified || "unlinked";
   const hasRiot = riotStatus === "verified";
   const riotPending = riotStatus === "pending";
-  const hasDiscord = !!userProfile?.discordId || !!user?.discordId || !!dotaProfile?.discordId;
-  const hasPhone = !!userProfile?.phone || !!user?.phoneNumber || phoneDone;
+  const hasDiscord = !!userProfile?.discordId || !!user?.discordId || !!dotaProfile?.discordId || localDiscord;
+  const hasPhone = !!userProfile?.phone || !!user?.phoneNumber || phoneDone || localPhone;
   const hasFullName = fullNameSaved && fullName.trim().length >= 2;
 
   // Keep fullName in sync if userProfile loads after mount
@@ -163,6 +175,39 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       setFullNameSaved(true);
     }
   }, [userProfile?.fullName, fullNameSaved]);
+
+  // Shared function to refresh user state from Firestore
+  const refreshUserState = async () => {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const d = snap.data();
+      if (!d) return;
+      if (d.discordId) setLocalDiscord(true);
+      if (d.steamId) setLocalSteam(true);
+      if (d.phone) setLocalPhone(true);
+      if (d.riotVerified) setLocalRiot(d.riotVerified);
+      if (d.fullName && !fullNameSaved) {
+        setFullName(d.fullName);
+        setFullNameSaved(true);
+      }
+      if (d.discordConnections?.length > 0) {
+        setDiscordConns(d.discordConnections);
+      }
+    } catch {}
+  };
+
+  // Fetch on mount (user may already have Discord connected)
+  useEffect(() => { refreshUserState(); }, [user]);
+
+  // Re-fetch when user returns from another tab
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refreshUserState();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [user, fullNameSaved]);
 
   // Save full name to Firestore
   const saveFullName = async () => {
@@ -179,6 +224,38 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     }
   };
 
+  // ── Link account from Discord connection ──────────────────────────────
+  const discordSteam = discordConns.find(c => c.type === "steam");
+  const discordRiot = discordConns.find(c => c.type === "riotgames");
+
+  const linkFromDiscord = async (type: "steam" | "riot") => {
+    const conn = type === "steam" ? discordSteam : discordRiot;
+    if (!conn || !user) return;
+    setLinkingFromDiscord(type);
+    setLinkFromDiscordError("");
+    try {
+      const res = await fetch("/api/auth/link-from-discord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: user.uid,
+          type,
+          platformId: conn.id,
+          platformName: conn.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to link account");
+      // Update local state so the requirement shows as met
+      if (type === "steam") setLocalSteam(true);
+      if (type === "riot") setLocalRiot("pending");
+    } catch (e: any) {
+      setLinkFromDiscordError(e.message || "Failed to link account. Try connecting manually.");
+    } finally {
+      setLinkingFromDiscord(null);
+    }
+  };
+
   // Check all requirements
   const gameAccountOk = isValorant ? (hasRiot || riotPending) : hasSteam;
   const allRequirementsMet = hasFullName && hasPhone && hasDiscord && gameAccountOk;
@@ -189,13 +266,15 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     : step;
 
   // ── Requirement items for UI ───────────────────────────────────────────
-  type ReqItem = { id: string; label: string; met: boolean; pending?: boolean; actionLabel?: string; action?: () => void };
+  type ReqItem = { id: string; label: string; desc: string; emoji: string; met: boolean; pending?: boolean; actionLabel?: string; action?: () => void };
   const requirements: ReqItem[] = [];
 
   // Full Name — always first
   requirements.push({
     id: "fullName",
     label: "Full Name",
+    desc: "Used for team rosters, match results, and prize payouts",
+    emoji: "\u{1F9D1}\u200D\u{1F4BB}",
     met: hasFullName,
   });
 
@@ -203,38 +282,46 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   requirements.push({
     id: "phone",
     label: "Phone Number",
+    desc: "For match reminders and prize claim verification via OTP",
+    emoji: "\u{1F4F2}",
     met: hasPhone,
-    actionLabel: "Connect Phone Number",
+    actionLabel: "Verify Phone Number",
     action: () => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); },
   });
 
-  // Game-specific account
+  // Game-specific account — opens in new tab, modal stays open
   if (isValorant) {
     requirements.push({
       id: "riot",
       label: "Riot ID",
+      desc: "We verify your Valorant rank to place you in a fair bracket",
+      emoji: "\u{1F3AF}",
       met: hasRiot,
       pending: riotPending,
       actionLabel: "Connect Riot ID",
-      action: () => router.push("/connect-riot"),
+      action: () => { window.open("/connect-riot", "_blank"); },
     });
   } else {
     requirements.push({
       id: "steam",
-      label: "Steam",
+      label: "Steam Account",
+      desc: "Links your Dota 2 profile so we can verify rank and track matches",
+      emoji: "\u{1F3AE}",
       met: hasSteam,
       actionLabel: "Connect Steam",
-      action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); },
+      action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); },
     });
   }
 
-  // Discord — mandatory for both
+  // Discord — mandatory for both, opens in new tab
   requirements.push({
     id: "discord",
     label: "Discord",
+    desc: "Tournament brackets, match scheduling, and team comms happen on Discord",
+    emoji: "\u{1F4AC}",
     met: hasDiscord,
     actionLabel: "Connect Discord",
-    action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname)}`); },
+    action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); window.open(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname)}`, "_blank"); },
   });
 
   const unmetRequirements = requirements.filter(r => !r.met && !r.pending);
@@ -303,16 +390,16 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         {actualStep === "connect" && (
           <div>
             {!showPhoneOtp && <div style={{
-              background: "linear-gradient(135deg, #1a0808, #0e0e0e)", border: "1px solid #7f1d1d", borderRadius: 12,
+              background: "linear-gradient(135deg, rgba(59,130,246,0.08), #0e0e0e)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 12,
               padding: "16px 18px", marginBottom: 20, position: "relative", overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", top: -20, right: -10, fontSize: 60, opacity: 0.06 }}>📋</div>
+              <div style={{ position: "absolute", top: -20, right: -10, fontSize: 60, opacity: 0.05 }}>{"\u{1F6E1}\uFE0F"}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 16 }}>📝</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#fca5a5" }}>Complete All Requirements</span>
+                <span style={{ fontSize: 16 }}>{"\u2728"}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#93c5fd" }}>Almost there! Complete these to register</span>
               </div>
-              <p style={{ fontSize: 12, color: "#b45050", lineHeight: 1.6 }}>
-                All fields below are mandatory to register for this tournament.
+              <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+                We need a few details to ensure fair play, coordinate matches, and deliver prizes.
               </p>
             </div>}
 
@@ -401,35 +488,48 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             )}
 
             {/* Full Name Input */}
-            {!showPhoneOtp && <div style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: hasFullName ? "#166534" : "#888", marginBottom: 6, textTransform: "uppercase" as const }}>
-                {hasFullName ? "✅ " : "👤 "}Full Name {!hasFullName && <span style={{ color: "#dc2626", fontSize: 9 }}>REQUIRED</span>}
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => { setFullName(e.target.value); setFullNameSaved(false); }}
-                  disabled={fullNameSaving}
-                  style={{
-                    flex: 1, padding: "10px 14px", background: hasFullName ? "#0a1a0a" : "#111",
-                    border: `1px solid ${hasFullName ? "#166534" : "#333"}`, borderRadius: 8,
-                    color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" as const,
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter") saveFullName(); }}
-                />
-                {!fullNameSaved && fullName.trim().length >= 2 && (
-                  <button onClick={saveFullName} disabled={fullNameSaving} style={{
-                    padding: "10px 16px", background: fullNameSaving ? "#333" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
-                    border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12,
-                    cursor: fullNameSaving ? "default" : "pointer", whiteSpace: "nowrap" as const,
-                  }}>
-                    {fullNameSaving ? "..." : "Save"}
-                  </button>
-                )}
+            {!showPhoneOtp && <div style={{
+              marginBottom: 14, padding: "14px 16px",
+              background: hasFullName ? "linear-gradient(135deg, #0a1a0a, #0e1a0e)" : "#111",
+              border: `1px solid ${hasFullName ? "#166534" : "#333"}`, borderRadius: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: hasFullName ? 0 : 10 }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{"\u{1F9D1}\u200D\u{1F4BB}"}</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: 700, fontSize: 13, color: hasFullName ? "#4ade80" : "#fff", marginBottom: 2 }}>
+                    Full Name
+                    {hasFullName && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "3px 8px", borderRadius: 100, border: "1px solid #166534", marginLeft: 8 }}>{"\u2705"} Saved</span>}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>Used for team rosters, match results, and prize payouts</p>
+                </div>
               </div>
-              {fullName.trim().length > 0 && fullName.trim().length < 2 && (
+              {!hasFullName && (
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <input
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={fullName}
+                    onChange={(e) => { setFullName(e.target.value); setFullNameSaved(false); }}
+                    disabled={fullNameSaving}
+                    style={{
+                      flex: 1, padding: "10px 14px", background: "#0a0a0a",
+                      border: "1px solid #222", borderRadius: 8,
+                      color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" as const,
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter") saveFullName(); }}
+                  />
+                  {fullName.trim().length >= 2 && (
+                    <button onClick={saveFullName} disabled={fullNameSaving} style={{
+                      padding: "10px 16px", background: fullNameSaving ? "#333" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12,
+                      cursor: fullNameSaving ? "default" : "pointer", whiteSpace: "nowrap" as const,
+                    }}>
+                      {fullNameSaving ? "..." : "Save"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {!hasFullName && fullName.trim().length > 0 && fullName.trim().length < 2 && (
                 <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Name must be at least 2 characters</p>
               )}
             </div>}
@@ -437,7 +537,6 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {/* Connection Requirements */}
             {!showPhoneOtp && <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {requirements.filter(r => r.id !== "fullName").map(req => {
-                const emoji = req.id === "discord" ? "💬" : req.id === "phone" ? "📱" : req.id === "steam" ? "🎮" : req.id === "riot" ? "🎯" : "🔗";
                 if (req.met) {
                   return (
                     <div key={req.id} style={{
@@ -445,9 +544,12 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                       padding: "14px 16px", background: "linear-gradient(135deg, #0a1a0a, #0e1a0e)", borderRadius: 12,
                       border: "1px solid #166534",
                     }}>
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
-                      <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#4ade80" }}>{req.label}</span>
-                      <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "4px 10px", borderRadius: 100, border: "1px solid #166534" }}>✅ Connected</span>
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 700, fontSize: 13, color: "#4ade80", marginBottom: 2 }}>{req.label}</p>
+                        <p style={{ fontSize: 11, color: "#3a6b3a", lineHeight: 1.4 }}>{req.desc}</p>
+                      </div>
+                      <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "4px 10px", borderRadius: 100, border: "1px solid #166534", flexShrink: 0 }}>{"\u2705"} Done</span>
                     </div>
                   );
                 }
@@ -458,12 +560,77 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                       padding: "14px 16px", background: "linear-gradient(135deg, #1a1200, #161000)", borderRadius: 12,
                       border: "1px solid #854d0e",
                     }}>
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>⏳</span>
-                      <span style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "#fbbf24" }}>{req.label}</span>
-                      <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800, background: "#1a1200", padding: "4px 10px", borderRadius: 100, border: "1px solid #854d0e" }}>⏳ Pending</span>
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 700, fontSize: 13, color: "#fbbf24", marginBottom: 2 }}>{req.label}</p>
+                        <p style={{ fontSize: 11, color: "#7a6520", lineHeight: 1.4 }}>System is verifying your account — nothing needed from you</p>
+                      </div>
+                      <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800, background: "#1a1200", padding: "4px 10px", borderRadius: 100, border: "1px solid #854d0e", flexShrink: 0 }}>{"\u23F3"} Verifying</span>
                     </div>
                   );
                 }
+                // Check if Discord has this account linked
+                const dcMatch = (req.id === "steam" && !hasSteam && discordSteam)
+                  ? discordSteam
+                  : (req.id === "riot" && !hasRiot && !riotPending && discordRiot)
+                    ? discordRiot
+                    : null;
+                const isLinking = linkingFromDiscord === (req.id === "steam" ? "steam" : req.id === "riot" ? "riot" : null);
+
+                if (dcMatch) {
+                  // ── "Found on Discord" card with one-click link ──
+                  return (
+                    <div key={req.id} style={{
+                      padding: "14px 16px", background: "linear-gradient(135deg, rgba(88,101,242,0.08), #111)", borderRadius: 12,
+                      border: "1.5px solid rgba(88,101,242,0.3)",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2 }}>{req.label}</p>
+                          <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{req.desc}</p>
+                        </div>
+                      </div>
+                      {/* Found on Discord banner */}
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "10px 12px", background: "rgba(88,101,242,0.1)", borderRadius: 8,
+                        border: "1px solid rgba(88,101,242,0.2)", marginBottom: 10,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#818cf8" style={{ flexShrink: 0 }}>
+                          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.12-.098.246-.198.373-.292a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419s.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419s.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                        </svg>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc" }}>Found on your Discord</p>
+                          <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginTop: 2 }}>{dcMatch.name}</p>
+                        </div>
+                      </div>
+                      {/* Action buttons */}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => linkFromDiscord(req.id === "steam" ? "steam" : "riot")} disabled={!!linkingFromDiscord} style={{
+                          flex: 2, padding: "10px 14px",
+                          background: isLinking ? "#333" : `linear-gradient(135deg, #5865F2, #4752C4)`,
+                          border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12,
+                          cursor: isLinking ? "default" : "pointer", fontFamily: "inherit",
+                        }}>
+                          {isLinking ? "Linking..." : `Use ${dcMatch.name}`}
+                        </button>
+                        <button onClick={req.action} style={{
+                          flex: 1, padding: "10px 14px",
+                          background: "transparent", border: "1px solid #333", borderRadius: 8,
+                          color: "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                        }}>
+                          Connect manually
+                        </button>
+                      </div>
+                      {linkFromDiscordError && !linkingFromDiscord && (
+                        <p style={{ fontSize: 11, color: "#f87171", marginTop: 8 }}>{linkFromDiscordError}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // ── Default unmet requirement card (no Discord match) ──
                 return (
                   <button key={req.id} onClick={req.action} style={{
                     display: "flex", alignItems: "center", gap: 12,
@@ -474,13 +641,13 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     onMouseEnter={e => { e.currentTarget.style.borderColor = accentColor; e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.background = "#111"; e.currentTarget.style.transform = "translateY(0)"; }}
                   >
-                    <span style={{ fontSize: 20, flexShrink: 0 }}>{emoji}</span>
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2 }}>{req.actionLabel || `Connect ${req.label}`}</p>
-                      <p style={{ fontSize: 11, color: "#666" }}>Required to register</p>
+                      <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{req.desc}</p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: "rgba(249,115,22,0.15)", color: accentColor, border: `1px solid ${accentColor}33` }}>Connect →</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}33`, flexShrink: 0 }}>Connect {"\u2192"}</span>
                     </div>
                   </button>
                 );
@@ -491,14 +658,16 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
             {/* Continue button — only when ALL requirements met */}
             {!showPhoneOtp && allRequirementsMet && (
-              <button onClick={() => setStep(isShuffle ? "solo" : "choose")} style={{
+              <button onClick={() => {
+                if (isShuffle) { handleSolo(); } else { setStep("choose"); }
+              }} disabled={loading} style={{
                 width: "100%", padding: 14,
-                background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                background: loading ? "#333" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
                 border: "none", borderRadius: 10, color: "#fff",
-                fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 4,
+                fontWeight: 700, fontSize: 15, cursor: loading ? "default" : "pointer", marginTop: 4,
                 boxShadow: `0 4px 20px ${accentColor}33`,
               }}>
-                🚀 Continue to Register
+                {loading ? "Registering..." : isShuffle ? `${"\u{1F680}"} Register Now` : `${"\u{1F680}"} Continue to Register`}
               </button>
             )}
 
@@ -531,21 +700,17 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           </div>
         )}
 
-        {/* Riot pending warning for Valorant */}
+        {/* Riot pending note for Valorant — subtle, not alarming */}
         {isValorant && riotPending && actualStep !== "connect" && actualStep !== "success" && (
           <div style={{
-            background: "#1a1200", border: "1px solid #854d0e",
-            borderRadius: 10, padding: "12px 14px", marginBottom: 16,
-            display: "flex", gap: 10, alignItems: "flex-start",
+            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+            display: "flex", gap: 10, alignItems: "center",
           }}>
-            <span style={{ fontSize: 16, marginTop: 1 }}>⏳</span>
-            <div>
-              <p style={{ color: "#fbbf24", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Riot ID verification pending</p>
-              <p style={{ color: "#92400e", fontSize: 12, lineHeight: 1.6 }}>
-                You can register now, but please complete the verification on the{" "}
-                <span style={{ color: "#fbbf24", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }} onClick={() => router.push("/connect-riot")}>Connect Riot page</span> before the tournament starts.
-              </p>
-            </div>
+            <span style={{ fontSize: 14, opacity: 0.5 }}>{"\u2705"}</span>
+            <p style={{ color: "#888", fontSize: 12, lineHeight: 1.5 }}>
+              Nothing needed from you — our system is verifying your Riot ID. You can register normally.
+            </p>
           </div>
         )}
 

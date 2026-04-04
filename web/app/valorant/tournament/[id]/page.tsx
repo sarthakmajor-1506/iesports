@@ -509,9 +509,9 @@ function ValorantTournamentDetailInner() {
 
         /* ── Tab bar ── */
         .vtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,15,42,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(60,203,255,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
-        .vtd-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
-        .vtd-tabs::-webkit-scrollbar { display: none; }
-        .vtd-tab { min-height: 52px; padding: 0 20px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; flex-shrink: 0; }
+        .vtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
+        .vtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
+        .vtd-tab-label { display: inline; }
         .vtd-tab:hover { background: rgba(60,203,255,0.08); color: rgba(255,255,255,0.75); border-color: rgba(60,203,255,0.2); }
         .vtd-tab.active { background: #3CCBFF; color: #fff; border-color: #3CCBFF; box-shadow: 0 0 20px rgba(60,203,255,0.35), 0 4px 16px rgba(60,203,255,0.25); }
         .vtd-tab-count { font-size: 0.68rem; font-weight: 700; opacity: 0.75; background: rgba(0,0,0,0.2); padding: 1px 7px; border-radius: 100px; }
@@ -730,7 +730,9 @@ function ValorantTournamentDetailInner() {
           .vtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .vtd-mc-team { padding: 8px 10px; gap: 8px; }
           .vtd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
-          .vtd-tab { min-height: 46px; padding: 0 14px; font-size: 0.82rem; gap: 6px; }
+          .vtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
+          .vtd-tab-label { display: none; }
+          .vtd-tab-count { display: none; }
           .vtd-hero-title { font-size: 1.6rem; }
           .vtd-hero-desc { font-size: 0.88rem; }
           .vtd-hero-actions { gap: 8px; }
@@ -749,7 +751,7 @@ function ValorantTournamentDetailInner() {
           .vtd-hero-content { padding: 0 12px 20px; min-height: 300px; }
           .vtd-content { padding: 0 12px 32px; }
           .vtd-tabs-wrap { margin-left: -12px; margin-right: -12px; padding: 6px 12px; }
-          .vtd-tab { min-height: 40px; padding: 0 10px; font-size: 0.76rem; }
+          .vtd-tab { min-height: 38px; padding: 0 4px; font-size: 0.7rem; }
           .vtd-hero-title { font-size: 1.4rem; }
           .vtd-stat-tiles { gap: 8px; }
         }
@@ -766,6 +768,22 @@ function ValorantTournamentDetailInner() {
 
       <div className="vtd-page">
         <Navbar />
+
+        {/* Back button */}
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 30px 0" }}>
+          <button onClick={() => router.back()} style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 100, padding: "6px 16px", fontSize: "0.78rem", fontWeight: 700,
+            color: "#8A8880", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0EEEA"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#8A8880"; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+        </div>
 
         {/* ═══ HERO ═══ */}
         <div className="vtd-hero">
@@ -867,9 +885,9 @@ function ValorantTournamentDetailInner() {
           <div className="vtd-tabs-wrap">
             <div className="vtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }}>
-                  <t.Icon size={18} strokeWidth={activeTab === t.key ? 2.5 : 2} />
-                  <span>{t.label}</span>
+                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }} title={t.label}>
+                  <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
+                  <span className="vtd-tab-label">{t.label}</span>
                   {t.key === "players" && <span className="vtd-tab-count">{players.length}</span>}
                   {t.key === "teams" && teams.length > 0 && <span className="vtd-tab-count">{teams.length}</span>}
                 </button>
