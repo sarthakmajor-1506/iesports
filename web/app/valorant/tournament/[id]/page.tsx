@@ -175,11 +175,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
 }
 
 async function captureTabImage(el: HTMLElement) {
-  const prev = el.style.filter;
-  el.style.filter = "contrast(1.25) brightness(1.15) saturate(1.15)";
+  const prevFilter = el.style.filter;
+  const prevPad = el.style.padding;
+  const prevBorder = el.style.border;
+  const prevBg = el.style.background;
+  el.style.filter = "contrast(1.3) brightness(1.25) saturate(1.2)";
+  el.style.padding = "24px";
+  el.style.border = "3px solid rgba(60,203,255,0.35)";
+  el.style.background = "#080c14";
   const html2canvas = (await import("html2canvas")).default;
-  const canvas = await html2canvas(el, { backgroundColor: "#080c14", scale: 2, useCORS: true, logging: false });
-  el.style.filter = prev;
+  const canvas = await html2canvas(el, { backgroundColor: "#050810", scale: 2, useCORS: true, logging: false });
+  el.style.filter = prevFilter;
+  el.style.padding = prevPad;
+  el.style.border = prevBorder;
+  el.style.background = prevBg;
   return canvas;
 }
 
@@ -615,21 +624,22 @@ function ValorantTournamentDetailInner() {
         .vtd-empty-sub { font-size: 0.86rem; color: #555550; display: block; margin-top: 6px; }
 
         /* ── Players tier columns ── */
+        @keyframes vtd-fadeSlideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .vtd-tier-columns { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
         .vtd-tier-columns::-webkit-scrollbar { height: 4px; }
         .vtd-tier-columns::-webkit-scrollbar-track { background: transparent; }
         .vtd-tier-columns::-webkit-scrollbar-thumb { background: rgba(60,203,255,0.35); border-radius: 4px; }
-        .vtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
+        .vtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
         .vtd-tier-header { padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; }
         .vtd-tier-header-count { font-size: 0.72rem; font-weight: 600; opacity: 0.7; }
-        .vtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; }
-        .vtd-tier-player:hover { transform: scale(1.02); border-color: rgba(60,203,255,0.35); box-shadow: 0 0 0 1px rgba(60,203,255,0.15), 0 8px 24px rgba(0,0,0,0.4); }
-        .vtd-tier-player-avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.08); }
-        .vtd-tier-player-avatar-init { width: 36px; height: 36px; border-radius: 8px; background: rgba(60,203,255,0.1); border: 1.5px solid rgba(60,203,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3CCBFF; flex-shrink: 0; }
-        .vtd-tier-player-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .vtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; animation: vtd-fadeSlideIn 0.35s ease both; }
+        .vtd-tier-player:hover { transform: translateY(-2px) scale(1.01); border-color: rgba(60,203,255,0.35); box-shadow: 0 0 0 1px rgba(60,203,255,0.15), 0 8px 24px rgba(0,0,0,0.4); background: rgba(25,25,30,0.9); }
+        .vtd-tier-player-avatar { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.1); }
+        .vtd-tier-player-avatar-init { width: 38px; height: 38px; border-radius: 10px; background: rgba(60,203,255,0.1); border: 1.5px solid rgba(60,203,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3CCBFF; flex-shrink: 0; }
+        .vtd-tier-player-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .vtd-tier-player-name { font-size: 0.85rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .vtd-tier-player-name .tag { color: #555550; font-weight: 400; }
-        .vtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; flex-shrink: 0; }
+        .vtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; }
 
         /* ── Legacy players grid (keep for backward compat) ── */
         .vtd-players-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -645,7 +655,7 @@ function ValorantTournamentDetailInner() {
 
         /* ── Teams grid ── */
         .vtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .vtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.2s ease; }
+        .vtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.25s ease; animation: vtd-fadeSlideIn 0.4s ease both; }
         .vtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(60,203,255,0.2); }
         .vtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #3CCBFF; background: rgba(60,203,255,0.1); border: 1px solid rgba(60,203,255,0.25); padding: 3px 10px; border-radius: 100px; }
         .vtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
@@ -654,12 +664,12 @@ function ValorantTournamentDetailInner() {
         .vtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
         .vtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
         .vtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
-        .vtd-team-box-member { display: flex; align-items: center; gap: 10px; }
+        .vtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; }
+        .vtd-team-box-member:hover { background: rgba(60,203,255,0.06); transform: translateX(2px); }
         .vtd-team-box-member-avatar { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
         .vtd-team-box-member-init { width: 34px; height: 34px; border-radius: 8px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555550; flex-shrink: 0; }
         .vtd-team-box-member-name { font-size: 0.86rem; font-weight: 600; color: #e0e0da; }
-        .vtd-team-box-member-rank { font-size: 0.72rem; color: #555550; }
-        .vtd-team-box-member-skill { margin-left: auto; font-size: 0.62rem; color: #555550; font-weight: 600; }
+        .vtd-team-box-member-rank { font-size: 0.72rem; color: #8A8880; }
         .vtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.74rem; color: #555550; }
         .vtd-team-edit-btn { padding: 5px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; color: #8A8880; font-family: inherit; transition: all 0.15s; }
         .vtd-team-edit-btn:hover { border-color: #3CCBFF; color: #3CCBFF; }
@@ -1106,12 +1116,12 @@ function ValorantTournamentDetailInner() {
                               <span>{rank}</span>
                               <span className="vtd-tier-header-count">{rankPlayers.length}</span>
                             </div>
-                            {rankPlayers.map((p: any) => (
+                            {rankPlayers.map((p: any, pi: number) => (
                               <Link key={p.uid} href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                                <div className="vtd-tier-player">
+                                <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s` }}>
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
-                                    <span className="vtd-tier-player-name">{p.riotGameName}<span className="tag">#{p.riotTagLine}</span></span>
+                                    <span className="vtd-tier-player-name">{p.riotGameName}<span className="tag"> #{p.riotTagLine}</span></span>
                                     <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}{p.riotTier ? ` (${p.riotTier})` : ""}</span>
                                   </div>
                                 </div>
@@ -1163,10 +1173,12 @@ function ValorantTournamentDetailInner() {
                       </div>
                       <div className="vtd-team-box-members">
                         {(team.members || []).map((m: any, i: number) => (
-                          <div key={m.uid || i} className="vtd-team-box-member">
-                            {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
-                            <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}{m.riotTier ? ` (${m.riotTier})` : ""}</div></div>
-                          </div>
+                          <Link key={m.uid || i} href={`/player/${m.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                            <div className="vtd-team-box-member">
+                              {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
+                              <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}{m.riotTier ? ` (${m.riotTier})` : ""}</div></div>
+                            </div>
+                          </Link>
                         ))}
                       </div>
                       <div className="vtd-team-box-footer">

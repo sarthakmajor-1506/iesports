@@ -166,11 +166,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
 }
 
 async function captureTabImage(el: HTMLElement) {
-  const prev = el.style.filter;
-  el.style.filter = "contrast(1.25) brightness(1.15) saturate(1.15)";
+  const prevFilter = el.style.filter;
+  const prevPad = el.style.padding;
+  const prevBorder = el.style.border;
+  const prevBg = el.style.background;
+  el.style.filter = "contrast(1.3) brightness(1.25) saturate(1.2)";
+  el.style.padding = "24px";
+  el.style.border = "3px solid rgba(59,130,246,0.35)";
+  el.style.background = "#080c14";
   const html2canvas = (await import("html2canvas")).default;
-  const canvas = await html2canvas(el, { backgroundColor: "#080c14", scale: 2, useCORS: true, logging: false });
-  el.style.filter = prev;
+  const canvas = await html2canvas(el, { backgroundColor: "#050810", scale: 2, useCORS: true, logging: false });
+  el.style.filter = prevFilter;
+  el.style.padding = prevPad;
+  el.style.border = prevBorder;
+  el.style.background = prevBg;
   return canvas;
 }
 
@@ -521,22 +530,24 @@ function DotaTournamentDetailInner() {
         .dtd-empty-title { font-size: 1rem; font-weight: 700; color: #8A8880; margin-bottom: 4px; display: block; }
         .dtd-empty-sub { font-size: 0.86rem; color: #555550; display: block; margin-top: 6px; }
 
+        @keyframes dtd-fadeSlideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
         /* ── Players tier columns ── */
         .dtd-tier-columns { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
-        .dtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
+        .dtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
         .dtd-tier-header { padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; }
         .dtd-tier-header-count { font-size: 0.72rem; font-weight: 600; opacity: 0.7; }
-        .dtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; }
-        .dtd-tier-player:hover { transform: scale(1.02); border-color: rgba(59,130,246,0.35); box-shadow: 0 0 0 1px rgba(59,130,246,0.15), 0 8px 24px rgba(0,0,0,0.4); }
-        .dtd-tier-player-avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.08); }
-        .dtd-tier-player-avatar-init { width: 36px; height: 36px; border-radius: 8px; background: rgba(59,130,246,0.1); border: 1.5px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3B82F6; flex-shrink: 0; }
-        .dtd-tier-player-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .dtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; animation: dtd-fadeSlideIn 0.35s ease both; }
+        .dtd-tier-player:hover { transform: translateY(-2px) scale(1.01); border-color: rgba(59,130,246,0.35); box-shadow: 0 0 0 1px rgba(59,130,246,0.15), 0 8px 24px rgba(0,0,0,0.4); background: rgba(25,25,30,0.9); }
+        .dtd-tier-player-avatar { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.1); }
+        .dtd-tier-player-avatar-init { width: 38px; height: 38px; border-radius: 10px; background: rgba(59,130,246,0.1); border: 1.5px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3B82F6; flex-shrink: 0; }
+        .dtd-tier-player-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .dtd-tier-player-name { font-size: 0.85rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; flex-shrink: 0; }
+        .dtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; }
 
         /* ── Teams grid ── */
         .dtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .dtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.2s ease; }
+        .dtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; }
         .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(59,130,246,0.2); }
         .dtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #3B82F6; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); padding: 3px 10px; border-radius: 100px; }
         .dtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
@@ -545,11 +556,12 @@ function DotaTournamentDetailInner() {
         .dtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
         .dtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
         .dtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
-        .dtd-team-box-member { display: flex; align-items: center; gap: 10px; }
+        .dtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; }
+        .dtd-team-box-member:hover { background: rgba(59,130,246,0.06); transform: translateX(2px); }
         .dtd-team-box-member-avatar { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
         .dtd-team-box-member-init { width: 34px; height: 34px; border-radius: 8px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555550; flex-shrink: 0; }
         .dtd-team-box-member-name { font-size: 0.86rem; font-weight: 600; color: #e0e0da; }
-        .dtd-team-box-member-rank { font-size: 0.72rem; color: #555550; }
+        .dtd-team-box-member-rank { font-size: 0.72rem; color: #8A8880; }
         .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.74rem; color: #555550; }
 
         /* ── Tables ── */
@@ -999,10 +1011,12 @@ function DotaTournamentDetailInner() {
                       </div>
                       <div className="dtd-team-box-members">
                         {(team.members || []).map((m: any, i: number) => (
-                          <div key={m.uid || i} className="dtd-team-box-member">
-                            {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
-                            <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
-                          </div>
+                          <Link key={m.uid || i} href={`/player/${m.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                            <div className="dtd-team-box-member">
+                              {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                              <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
+                            </div>
+                          </Link>
                         ))}
                       </div>
                       <div className="dtd-team-box-footer">
