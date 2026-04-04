@@ -159,6 +159,8 @@ export default function DotaTournaments() {
                   const isRegistered = registeredIds.has(t.id);
                   const regState = getRegistrationState(t);
                   const pct = Math.round((t.slotsBooked / t.totalSlots) * 100);
+                  const now = new Date();
+                  const isActive = now >= new Date(t.startDate) && now <= new Date(t.endDate);
                   const entryDisplay = t.entryFee !== undefined ? (t.entryFee === 0 ? "Free" : `₹${t.entryFee}`) : t.entry;
                   return (
                     <div key={t.id} className={`dt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s`, position: "relative" }} onClick={() => router.push(`/tournament/${t.id}`)}>
@@ -174,7 +176,7 @@ export default function DotaTournaments() {
                           <img src="https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png" alt="Dota 2" />
                         </div>
                         <div className="dt-card-info">
-                          <div className="dt-card-name">{t.name}</div>
+                          <div className="dt-card-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>{t.name}{isActive && <span style={{ fontSize: "0.6rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(34,197,94,0.12)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)", whiteSpace: "nowrap", lineHeight: 1.4 }}>LIVE</span>}</div>
                           <div className="dt-card-meta">
                             <div className="dt-meta-item">
                               <span className="dt-meta-key">Prize</span>
@@ -216,6 +218,8 @@ export default function DotaTournaments() {
                               <div className="dt-coming-soon-date">Reg opens {formatDate(t.schedule.registrationOpens)}</div>
                             )}
                           </div>
+                        ) : (t.totalSlots - t.slotsBooked) <= 0 ? (
+                          <button className="dt-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>Slots Full</button>
                         ) : (
                           <button className="dt-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${t.id}`); }}>Register →</button>
                         )}

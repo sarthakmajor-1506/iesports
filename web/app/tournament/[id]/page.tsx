@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
@@ -233,7 +233,7 @@ function DotaTournamentDetailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id as string;
-  const { user, loading: authLoading, steamLinked, dotaProfile } = useAuth();
+  const { user, loading: authLoading, steamLinked, dotaProfile, userProfile } = useAuth();
 
   const [tournament, setTournament] = useState<any>(null);
   const [tLoading, setTLoading] = useState(true);
@@ -248,6 +248,8 @@ function DotaTournamentDetailInner() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
+  const [onWaitlist, setOnWaitlist] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<any[]>([]);
@@ -268,6 +270,24 @@ function DotaTournamentDetailInner() {
     window.addEventListener("focus", checkReg);
     return () => window.removeEventListener("focus", checkReg);
   }, [user, id]);
+  useEffect(() => {
+    if (!user || !id) return;
+    getDoc(doc(db, "tournaments", id, "waitlist", user.uid)).then(snap => setOnWaitlist(snap.exists()));
+  }, [user, id]);
+  const toggleWaitlist = async () => {
+    if (!user || !id) return;
+    setWaitlistLoading(true);
+    try {
+      const ref = doc(db, "tournaments", id, "waitlist", user.uid);
+      if (onWaitlist) {
+        await deleteDoc(ref);
+        setOnWaitlist(false);
+      } else {
+        await setDoc(ref, { uid: user.uid, displayName: user.displayName || "", phone: userProfile?.phone || "", addedAt: new Date().toISOString() });
+        setOnWaitlist(true);
+      }
+    } catch {} finally { setWaitlistLoading(false); }
+  };
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "tournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "tournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }); return () => unsub(); }, [id]);
@@ -646,6 +666,18 @@ function DotaTournamentDetailInner() {
                       setShowRegister(true);
                     }}
                   >Register Now →</button>
+                )}
+                {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
+                  <>
+                    <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>Slots Full</button>
+                    {user && (
+                      <button
+                        onClick={toggleWaitlist}
+                        disabled={waitlistLoading}
+                        style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                      >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Notify Me"}</button>
+                    )}
+                  </>
                 )}
                 {isRegistered && (
                   <div style={{ padding: "12px 28px", background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 100, fontSize: "0.9rem", fontWeight: 700 }}>✓ Registered</div>

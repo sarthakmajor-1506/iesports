@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
@@ -265,7 +265,7 @@ function ValorantTournamentDetailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id as string;
-  const { user, loading: authLoading, riotData } = useAuth();
+  const { user, loading: authLoading, riotData, userProfile } = useAuth();
 
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [tournament, setTournament] = useState<any>(null);
@@ -282,6 +282,8 @@ function ValorantTournamentDetailInner() {
   const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
+  const [onWaitlist, setOnWaitlist] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
@@ -299,6 +301,24 @@ function ValorantTournamentDetailInner() {
   useEffect(() => { if (!id) return; const unsub = onSnapshot(doc(db, "valorantTournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); setTLoading(false); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); if (Math.abs(acsB - acsA) > 1) return acsB - acsA; return (b.kd || 0) - (a.kd || 0); }); setLeaderboard(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "soloPlayers"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); if (user) setIsRegistered(list.some((p: any) => p.uid === user.uid)); }); return () => unsub(); }, [id, user]);
+  useEffect(() => {
+    if (!user || !id) return;
+    getDoc(doc(db, "valorantTournaments", id, "waitlist", user.uid)).then(snap => setOnWaitlist(snap.exists()));
+  }, [user, id]);
+  const toggleWaitlist = async () => {
+    if (!user || !id) return;
+    setWaitlistLoading(true);
+    try {
+      const ref = doc(db, "valorantTournaments", id, "waitlist", user.uid);
+      if (onWaitlist) {
+        await deleteDoc(ref);
+        setOnWaitlist(false);
+      } else {
+        await setDoc(ref, { uid: user.uid, displayName: user.displayName || "", phone: userProfile?.phone || "", addedAt: new Date().toISOString() });
+        setOnWaitlist(true);
+      }
+    } catch {} finally { setWaitlistLoading(false); }
+  };
   useEffect(() => { if (!id) return; const unsub = onSnapshot(query(collection(db, "valorantTournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }); return () => unsub(); }, [id]);
   useEffect(() => { if (!id) return; const unsub = onSnapshot(collection(db, "valorantTournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }); return () => unsub(); }, [id]);
@@ -799,6 +819,18 @@ function ValorantTournamentDetailInner() {
               )}
               <div className="vtd-hero-actions">
                 {canRegister && <button className="vtd-reg-btn" onClick={() => setShowRegister(true)}>Register Now →</button>}
+                {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
+                  <>
+                    <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
+                    {user && (
+                      <button
+                        onClick={toggleWaitlist}
+                        disabled={waitlistLoading}
+                        style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                      >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Notify Me"}</button>
+                    )}
+                  </>
+                )}
                 {isRegistered && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div className="vtd-reg-done">✓ Registered</div>

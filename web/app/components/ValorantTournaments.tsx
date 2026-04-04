@@ -161,6 +161,8 @@ export default function ValorantTournaments() {
                   const slotsLeft = t.totalSlots - t.slotsBooked;
                   const isRegistered = registeredIds.has(t.id);
                   const regState = getRegistrationState(t);
+                  const now = new Date();
+                  const isActive = now >= new Date(t.startDate) && now <= new Date(t.endDate);
                   return (
                     <div key={t.id} className={`vt-card${isRegistered ? " registered" : ""}`} style={{ animationDelay: `${0.05 * tournaments.indexOf(t)}s`, position: "relative" }} onClick={() => router.push(`/valorant/tournament/${t.id}`)}>
                       {t.bannerImage && (
@@ -173,7 +175,7 @@ export default function ValorantTournaments() {
                       <div className="vt-card-body" style={{ position: "relative", zIndex: 1 }}>
                         <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
                         <div className="vt-card-info">
-                          <div className="vt-card-name">{t.name}</div>
+                          <div className="vt-card-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>{t.name}{isActive && <span style={{ fontSize: "0.6rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(34,197,94,0.12)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)", whiteSpace: "nowrap", lineHeight: 1.4 }}>LIVE</span>}</div>
                           <div className="vt-card-meta">
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Prize</span>
@@ -215,6 +217,8 @@ export default function ValorantTournaments() {
                               <div className="vt-coming-soon-date">Reg opens {formatDate(t.schedule.registrationOpens)}</div>
                             )}
                           </div>
+                        ) : slotsLeft <= 0 ? (
+                          <button className="vt-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>Slots Full</button>
                         ) : (
                           <button className="vt-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}`); }}>Register →</button>
                         )}
