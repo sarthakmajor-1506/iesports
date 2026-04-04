@@ -365,7 +365,7 @@ export default function Home() {
           </div>
           <div className="ie-games-grid">
             {[
-              { name: "Dota 2",         tag: "Live Now",    src: "/dota2poster3.png",   soon: false, href: "/dota2" },
+              { name: "Dota 2",         tag: "Live Now",    src: "/dota2image33.jpeg",  soon: false, href: "/dota2" },
               { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false, href: "/valorant" },
               { name: "Counter Strike", tag: "Coming Soon", src: "/csgoimage3.jpg",     soon: true,  href: "" },
               { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true,  href: "" },
