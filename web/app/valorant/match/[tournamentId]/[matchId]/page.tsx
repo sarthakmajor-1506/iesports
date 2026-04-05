@@ -20,8 +20,10 @@ export default function MatchDetail() {
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [activeGame, setActiveGame] = useState<1 | 2>(1);
+  const [activeGame, setActiveGame] = useState<number>(1);
   const [detailTab, setDetailTab] = useState<"scoreboard" | "duels">("scoreboard");
+  const [sortCol, setSortCol] = useState<string>("kills");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     if (!tournamentId || !matchId) return;
@@ -88,17 +90,56 @@ export default function MatchDetail() {
       <><style>{styles}</style><div className="md-page"><Navbar /><div className="md-content"><div className="md-loading">Match not found.</div></div></div></>
     );
   }
-  const g1 = match.game1 || match.games?.game1;
-  const g2 = match.game2 || match.games?.game2;   
-  const activeGameData = activeGame === 1 ? g1 : g2;
+  const bestOf = match.isBracket
+    ? (match.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : (tournament?.bracketBestOf || 2))
+    : (tournament?.matchesPerRound || 2);
+  const games: any[] = [];
+  for (let i = 1; i <= bestOf; i++) {
+    games.push(match[`game${i}`] || match.games?.[`game${i}`] || null);
+  }
+  const activeGameData = games[activeGame - 1] || null;
   const isComplete = match.status === "completed";
 
-  const t1Players = (activeGameData?.playerStats || []).filter((p: any) =>
+  const roundsPlayed = activeGameData?.roundsPlayed || ((activeGameData?.redRoundsWon || 0) + (activeGameData?.blueRoundsWon || 0)) || 1;
+  const getSortValue = (p: any, col: string) => {
+    const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
+    const adr = roundsPlayed > 0 ? Math.round((p.damageDealt || 0) / roundsPlayed) : 0;
+    const hs = Math.round((p.headshots || 0) / Math.max(1, (p.headshots || 0) + (p.bodyshots || 0) + (p.legshots || 0)) * 100);
+    switch (col) {
+      case "player": return (p.name || "").toLowerCase();
+      case "agent": return (p.agent || "").toLowerCase();
+      case "kills": return p.kills || 0;
+      case "deaths": return p.deaths || 0;
+      case "assists": return p.assists || 0;
+      case "kd": return kd;
+      case "adr": return adr;
+      case "hs": return hs;
+      case "fk": return p.firstKills ?? 0;
+      case "fd": return p.firstDeaths ?? 0;
+      default: return 0;
+    }
+  };
+  const sortPlayers = (arr: any[]) => {
+    return [...arr].sort((a, b) => {
+      const va = getSortValue(a, sortCol);
+      const vb = getSortValue(b, sortCol);
+      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb as string) : (vb as string).localeCompare(va);
+      return sortDir === "asc" ? (va as number) - (vb as number) : (vb as number) - (va as number);
+    });
+  };
+  const handleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === "desc" ? "asc" : "desc");
+    else { setSortCol(col); setSortDir("desc"); }
+  };
+  const sortArrow = (col: string) => sortCol === col ? (sortDir === "desc" ? " ▼" : " ▲") : "";
+  const thSortStyle = (col: string): React.CSSProperties => ({ cursor: "pointer", color: sortCol === col ? "#3CCBFF" : undefined });
+
+  const t1Players = sortPlayers((activeGameData?.playerStats || []).filter((p: any) =>
     p.tournamentTeam === "team1" || p.teamId === match.team1Id
-  );
-  const t2Players = (activeGameData?.playerStats || []).filter((p: any) =>
+  ));
+  const t2Players = sortPlayers((activeGameData?.playerStats || []).filter((p: any) =>
     p.tournamentTeam === "team2" || p.teamId === match.team2Id
-  );
+  ));
 
   return (
     <>
@@ -147,28 +188,20 @@ export default function MatchDetail() {
 
           {/* ═══ GAME TABS ═══ */}
           <div className="md-game-tabs">
-            <button
-              className={`md-game-tab ${activeGame === 1 ? "active" : ""} ${g1?.status === "completed" ? "done" : ""}`}
-              onClick={() => setActiveGame(1)}
-            >
-              <span className="md-game-tab-num">Game 1</span>
-              {g1 ? (
-                <span className="md-game-tab-info">{g1.mapName} · {g1.team1RoundsWon ?? "?"}-{g1.team2RoundsWon ?? "?"}</span>
-              ) : (
-                <span className="md-game-tab-info md-game-tab-pending">Pending</span>
-              )}
-            </button>
-            <button
-              className={`md-game-tab ${activeGame === 2 ? "active" : ""} ${g2?.status === "completed" ? "done" : ""}`}
-              onClick={() => setActiveGame(2)}
-            >
-              <span className="md-game-tab-num">Game 2</span>
-              {g2 ? (
-                <span className="md-game-tab-info">{g2.mapName} · {g2.team1RoundsWon ?? "?"}-{g2.team2RoundsWon ?? "?"}</span>
-              ) : (
-                <span className="md-game-tab-info md-game-tab-pending">Pending</span>
-              )}
-            </button>
+            {games.map((g, i) => (
+              <button
+                key={i}
+                className={`md-game-tab ${activeGame === i + 1 ? "active" : ""} ${g?.status === "completed" ? "done" : ""}`}
+                onClick={() => setActiveGame(i + 1)}
+              >
+                <span className="md-game-tab-num">Game {i + 1}</span>
+                {g ? (
+                  <span className="md-game-tab-info">{g.mapName} · {g.team1RoundsWon ?? "?"}-{g.team2RoundsWon ?? "?"}</span>
+                ) : (
+                  <span className="md-game-tab-info md-game-tab-pending">Pending</span>
+                )}
+              </button>
+            ))}
           </div>
 
           {/* ═══ GAME SCOREBOARD ═══ */}
@@ -204,45 +237,45 @@ export default function MatchDetail() {
                 const t1Rounds = activeGameData.team1RoundsWon ?? "?";
                 const t2Rounds = activeGameData.team2RoundsWon ?? "?";
                 return (
-                <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "14px 20px", marginBottom: 12, width: "100%" }}>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 10 }}>Round Timeline</div>
+                <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "16px 20px", marginBottom: 12, width: "100%" }}>
+                  <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#8A8880", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 12 }}>Round Timeline</div>
                   {/* Team 1 row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 2 }}>
-                    <div style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#8A8880", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 36 }}>{match.team1Name.length > 5 ? match.team1Name.slice(0, 4) + "…" : match.team1Name}</span>
-                      <span style={{ fontSize: "0.82rem", fontWeight: 900, color: t1Color }}>{t1Rounds}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 3 }}>
+                    <div style={{ width: 120, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: t1Color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 88 }}>{match.team1Name}</span>
+                      <span style={{ fontSize: "0.92rem", fontWeight: 900, color: t1Color, textShadow: `0 0 8px ${t1Color}44` }}>{t1Rounds}</span>
                     </div>
                     <div style={{ display: "flex", flex: 1, gap: 2, alignItems: "center" }}>
                       {rounds.map((r: any, ri: number) => {
                         const isT1Win = r.winner === "team1";
                         return (
                           <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                            {ri === 12 && <div style={{ width: 2, height: 22, background: "#555550", margin: "0 2px", borderRadius: 1, flexShrink: 0 }} />}
+                            {ri === 12 && <div style={{ width: 2, height: 26, background: "linear-gradient(180deg, transparent, #555550, transparent)", margin: "0 3px", borderRadius: 1, flexShrink: 0 }} />}
                             <div title={`R${r.round}: ${isT1Win ? match.team1Name : match.team2Name} — ${r.endType || ""}`} style={{
-                              width: "100%", height: 22,
+                              width: "100%", height: 26,
                               display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>{isT1Win ? <span style={{ color: t1Color, fontSize: "0.72rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.35rem" }}>●</span>}</div>
+                            }}>{isT1Win ? <span style={{ color: t1Color, fontSize: "0.82rem", filter: `drop-shadow(0 0 4px ${t1Color}66)` }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#1e1e22", fontSize: "0.4rem" }}>●</span>}</div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
                   {/* Team 2 row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 2 }}>
-                    <div style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#8A8880", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 36 }}>{match.team2Name.length > 5 ? match.team2Name.slice(0, 4) + "…" : match.team2Name}</span>
-                      <span style={{ fontSize: "0.82rem", fontWeight: 900, color: t2Color }}>{t2Rounds}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 3 }}>
+                    <div style={{ width: 120, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: t2Color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 88 }}>{match.team2Name}</span>
+                      <span style={{ fontSize: "0.92rem", fontWeight: 900, color: t2Color, textShadow: `0 0 8px ${t2Color}44` }}>{t2Rounds}</span>
                     </div>
                     <div style={{ display: "flex", flex: 1, gap: 2, alignItems: "center" }}>
                       {rounds.map((r: any, ri: number) => {
                         const isT2Win = r.winner === "team2";
                         return (
                           <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                            {ri === 12 && <div style={{ width: 2, height: 22, background: "#555550", margin: "0 2px", borderRadius: 1, flexShrink: 0 }} />}
+                            {ri === 12 && <div style={{ width: 2, height: 26, background: "linear-gradient(180deg, transparent, #555550, transparent)", margin: "0 3px", borderRadius: 1, flexShrink: 0 }} />}
                             <div title={`R${r.round}: ${isT2Win ? match.team2Name : match.team1Name} — ${r.endType || ""}`} style={{
-                              width: "100%", height: 22,
+                              width: "100%", height: 26,
                               display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>{isT2Win ? <span style={{ color: t2Color, fontSize: "0.72rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.35rem" }}>●</span>}</div>
+                            }}>{isT2Win ? <span style={{ color: t2Color, fontSize: "0.82rem", filter: `drop-shadow(0 0 4px ${t2Color}66)` }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#1e1e22", fontSize: "0.4rem" }}>●</span>}</div>
                           </div>
                         );
                       })}
@@ -250,12 +283,12 @@ export default function MatchDetail() {
                   </div>
                   {/* Round numbers */}
                   <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
-                    <div style={{ width: 60, flexShrink: 0 }} />
+                    <div style={{ width: 120, flexShrink: 0 }} />
                     <div style={{ display: "flex", flex: 1, gap: 2 }}>
                       {rounds.map((r: any, ri: number) => (
                         <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                          {ri === 12 && <div style={{ width: 2, margin: "0 2px", flexShrink: 0 }} />}
-                          <div style={{ width: "100%", textAlign: "center", fontSize: "0.56rem", color: "#555550", fontWeight: 600 }}>{r.round}</div>
+                          {ri === 12 && <div style={{ width: 2, margin: "0 3px", flexShrink: 0 }} />}
+                          <div style={{ width: "100%", textAlign: "center", fontSize: "0.58rem", color: "#6b7280", fontWeight: 600 }}>{r.round}</div>
                         </div>
                       ))}
                     </div>
@@ -279,21 +312,20 @@ export default function MatchDetail() {
                 </div>
                 <div className="md-stats-table">
                   <div className="md-stats-header">
-                    <div className="md-stats-cell md-stats-player">Player</div>
-                    <div className="md-stats-cell">Agent</div>
-                    <div className="md-stats-cell md-stats-k">K</div>
-                    <div className="md-stats-cell md-stats-d">D</div>
-                    <div className="md-stats-cell">A</div>
-                    <div className="md-stats-cell md-stats-kd">K/D</div>
-                    <div className="md-stats-cell">ADR</div>
-                    <div className="md-stats-cell">HS%</div>
-                    <div className="md-stats-cell md-stats-fk">FK</div>
-                    <div className="md-stats-cell md-stats-fd">FD</div>
+                    <div className="md-stats-cell md-stats-player" style={thSortStyle("player")} onClick={() => handleSort("player")}>Player{sortArrow("player")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("agent")} onClick={() => handleSort("agent")}>Agent{sortArrow("agent")}</div>
+                    <div className="md-stats-cell md-stats-k" style={thSortStyle("kills")} onClick={() => handleSort("kills")}>K{sortArrow("kills")}</div>
+                    <div className="md-stats-cell md-stats-d" style={thSortStyle("deaths")} onClick={() => handleSort("deaths")}>D{sortArrow("deaths")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("assists")} onClick={() => handleSort("assists")}>A{sortArrow("assists")}</div>
+                    <div className="md-stats-cell md-stats-kd" style={thSortStyle("kd")} onClick={() => handleSort("kd")}>K/D{sortArrow("kd")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("adr")} onClick={() => handleSort("adr")}>ADR{sortArrow("adr")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("hs")} onClick={() => handleSort("hs")}>HS%{sortArrow("hs")}</div>
+                    <div className="md-stats-cell md-stats-fk" style={thSortStyle("fk")} onClick={() => handleSort("fk")}>FK{sortArrow("fk")}</div>
+                    <div className="md-stats-cell md-stats-fd" style={thSortStyle("fd")} onClick={() => handleSort("fd")}>FD{sortArrow("fd")}</div>
                   </div>
                   {t1Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
-                    const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
-                    const adr = rounds > 0 ? Math.round((p.damageDealt || 0) / rounds) : 0;
+                    const adr = roundsPlayed > 0 ? Math.round((p.damageDealt || 0) / roundsPlayed) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
@@ -323,21 +355,20 @@ export default function MatchDetail() {
                 </div>
                 <div className="md-stats-table">
                   <div className="md-stats-header">
-                    <div className="md-stats-cell md-stats-player">Player</div>
-                    <div className="md-stats-cell">Agent</div>
-                    <div className="md-stats-cell md-stats-k">K</div>
-                    <div className="md-stats-cell md-stats-d">D</div>
-                    <div className="md-stats-cell">A</div>
-                    <div className="md-stats-cell md-stats-kd">K/D</div>
-                    <div className="md-stats-cell">ADR</div>
-                    <div className="md-stats-cell">HS%</div>
-                    <div className="md-stats-cell md-stats-fk">FK</div>
-                    <div className="md-stats-cell md-stats-fd">FD</div>
+                    <div className="md-stats-cell md-stats-player" style={thSortStyle("player")} onClick={() => handleSort("player")}>Player{sortArrow("player")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("agent")} onClick={() => handleSort("agent")}>Agent{sortArrow("agent")}</div>
+                    <div className="md-stats-cell md-stats-k" style={thSortStyle("kills")} onClick={() => handleSort("kills")}>K{sortArrow("kills")}</div>
+                    <div className="md-stats-cell md-stats-d" style={thSortStyle("deaths")} onClick={() => handleSort("deaths")}>D{sortArrow("deaths")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("assists")} onClick={() => handleSort("assists")}>A{sortArrow("assists")}</div>
+                    <div className="md-stats-cell md-stats-kd" style={thSortStyle("kd")} onClick={() => handleSort("kd")}>K/D{sortArrow("kd")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("adr")} onClick={() => handleSort("adr")}>ADR{sortArrow("adr")}</div>
+                    <div className="md-stats-cell" style={thSortStyle("hs")} onClick={() => handleSort("hs")}>HS%{sortArrow("hs")}</div>
+                    <div className="md-stats-cell md-stats-fk" style={thSortStyle("fk")} onClick={() => handleSort("fk")}>FK{sortArrow("fk")}</div>
+                    <div className="md-stats-cell md-stats-fd" style={thSortStyle("fd")} onClick={() => handleSort("fd")}>FD{sortArrow("fd")}</div>
                   </div>
                   {t2Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
-                    const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
-                    const adr = rounds > 0 ? Math.round((p.damageDealt || 0) / rounds) : 0;
+                    const adr = roundsPlayed > 0 ? Math.round((p.damageDealt || 0) / roundsPlayed) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
@@ -372,43 +403,92 @@ export default function MatchDetail() {
                     </div>
                   );
                 }
+                // Helper to find riot avatar from teams by puuid
+                const findRiotAvatar = (puuid: string, name: string) => {
+                  for (const tid of [match.team1Id, match.team2Id]) {
+                    const team = teams[tid];
+                    if (!team) continue;
+                    for (const m of team.members || []) {
+                      if ((m.riotPuuid && m.riotPuuid === puuid) || (m.riotGameName && name && m.riotGameName.toLowerCase() === name.toLowerCase()))
+                        return m.riotAvatar || "";
+                    }
+                  }
+                  return "";
+                };
                 return (
-                  <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "16px 20px" }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 12 }}>Head-to-Head Duels</div>
+                  <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "18px 22px" }}>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#8A8880", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 14 }}>Head-to-Head Duels</div>
                     <div style={{ overflowX: "auto" }}>
-                      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 400 }}>
+                      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
                         <thead>
                           <tr>
-                            <th style={{ padding: "6px 8px", fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", textAlign: "left", borderBottom: "1.5px solid #2A2A30" }}>{match.team1Name}</th>
-                            {t2Players.map((p2: any) => (
-                              <th key={p2.puuid} style={{ padding: "6px 4px", fontSize: "0.62rem", fontWeight: 700, color: "#3b82f6", textAlign: "center", borderBottom: "1.5px solid #2A2A30", minWidth: 55 }}>{(p2.name || "?").length > 8 ? (p2.name || "?").slice(0, 6) + "…" : p2.name || "?"}</th>
-                            ))}
+                            <th style={{ padding: "10px 10px", fontSize: "0.68rem", fontWeight: 800, color: "#3CCBFF", textAlign: "left", borderBottom: "2px solid #2A2A30" }}>{match.team1Name}</th>
+                            {t2Players.map((p2: any) => {
+                              const avatar = findRiotAvatar(p2.puuid, p2.name);
+                              return (
+                              <th key={p2.puuid} style={{ padding: "10px 6px", textAlign: "center", borderBottom: "2px solid #2A2A30", minWidth: 90 }}>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                  {avatar ? (
+                                    <img src={avatar} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(59,130,246,0.35)", boxShadow: "0 0 8px rgba(59,130,246,0.15)" }} />
+                                  ) : (
+                                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 800, color: "#fff", boxShadow: "0 0 8px rgba(59,130,246,0.15)" }}>{(p2.name || "?")[0]}</div>
+                                  )}
+                                  <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#3b82f6", whiteSpace: "nowrap" }}>{p2.name || "?"}</span>
+                                  <span style={{ fontSize: "0.58rem", fontWeight: 600, color: "#6b7280" }}>{p2.agent || ""}</span>
+                                </div>
+                              </th>
+                              );
+                            })}
                           </tr>
                         </thead>
                         <tbody>
-                          {t1Players.map((p1: any) => (
+                          {t1Players.map((p1: any, p1i: number) => {
+                            const avatar = findRiotAvatar(p1.puuid, p1.name);
+                            return (
                             <tr key={p1.puuid} style={{ borderBottom: "1px solid #1e1e22" }}>
-                              <td style={{ padding: "7px 8px", fontSize: "0.72rem", fontWeight: 700, color: "#e0e0da" }}>{p1.name || "?"}</td>
-                              {t2Players.map((p2: any) => {
+                              <td style={{ padding: "10px 10px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  {avatar ? (
+                                    <img src={avatar} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(60,203,255,0.35)", boxShadow: "0 0 8px rgba(60,203,255,0.15)", flexShrink: 0 }} />
+                                  ) : (
+                                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #3CCBFF, #2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 0 8px rgba(60,203,255,0.15)" }}>{(p1.name || "?")[0]}</div>
+                                  )}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#e0e0da", whiteSpace: "nowrap" }}>{p1.name || "?"}</span>
+                                    <span style={{ fontSize: "0.58rem", fontWeight: 600, color: "#6b7280" }}>{p1.agent || ""}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              {t2Players.map((p2: any, p2i: number) => {
                                 const killed = km[p1.puuid]?.[p2.puuid] || 0;
                                 const killedBy = km[p2.puuid]?.[p1.puuid] || 0;
                                 const diff = killed - killedBy;
+                                const cellBg = diff > 0 ? "rgba(74,222,128,0.06)" : diff < 0 ? "rgba(248,113,113,0.06)" : "transparent";
                                 return (
-                                  <td key={p2.puuid} style={{ padding: "5px 4px", textAlign: "center" }}>
-                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#8A8880" }}>{killed}</span>
-                                      <div style={{ width: 16, height: 1, background: "#2A2A30" }} />
-                                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: "#555550" }}>{killedBy}</span>
+                                  <td key={p2.puuid} style={{ padding: "8px 6px", textAlign: "center", background: cellBg, transition: "background 0.2s" }}>
+                                    <div className="md-duel-cell" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                      <span style={{
+                                        fontSize: "1.05rem", fontWeight: 900, lineHeight: 1,
+                                        color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#8A8880",
+                                        textShadow: diff > 0 ? "0 0 8px rgba(74,222,128,0.3)" : diff < 0 ? "0 0 8px rgba(248,113,113,0.3)" : "none",
+                                        animation: `md-duel-pop 0.4s cubic-bezier(0.16,1,0.3,1) ${(p1i * t2Players.length + p2i) * 0.04}s both`,
+                                      }}>{killed}</span>
+                                      <div style={{ width: 20, height: 1.5, background: diff > 0 ? "rgba(74,222,128,0.25)" : diff < 0 ? "rgba(248,113,113,0.25)" : "#2A2A30", borderRadius: 1 }} />
+                                      <span style={{
+                                        fontSize: "0.82rem", fontWeight: 700, color: "#555550", lineHeight: 1,
+                                        animation: `md-duel-pop 0.4s cubic-bezier(0.16,1,0.3,1) ${(p1i * t2Players.length + p2i) * 0.04 + 0.1}s both`,
+                                      }}>{killedBy}</span>
                                     </div>
                                   </td>
                                 );
                               })}
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
-                    <div style={{ marginTop: 10, fontSize: "0.62rem", color: "#555550", lineHeight: 1.5 }}>
+                    <div style={{ marginTop: 12, fontSize: "0.65rem", color: "#6b7280", lineHeight: 1.6 }}>
                       <span style={{ color: "#4ade80", fontWeight: 700 }}>Green</span> = won matchup · <span style={{ color: "#f87171", fontWeight: 700 }}>Red</span> = lost matchup. Top number = kills on opponent, bottom = deaths to opponent.
                     </div>
                   </div>
@@ -445,7 +525,7 @@ function findUidByPuuid(puuid: string, playerName: string, teams: Record<string,
 }
 const styles = `
   .md-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; }
-  .md-content { max-width: 920px; margin: 0 auto; padding: 20px 24px 60px; }
+  .md-content { max-width: 1400px; margin: 0 auto; padding: 20px 48px 60px; }
   .md-loading { text-align: center; padding: 80px 20px; color: #555550; }
 
   .md-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: #555550; margin-bottom: 20px; }
@@ -492,7 +572,8 @@ const styles = `
 
   .md-stats-table { width: 100%; }
   .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
-  .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; }
+  .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; cursor: pointer; user-select: none; transition: color 0.15s; }
+  .md-stats-header .md-stats-cell:hover { color: #3CCBFF; }
   .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
   .md-stats-row:last-child { border-bottom: none; }
   .md-stats-cell { font-size: 0.82rem; color: #e0e0da; }
@@ -512,6 +593,9 @@ const styles = `
   .md-pending-text { display: block; font-size: 0.92rem; font-weight: 700; color: #8A8880; margin-bottom: 6px; }
   .md-pending-sub { display: block; font-size: 0.76rem; color: #555550; }
 
+  @keyframes md-duel-pop { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+  .md-duel-cell:hover span { transform: scale(1.15); transition: transform 0.15s ease; }
+
   @media (max-width: 700px) {
     .md-header { flex-direction: column; gap: 16px; padding: 20px; }
     .md-header-team { align-items: center !important; }
@@ -519,5 +603,6 @@ const styles = `
     .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.5fr 0.4fr 0.4fr 0.4fr; }
     .md-stats-cell { font-size: 0.72rem; }
     .md-stats-agent { font-size: 0.62rem; }
+    .md-content { padding: 20px 16px 60px; }
   }
 `;

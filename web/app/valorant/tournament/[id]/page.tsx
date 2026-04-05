@@ -287,7 +287,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <>
               <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 3)}, 1fr)`, gap: 12, marginTop: 14 }}>
                 {games.map((g, i) => (
-                  <GameDetailCard key={i} game={g} gameNum={i + 1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} />
+                  <GameDetailCard key={i} game={g} gameNum={i + 1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} teamMembers={teamMembers} />
                 ))}
               </div>
               <div style={{ marginTop: 10, textAlign: "center" }}>
@@ -925,6 +925,8 @@ function ValorantTournamentDetailInner() {
         @keyframes vtd-player-reveal-right { from { opacity: 0; transform: translateY(24px) scale(0.7) rotate(2deg); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); filter: blur(0); } }
         @keyframes vtd-vs-pop { 0% { opacity: 0; transform: scale(0.2) rotate(-180deg); filter: blur(8px); } 50% { opacity: 1; transform: scale(1.25) rotate(10deg); filter: blur(0); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
         @keyframes vtd-glow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(60,203,255,0.4), 0 0 40px rgba(60,203,255,0.15); } 50% { box-shadow: 0 0 24px rgba(60,203,255,0.7), 0 0 60px rgba(60,203,255,0.25); } }
+        @keyframes gdc-crown-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+        @keyframes gdc-num-pop { from { opacity: 0; transform: scale(0.6) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes vtd-streak-left { 0% { opacity: 0; transform: translateX(60px); } 100% { opacity: 1; transform: translateX(0); } }
         @keyframes vtd-streak-right { 0% { opacity: 0; transform: translateX(-60px); } 100% { opacity: 1; transform: translateX(0); } }
         @keyframes vtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
@@ -1644,7 +1646,7 @@ export default function ValorantTournamentDetail() {
   );
 }
 
-function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id }: { game: any; gameNum: number; team1Name: string; team2Name: string; team1Id: string; team2Id: string; }) {
+function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id, teamMembers }: { game: any; gameNum: number; team1Name: string; team2Name: string; team1Id: string; team2Id: string; teamMembers: Record<string, any[]>; }) {
   if (!game) return (
     <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "12px 14px", opacity: 0.5 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -1659,40 +1661,60 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   const t1Won = game.winner === team1Id || game.winner === "team1";
   const t2Won = game.winner === team2Id || game.winner === "team2";
   const stats: any[] = game.playerStats || [];
-  const t1Stats = stats.filter((s: any) => s.teamId === team1Id || s.team === "team1");
-  const t2Stats = stats.filter((s: any) => s.teamId === team2Id || s.team === "team2");
   const t1Rounds = game.team1RoundsWon ?? game.team1Rounds ?? "–";
   const t2Rounds = game.team2RoundsWon ?? game.team2Rounds ?? "–";
-  const rounds: any[] = game.roundResults || [];
   const rp = game.roundsPlayed || (typeof t1Rounds === "number" && typeof t2Rounds === "number" ? t1Rounds + t2Rounds : 0);
 
-  const renderPlayerRow = (s: any, teamWon: boolean) => {
-    const adr = rp > 0 ? Math.round((s.damageDealt || 0) / rp) : 0;
-    const totalShots = (s.headshots || 0) + (s.bodyshots || 0) + (s.legshots || 0);
-    const hs = totalShots > 0 ? Math.round((s.headshots || 0) / totalShots * 100) : 0;
-    const kd = Math.round((s.kills || 0) / Math.max(1, s.deaths || 1) * 100) / 100;
-    return (
-      <tr key={s.puuid || s.name} style={{ borderBottom: "1px solid #1e1e22" }}>
-        <td style={{ padding: "5px 4px", display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
-          <span style={{ fontWeight: 600, color: teamWon ? "#4ade80" : "#e0e0da", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 80 }}>{s.name || "Player"}</span>
-        </td>
-        <td style={{ padding: "5px 3px", textAlign: "center", fontWeight: 700, color: kd >= 1.0 ? "#4ade80" : "#f87171", fontSize: "0.72rem" }}>{kd}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", color: "#4ade80", fontWeight: 600, fontSize: "0.72rem" }}>{s.kills ?? 0}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", color: "#f87171", fontSize: "0.72rem" }}>{s.deaths ?? 0}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{s.assists ?? 0}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{adr}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{hs}%</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", fontWeight: 700, color: "#f59e0b", fontSize: "0.72rem" }}>{s.firstKills ?? 0}</td>
-        <td style={{ padding: "5px 3px", textAlign: "center", color: "#f87171", fontSize: "0.72rem" }}>{s.firstDeaths ?? 0}</td>
-      </tr>
-    );
+  // Helper: find riot avatar from team members by puuid
+  const findAvatar = (puuid: string, name: string) => {
+    for (const tid of [team1Id, team2Id]) {
+      for (const m of teamMembers[tid] || []) {
+        if ((m.riotPuuid && m.riotPuuid === puuid) || (m.riotGameName && name && m.riotGameName.toLowerCase() === name.toLowerCase()))
+          return m.riotAvatar || "";
+      }
+    }
+    return "";
   };
 
+  // Find MVP: highest K/D ratio
+  const kdSorted = stats.length > 0 ? [...stats].sort((a, b) => {
+    const kdA = (a.kills || 0) / Math.max(1, a.deaths || 1);
+    const kdB = (b.kills || 0) / Math.max(1, b.deaths || 1);
+    if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA;
+    return (b.kills || 0) - (a.kills || 0);
+  }) : [];
+  const mvp = kdSorted[0] || null;
+  const mvpKd = mvp ? Math.round((mvp.kills || 0) / Math.max(1, mvp.deaths || 1) * 100) / 100 : 0;
+  const mvpAvatar = mvp ? findAvatar(mvp.puuid, mvp.name) : "";
+
+  // Find 2nd mention: highest ADR excluding MVP, fallback to most kills excluding MVP
+  let second: any = null;
+  let secondLabel = "";
+  let secondMetric = "";
+  if (stats.length > 1 && mvp) {
+    const others = stats.filter(s => s.puuid !== mvp.puuid);
+    // Try highest ADR
+    const adrSorted = [...others].sort((a, b) => {
+      const adrA = rp > 0 ? (a.damageDealt || 0) / rp : 0;
+      const adrB = rp > 0 ? (b.damageDealt || 0) / rp : 0;
+      return adrB - adrA;
+    });
+    if (adrSorted.length > 0) {
+      second = adrSorted[0];
+      const adr = rp > 0 ? Math.round((second.damageDealt || 0) / rp) : 0;
+      secondLabel = "Damage Dealer";
+      secondMetric = `${adr} ADR`;
+    }
+  }
+  const secondAvatar = second ? findAvatar(second.puuid, second.name) : "";
+
   return (
-    <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "12px 14px" }}>
+    <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "14px 16px", position: "relative", overflow: "hidden" }}>
+      {/* Ambient glow */}
+      {mvp && <div style={{ position: "absolute", top: "30%", left: "50%", width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />}
+
       {/* Header: Game label + map + status */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, position: "relative" }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#3CCBFF" : "#3b82f6" }}>Game {gameNum}</span>
         <span style={{ fontSize: "0.72rem", color: "#8A8880", fontWeight: 600 }}>{mapName}</span>
         {isPlayed ? <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span> : <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#1a1a1f", color: "#555550" }}>Pending</span>}
@@ -1700,7 +1722,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
 
       {/* Score header */}
       {isPlayed && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ textAlign: "center", flex: 1 }}>
             <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t1Won ? "#4ade80" : "#555550", marginBottom: 2 }}>{team1Name.length > 14 ? team1Name.slice(0, 12) + "…" : team1Name}</div>
             <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t1Won ? "#4ade80" : "#f87171" }}>{t1Rounds}</div>
@@ -1713,111 +1735,70 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
         </div>
       )}
 
-      {/* Round timeline — two-row layout */}
-      {isPlayed && rounds.length > 0 && (() => {
-        const endTypeIcon = (et: string) => {
-          const e = (et || "").toLowerCase();
-          if (e.includes("detonate") || e.includes("bomb")) return "💣";
-          if (e.includes("defuse")) return "🛡";
-          if (e.includes("elim")) return "☠";
-          if (e.includes("timer") || e.includes("time")) return "⏱";
-          return "⚔";
-        };
-        const t1Color = "#4ade80";
-        const t2Color = "#f87171";
-        return (
-        <div style={{ marginBottom: 10, width: "100%" }}>
-          <div style={{ display: "flex", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", marginBottom: 4 }}>ROUNDS</div>
-          {/* Team 1 row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
-            <div style={{ width: 36, flexShrink: 0, fontSize: "0.62rem", fontWeight: 900, color: t1Color, textAlign: "right", paddingRight: 6 }}>{t1Rounds}</div>
-            <div style={{ display: "flex", flex: 1, gap: 1, alignItems: "center" }}>
-              {rounds.map((r: any, ri: number) => {
-                const isT1Win = r.winner === "team1";
-                const isHalf = ri === 12;
-                return (
-                  <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                    {isHalf && <div style={{ width: 2, height: 18, background: "#555550", margin: "0 1px", borderRadius: 1, flexShrink: 0 }} />}
-                    <div title={`R${r.round}: ${isT1Win ? team1Name : team2Name} — ${r.endType || ""}`} style={{
-                      width: "100%", height: 18,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "0.5rem",
-                    }}>{isT1Win ? <span style={{ color: t1Color, fontSize: "0.6rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.3rem" }}>●</span>}</div>
-                  </div>
-                );
-              })}
+      {/* MVP + 2nd Place Showcase */}
+      {mvp && isPlayed ? (
+        <div style={{ borderTop: "1px solid #1e1e22", paddingTop: 14, position: "relative" }}>
+          {/* MVP */}
+          <div style={{ textAlign: "center", marginBottom: second ? 14 : 0 }}>
+            <div style={{ fontSize: "1.5rem", marginBottom: 4, animation: "gdc-crown-bob 2s ease-in-out infinite", filter: "drop-shadow(0 0 8px rgba(245,158,11,0.6))" }}>👑</div>
+            {mvpAvatar ? (
+              <img src={mvpAvatar} alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2.5px solid rgba(245,158,11,0.5)", boxShadow: "0 0 16px rgba(245,158,11,0.25), 0 4px 12px rgba(0,0,0,0.4)", display: "block", margin: "0 auto 6px" }} />
+            ) : (
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, #f59e0b, #d97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: 900, color: "#fff", border: "2.5px solid rgba(245,158,11,0.5)", boxShadow: "0 0 16px rgba(245,158,11,0.25)", margin: "0 auto 6px" }}>{(mvp.name || "?")[0]}</div>
+            )}
+            <div style={{ fontSize: "0.54rem", fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#f59e0b", marginBottom: 4 }}>GAME MVP</div>
+            <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#F0EEEA", textShadow: "0 0 14px rgba(245,158,11,0.35)", marginBottom: 2, lineHeight: 1.2 }}>{mvp.name || "Unknown"}</div>
+            <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#8A8880", marginBottom: 8 }}>{mvp.agent || ""}</div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 6 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: mvpKd >= 1.0 ? "#4ade80" : "#f87171", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both" }}>{mvpKd}</div>
+                <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>K/D</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#4ade80", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>{mvp.kills ?? 0}</div>
+                <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>K</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#f87171", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>{mvp.deaths ?? 0}</div>
+                <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>D</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#e0e0da", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.4s both" }}>{mvp.assists ?? 0}</div>
+                <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>A</div>
+              </div>
             </div>
+            <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "rgba(245,158,11,0.5)", fontStyle: "italic", letterSpacing: "0.03em" }}>Dominated the server</div>
           </div>
-          {/* Team 2 row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
-            <div style={{ width: 36, flexShrink: 0, fontSize: "0.62rem", fontWeight: 900, color: t2Color, textAlign: "right", paddingRight: 6 }}>{t2Rounds}</div>
-            <div style={{ display: "flex", flex: 1, gap: 1, alignItems: "center" }}>
-              {rounds.map((r: any, ri: number) => {
-                const isT2Win = r.winner === "team2";
-                const isHalf = ri === 12;
-                return (
-                  <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                    {isHalf && <div style={{ width: 2, height: 18, background: "#555550", margin: "0 1px", borderRadius: 1, flexShrink: 0 }} />}
-                    <div title={`R${r.round}: ${isT2Win ? team2Name : team1Name} — ${r.endType || ""}`} style={{
-                      width: "100%", height: 18,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "0.5rem",
-                    }}>{isT2Win ? <span style={{ color: t2Color, fontSize: "0.6rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.3rem" }}>●</span>}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {/* Round numbers */}
-          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
-            <div style={{ width: 36, flexShrink: 0 }} />
-            <div style={{ display: "flex", flex: 1, gap: 1 }}>
-              {rounds.map((r: any, ri: number) => (
-                <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                  {ri === 12 && <div style={{ width: 2, margin: "0 1px", flexShrink: 0 }} />}
-                  <div style={{ width: "100%", textAlign: "center", fontSize: "0.46rem", color: "#555550", fontWeight: 600 }}>{r.round}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        );
-      })()}
 
-      {/* Player stats table */}
-      {stats.length > 0 && (
-        <div style={{ borderTop: "1px solid #1e1e22", paddingTop: 8, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.68rem" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #2A2A30" }}>
-                <th style={{ padding: "4px", textAlign: "left", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em" }}>PLAYER</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#3CCBFF", letterSpacing: "0.05em" }}>K/D</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#4ade80", letterSpacing: "0.05em" }}>K</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.05em" }}>D</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>A</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>ADR</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>HS%</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.05em" }}>FK</th>
-                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.05em" }}>FD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {t1Stats.map(s => renderPlayerRow(s, t1Won))}
-              {t1Stats.length > 0 && t2Stats.length > 0 && (
-                <tr><td colSpan={9} style={{ padding: 0 }}><div style={{ height: 2, background: "linear-gradient(90deg, transparent, #2A2A30, transparent)", margin: "4px 0" }} /></td></tr>
-              )}
-              {t2Stats.map(s => renderPlayerRow(s, t2Won))}
-            </tbody>
-          </table>
+          {/* 2nd Place */}
+          {second && (
+            <div style={{ textAlign: "center", borderTop: "1px solid #1e1e22", paddingTop: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                {secondAvatar ? (
+                  <img src={secondAvatar} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(192,192,192,0.35)", boxShadow: "0 0 8px rgba(192,192,192,0.15)", flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #9ca3af, #6b7280)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 900, color: "#fff", border: "2px solid rgba(192,192,192,0.35)", flexShrink: 0 }}>{(second.name || "?")[0]}</div>
+                )}
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 1 }}>
+                    <span style={{ fontSize: "0.9rem", filter: "drop-shadow(0 0 4px rgba(192,192,192,0.4))" }}>🥈</span>
+                    <span style={{ fontSize: "0.52rem", fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#9ca3af" }}>{secondLabel}</span>
+                  </div>
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#e0e0da" }}>{second.name || "Unknown"}</div>
+                  <div style={{ fontSize: "0.58rem", fontWeight: 600, color: "#8A8880" }}>{second.agent || ""} · <span style={{ color: "#3CCBFF", fontWeight: 800 }}>{secondMetric}</span></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      {isPlayed && stats.length === 0 && (
+      ) : isPlayed && stats.length === 0 ? (
         <div style={{ textAlign: "center", padding: "8px 0", color: "#555550", fontSize: "0.72rem" }}>
           {t1Won ? `${team1Name} won` : t2Won ? `${team2Name} won` : "Result recorded"}
           {game.reason && <span style={{ display: "block", fontSize: "0.64rem", color: "#555550", marginTop: 2 }}>({game.reason})</span>}
         </div>
-      )}
-      {!isPlayed && stats.length === 0 && <div style={{ textAlign: "center", padding: "12px 0", color: "#555550", fontSize: "0.78rem" }}>Waiting to be played</div>}
+      ) : !isPlayed ? (
+        <div style={{ textAlign: "center", padding: "12px 0", color: "#555550", fontSize: "0.78rem" }}>Waiting to be played</div>
+      ) : null}
     </div>
   );
 }
