@@ -443,7 +443,7 @@ function ValorantTournamentDetailInner() {
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
-  const [lbSort, setLbSort] = useState<"kd" | "kills" | "assists" | "hs" | "fk" | "adr">("kd");
+  const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "dmg" | "maps">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [teamNameLoading, setTeamNameLoading] = useState(false);
@@ -1476,70 +1476,81 @@ function ValorantTournamentDetailInner() {
           {activeTab === "leaderboard" && (() => {
             const teamNameMap: Record<string, string> = {};
             for (const t of teams) teamNameMap[(t as any).id] = (t as any).teamName || "—";
-            const sortOptions: { key: typeof lbSort; label: string }[] = [
-              { key: "kd", label: "K/D" },
-              { key: "kills", label: "Kills" },
-              { key: "assists", label: "Assists" },
-              { key: "hs", label: "HS%" },
-              { key: "fk", label: "First Blood" },
-              { key: "adr", label: "ADR" },
-            ];
+
+            // Fixed KDA ranking — MVP/2nd/3rd always by K/D
+            const kdaRanked = [...leaderboard].sort((a: any, b: any) => {
+              const kdA = a.kd || 0; const kdB = b.kd || 0;
+              if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA;
+              return (b.totalKills || 0) - (a.totalKills || 0);
+            });
+            const kdaRankMap: Record<string, number> = {};
+            kdaRanked.forEach((p: any, i: number) => { kdaRankMap[p.id] = i + 1; });
+
+            // Sort helper
+            const getSortVal = (p: any, key: typeof lbSort): number => {
+              switch (key) {
+                case "kd": return p.kd || 0;
+                case "kills": return p.totalKills || 0;
+                case "deaths": return p.totalDeaths || 0;
+                case "assists": return p.totalAssists || 0;
+                case "hs": return p.hsPercent || 0;
+                case "fk": return p.totalFirstKills || 0;
+                case "fd": return p.totalFirstDeaths || 0;
+                case "adr": return (p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1);
+                case "dmg": return p.totalDamageDealt || 0;
+                case "maps": return p.matchesPlayed || 0;
+                default: return 0;
+              }
+            };
             const sortedLb = [...leaderboard].sort((a: any, b: any) => {
-              const valA = lbSort === "kd" ? (a.kd || 0)
-                : lbSort === "kills" ? (a.totalKills || 0)
-                : lbSort === "assists" ? (a.totalAssists || 0)
-                : lbSort === "hs" ? (a.hsPercent || 0)
-                : lbSort === "fk" ? (a.totalFirstKills || 0)
-                : lbSort === "adr" ? ((a.totalDamageDealt || 0) / Math.max(1, a.totalRoundsPlayed || 1))
-                : 0;
-              const valB = lbSort === "kd" ? (b.kd || 0)
-                : lbSort === "kills" ? (b.totalKills || 0)
-                : lbSort === "assists" ? (b.totalAssists || 0)
-                : lbSort === "hs" ? (b.hsPercent || 0)
-                : lbSort === "fk" ? (b.totalFirstKills || 0)
-                : lbSort === "adr" ? ((b.totalDamageDealt || 0) / Math.max(1, b.totalRoundsPlayed || 1))
-                : 0;
-              if (valB !== valA) return valB - valA;
+              const diff = getSortVal(b, lbSort) - getSortVal(a, lbSort);
+              if (Math.abs(diff) > 0.001) return diff;
               return (b.kd || 0) - (a.kd || 0);
             });
+
+            // Column header helper
+            const thStyle = (key: typeof lbSort, baseColor?: string): React.CSSProperties => ({
+              cursor: "pointer",
+              color: lbSort === key ? "#3CCBFF" : baseColor || undefined,
+              position: "relative" as const,
+            });
+            const sortArrow = (key: typeof lbSort) => lbSort === key ? " ▼" : "";
+
             return (
             <div className="vtd-tab-pane" ref={tabContentRef}>
               <div className="vtd-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Player Leaderboard — MVP Tracker</span>
                   <TabSharePopover tabKey="leaderboard" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
-                </div>
-                {/* Sort options */}
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                  {sortOptions.map(opt => (
-                    <button key={opt.key} onClick={() => setLbSort(opt.key)} style={{ padding: "4px 12px", borderRadius: 6, border: lbSort === opt.key ? "1px solid #3CCBFF" : "1px solid #2A2A30", background: lbSort === opt.key ? "rgba(60,203,255,0.1)" : "#121215", color: lbSort === opt.key ? "#3CCBFF" : "#8A8880", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}>{opt.label}</button>
-                  ))}
                 </div>
                 {leaderboard.length === 0 ? (
                   <div className="vtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No stats yet</span><span className="vtd-empty-sub">Player stats will appear once match data is fetched.</span></div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
+                    <div style={{ marginBottom: 10, fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. MVP rank (#) is always by K/D.</div>
                     <table className="vtd-standings-table">
                       <thead><tr>
                         <th>#</th>
                         <th>Player</th>
                         <th>Team</th>
                         <th>Agent(s)</th>
-                        <th>Maps</th>
-                        <th style={{ color: "#4ade80" }}>K</th>
-                        <th style={{ color: "#f87171" }}>D</th>
-                        <th>A</th>
-                        <th style={{ color: "#3CCBFF", cursor: "pointer", textDecoration: lbSort === "kd" ? "underline" : "none" }} onClick={() => setLbSort("kd")}>K/D</th>
-                        <th style={{ cursor: "pointer", textDecoration: lbSort === "adr" ? "underline" : "none" }} onClick={() => setLbSort("adr")}>ADR</th>
-                        <th style={{ cursor: "pointer", textDecoration: lbSort === "hs" ? "underline" : "none" }} onClick={() => setLbSort("hs")}>HS%</th>
-                        <th style={{ color: "#f59e0b", cursor: "pointer", textDecoration: lbSort === "fk" ? "underline" : "none" }} onClick={() => setLbSort("fk")}>FK</th>
-                        <th style={{ color: "#f87171" }}>FD</th>
+                        <th style={thStyle("maps")} onClick={() => setLbSort("maps")}>Maps{sortArrow("maps")}</th>
+                        <th style={thStyle("kills", "#4ade80")} onClick={() => setLbSort("kills")}>K{sortArrow("kills")}</th>
+                        <th style={thStyle("deaths", "#f87171")} onClick={() => setLbSort("deaths")}>D{sortArrow("deaths")}</th>
+                        <th style={thStyle("assists")} onClick={() => setLbSort("assists")}>A{sortArrow("assists")}</th>
+                        <th style={thStyle("kd", "#3CCBFF")} onClick={() => setLbSort("kd")}>K/D{sortArrow("kd")}</th>
+                        <th style={thStyle("adr")} onClick={() => setLbSort("adr")}>ADR{sortArrow("adr")}</th>
+                        <th style={thStyle("hs")} onClick={() => setLbSort("hs")}>HS%{sortArrow("hs")}</th>
+                        <th style={thStyle("fk", "#f59e0b")} onClick={() => setLbSort("fk")}>FK{sortArrow("fk")}</th>
+                        <th style={thStyle("fd", "#f87171")} onClick={() => setLbSort("fd")}>FD{sortArrow("fd")}</th>
+                        <th style={thStyle("dmg")} onClick={() => setLbSort("dmg")}>DMG{sortArrow("dmg")}</th>
                       </tr></thead>
-                      <tbody>{sortedLb.map((p: any, i: number) => {
+                      <tbody>{sortedLb.map((p: any) => {
+                        const rank = kdaRankMap[p.id] || 99;
                         const adr = Math.round((p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1));
                         return (
-                        <tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}>
-                          <td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3CCBFF" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td>
+                        <tr key={p.id} style={rank === 1 ? { background: "rgba(245,158,11,0.08)" } : rank <= 3 ? { background: "rgba(60,203,255,0.04)" } : {}}>
+                          <td style={{ fontWeight: 800, color: rank === 1 ? "#f59e0b" : rank <= 3 ? "#3CCBFF" : "#555550" }}>{rank === 1 ? "👑" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}</td>
                           <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
                           <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
                           <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
@@ -1552,11 +1563,12 @@ function ValorantTournamentDetailInner() {
                           <td>{p.hsPercent || 0}%</td>
                           <td style={{ fontWeight: 700, color: "#f59e0b" }}>{p.totalFirstKills || 0}</td>
                           <td style={{ color: "#f87171" }}>{p.totalFirstDeaths || 0}</td>
+                          <td style={{ fontSize: "0.82rem", color: "#8A8880" }}>{p.totalDamageDealt || 0}</td>
                         </tr>);
                       })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Players ranked by K/D ratio (kills / deaths). Use sort buttons to view by other metrics. FK = First Kills (opening frags), FD = First Deaths, ADR = Average Damage per Round.
+                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> 👑 MVP, 🥈 2nd, 🥉 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. FK = First Kills, FD = First Deaths, ADR = Avg Damage/Round.
                     </div>
                   </div>
                 )}
