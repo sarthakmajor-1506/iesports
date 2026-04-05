@@ -174,6 +174,65 @@ export async function POST(req: NextRequest) {
 
     const valorantWinnerSide = redWon ? "Red" : "Blue"; // which Valorant side won
 
+    // ── Extract round-by-round data, first bloods, kill matrix ──
+    let roundResults: { round: number; winTeam: string; endType: string }[] = [];
+    const playerFirstKills: Record<string, number> = {};
+    const playerFirstDeaths: Record<string, number> = {};
+    const killMatrix: Record<string, Record<string, number>> = {}; // killer puuid -> victim puuid -> count
+
+    if (matchData.rounds && Array.isArray(matchData.rounds)) {
+      for (let ri = 0; ri < matchData.rounds.length; ri++) {
+        const round = matchData.rounds[ri];
+        const winTeam = round.winning_team || round.winningTeam || round.result || "";
+        const normalizedWin = typeof winTeam === "string"
+          ? (winTeam.toLowerCase().includes("red") ? "Red" : winTeam.toLowerCase().includes("blue") ? "Blue" : winTeam)
+          : "";
+        const endType = round.end_type || round.endType || "";
+
+        roundResults.push({ round: ri + 1, winTeam: normalizedWin, endType });
+
+        // Extract kill events from round
+        const kills: { killer: string; victim: string }[] = [];
+
+        // Path 1: player_stats[].kills[]
+        const roundPlayerStats = round.player_stats || round.playerStats || [];
+        if (Array.isArray(roundPlayerStats)) {
+          for (const ps of roundPlayerStats) {
+            const playerKills = ps.kills || ps.kill_events || [];
+            if (Array.isArray(playerKills)) {
+              for (const k of playerKills) {
+                const killer = k.killer?.puuid || k.killer_puuid || ps.puuid || "";
+                const victim = k.victim?.puuid || k.victim_puuid || "";
+                if (killer && victim) kills.push({ killer, victim });
+              }
+            }
+          }
+        }
+
+        // Path 2: round.kills[] (flat array)
+        if (kills.length === 0 && Array.isArray(round.kills)) {
+          for (const k of round.kills) {
+            const killer = k.killer?.puuid || k.killer_puuid || "";
+            const victim = k.victim?.puuid || k.victim_puuid || "";
+            if (killer && victim) kills.push({ killer, victim });
+          }
+        }
+
+        // First blood = first kill of the round
+        if (kills.length > 0) {
+          const fb = kills[0];
+          playerFirstKills[fb.killer] = (playerFirstKills[fb.killer] || 0) + 1;
+          playerFirstDeaths[fb.victim] = (playerFirstDeaths[fb.victim] || 0) + 1;
+        }
+
+        // Aggregate kill matrix for duels
+        for (const k of kills) {
+          if (!killMatrix[k.killer]) killMatrix[k.killer] = {};
+          killMatrix[k.killer][k.victim] = (killMatrix[k.killer][k.victim] || 0) + 1;
+        }
+      }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // 3. LOAD MATCH DOC + TOURNAMENT TEAMS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -280,12 +339,13 @@ export async function POST(req: NextRequest) {
       gameWinner = valorantWinnerSide === team1ValorantSide ? "team1" : "team2";
     }
 
-    // Tag each player stat with teamId for the frontend
+    // Tag each player stat with teamId + first blood stats for the frontend
     const enrichedPlayerStats = playerStats.map(ps => ({
       ...ps,
+      firstKills: playerFirstKills[ps.puuid] || 0,
+      firstDeaths: playerFirstDeaths[ps.puuid] || 0,
       teamId: team1Puuids.has(ps.puuid) ? team1Id :
               team2Puuids.has(ps.puuid) ? team2Id :
-              // Name fallback for teamId tagging
               (team1ValorantSide && ps.team === team1ValorantSide) ? team1Id :
               (team2ValorantSide && ps.team === team2ValorantSide) ? team2Id : null,
       tournamentTeam: team1Puuids.has(ps.puuid) ? "team1" :
@@ -298,6 +358,14 @@ export async function POST(req: NextRequest) {
     // 6. BUILD GAME DATA + UPDATE MATCH DOC (IMMEDIATELY)
     // ═══════════════════════════════════════════════════════════════════════════
     const gameKey = `game${gameNumber}`;
+
+    // Map round results to tournament teams
+    const mappedRoundResults = roundResults.map(r => ({
+      ...r,
+      winner: !team1ValorantSide ? null :
+        r.winTeam === team1ValorantSide ? "team1" :
+        r.winTeam === team2ValorantSide ? "team2" : null,
+    }));
 
     const gameData = {
       valorantMatchId,
@@ -312,6 +380,8 @@ export async function POST(req: NextRequest) {
       team1ValorantSide: team1ValorantSide,
       team2ValorantSide: team2ValorantSide,
       playerStats: enrichedPlayerStats,
+      roundResults: mappedRoundResults,
+      killMatrix,
       fetchedAt: new Date().toISOString(),
       apiVersion,
       status: "completed",
@@ -530,6 +600,9 @@ export async function POST(req: NextRequest) {
         const newRounds = (ex.totalRoundsPlayed || 0) + roundsPlayed;
         const newScore = (ex.totalScore || 0) + player.score;
 
+        const newFK = (ex.totalFirstKills || 0) + (player.firstKills || 0);
+        const newFD = (ex.totalFirstDeaths || 0) + (player.firstDeaths || 0);
+
         lbBatch.update(playerRef, {
           totalKills: newKills,
           totalDeaths: newDeaths,
@@ -540,6 +613,8 @@ export async function POST(req: NextRequest) {
           totalLegshots: newLS,
           totalDamageDealt: (ex.totalDamageDealt || 0) + player.damageDealt,
           totalDamageReceived: (ex.totalDamageReceived || 0) + player.damageReceived,
+          totalFirstKills: newFK,
+          totalFirstDeaths: newFD,
           matchesPlayed: newMatches,
           totalRoundsPlayed: newRounds,
           agents: [...new Set([...(ex.agents || []), player.agent])],
@@ -549,7 +624,6 @@ export async function POST(req: NextRequest) {
           acs: newRounds > 0 ? Math.round(newScore / newRounds) : 0,
           hsPercent: Math.round(newHS / Math.max(1, newHS + newBS + newLS) * 100),
           lastUpdated: new Date().toISOString(),
-          // Link to user
           uid: puuidToUid[player.puuid] || ex.uid || null,
           teamId: player.teamId,
         });
@@ -569,6 +643,8 @@ export async function POST(req: NextRequest) {
           totalLegshots: player.legshots,
           totalDamageDealt: player.damageDealt,
           totalDamageReceived: player.damageReceived,
+          totalFirstKills: player.firstKills || 0,
+          totalFirstDeaths: player.firstDeaths || 0,
           matchesPlayed: 1,
           totalRoundsPlayed: roundsPlayed,
           agents: [player.agent],

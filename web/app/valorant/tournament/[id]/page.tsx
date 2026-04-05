@@ -443,6 +443,7 @@ function ValorantTournamentDetailInner() {
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
+  const [lbSort, setLbSort] = useState<"kd" | "kills" | "assists" | "hs" | "fk" | "adr">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [teamNameLoading, setTeamNameLoading] = useState(false);
@@ -474,7 +475,7 @@ function ValorantTournamentDetailInner() {
           setMatches(sorted);
         }
         if (data.leaderboard) {
-          const sorted = [...data.leaderboard].sort((a: any, b: any) => { const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); if (Math.abs(acsB - acsA) > 1) return acsB - acsA; return (b.kd || 0) - (a.kd || 0); });
+          const sorted = [...data.leaderboard].sort((a: any, b: any) => { const kdA = a.kd || 0; const kdB = b.kd || 0; if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA; const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); return acsB - acsA; });
           setLeaderboard(sorted);
         }
         setTLoading(false);
@@ -491,7 +492,7 @@ function ValorantTournamentDetailInner() {
     unsubs.push(onSnapshot(query(collection(db, "valorantTournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
     unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }));
     unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }));
-    unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); if (Math.abs(acsB - acsA) > 1) return acsB - acsA; return (b.kd || 0) - (a.kd || 0); }); setLeaderboard(list); }));
+    unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { const kdA = a.kd || 0; const kdB = b.kd || 0; if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA; const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); return acsB - acsA; }); setLeaderboard(list); }));
     return () => unsubs.forEach(u => u());
   }, [id, user]);
 
@@ -1472,30 +1473,98 @@ function ValorantTournamentDetailInner() {
           )}
 
           {/* ═══ LEADERBOARD ═══ */}
-          {activeTab === "leaderboard" && (
+          {activeTab === "leaderboard" && (() => {
+            const teamNameMap: Record<string, string> = {};
+            for (const t of teams) teamNameMap[(t as any).id] = (t as any).teamName || "—";
+            const sortOptions: { key: typeof lbSort; label: string }[] = [
+              { key: "kd", label: "K/D" },
+              { key: "kills", label: "Kills" },
+              { key: "assists", label: "Assists" },
+              { key: "hs", label: "HS%" },
+              { key: "fk", label: "First Blood" },
+              { key: "adr", label: "ADR" },
+            ];
+            const sortedLb = [...leaderboard].sort((a: any, b: any) => {
+              const valA = lbSort === "kd" ? (a.kd || 0)
+                : lbSort === "kills" ? (a.totalKills || 0)
+                : lbSort === "assists" ? (a.totalAssists || 0)
+                : lbSort === "hs" ? (a.hsPercent || 0)
+                : lbSort === "fk" ? (a.totalFirstKills || 0)
+                : lbSort === "adr" ? ((a.totalDamageDealt || 0) / Math.max(1, a.totalRoundsPlayed || 1))
+                : 0;
+              const valB = lbSort === "kd" ? (b.kd || 0)
+                : lbSort === "kills" ? (b.totalKills || 0)
+                : lbSort === "assists" ? (b.totalAssists || 0)
+                : lbSort === "hs" ? (b.hsPercent || 0)
+                : lbSort === "fk" ? (b.totalFirstKills || 0)
+                : lbSort === "adr" ? ((b.totalDamageDealt || 0) / Math.max(1, b.totalRoundsPlayed || 1))
+                : 0;
+              if (valB !== valA) return valB - valA;
+              return (b.kd || 0) - (a.kd || 0);
+            });
+            return (
             <div className="vtd-tab-pane" ref={tabContentRef}>
               <div className="vtd-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Player Leaderboard — MVP Tracker</span>
                   <TabSharePopover tabKey="leaderboard" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
+                </div>
+                {/* Sort options */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                  {sortOptions.map(opt => (
+                    <button key={opt.key} onClick={() => setLbSort(opt.key)} style={{ padding: "4px 12px", borderRadius: 6, border: lbSort === opt.key ? "1px solid #3CCBFF" : "1px solid #2A2A30", background: lbSort === opt.key ? "rgba(60,203,255,0.1)" : "#121215", color: lbSort === opt.key ? "#3CCBFF" : "#8A8880", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}>{opt.label}</button>
+                  ))}
                 </div>
                 {leaderboard.length === 0 ? (
                   <div className="vtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No stats yet</span><span className="vtd-empty-sub">Player stats will appear once match data is fetched.</span></div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Player</th><th>Agent(s)</th><th>Maps</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th style={{ color: "#3CCBFF" }}>K/D</th><th>ACS</th><th>HS%</th><th>DMG</th></tr></thead>
-                      <tbody>{leaderboard.map((p: any, i: number) => { const acs = Math.round((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1)); return (<tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}><td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3CCBFF" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td><td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td><td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td><td>{p.matchesPlayed || 0}</td><td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td><td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td><td>{p.totalAssists || 0}</td><td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td><td style={{ fontWeight: 700 }}>{acs}</td><td>{p.hsPercent || 0}%</td><td style={{ fontSize: "0.82rem", color: "#8A8880" }}>{p.totalDamageDealt || 0}</td></tr>); })}</tbody>
+                      <thead><tr>
+                        <th>#</th>
+                        <th>Player</th>
+                        <th>Team</th>
+                        <th>Agent(s)</th>
+                        <th>Maps</th>
+                        <th style={{ color: "#4ade80" }}>K</th>
+                        <th style={{ color: "#f87171" }}>D</th>
+                        <th>A</th>
+                        <th style={{ color: "#3CCBFF", cursor: "pointer", textDecoration: lbSort === "kd" ? "underline" : "none" }} onClick={() => setLbSort("kd")}>K/D</th>
+                        <th style={{ cursor: "pointer", textDecoration: lbSort === "adr" ? "underline" : "none" }} onClick={() => setLbSort("adr")}>ADR</th>
+                        <th style={{ cursor: "pointer", textDecoration: lbSort === "hs" ? "underline" : "none" }} onClick={() => setLbSort("hs")}>HS%</th>
+                        <th style={{ color: "#f59e0b", cursor: "pointer", textDecoration: lbSort === "fk" ? "underline" : "none" }} onClick={() => setLbSort("fk")}>FK</th>
+                        <th style={{ color: "#f87171" }}>FD</th>
+                      </tr></thead>
+                      <tbody>{sortedLb.map((p: any, i: number) => {
+                        const adr = Math.round((p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1));
+                        return (
+                        <tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}>
+                          <td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3CCBFF" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td>
+                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
+                          <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
+                          <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
+                          <td>{p.matchesPlayed || 0}</td>
+                          <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
+                          <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
+                          <td>{p.totalAssists || 0}</td>
+                          <td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td>
+                          <td style={{ fontWeight: 600 }}>{adr}</td>
+                          <td>{p.hsPercent || 0}%</td>
+                          <td style={{ fontWeight: 700, color: "#f59e0b" }}>{p.totalFirstKills || 0}</td>
+                          <td style={{ color: "#f87171" }}>{p.totalFirstDeaths || 0}</td>
+                        </tr>);
+                      })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Players ranked by Average Combat Score (ACS = total score / rounds played), then K/D ratio as tiebreaker.
+                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Players ranked by K/D ratio (kills / deaths). Use sort buttons to view by other metrics. FK = First Kills (opening frags), FD = First Deaths, ADR = Average Damage per Round.
                     </div>
                   </div>
                 )}
               </div>
               <CommentSection tournamentId={id} section="leaderboard" game="valorant" user={user} riotData={riotData} userProfile={userProfile} />
             </div>
-          )}
+            );
+          })()}
 
         </div>
       </div>
@@ -1577,16 +1646,44 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
   const t2Stats = stats.filter((s: any) => s.teamId === team2Id || s.team === "team2");
   const t1Rounds = game.team1RoundsWon ?? game.team1Rounds ?? "–";
   const t2Rounds = game.team2RoundsWon ?? game.team2Rounds ?? "–";
+  const rounds: any[] = game.roundResults || [];
+  const rp = game.roundsPlayed || (typeof t1Rounds === "number" && typeof t2Rounds === "number" ? t1Rounds + t2Rounds : 0);
+
+  const renderPlayerRow = (s: any, teamWon: boolean) => {
+    const adr = rp > 0 ? Math.round((s.damageDealt || 0) / rp) : 0;
+    const totalShots = (s.headshots || 0) + (s.bodyshots || 0) + (s.legshots || 0);
+    const hs = totalShots > 0 ? Math.round((s.headshots || 0) / totalShots * 100) : 0;
+    const kd = Math.round((s.kills || 0) / Math.max(1, s.deaths || 1) * 100) / 100;
+    return (
+      <tr key={s.puuid || s.name} style={{ borderBottom: "1px solid #1e1e22" }}>
+        <td style={{ padding: "5px 4px", display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
+          <span style={{ fontWeight: 600, color: teamWon ? "#4ade80" : "#e0e0da", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 80 }}>{s.name || "Player"}</span>
+        </td>
+        <td style={{ padding: "5px 3px", textAlign: "center", fontWeight: 700, color: kd >= 1.0 ? "#4ade80" : "#f87171", fontSize: "0.72rem" }}>{kd}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", color: "#4ade80", fontWeight: 600, fontSize: "0.72rem" }}>{s.kills ?? 0}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", color: "#f87171", fontSize: "0.72rem" }}>{s.deaths ?? 0}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{s.assists ?? 0}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{adr}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", fontSize: "0.72rem" }}>{hs}%</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", fontWeight: 700, color: "#f59e0b", fontSize: "0.72rem" }}>{s.firstKills ?? 0}</td>
+        <td style={{ padding: "5px 3px", textAlign: "center", color: "#f87171", fontSize: "0.72rem" }}>{s.firstDeaths ?? 0}</td>
+      </tr>
+    );
+  };
 
   return (
     <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, padding: "12px 14px" }}>
+      {/* Header: Game label + map + status */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#3CCBFF" : "#3b82f6" }}>Game {gameNum}</span>
         <span style={{ fontSize: "0.72rem", color: "#8A8880", fontWeight: 600 }}>{mapName}</span>
         {isPlayed ? <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span> : <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#1a1a1f", color: "#555550" }}>Pending</span>}
       </div>
+
+      {/* Score header */}
       {isPlayed && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
           <div style={{ textAlign: "center", flex: 1 }}>
             <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t1Won ? "#4ade80" : "#555550", marginBottom: 2 }}>{team1Name.length > 14 ? team1Name.slice(0, 12) + "…" : team1Name}</div>
             <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t1Won ? "#4ade80" : "#f87171" }}>{t1Rounds}</div>
@@ -1598,32 +1695,60 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
           </div>
         </div>
       )}
-      {stats.length > 0 && (
-        <div style={{ borderTop: "1px solid #1e1e22", paddingTop: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em" }}>PLAYER</span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <span style={{ fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", minWidth: 60, textAlign: "right" as const }}>K/D/A</span>
-              <span style={{ fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", minWidth: 30, textAlign: "right" as const }}>ACS</span>
-            </div>
+
+      {/* Round timeline */}
+      {isPlayed && rounds.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", marginBottom: 4 }}>ROUNDS</div>
+          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+            {rounds.map((r: any, ri: number) => {
+              const isHalf = ri === 11; // halftime after round 12
+              return (
+                <div key={ri} style={{ display: "flex", alignItems: "center", gap: isHalf ? 0 : undefined }}>
+                  {isHalf && <div style={{ width: 2, height: 16, background: "#555550", margin: "0 3px", borderRadius: 1 }} />}
+                  <div title={`R${r.round}: ${r.winner === "team1" ? team1Name : r.winner === "team2" ? team2Name : "?"} — ${r.endType || ""}`} style={{
+                    width: 14, height: 16, borderRadius: 2, fontSize: "0.5rem", fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: r.winner === "team1" ? "rgba(74,222,128,0.15)" : r.winner === "team2" ? "rgba(248,113,113,0.15)" : "#1a1a1f",
+                    color: r.winner === "team1" ? "#4ade80" : r.winner === "team2" ? "#f87171" : "#555550",
+                    border: `1px solid ${r.winner === "team1" ? "rgba(74,222,128,0.3)" : r.winner === "team2" ? "rgba(248,113,113,0.3)" : "#2A2A30"}`,
+                  }}>{r.round}</div>
+                </div>
+              );
+            })}
           </div>
-          {t1Stats.map((s: any, i: number) => (
-            <div key={`t1-${i}`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", fontSize: "0.68rem" }}>
-              <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
-              <span style={{ flex: 1, fontWeight: 600, color: t1Won ? "#4ade80" : "#e0e0da", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name || s.riotGameName || "Player"}</span>
-              <span style={{ fontWeight: 700, color: "#8A8880", minWidth: 60, textAlign: "right" as const }}>{s.kills ?? 0}/{s.deaths ?? 0}/{s.assists ?? 0}</span>
-              <span style={{ fontWeight: 700, color: "#3CCBFF", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
-            </div>
-          ))}
-          {t1Stats.length > 0 && t2Stats.length > 0 && <div style={{ height: 1, background: "#2A2A30", margin: "6px 0" }} />}
-          {t2Stats.map((s: any, i: number) => (
-            <div key={`t2-${i}`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", fontSize: "0.68rem" }}>
-              <div style={{ width: 18, height: 18, borderRadius: 4, background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "#555550", flexShrink: 0, overflow: "hidden" }}>{s.agentIcon ? <img src={s.agentIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.agent || "?")[0]}</div>
-              <span style={{ flex: 1, fontWeight: 600, color: t2Won ? "#4ade80" : "#e0e0da", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name || s.riotGameName || "Player"}</span>
-              <span style={{ fontWeight: 700, color: "#8A8880", minWidth: 60, textAlign: "right" as const }}>{s.kills ?? 0}/{s.deaths ?? 0}/{s.assists ?? 0}</span>
-              <span style={{ fontWeight: 700, color: "#3CCBFF", minWidth: 30, textAlign: "right" as const }}>{s.acs ?? Math.round((s.score || 0) / Math.max(1, s.rounds || 1))}</span>
-            </div>
-          ))}
+          <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: "0.56rem", color: "#555550" }}>
+            <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.3)", marginRight: 3, verticalAlign: "middle" }} />{team1Name.length > 10 ? team1Name.slice(0, 8) + "…" : team1Name}</span>
+            <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", marginRight: 3, verticalAlign: "middle" }} />{team2Name.length > 10 ? team2Name.slice(0, 8) + "…" : team2Name}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Player stats table */}
+      {stats.length > 0 && (
+        <div style={{ borderTop: "1px solid #1e1e22", paddingTop: 8, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.68rem" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #2A2A30" }}>
+                <th style={{ padding: "4px", textAlign: "left", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em" }}>PLAYER</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#3CCBFF", letterSpacing: "0.05em" }}>K/D</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#4ade80", letterSpacing: "0.05em" }}>K</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.05em" }}>D</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>A</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>ADR</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.05em" }}>HS%</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.05em" }}>FK</th>
+                <th style={{ padding: "4px", textAlign: "center", fontSize: "0.58rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.05em" }}>FD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {t1Stats.map(s => renderPlayerRow(s, t1Won))}
+              {t1Stats.length > 0 && t2Stats.length > 0 && (
+                <tr><td colSpan={9} style={{ padding: 0 }}><div style={{ height: 2, background: "linear-gradient(90deg, transparent, #2A2A30, transparent)", margin: "4px 0" }} /></td></tr>
+              )}
+              {t2Stats.map(s => renderPlayerRow(s, t2Won))}
+            </tbody>
+          </table>
         </div>
       )}
       {isPlayed && stats.length === 0 && (

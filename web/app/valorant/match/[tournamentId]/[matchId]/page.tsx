@@ -21,6 +21,7 @@ export default function MatchDetail() {
   const [teams, setTeams] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeGame, setActiveGame] = useState<1 | 2>(1);
+  const [detailTab, setDetailTab] = useState<"scoreboard" | "duels">("scoreboard");
 
   useEffect(() => {
     if (!tournamentId || !matchId) return;
@@ -187,6 +188,38 @@ export default function MatchDetail() {
                 </div>
               </div>
 
+              {/* Round Timeline */}
+              {(activeGameData.roundResults || []).length > 0 && (
+                <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "14px 20px", marginBottom: 12 }}>
+                  <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 8 }}>Round Timeline</div>
+                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center" }}>
+                    {(activeGameData.roundResults as any[]).map((r: any, ri: number) => (
+                      <div key={ri} style={{ display: "flex", alignItems: "center" }}>
+                        {ri === 12 && <div style={{ width: 3, height: 22, background: "#555550", margin: "0 5px", borderRadius: 2 }} />}
+                        <div title={`R${r.round}: ${r.winner === "team1" ? match.team1Name : r.winner === "team2" ? match.team2Name : "?"} — ${r.endType || ""}`} style={{
+                          width: 20, height: 22, borderRadius: 3, fontSize: "0.56rem", fontWeight: 700,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: r.winner === "team1" ? "rgba(60,203,255,0.12)" : r.winner === "team2" ? "rgba(59,130,246,0.12)" : "#1a1a1f",
+                          color: r.winner === "team1" ? "#3CCBFF" : r.winner === "team2" ? "#3b82f6" : "#555550",
+                          border: `1px solid ${r.winner === "team1" ? "rgba(60,203,255,0.3)" : r.winner === "team2" ? "rgba(59,130,246,0.3)" : "#2A2A30"}`,
+                        }}>{r.round}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 14, marginTop: 6, fontSize: "0.62rem", color: "#8A8880" }}>
+                    <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "rgba(60,203,255,0.12)", border: "1px solid rgba(60,203,255,0.3)", marginRight: 4, verticalAlign: "middle" }} />{match.team1Name}</span>
+                    <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", marginRight: 4, verticalAlign: "middle" }} />{match.team2Name}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Detail sub-tabs: Scoreboard / Duels */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <button onClick={() => setDetailTab("scoreboard")} style={{ padding: "6px 18px", borderRadius: 8, border: detailTab === "scoreboard" ? "1px solid #3CCBFF" : "1px solid #2A2A30", background: detailTab === "scoreboard" ? "rgba(60,203,255,0.08)" : "#121215", color: detailTab === "scoreboard" ? "#3CCBFF" : "#8A8880", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Scoreboard</button>
+                <button onClick={() => setDetailTab("duels")} style={{ padding: "6px 18px", borderRadius: 8, border: detailTab === "duels" ? "1px solid #f59e0b" : "1px solid #2A2A30", background: detailTab === "duels" ? "rgba(245,158,11,0.08)" : "#121215", color: detailTab === "duels" ? "#f59e0b" : "#8A8880", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Duels</button>
+              </div>
+
+              {detailTab === "scoreboard" && (<>
               {/* Team 1 Scoreboard */}
               <div className="md-team-section">
                 <div className="md-team-label" style={{ color: "#3CCBFF" }}>
@@ -201,14 +234,15 @@ export default function MatchDetail() {
                     <div className="md-stats-cell md-stats-d">D</div>
                     <div className="md-stats-cell">A</div>
                     <div className="md-stats-cell md-stats-kd">K/D</div>
-                    <div className="md-stats-cell">ACS</div>
+                    <div className="md-stats-cell">ADR</div>
                     <div className="md-stats-cell">HS%</div>
-                    <div className="md-stats-cell">DMG</div>
+                    <div className="md-stats-cell md-stats-fk">FK</div>
+                    <div className="md-stats-cell md-stats-fd">FD</div>
                   </div>
                   {t1Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
                     const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
-                    const acs = rounds > 0 ? Math.round(p.score / rounds) : 0;
+                    const adr = rounds > 0 ? Math.round((p.damageDealt || 0) / rounds) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
@@ -220,9 +254,10 @@ export default function MatchDetail() {
                         <div className="md-stats-cell md-stats-d">{p.deaths}</div>
                         <div className="md-stats-cell">{p.assists}</div>
                         <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
-                        <div className="md-stats-cell" style={{ fontWeight: 700 }}>{acs}</div>
+                        <div className="md-stats-cell" style={{ fontWeight: 600 }}>{adr}</div>
                         <div className="md-stats-cell">{hs}%</div>
-                        <div className="md-stats-cell">{p.damageDealt?.toLocaleString() || 0}</div>
+                        <div className="md-stats-cell md-stats-fk">{p.firstKills ?? 0}</div>
+                        <div className="md-stats-cell md-stats-fd">{p.firstDeaths ?? 0}</div>
                       </div>
                     );
                   })}
@@ -243,14 +278,15 @@ export default function MatchDetail() {
                     <div className="md-stats-cell md-stats-d">D</div>
                     <div className="md-stats-cell">A</div>
                     <div className="md-stats-cell md-stats-kd">K/D</div>
-                    <div className="md-stats-cell">ACS</div>
+                    <div className="md-stats-cell">ADR</div>
                     <div className="md-stats-cell">HS%</div>
-                    <div className="md-stats-cell">DMG</div>
+                    <div className="md-stats-cell md-stats-fk">FK</div>
+                    <div className="md-stats-cell md-stats-fd">FD</div>
                   </div>
                   {t2Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
                     const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
-                    const acs = rounds > 0 ? Math.round(p.score / rounds) : 0;
+                    const adr = rounds > 0 ? Math.round((p.damageDealt || 0) / rounds) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
@@ -262,14 +298,71 @@ export default function MatchDetail() {
                         <div className="md-stats-cell md-stats-d">{p.deaths}</div>
                         <div className="md-stats-cell">{p.assists}</div>
                         <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
-                        <div className="md-stats-cell" style={{ fontWeight: 700 }}>{acs}</div>
+                        <div className="md-stats-cell" style={{ fontWeight: 600 }}>{adr}</div>
                         <div className="md-stats-cell">{hs}%</div>
-                        <div className="md-stats-cell">{p.damageDealt?.toLocaleString() || 0}</div>
+                        <div className="md-stats-cell md-stats-fk">{p.firstKills ?? 0}</div>
+                        <div className="md-stats-cell md-stats-fd">{p.firstDeaths ?? 0}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+              </>)}
+
+              {/* ═══ DUELS TAB ═══ */}
+              {detailTab === "duels" && (() => {
+                const km: Record<string, Record<string, number>> = activeGameData.killMatrix || {};
+                if (t1Players.length === 0 || t2Players.length === 0 || Object.keys(km).length === 0) {
+                  return (
+                    <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "40px 20px", textAlign: "center" }}>
+                      <div style={{ fontSize: "1.4rem", marginBottom: 8 }}>⚔️</div>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#8A8880", marginBottom: 4 }}>No duel data available</div>
+                      <div style={{ fontSize: "0.76rem", color: "#555550" }}>Duel data will be available for matches fetched after this update.</div>
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "16px 20px" }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 12 }}>Head-to-Head Duels</div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 400 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: "6px 8px", fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", textAlign: "left", borderBottom: "1.5px solid #2A2A30" }}>{match.team1Name}</th>
+                            {t2Players.map((p2: any) => (
+                              <th key={p2.puuid} style={{ padding: "6px 4px", fontSize: "0.62rem", fontWeight: 700, color: "#3b82f6", textAlign: "center", borderBottom: "1.5px solid #2A2A30", minWidth: 55 }}>{(p2.name || "?").length > 8 ? (p2.name || "?").slice(0, 6) + "…" : p2.name || "?"}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {t1Players.map((p1: any) => (
+                            <tr key={p1.puuid} style={{ borderBottom: "1px solid #1e1e22" }}>
+                              <td style={{ padding: "7px 8px", fontSize: "0.72rem", fontWeight: 700, color: "#e0e0da" }}>{p1.name || "?"}</td>
+                              {t2Players.map((p2: any) => {
+                                const killed = km[p1.puuid]?.[p2.puuid] || 0;
+                                const killedBy = km[p2.puuid]?.[p1.puuid] || 0;
+                                const diff = killed - killedBy;
+                                return (
+                                  <td key={p2.puuid} style={{ padding: "5px 4px", textAlign: "center" }}>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#8A8880" }}>{killed}</span>
+                                      <div style={{ width: 16, height: 1, background: "#2A2A30" }} />
+                                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: "#555550" }}>{killedBy}</span>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: "0.62rem", color: "#555550", lineHeight: 1.5 }}>
+                      <span style={{ color: "#4ade80", fontWeight: 700 }}>Green</span> = won matchup · <span style={{ color: "#f87171", fontWeight: 700 }}>Red</span> = lost matchup. Top number = kills on opponent, bottom = deaths to opponent.
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="md-pending-game">
@@ -347,9 +440,9 @@ const styles = `
   .md-team-winner { font-size: 0.56rem; padding: 2px 8px; background: rgba(22,163,74,0.12); color: #4ade80; border-radius: 100px; border: 1px solid rgba(34,197,94,0.3); }
 
   .md-stats-table { width: 100%; }
-  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
+  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
   .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; }
-  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.7fr 0.6fr 0.8fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
+  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
   .md-stats-row:last-child { border-bottom: none; }
   .md-stats-cell { font-size: 0.82rem; color: #e0e0da; }
   .md-stats-player { font-weight: 700; }
@@ -360,6 +453,8 @@ const styles = `
   .md-stats-k { color: #4ade80; font-weight: 700; }
   .md-stats-d { color: #f87171; }
   .md-stats-kd { font-weight: 800; }
+  .md-stats-fk { color: #f59e0b; font-weight: 700; }
+  .md-stats-fd { color: #f87171; }
 
   .md-pending-game { text-align: center; padding: 60px 20px; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; }
   .md-pending-icon { font-size: 2rem; display: block; margin-bottom: 12px; }
@@ -370,7 +465,7 @@ const styles = `
     .md-header { flex-direction: column; gap: 16px; padding: 20px; }
     .md-header-team { align-items: center !important; }
     .md-header-score { font-size: 1.8rem; }
-    .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.6fr 0.5fr 0.7fr; }
+    .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.5fr 0.4fr 0.4fr 0.4fr; }
     .md-stats-cell { font-size: 0.72rem; }
     .md-stats-agent { font-size: 0.62rem; }
   }
