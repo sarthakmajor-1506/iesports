@@ -82,36 +82,77 @@ export async function POST(req: NextRequest) {
     let roundsPlayed = 0;
     let redWon = false;
 
+    // Helper: extract rounds won from a team object, trying all known field paths
+    const extractRoundsWon = (teamObj: any): number => {
+      if (!teamObj) return 0;
+      // Try: rounds_won (snake), roundsWon (camel), rounds.won (nested)
+      return teamObj.rounds_won ?? teamObj.roundsWon ?? teamObj.rounds?.won ?? 0;
+    };
+    const extractHasWon = (teamObj: any): boolean => {
+      if (!teamObj) return false;
+      // Try: has_won, hasWon, won
+      return teamObj.has_won === true || teamObj.hasWon === true || teamObj.won === true;
+    };
+
+    // Helper: resolve teams — could be object {red:{}, blue:{}} or array [{team_id:"Red",...}]
+    let redTeamObj: any = null;
+    let blueTeamObj: any = null;
+    if (matchData.teams) {
+      if (Array.isArray(matchData.teams)) {
+        redTeamObj = matchData.teams.find((t: any) => (t.team_id || t.teamId || "").toLowerCase() === "red");
+        blueTeamObj = matchData.teams.find((t: any) => (t.team_id || t.teamId || "").toLowerCase() === "blue");
+      } else {
+        redTeamObj = matchData.teams.red || matchData.teams.Red;
+        blueTeamObj = matchData.teams.blue || matchData.teams.Blue;
+      }
+    }
+
+    // Dump raw teams structure for debugging
+    const rawTeamsDebug = {
+      isArray: Array.isArray(matchData.teams),
+      keys: matchData.teams ? Object.keys(matchData.teams) : [],
+      redKeys: redTeamObj ? Object.keys(redTeamObj) : [],
+      redRaw: redTeamObj ? JSON.parse(JSON.stringify(redTeamObj, (k, v) => k === "roster" ? "[omitted]" : v)) : null,
+      blueRaw: blueTeamObj ? JSON.parse(JSON.stringify(blueTeamObj, (k, v) => k === "roster" ? "[omitted]" : v)) : null,
+    };
+
     if (apiVersion === "v4") {
       mapName = matchData.metadata?.map?.name || matchData.metadata?.map || "Unknown";
-      redRoundsWon = matchData.teams?.red?.rounds_won || 0;
-      blueRoundsWon = matchData.teams?.blue?.rounds_won || 0;
+      redRoundsWon = extractRoundsWon(redTeamObj);
+      blueRoundsWon = extractRoundsWon(blueTeamObj);
       roundsPlayed = redRoundsWon + blueRoundsWon;
-      redWon = matchData.teams?.red?.has_won === true;
+      redWon = extractHasWon(redTeamObj);
 
-      playerStats = (matchData.players || []).map((p: any) => ({
-        puuid: p.puuid,
-        name: p.name,
-        tag: p.tag,
-        team: p.team_id || p.team, // "Red" or "Blue"
-        agent: p.agent?.name || "Unknown",
-        kills: p.stats?.kills || 0,
-        deaths: p.stats?.deaths || 0,
-        assists: p.stats?.assists || 0,
-        score: p.stats?.score || 0,
-        headshots: p.stats?.headshots || 0,
-        bodyshots: p.stats?.bodyshots || 0,
-        legshots: p.stats?.legshots || 0,
-        damageDealt: p.stats?.damage?.dealt || 0,
-        damageReceived: p.stats?.damage?.received || 0,
-      }));
+      playerStats = (matchData.players || []).map((p: any) => {
+        // Normalize team to "Red" or "Blue" — v4 may use team_id (could be non-standard) or team
+        const rawTeam = p.team_id || p.team || "";
+        const normalizedTeam = rawTeam.toLowerCase().includes("red") ? "Red"
+          : rawTeam.toLowerCase().includes("blue") ? "Blue"
+          : rawTeam; // pass through if unexpected
+        return {
+          puuid: p.puuid,
+          name: p.name,
+          tag: p.tag,
+          team: normalizedTeam,
+          agent: p.agent?.name || "Unknown",
+          kills: p.stats?.kills || 0,
+          deaths: p.stats?.deaths || 0,
+          assists: p.stats?.assists || 0,
+          score: p.stats?.score || 0,
+          headshots: p.stats?.headshots || 0,
+          bodyshots: p.stats?.bodyshots || 0,
+          legshots: p.stats?.legshots || 0,
+          damageDealt: p.stats?.damage?.dealt || 0,
+          damageReceived: p.stats?.damage?.received || 0,
+        };
+      });
     } else {
       const allPlayers = matchData.players?.all_players || [];
       mapName = matchData.metadata?.map || "Unknown";
       roundsPlayed = matchData.metadata?.rounds_played || 0;
-      redRoundsWon = matchData.teams?.red?.rounds_won || 0;
-      blueRoundsWon = matchData.teams?.blue?.rounds_won || 0;
-      redWon = matchData.teams?.red?.has_won === true;
+      redRoundsWon = extractRoundsWon(redTeamObj);
+      blueRoundsWon = extractRoundsWon(blueTeamObj);
+      redWon = extractHasWon(redTeamObj);
 
       playerStats = allPlayers.map((p: any) => ({
         puuid: p.puuid,
@@ -725,12 +766,15 @@ export async function POST(req: NextRequest) {
       map: mapName,
       roundsPlayed,
       roundScore: `${team1RoundsWon}-${team2RoundsWon}`,
-      valorantSideScore: `${redRoundsWon}-${blueRoundsWon}`,
+      valorantSideScore: `Red ${redRoundsWon} - Blue ${blueRoundsWon}`,
+      redWon,
       gameWinner,
       team1ValorantSide,
       team2ValorantSide,
       puuidMatchMethod: team1MatchCount > 0 ? "puuid" : "name_fallback",
       playersMatched: { team1: team1MatchCount, team2: team2MatchCount },
+      rawTeamsDebug,
+      puuidsFound: { team1: team1Puuids.size, team2: team2Puuids.size },
       playersTracked,
       playersSkipped,
       seriesComplete,

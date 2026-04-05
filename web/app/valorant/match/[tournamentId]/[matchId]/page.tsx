@@ -213,8 +213,7 @@ export default function MatchDetail() {
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
-                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link"></Link>
-                          
+                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">{p.name || "Unknown"}</Link>
                         </div>
                         <div className="md-stats-cell md-stats-agent">{p.agent}</div>
                         <div className="md-stats-cell md-stats-k">{p.kills}</div>
@@ -250,13 +249,13 @@ export default function MatchDetail() {
                   </div>
                   {t2Players.map((p: any, i: number) => {
                     const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
-                    const acs = (activeGameData.roundsPlayed || 1) > 0 ? Math.round(p.score / activeGameData.roundsPlayed) : 0;
+                    const rounds = activeGameData.roundsPlayed || (activeGameData.redRoundsWon + activeGameData.blueRoundsWon) || 1;
+                    const acs = rounds > 0 ? Math.round(p.score / rounds) : 0;
                     const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
-                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">
-                          </Link>
+                          <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">{p.name || "Unknown"}</Link>
                         </div>
                         <div className="md-stats-cell md-stats-agent">{p.agent}</div>
                         <div className="md-stats-cell md-stats-k">{p.kills}</div>
