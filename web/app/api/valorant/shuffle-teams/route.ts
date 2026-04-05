@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       totalSkill: number;
     }[] = Array.from({ length: numTeams }, (_, i) => ({
       teamIndex: i + 1,
-      teamName: teamNames?.[i] || `Team ${i + 1}`,
+      teamName: (teamNames?.[i] || `Team ${i + 1}`).toUpperCase(),
       members: [],
       totalSkill: 0,
     }));

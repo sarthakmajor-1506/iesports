@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
 
-    const cleanName = newTeamName.trim();
+    const cleanName = newTeamName.trim().toUpperCase();
     const oldName = teamData.teamName;
 
     // Update team doc

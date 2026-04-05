@@ -109,7 +109,7 @@ export default function MatchDetail() {
 
           {/* ═══ BREADCRUMB ═══ */}
           <div className="md-breadcrumb">
-            <Link href={`/valorant/tournament/${tournamentId}`} className="md-breadcrumb-link">
+            <Link href={`/valorant/tournament/${tournamentId}?tab=${match.isBracket ? "brackets" : "matches"}&match=${matchId}`} className="md-breadcrumb-link">
               ← {tournament?.name || "Tournament"}
             </Link>
             <span className="md-breadcrumb-sep">›</span>
@@ -188,30 +188,81 @@ export default function MatchDetail() {
                 </div>
               </div>
 
-              {/* Round Timeline */}
-              {(activeGameData.roundResults || []).length > 0 && (
-                <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "14px 20px", marginBottom: 12 }}>
-                  <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 8 }}>Round Timeline</div>
-                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center" }}>
-                    {(activeGameData.roundResults as any[]).map((r: any, ri: number) => (
-                      <div key={ri} style={{ display: "flex", alignItems: "center" }}>
-                        {ri === 12 && <div style={{ width: 3, height: 22, background: "#555550", margin: "0 5px", borderRadius: 2 }} />}
-                        <div title={`R${r.round}: ${r.winner === "team1" ? match.team1Name : r.winner === "team2" ? match.team2Name : "?"} — ${r.endType || ""}`} style={{
-                          width: 20, height: 22, borderRadius: 3, fontSize: "0.56rem", fontWeight: 700,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          background: r.winner === "team1" ? "rgba(60,203,255,0.12)" : r.winner === "team2" ? "rgba(59,130,246,0.12)" : "#1a1a1f",
-                          color: r.winner === "team1" ? "#3CCBFF" : r.winner === "team2" ? "#3b82f6" : "#555550",
-                          border: `1px solid ${r.winner === "team1" ? "rgba(60,203,255,0.3)" : r.winner === "team2" ? "rgba(59,130,246,0.3)" : "#2A2A30"}`,
-                        }}>{r.round}</div>
-                      </div>
-                    ))}
+              {/* Round Timeline — two-row layout */}
+              {(activeGameData.roundResults || []).length > 0 && (() => {
+                const endTypeIcon = (et: string) => {
+                  const e = (et || "").toLowerCase();
+                  if (e.includes("detonate") || e.includes("bomb")) return "💣";
+                  if (e.includes("defuse")) return "🛡";
+                  if (e.includes("elim")) return "☠";
+                  if (e.includes("timer") || e.includes("time")) return "⏱";
+                  return "⚔";
+                };
+                const rounds = activeGameData.roundResults as any[];
+                const t1Color = "#3CCBFF";
+                const t2Color = "#f87171";
+                const t1Rounds = activeGameData.team1RoundsWon ?? "?";
+                const t2Rounds = activeGameData.team2RoundsWon ?? "?";
+                return (
+                <div style={{ background: "#121215", border: "1px solid #2A2A30", borderRadius: 12, padding: "14px 20px", marginBottom: 12, width: "100%" }}>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 10 }}>Round Timeline</div>
+                  {/* Team 1 row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 2 }}>
+                    <div style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#8A8880", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 36 }}>{match.team1Name.length > 5 ? match.team1Name.slice(0, 4) + "…" : match.team1Name}</span>
+                      <span style={{ fontSize: "0.82rem", fontWeight: 900, color: t1Color }}>{t1Rounds}</span>
+                    </div>
+                    <div style={{ display: "flex", flex: 1, gap: 2, alignItems: "center" }}>
+                      {rounds.map((r: any, ri: number) => {
+                        const isT1Win = r.winner === "team1";
+                        return (
+                          <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                            {ri === 12 && <div style={{ width: 2, height: 22, background: "#555550", margin: "0 2px", borderRadius: 1, flexShrink: 0 }} />}
+                            <div title={`R${r.round}: ${isT1Win ? match.team1Name : match.team2Name} — ${r.endType || ""}`} style={{
+                              width: "100%", height: 22,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>{isT1Win ? <span style={{ color: t1Color, fontSize: "0.72rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.35rem" }}>●</span>}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 14, marginTop: 6, fontSize: "0.62rem", color: "#8A8880" }}>
-                    <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "rgba(60,203,255,0.12)", border: "1px solid rgba(60,203,255,0.3)", marginRight: 4, verticalAlign: "middle" }} />{match.team1Name}</span>
-                    <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", marginRight: 4, verticalAlign: "middle" }} />{match.team2Name}</span>
+                  {/* Team 2 row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginBottom: 2 }}>
+                    <div style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#8A8880", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 36 }}>{match.team2Name.length > 5 ? match.team2Name.slice(0, 4) + "…" : match.team2Name}</span>
+                      <span style={{ fontSize: "0.82rem", fontWeight: 900, color: t2Color }}>{t2Rounds}</span>
+                    </div>
+                    <div style={{ display: "flex", flex: 1, gap: 2, alignItems: "center" }}>
+                      {rounds.map((r: any, ri: number) => {
+                        const isT2Win = r.winner === "team2";
+                        return (
+                          <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                            {ri === 12 && <div style={{ width: 2, height: 22, background: "#555550", margin: "0 2px", borderRadius: 1, flexShrink: 0 }} />}
+                            <div title={`R${r.round}: ${isT2Win ? match.team2Name : match.team1Name} — ${r.endType || ""}`} style={{
+                              width: "100%", height: 22,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>{isT2Win ? <span style={{ color: t2Color, fontSize: "0.72rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.35rem" }}>●</span>}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Round numbers */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
+                    <div style={{ width: 60, flexShrink: 0 }} />
+                    <div style={{ display: "flex", flex: 1, gap: 2 }}>
+                      {rounds.map((r: any, ri: number) => (
+                        <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                          {ri === 12 && <div style={{ width: 2, margin: "0 2px", flexShrink: 0 }} />}
+                          <div style={{ width: "100%", textAlign: "center", fontSize: "0.56rem", color: "#555550", fontWeight: 600 }}>{r.round}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Detail sub-tabs: Scoreboard / Duels */}
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>

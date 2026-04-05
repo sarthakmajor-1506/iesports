@@ -442,8 +442,8 @@ function ValorantTournamentDetailInner() {
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
-  const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
-  const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "dmg" | "maps">("kd");
+  const [expandedMatch, setExpandedMatch] = useState<string | null>(() => searchParams.get("match") || null);
+  const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "acs" | "dmg" | "maps">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [teamNameLoading, setTeamNameLoading] = useState(false);
@@ -870,7 +870,7 @@ function ValorantTournamentDetailInner() {
         .vtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .vtd-mc-team-info { flex: 1; min-width: 0; }
         .vtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #3CCBFF; text-transform: uppercase; }
-        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
         .vtd-mc-avatars { display: flex; gap: 0; margin-top: 4px; }
         .vtd-mc-avatars img, .vtd-mc-avatars .vtd-mc-av-init { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(18,18,21,0.9); margin-left: -4px; object-fit: cover; }
         .vtd-mc-avatars img:first-child, .vtd-mc-avatars .vtd-mc-av-init:first-child { margin-left: 0; }
@@ -1345,7 +1345,7 @@ function ValorantTournamentDetailInner() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {isEditing ? (
                             <div>
-                              <input className="vtd-team-edit-input" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} placeholder="Enter team name" maxLength={24} autoFocus onKeyDown={e => { if (e.key === "Enter") handleUpdateTeamName(team.id); }} />
+                              <input className="vtd-team-edit-input" value={newTeamName} onChange={e => setNewTeamName(e.target.value.toUpperCase())} placeholder="Enter team name" maxLength={24} autoFocus style={{ textTransform: "uppercase" }} onKeyDown={e => { if (e.key === "Enter") handleUpdateTeamName(team.id); }} />
                               {teamNameError && <div style={{ fontSize: "0.68rem", color: "#f87171", marginTop: 4 }}>{teamNameError}</div>}
                               <div className="vtd-team-edit-actions"><button className="vtd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="vtd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
@@ -1458,6 +1458,7 @@ function ValorantTournamentDetailInner() {
                   bracketBestOf={tournament.bracketBestOf || 2}
                   lbFinalBestOf={tournament.lbFinalBestOf}
                   grandFinalBestOf={tournament.grandFinalBestOf || 3}
+                  tournamentId={id}
                 />
               ) : (
                 <DoubleBracket
@@ -1467,6 +1468,7 @@ function ValorantTournamentDetailInner() {
                   bracketBestOf={tournament.bracketBestOf || 2}
                   lbFinalBestOf={tournament.lbFinalBestOf}
                   grandFinalBestOf={tournament.grandFinalBestOf || 3}
+                  tournamentId={id}
                 />
               )}
             </div>
@@ -1497,6 +1499,7 @@ function ValorantTournamentDetailInner() {
                 case "fk": return p.totalFirstKills || 0;
                 case "fd": return p.totalFirstDeaths || 0;
                 case "adr": return (p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1);
+                case "acs": return p.acs || ((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1));
                 case "dmg": return p.totalDamageDealt || 0;
                 case "maps": return p.matchesPlayed || 0;
                 default: return 0;
@@ -1539,6 +1542,7 @@ function ValorantTournamentDetailInner() {
                         <th style={thStyle("deaths", "#f87171")} onClick={() => setLbSort("deaths")}>D{sortArrow("deaths")}</th>
                         <th style={thStyle("assists")} onClick={() => setLbSort("assists")}>A{sortArrow("assists")}</th>
                         <th style={thStyle("kd", "#3CCBFF")} onClick={() => setLbSort("kd")}>K/D{sortArrow("kd")}</th>
+                        <th style={thStyle("acs", "#a78bfa")} onClick={() => setLbSort("acs")}>ACS{sortArrow("acs")}</th>
                         <th style={thStyle("adr")} onClick={() => setLbSort("adr")}>ADR{sortArrow("adr")}</th>
                         <th style={thStyle("hs")} onClick={() => setLbSort("hs")}>HS%{sortArrow("hs")}</th>
                         <th style={thStyle("fk", "#f59e0b")} onClick={() => setLbSort("fk")}>FK{sortArrow("fk")}</th>
@@ -1559,6 +1563,7 @@ function ValorantTournamentDetailInner() {
                           <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
                           <td>{p.totalAssists || 0}</td>
                           <td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td>
+                          <td style={{ fontWeight: 700, color: "#a78bfa" }}>{p.acs || Math.round((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1))}</td>
                           <td style={{ fontWeight: 600 }}>{adr}</td>
                           <td>{p.hsPercent || 0}%</td>
                           <td style={{ fontWeight: 700, color: "#f59e0b" }}>{p.totalFirstKills || 0}</td>
@@ -1568,7 +1573,7 @@ function ValorantTournamentDetailInner() {
                       })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> 👑 MVP, 🥈 2nd, 🥉 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. FK = First Kills, FD = First Deaths, ADR = Avg Damage/Round.
+                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> 👑 MVP, 🥈 2nd, 🥉 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.
                     </div>
                   </div>
                 )}
@@ -1708,33 +1713,76 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id 
         </div>
       )}
 
-      {/* Round timeline */}
-      {isPlayed && rounds.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", marginBottom: 4 }}>ROUNDS</div>
-          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-            {rounds.map((r: any, ri: number) => {
-              const isHalf = ri === 11; // halftime after round 12
-              return (
-                <div key={ri} style={{ display: "flex", alignItems: "center", gap: isHalf ? 0 : undefined }}>
-                  {isHalf && <div style={{ width: 2, height: 16, background: "#555550", margin: "0 3px", borderRadius: 1 }} />}
-                  <div title={`R${r.round}: ${r.winner === "team1" ? team1Name : r.winner === "team2" ? team2Name : "?"} — ${r.endType || ""}`} style={{
-                    width: 14, height: 16, borderRadius: 2, fontSize: "0.5rem", fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: r.winner === "team1" ? "rgba(74,222,128,0.15)" : r.winner === "team2" ? "rgba(248,113,113,0.15)" : "#1a1a1f",
-                    color: r.winner === "team1" ? "#4ade80" : r.winner === "team2" ? "#f87171" : "#555550",
-                    border: `1px solid ${r.winner === "team1" ? "rgba(74,222,128,0.3)" : r.winner === "team2" ? "rgba(248,113,113,0.3)" : "#2A2A30"}`,
-                  }}>{r.round}</div>
-                </div>
-              );
-            })}
+      {/* Round timeline — two-row layout */}
+      {isPlayed && rounds.length > 0 && (() => {
+        const endTypeIcon = (et: string) => {
+          const e = (et || "").toLowerCase();
+          if (e.includes("detonate") || e.includes("bomb")) return "💣";
+          if (e.includes("defuse")) return "🛡";
+          if (e.includes("elim")) return "☠";
+          if (e.includes("timer") || e.includes("time")) return "⏱";
+          return "⚔";
+        };
+        const t1Color = "#4ade80";
+        const t2Color = "#f87171";
+        return (
+        <div style={{ marginBottom: 10, width: "100%" }}>
+          <div style={{ display: "flex", fontSize: "0.58rem", fontWeight: 800, color: "#555550", letterSpacing: "0.1em", marginBottom: 4 }}>ROUNDS</div>
+          {/* Team 1 row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
+            <div style={{ width: 36, flexShrink: 0, fontSize: "0.62rem", fontWeight: 900, color: t1Color, textAlign: "right", paddingRight: 6 }}>{t1Rounds}</div>
+            <div style={{ display: "flex", flex: 1, gap: 1, alignItems: "center" }}>
+              {rounds.map((r: any, ri: number) => {
+                const isT1Win = r.winner === "team1";
+                const isHalf = ri === 12;
+                return (
+                  <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                    {isHalf && <div style={{ width: 2, height: 18, background: "#555550", margin: "0 1px", borderRadius: 1, flexShrink: 0 }} />}
+                    <div title={`R${r.round}: ${isT1Win ? team1Name : team2Name} — ${r.endType || ""}`} style={{
+                      width: "100%", height: 18,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.5rem",
+                    }}>{isT1Win ? <span style={{ color: t1Color, fontSize: "0.6rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.3rem" }}>●</span>}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: "0.56rem", color: "#555550" }}>
-            <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.3)", marginRight: 3, verticalAlign: "middle" }} />{team1Name.length > 10 ? team1Name.slice(0, 8) + "…" : team1Name}</span>
-            <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", marginRight: 3, verticalAlign: "middle" }} />{team2Name.length > 10 ? team2Name.slice(0, 8) + "…" : team2Name}</span>
+          {/* Team 2 row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
+            <div style={{ width: 36, flexShrink: 0, fontSize: "0.62rem", fontWeight: 900, color: t2Color, textAlign: "right", paddingRight: 6 }}>{t2Rounds}</div>
+            <div style={{ display: "flex", flex: 1, gap: 1, alignItems: "center" }}>
+              {rounds.map((r: any, ri: number) => {
+                const isT2Win = r.winner === "team2";
+                const isHalf = ri === 12;
+                return (
+                  <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                    {isHalf && <div style={{ width: 2, height: 18, background: "#555550", margin: "0 1px", borderRadius: 1, flexShrink: 0 }} />}
+                    <div title={`R${r.round}: ${isT2Win ? team2Name : team1Name} — ${r.endType || ""}`} style={{
+                      width: "100%", height: 18,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.5rem",
+                    }}>{isT2Win ? <span style={{ color: t2Color, fontSize: "0.6rem" }}>{endTypeIcon(r.endType)}</span> : <span style={{ color: "#2A2A30", fontSize: "0.3rem" }}>●</span>}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Round numbers */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
+            <div style={{ width: 36, flexShrink: 0 }} />
+            <div style={{ display: "flex", flex: 1, gap: 1 }}>
+              {rounds.map((r: any, ri: number) => (
+                <div key={ri} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                  {ri === 12 && <div style={{ width: 2, margin: "0 1px", flexShrink: 0 }} />}
+                  <div style={{ width: "100%", textAlign: "center", fontSize: "0.46rem", color: "#555550", fontWeight: 600 }}>{r.round}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Player stats table */}
       {stats.length > 0 && (

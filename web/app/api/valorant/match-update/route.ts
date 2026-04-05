@@ -104,7 +104,7 @@ async function createVoiceChannel(
   const channelPayload: any = {
     name,
     type: CHANNEL_TYPE_VOICE,
-    user_limit: 7,
+    user_limit: 15,
     permission_overwrites: permissionOverwrites,
   };
 
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
     // → Send Discord notification with lobby details + clickable VC link
     // ═══════════════════════════════════════════════════════════════════════
     if (action === "set-lobby") {
-      const gameKey = gameNumber === 2 ? "game2" : "game1";
+      const gameKey = `game${gameNumber || 1}`;
       const updateData: any = {
         lobbyName: lobbyName || "",
         lobbyPassword: lobbyPassword || "",
@@ -274,7 +274,8 @@ export async function POST(req: NextRequest) {
           }
 
           // ── Build notification message ──────────────────────────────────
-          const gameLabel = gameNumber === 2 ? "Game 2 (Map 2)" : "Game 1 (Map 1)";
+          const gn = gameNumber || 1;
+          const gameLabel = `Game ${gn} (Map ${gn})`;
           const scheduledTime = matchData.games?.[gameKey]?.scheduledTime || matchData.scheduledTime;
           const timeStr = scheduledTime
             ? new Date(scheduledTime).toLocaleTimeString("en-IN", {

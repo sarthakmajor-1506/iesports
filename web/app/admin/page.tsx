@@ -112,6 +112,10 @@ export default function AdminPanel() {
   const [fetchRegion, setFetchRegion] = useState("ap");
   const [gameExcludedPuuids, setGameExcludedPuuids] = useState<string[]>(["", ""]);
 
+  // ─── Delete Game Data ───────────────────────────────────────────────────────
+  const [deleteGameMatchId, setDeleteGameMatchId] = useState("");
+  const [deleteGameNumber, setDeleteGameNumber] = useState("1");
+
   // ─── Add/Remove Player ─────────────────────────────────────────────────────
   const [modTeamId, setModTeamId] = useState("");
   const [modPlayerUid, setModPlayerUid] = useState("");
@@ -1047,6 +1051,10 @@ export default function AdminPanel() {
 
                 {/* ═══ 3. SET LOBBY & NOTIFY ═══ */}
                 <div style={sectionStyle}>
+                  {(() => {
+                    const lobbyMatch = matches.find(m => m.id === selectedMatchForLobby);
+                    const lobbyBo = getMatchBo(lobbyMatch);
+                    return (<>
                   <span style={labelStyle}>3. Set Lobby & Notify Discord</span>
                   <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
                     Select a match and game. Setting lobby sends a Discord notification pinging all players.
@@ -1064,10 +1072,11 @@ export default function AdminPanel() {
                       </select>
                     </div>
                     <div>
-                      <label style={smallLabel}>Game</label>
+                      <label style={smallLabel}>Game (BO{lobbyBo})</label>
                       <select value={selectedGameForLobby} onChange={e => setSelectedGameForLobby(e.target.value)} style={selectStyle}>
-                        <option value="1">Game 1</option>
-                        <option value="2">Game 2</option>
+                        {Array.from({ length: lobbyBo }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>Game {i + 1}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1093,6 +1102,8 @@ export default function AdminPanel() {
                     <strong style={{ color: "#888" }}>Start Match</strong> → Creates 2 team VCs, moves players, deletes waiting room<br/>
                     <strong style={{ color: "#888" }}>Cleanup VCs</strong> → Deletes all VCs for this match
                   </div>
+                    </>);
+                  })()}
                 </div>
 
                 {/* ═══ 4. MANUAL SERIES RESULT ═══ */}
@@ -1287,6 +1298,51 @@ export default function AdminPanel() {
                               })}>Fetch Game {i + 1}</button>
                           </div>
                         ))}
+                      </div>
+                    </>);
+                  })()}
+                </div>
+
+                {/* ═══ 7b. DELETE GAME DATA ═══ */}
+                <div style={{ ...sectionStyle, gridColumn: "1 / -1", border: "1.5px solid #7f1d1d", background: "#1a0808" }}>
+                  {(() => {
+                    const selMatch = matches.find(m => m.id === deleteGameMatchId);
+                    const bo = getMatchBo(selMatch);
+                    return (<>
+                      <span style={{ ...labelStyle, color: "#f87171" }}>7b. Delete Game Data (Rollback)</span>
+                      <p style={{ fontSize: "0.72rem", color: "#777", marginBottom: 12, lineHeight: 1.5 }}>
+                        Reverses leaderboard stats, standings (group stage), and clears game data from match. Use this to re-fetch correct data.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div>
+                          <label style={smallLabel}>Match</label>
+                          <select value={deleteGameMatchId} onChange={e => setDeleteGameMatchId(e.target.value)} style={selectStyle}>
+                            <option value="">Select a match...</option>
+                            {matches.map(m => (
+                              <option key={m.id} value={m.id}>
+                                {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} ({m.status})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={smallLabel}>Game Number</label>
+                          <select value={deleteGameNumber} onChange={e => setDeleteGameNumber(e.target.value)} style={selectStyle}>
+                            {Array.from({ length: bo }, (_, i) => (
+                              <option key={i + 1} value={String(i + 1)}>Game {i + 1}{selMatch?.games?.[`game${i + 1}`] || (selMatch as any)?.[`game${i + 1}`] ? " (has data)" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "flex-end" }}>
+                          <button disabled={loading || !deleteGameMatchId} style={{ ...btnStyle, background: "#dc2626", width: "100%" }}
+                            onClick={() => {
+                              if (!confirm(`Delete Game ${deleteGameNumber} data from ${selMatch?.team1Name} vs ${selMatch?.team2Name}? This will reverse all stats.`)) return;
+                              apiCall("/api/admin/delete-game-data", {
+                                tournamentId, matchDocId: deleteGameMatchId,
+                                gameNumber: parseInt(deleteGameNumber),
+                              });
+                            }}>Delete Game {deleteGameNumber} Data</button>
+                        </div>
                       </div>
                     </>);
                   })()}

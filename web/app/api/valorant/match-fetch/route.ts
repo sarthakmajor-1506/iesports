@@ -129,6 +129,11 @@ export async function POST(req: NextRequest) {
         const normalizedTeam = rawTeam.toLowerCase().includes("red") ? "Red"
           : rawTeam.toLowerCase().includes("blue") ? "Blue"
           : rawTeam; // pass through if unexpected
+
+        // Extract FK/FD from player stats (v4 provides these directly)
+        const directFK = p.stats?.first_kills ?? p.stats?.firstKills ?? p.first_kills ?? p.firstKills ?? null;
+        const directFD = p.stats?.first_deaths ?? p.stats?.firstDeaths ?? p.first_deaths ?? p.firstDeaths ?? null;
+
         return {
           puuid: p.puuid,
           name: p.name,
@@ -142,8 +147,10 @@ export async function POST(req: NextRequest) {
           headshots: p.stats?.headshots || 0,
           bodyshots: p.stats?.bodyshots || 0,
           legshots: p.stats?.legshots || 0,
-          damageDealt: p.stats?.damage?.dealt || 0,
-          damageReceived: p.stats?.damage?.received || 0,
+          damageDealt: p.stats?.damage?.dealt || p.stats?.damage_dealt || 0,
+          damageReceived: p.stats?.damage?.received || p.stats?.damage_received || 0,
+          directFirstKills: directFK,
+          directFirstDeaths: directFD,
         };
       });
     } else {
@@ -154,22 +161,30 @@ export async function POST(req: NextRequest) {
       blueRoundsWon = extractRoundsWon(blueTeamObj);
       redWon = extractHasWon(redTeamObj);
 
-      playerStats = allPlayers.map((p: any) => ({
-        puuid: p.puuid,
-        name: p.name,
-        tag: p.tag,
-        team: p.team, // "Red" or "Blue"
-        agent: p.character || "Unknown",
-        kills: p.stats?.kills || 0,
-        deaths: p.stats?.deaths || 0,
-        assists: p.stats?.assists || 0,
-        score: p.stats?.score || 0,
-        headshots: p.stats?.headshots || 0,
-        bodyshots: p.stats?.bodyshots || 0,
-        legshots: p.stats?.legshots || 0,
-        damageDealt: p.damage_made || 0,
-        damageReceived: p.damage_received || 0,
-      }));
+      playerStats = allPlayers.map((p: any) => {
+        // Extract FK/FD from v2 player stats if available
+        const directFK = p.stats?.first_kills ?? p.first_kills ?? p.firstKills ?? null;
+        const directFD = p.stats?.first_deaths ?? p.first_deaths ?? p.firstDeaths ?? null;
+
+        return {
+          puuid: p.puuid,
+          name: p.name,
+          tag: p.tag,
+          team: p.team, // "Red" or "Blue"
+          agent: p.character || "Unknown",
+          kills: p.stats?.kills || 0,
+          deaths: p.stats?.deaths || 0,
+          assists: p.stats?.assists || 0,
+          score: p.stats?.score || 0,
+          headshots: p.stats?.headshots || 0,
+          bodyshots: p.stats?.bodyshots || 0,
+          legshots: p.stats?.legshots || 0,
+          damageDealt: p.damage_made || p.stats?.damage_dealt || 0,
+          damageReceived: p.damage_received || p.stats?.damage_received || 0,
+          directFirstKills: directFK,
+          directFirstDeaths: directFD,
+        };
+      });
     }
 
     const valorantWinnerSide = redWon ? "Red" : "Blue"; // which Valorant side won
@@ -192,18 +207,19 @@ export async function POST(req: NextRequest) {
         roundResults.push({ round: ri + 1, winTeam: normalizedWin, endType });
 
         // Extract kill events from round
-        const kills: { killer: string; victim: string }[] = [];
+        const kills: { killer: string; victim: string; round_time?: number }[] = [];
 
         // Path 1: player_stats[].kills[]
-        const roundPlayerStats = round.player_stats || round.playerStats || [];
+        const roundPlayerStats = round.player_stats || round.playerStats || round.stats || [];
         if (Array.isArray(roundPlayerStats)) {
           for (const ps of roundPlayerStats) {
             const playerKills = ps.kills || ps.kill_events || [];
             if (Array.isArray(playerKills)) {
               for (const k of playerKills) {
-                const killer = k.killer?.puuid || k.killer_puuid || ps.puuid || "";
-                const victim = k.victim?.puuid || k.victim_puuid || "";
-                if (killer && victim) kills.push({ killer, victim });
+                const killer = k.killer?.puuid || k.killer_puuid || k.killer_id || ps.puuid || "";
+                const victim = k.victim?.puuid || k.victim_puuid || k.victim_id || "";
+                const rt = k.round_time_in_ms ?? k.round_time ?? k.time_in_round ?? 0;
+                if (killer && victim) kills.push({ killer, victim, round_time: rt });
               }
             }
           }
@@ -212,14 +228,29 @@ export async function POST(req: NextRequest) {
         // Path 2: round.kills[] (flat array)
         if (kills.length === 0 && Array.isArray(round.kills)) {
           for (const k of round.kills) {
-            const killer = k.killer?.puuid || k.killer_puuid || "";
-            const victim = k.victim?.puuid || k.victim_puuid || "";
-            if (killer && victim) kills.push({ killer, victim });
+            const killer = k.killer?.puuid || k.killer_puuid || k.killer_id || "";
+            const victim = k.victim?.puuid || k.victim_puuid || k.victim_id || "";
+            const rt = k.round_time_in_ms ?? k.round_time ?? k.time_in_round ?? 0;
+            if (killer && victim) kills.push({ killer, victim, round_time: rt });
           }
         }
 
-        // First blood = first kill of the round
+        // Path 3: round.player_stats[].was_first_kill / was_first_death (v4 shortcut)
+        if (kills.length === 0 && Array.isArray(roundPlayerStats)) {
+          for (const ps of roundPlayerStats) {
+            const puuid = ps.puuid || ps.player_puuid || "";
+            if (puuid && (ps.was_first_kill || ps.first_kill)) {
+              playerFirstKills[puuid] = (playerFirstKills[puuid] || 0) + 1;
+            }
+            if (puuid && (ps.was_first_death || ps.first_death)) {
+              playerFirstDeaths[puuid] = (playerFirstDeaths[puuid] || 0) + 1;
+            }
+          }
+        }
+
+        // Sort kills by time so first blood = earliest kill
         if (kills.length > 0) {
+          kills.sort((a, b) => (a.round_time || 0) - (b.round_time || 0));
           const fb = kills[0];
           playerFirstKills[fb.killer] = (playerFirstKills[fb.killer] || 0) + 1;
           playerFirstDeaths[fb.victim] = (playerFirstDeaths[fb.victim] || 0) + 1;
@@ -227,6 +258,34 @@ export async function POST(req: NextRequest) {
 
         // Aggregate kill matrix for duels
         for (const k of kills) {
+          if (!killMatrix[k.killer]) killMatrix[k.killer] = {};
+          killMatrix[k.killer][k.victim] = (killMatrix[k.killer][k.victim] || 0) + 1;
+        }
+      }
+    }
+
+    // Path 4: Top-level matchData.kills[] (v4 flat kill feed across all rounds)
+    if (Object.keys(playerFirstKills).length === 0 && matchData.kills && Array.isArray(matchData.kills)) {
+      // Group kills by round
+      const killsByRound: Record<number, { killer: string; victim: string; time: number }[]> = {};
+      for (const k of matchData.kills) {
+        const roundNum = k.round ?? k.round_number ?? 0;
+        const killer = k.killer?.puuid || k.killer_puuid || "";
+        const victim = k.victim?.puuid || k.victim_puuid || "";
+        const time = k.round_time_in_ms ?? k.round_time ?? k.time_in_round ?? 0;
+        if (killer && victim) {
+          if (!killsByRound[roundNum]) killsByRound[roundNum] = [];
+          killsByRound[roundNum].push({ killer, victim, time });
+        }
+      }
+      for (const roundKills of Object.values(killsByRound)) {
+        roundKills.sort((a, b) => a.time - b.time);
+        if (roundKills.length > 0) {
+          playerFirstKills[roundKills[0].killer] = (playerFirstKills[roundKills[0].killer] || 0) + 1;
+          playerFirstDeaths[roundKills[0].victim] = (playerFirstDeaths[roundKills[0].victim] || 0) + 1;
+        }
+        // Also aggregate kill matrix
+        for (const k of roundKills) {
           if (!killMatrix[k.killer]) killMatrix[k.killer] = {};
           killMatrix[k.killer][k.victim] = (killMatrix[k.killer][k.victim] || 0) + 1;
         }
@@ -340,10 +399,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Tag each player stat with teamId + first blood stats for the frontend
+    // Prefer direct API values, fall back to round-extracted values
     const enrichedPlayerStats = playerStats.map(ps => ({
       ...ps,
-      firstKills: playerFirstKills[ps.puuid] || 0,
-      firstDeaths: playerFirstDeaths[ps.puuid] || 0,
+      firstKills: ps.directFirstKills ?? playerFirstKills[ps.puuid] ?? 0,
+      firstDeaths: ps.directFirstDeaths ?? playerFirstDeaths[ps.puuid] ?? 0,
       teamId: team1Puuids.has(ps.puuid) ? team1Id :
               team2Puuids.has(ps.puuid) ? team2Id :
               (team1ValorantSide && ps.team === team1ValorantSide) ? team1Id :
@@ -450,9 +510,56 @@ export async function POST(req: NextRequest) {
     await matchRef.update(updatePayload);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 8. UPDATE STANDINGS IF SERIES COMPLETE
+    // 8. UPDATE STANDINGS IF SERIES COMPLETE — GROUP STAGE ONLY
     // ═══════════════════════════════════════════════════════════════════════════
-    if (seriesComplete && existingMatch.status !== "completed") {
+    const isBracketMatch = existingMatch.isBracket === true;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 8a. BRACKET ADVANCEMENT — propagate winner/loser to next matches
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (seriesComplete && isBracketMatch) {
+      const winnerId   = team1SeriesScore >= team2SeriesScore ? team1Id : team2Id;
+      const winnerName = team1SeriesScore >= team2SeriesScore ? existingMatch.team1Name : existingMatch.team2Name;
+      const loserId    = team1SeriesScore >= team2SeriesScore ? team2Id : team1Id;
+      const loserName  = team1SeriesScore >= team2SeriesScore ? existingMatch.team2Name : existingMatch.team1Name;
+
+      const advanceBatch = adminDb.batch();
+
+      // Move winner into winnerGoesTo match
+      if (existingMatch.winnerGoesTo) {
+        const nextMatchRef = tournamentRef.collection("matches").doc(existingMatch.winnerGoesTo);
+        const nextMatchDoc = await nextMatchRef.get();
+        if (nextMatchDoc.exists) {
+          const nextMatch = nextMatchDoc.data()!;
+          if (nextMatch.team1Id === "TBD") {
+            advanceBatch.update(nextMatchRef, { team1Id: winnerId, team1Name: winnerName });
+          } else if (nextMatch.team2Id === "TBD") {
+            advanceBatch.update(nextMatchRef, { team2Id: winnerId, team2Name: winnerName });
+          }
+        }
+      }
+
+      // Move loser into loserGoesTo match
+      if (existingMatch.loserGoesTo) {
+        const loseMatchRef = tournamentRef.collection("matches").doc(existingMatch.loserGoesTo);
+        const loseMatchDoc = await loseMatchRef.get();
+        if (loseMatchDoc.exists) {
+          const loseMatch = loseMatchDoc.data()!;
+          if (loseMatch.team1Id === "TBD") {
+            advanceBatch.update(loseMatchRef, { team1Id: loserId, team1Name: loserName });
+          } else if (loseMatch.team2Id === "TBD") {
+            advanceBatch.update(loseMatchRef, { team2Id: loserId, team2Name: loserName });
+          }
+        }
+      }
+
+      await advanceBatch.commit();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 8b. UPDATE STANDINGS IF SERIES COMPLETE — GROUP STAGE ONLY
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (seriesComplete && existingMatch.status !== "completed" && !isBracketMatch) {
       let team1Points = 0;
       let team2Points = 0;
       let team1Result: "win" | "draw" | "loss" = "draw";
@@ -501,14 +608,17 @@ export async function POST(req: NextRequest) {
         mapsLost: FieldValue.increment(team1SeriesScore),
       });
 
-      // Recompute Buchholz
-      const allMatches = await tournamentRef.collection("matches").where("status", "==", "completed").get();
+      // Recompute Buchholz using only group stage matches
+      const allCompletedMatches = await tournamentRef.collection("matches")
+        .where("status", "==", "completed")
+        .where("isBracket", "!=", true)
+        .get();
       const allStandings = await standingsRef.get();
       const pointsMap: Record<string, number> = {};
       for (const doc of allStandings.docs) pointsMap[doc.id] = doc.data().points || 0;
 
       const opponentsMap: Record<string, string[]> = {};
-      for (const doc of allMatches.docs) {
+      for (const doc of allCompletedMatches.docs) {
         const d = doc.data();
         if (!opponentsMap[d.team1Id]) opponentsMap[d.team1Id] = [];
         if (!opponentsMap[d.team2Id]) opponentsMap[d.team2Id] = [];
@@ -740,7 +850,7 @@ export async function POST(req: NextRequest) {
     let autoResolved = false;
     let resolvedPairings: string[] = [];
 
-    if (seriesComplete && existingMatch.status !== "completed") {
+    if (seriesComplete && existingMatch.status !== "completed" && !isBracketMatch) {
       try {
         const matchDay = existingMatch.matchDay;
         const roundMatches = await tournamentRef

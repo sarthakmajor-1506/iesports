@@ -59,11 +59,12 @@ interface Props {
   bracketBestOf?: number;
   lbFinalBestOf?: number;
   grandFinalBestOf?: number;
+  tournamentId?: string;
 }
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 const MATCH_W = 300;
-const MATCH_H = 78;
+const MATCH_H = 64;
 const COL_GAP = 70;
 const ROW_GAP = 28;
 const SECTION_GAP = 56;
@@ -136,7 +137,7 @@ function makePlaceholder(
 }
 
 // ── SVG Match Card ────────────────────────────────────────────────────────────
-function MatchCard({ match, x, y, bestOf = 1 }: { match: BracketMatch; x: number; y: number; bestOf?: number }) {
+function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMatch; x: number; y: number; bestOf?: number; tournamentId?: string }) {
   const isComplete = match.status === "completed";
   const isLive = match.status === "live";
   const t1Won = isComplete && match.team1Score > match.team2Score;
@@ -146,66 +147,76 @@ function MatchCard({ match, x, y, bestOf = 1 }: { match: BracketMatch; x: number
     teamId: match.team1Id,
     teamName: match.team1Name !== "TBD" ? match.team1Name : (match.team1?.teamName || "TBD"),
     seed: match.team1?.seed || 0,
-    members: match.team1?.members || [],
   };
   const t2 = {
     teamId: match.team2Id,
     teamName: match.team2Name !== "TBD" ? match.team2Name : (match.team2?.teamName || "TBD"),
     seed: match.team2?.seed || 0,
-    members: match.team2?.members || [],
   };
   const borderColor = isLive ? C.live : isComplete ? C.winBorder : C.cardBorder;
+  const clickable = !!tournamentId && match.team1Id !== "TBD" && match.team2Id !== "TBD";
 
   return (
-    <g transform={`translate(${x}, ${y})`}>
+    <g transform={`translate(${x}, ${y})`} style={clickable ? { cursor: "pointer" } : undefined}>
+      {clickable && (
+        <a href={`/valorant/match/${tournamentId}/${match.id}`} style={{ textDecoration: "none" }}>
+          <rect width={MATCH_W} height={MATCH_H} fill="transparent" style={{ cursor: "pointer" }} />
+        </a>
+      )}
       {/* Shadow */}
-      <rect width={MATCH_W} height={MATCH_H} rx={10} ry={10} fill="rgba(0,0,0,0.2)" x={1} y={2} />
+      <rect width={MATCH_W} height={MATCH_H} rx={8} ry={8} fill="rgba(0,0,0,0.2)" x={1} y={2} pointerEvents="none" />
       {/* Card */}
-      <rect width={MATCH_W} height={MATCH_H} rx={10} ry={10} fill={C.cardBg} stroke={borderColor} strokeWidth={1.2} />
+      <rect width={MATCH_W} height={MATCH_H} rx={8} ry={8} fill={C.cardBg} stroke={borderColor} strokeWidth={1.2} pointerEvents="none" />
 
       {/* Match label */}
-      <text x={8} y={-5} fill={C.textMuted} fontSize={9.5} fontWeight={700} fontFamily="system-ui">
+      <text x={8} y={-5} fill={C.textMuted} fontSize={9} fontWeight={700} fontFamily="system-ui" pointerEvents="none">
         M{match.matchIndex}
       </text>
       {/* Format badge */}
-      <rect x={28} y={-15} width={26} height={13} rx={3} fill={C.accentLight} stroke={C.accentBorder} strokeWidth={0.5} />
-      <text x={41} y={-5} fill={C.accent} fontSize={7.5} fontWeight={800} textAnchor="middle" fontFamily="system-ui">BO{bestOf}</text>
+      <rect x={26} y={-14} width={24} height={12} rx={3} fill={C.accentLight} stroke={C.accentBorder} strokeWidth={0.5} pointerEvents="none" />
+      <text x={38} y={-5} fill={C.accent} fontSize={7} fontWeight={800} textAnchor="middle" fontFamily="system-ui" pointerEvents="none">BO{bestOf}</text>
 
       {/* Status badge top-right */}
       {isComplete && (
         <>
-          <rect x={MATCH_W - 48} y={-15} width={48} height={13} rx={3} fill={C.winBg} stroke={C.winBorder} strokeWidth={0.5} />
-          <text x={MATCH_W - 24} y={-5} fill={C.win} fontSize={7.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui">✓ Played</text>
+          <rect x={MATCH_W - 46} y={-14} width={46} height={12} rx={3} fill={C.winBg} stroke={C.winBorder} strokeWidth={0.5} pointerEvents="none" />
+          <text x={MATCH_W - 23} y={-5} fill={C.win} fontSize={7} fontWeight={700} textAnchor="middle" fontFamily="system-ui" pointerEvents="none">✓ Played</text>
         </>
       )}
       {isLive && (
         <>
-          <rect x={MATCH_W - 36} y={-15} width={36} height={13} rx={3} fill={C.liveBg} stroke={C.live} strokeWidth={0.5} />
-          <text x={MATCH_W - 18} y={-5} fill={C.live} fontSize={7.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui">● LIVE</text>
+          <rect x={MATCH_W - 34} y={-14} width={34} height={12} rx={3} fill={C.liveBg} stroke={C.live} strokeWidth={0.5} pointerEvents="none" />
+          <text x={MATCH_W - 17} y={-5} fill={C.live} fontSize={7} fontWeight={700} textAnchor="middle" fontFamily="system-ui" pointerEvents="none">● LIVE</text>
         </>
       )}
 
       {/* Team 1 */}
-      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} y={3} matchId={match.id} rowIdx={0} />
+      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} y={2} />
 
       {/* Divider */}
-      <line x1={6} y1={MATCH_H / 2} x2={MATCH_W - 6} y2={MATCH_H / 2} stroke={C.divider} strokeWidth={1} />
+      <line x1={6} y1={MATCH_H / 2} x2={MATCH_W - 6} y2={MATCH_H / 2} stroke={C.divider} strokeWidth={1} pointerEvents="none" />
 
       {/* Team 2 */}
-      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} y={MATCH_H / 2 + 2} matchId={match.id} rowIdx={1} />
+      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} y={MATCH_H / 2 + 1} />
+
+      {/* Invisible click overlay */}
+      {clickable && (
+        <a href={`/valorant/match/${tournamentId}/${match.id}`}>
+          <rect width={MATCH_W} height={MATCH_H} fill="transparent" rx={8} ry={8} style={{ cursor: "pointer" }} />
+        </a>
+      )}
     </g>
   );
 }
 
-function TeamRow({ team, score, isWinner, isLoser, isComplete, y, matchId, rowIdx }: {
-  team: TeamSlot; score: number; isWinner: boolean; isLoser: boolean;
-  isComplete: boolean; y: number; matchId: string; rowIdx: number;
+function TeamRow({ team, score, isWinner, isLoser, isComplete, y }: {
+  team: { teamId: string; teamName: string; seed: number }; score: number; isWinner: boolean; isLoser: boolean;
+  isComplete: boolean; y: number;
 }) {
   const isTBD = team.teamId === "TBD";
   const isBye = team.teamId === "BYE";
   const isEmpty = isTBD || isBye;
-  const rowH = MATCH_H / 2 - 4;
-  const members = (team.members || []).slice(0, 5);
+  const rowH = MATCH_H / 2 - 3;
   const initials = getTeamInitials(team.teamName);
 
   let nameColor = isEmpty ? C.textPlaceholder : C.text;
@@ -217,66 +228,39 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, y, matchId, rowId
   let logoBorder = isEmpty ? C.cardBorder : C.accentBorder;
 
   return (
-    <g transform={`translate(0, ${y})`}>
+    <g transform={`translate(0, ${y})`} pointerEvents="none">
       {/* Winner highlight bar */}
-      {isWinner && <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={6} fill={C.winBg} />}
+      {isWinner && <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={5} fill={C.winBg} />}
 
       {/* Logo */}
-      <rect x={8} y={3} width={26} height={26} rx={6} fill={logoBg} stroke={logoBorder} strokeWidth={0.5} />
-      <text x={21} y={21} fill={logoColor} fontSize={9.5} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
+      <rect x={8} y={3} width={24} height={24} rx={5} fill={logoBg} stroke={logoBorder} strokeWidth={0.5} />
+      <text x={20} y={19} fill={logoColor} fontSize={9} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
         {initials}
       </text>
 
       {/* Seed badge */}
       {team.seed > 0 && (
         <>
-          <rect x={39} y={3} width={18} height={11} rx={3} fill={C.seedBg} stroke={C.seedBorder} strokeWidth={0.5} />
-          <text x={48} y={11} fill={C.seedText} fontSize={7.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui">#{team.seed}</text>
+          <rect x={36} y={3} width={16} height={10} rx={3} fill={C.seedBg} stroke={C.seedBorder} strokeWidth={0.5} />
+          <text x={44} y={10.5} fill={C.seedText} fontSize={6.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui">#{team.seed}</text>
         </>
       )}
 
       {/* Team name */}
-      <text x={team.seed > 0 ? 62 : 40} y={isBye ? 20 : 13} fill={nameColor} fontSize={11.5}
+      <text x={team.seed > 0 ? 56 : 38} y={isBye ? 19 : 19} fill={nameColor} fontSize={10.5}
         fontWeight={isWinner ? 800 : isEmpty ? 500 : 600} fontFamily="system-ui"
         fontStyle={isBye ? "italic" : "normal"}>
-        {isBye ? "BYE" : isTBD ? "TBD" : (team.teamName.length > 20 ? team.teamName.slice(0, 18) + "…" : team.teamName)}
+        {isBye ? "BYE" : isTBD ? "TBD" : (team.teamName.length > 22 ? team.teamName.slice(0, 20).toUpperCase() + "…" : team.teamName.toUpperCase())}
       </text>
-
-      {/* Player avatars */}
-      {!isEmpty && members.length > 0 && (
-        <g transform={`translate(40, 17)`}>
-          {members.map((m: any, i: number) => (
-            <g key={m.uid || i} transform={`translate(${i * 14}, 0)`}>
-              {m.riotAvatar ? (
-                <>
-                  <clipPath id={`av-${matchId}-${rowIdx}-${i}`}>
-                    <circle cx={6} cy={6} r={6} />
-                  </clipPath>
-                  <image href={m.riotAvatar} x={0} y={0} width={12} height={12}
-                    clipPath={`url(#av-${matchId}-${rowIdx}-${i})`} preserveAspectRatio="xMidYMid slice" />
-                  <circle cx={6} cy={6} r={6} fill="none" stroke={C.cardBg} strokeWidth={1} />
-                </>
-              ) : (
-                <>
-                  <circle cx={6} cy={6} r={6} fill={C.divider} />
-                  <text x={6} y={9} fill={C.textMuted} fontSize={6.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui">
-                    {(m.riotGameName || "?")[0]}
-                  </text>
-                </>
-              )}
-            </g>
-          ))}
-        </g>
-      )}
 
       {/* Score */}
       {!isBye && (
         <>
-          <rect x={MATCH_W - 30} y={3} width={22} height={26} rx={5}
+          <rect x={MATCH_W - 28} y={3} width={20} height={24} rx={4}
             fill={isWinner ? C.winBg : isComplete ? C.lossBg : C.bg}
             stroke={isWinner ? C.winBorder : isComplete ? "rgba(239,68,68,0.25)" : C.cardBorder} strokeWidth={0.5} />
-          <text x={MATCH_W - 19} y={21} fill={isWinner ? C.win : isComplete ? (isLoser ? C.loss : C.textMuted) : C.textPlaceholder}
-            fontSize={12} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
+          <text x={MATCH_W - 18} y={19} fill={isWinner ? C.win : isComplete ? (isLoser ? C.loss : C.textMuted) : C.textPlaceholder}
+            fontSize={11} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
             {isComplete ? score : "–"}
           </text>
         </>
@@ -309,7 +293,7 @@ function ColHeader({ x, y, text: t, accent = false }: { x: number; y: number; te
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
-export default function DoubleBracket({ matches, bracketSize, standings = [], bracketBestOf = 2, lbFinalBestOf, grandFinalBestOf = 3 }: Props) {
+export default function DoubleBracket({ matches, bracketSize, standings = [], bracketBestOf = 2, lbFinalBestOf, grandFinalBestOf = 3, tournamentId }: Props) {
   const lbFinalBO = lbFinalBestOf ?? bracketBestOf;
   const matchMap = useMemo(() => {
     const m: Record<string, BracketMatch> = {};
@@ -328,12 +312,13 @@ export default function DoubleBracket({ matches, bracketSize, standings = [], br
   }, [standings]);
 
   const teamCount = seededTeams.length || bracketSize;
+  const tId = tournamentId;
 
   // Determine effective bracket type
-  if (teamCount <= 2) return <Bracket2 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
-  if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
-  if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
-  return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} />;
+  if (teamCount <= 2) return <Bracket2 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -367,7 +352,7 @@ function BracketWrapper({ children, width, height, teamCount }: { children: Reac
 // ═══════════════════════════════════════════════════════════════════════════════
 // 2-TEAM: Just Grand Final
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
+function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf, tournamentId }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number; tournamentId?: string }) {
   const gf = { x: PAD, y: PAD + 30 };
   const totalW = PAD + MATCH_W + PAD;
   const totalH = gf.y + MATCH_H + PAD + 20;
@@ -379,7 +364,7 @@ function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length}>
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
-      <MatchCard match={match} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
+      <MatchCard match={match} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
     </BracketWrapper>
   );
 }
@@ -387,7 +372,7 @@ function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3-TEAM: UB Final (#1 vs #2) → LB Final (UB loser vs #3) → Grand Final
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
+function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf, tournamentId }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number; tournamentId?: string }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubFinal = { x: colX(0), y: PAD + 30 };
@@ -427,9 +412,9 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
-      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} />
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
 
       <text x={lbFinal.x + MATCH_W + 10} y={lbFinal.y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={9} fontFamily="system-ui" fontStyle="italic">
@@ -442,7 +427,7 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4-TEAM BRACKET — 50/50 SPLIT
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
+function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf, tournamentId }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number; tournamentId?: string }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubSemi = { x: colX(0), y: PAD + 30 };
@@ -485,10 +470,10 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={lbF.x + MATCH_W} y1={lbF.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbF.x + MATCH_W} y={lbF.y + MATCH_H / 2} lower />
 
-      <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={lbFinalBestOf} />
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
+      <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
 
       <text x={ubSemi.x + MATCH_W + 10} y={ubSemi.y + MATCH_H / 2 - 4}
         fill={C.win} fontSize={8.5} fontFamily="system-ui" fontWeight={700}>
@@ -505,7 +490,7 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
 // ═══════════════════════════════════════════════════════════════════════════════
 // 8-TEAM BRACKET — 50/50 SPLIT
 // ═══════════════════════════════════════════════════════════════════════════════
-function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number }) {
+function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf, tournamentId }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number; tournamentId?: string }) {
   const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
 
   const ubR1Y = (i: number) => PAD + 30 + i * (MATCH_H + ROW_GAP);
@@ -599,17 +584,17 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
 
-      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} />)}
-      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} />
+      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
 
-      <MatchCard match={mLBR1_1} x={lbR1[0].x} y={lbR1[0].y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBR1_2} x={lbR1[1].x} y={lbR1[1].y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBR2_2} x={lbR2[1].x} y={lbR2[1].y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} />
+      <MatchCard match={mLBR1_1} x={lbR1[0].x} y={lbR1[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBR1_2} x={lbR1[1].x} y={lbR1[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBR2_2} x={lbR2[1].x} y={lbR2[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
 
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
 
       <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
