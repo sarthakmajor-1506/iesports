@@ -223,8 +223,8 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, isLive, isElimina
 
   let nameColor = isEmpty ? C.textPlaceholder : C.text;
   if (isWinner) nameColor = C.win;
-  if (isEliminated) nameColor = "rgba(239,68,68,0.55)";
-  else if (isLoser) nameColor = C.textMuted;
+  if (isEliminated) nameColor = "#f87171";
+  else if (isLoser) nameColor = "#f87171";
 
   let logoBg = isEmpty ? C.divider : C.accentLight;
   let logoColor = isEmpty ? C.textPlaceholder : C.accent;
@@ -252,10 +252,9 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, isLive, isElimina
       )}
 
       {/* Team name */}
-      <text x={team.seed > 0 ? 56 : 38} y={isBye ? 19 : 19} fill={nameColor} fontSize={10.5}
-        fontWeight={isWinner ? 800 : isEmpty ? 500 : 600} fontFamily="system-ui"
-        fontStyle={isBye ? "italic" : "normal"}
-        textDecoration={isEliminated ? "line-through" : "none"}>
+      <text x={team.seed > 0 ? 56 : 38} y={isBye ? 19 : 19} fill={nameColor} fontSize={11}
+        fontWeight={isWinner ? 800 : isEmpty ? 500 : 700} fontFamily="system-ui"
+        fontStyle={isBye ? "italic" : "normal"}>
         {isBye ? "BYE" : isTBD ? "TBD" : (team.teamName.length > 22 ? team.teamName.slice(0, 20).toUpperCase() + "…" : team.teamName.toUpperCase())}
       </text>
 
