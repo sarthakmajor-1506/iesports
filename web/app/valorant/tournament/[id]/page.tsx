@@ -54,6 +54,29 @@ function getTeamTag(name: string): string {
   return m ? m[1] : getTeamInitials(name);
 }
 
+// Agent name → Valorant API UUID for display icons
+const AGENT_UUIDS: Record<string, string> = {
+  "Jett": "add6443a-41bd-e414-f6ad-e58d267f4e95", "Reyna": "a3bfb853-43b2-7238-a4f1-ad90e9e46bcc",
+  "Omen": "8e253930-4c05-31dd-1b6c-968525494517", "Sage": "569fdd95-4d10-43ab-ca70-79becc718b46",
+  "Sova": "320b2a48-4d9b-a075-30f1-1f93a9b638fa", "Killjoy": "1e58de9c-4950-5125-93e9-a0aee9f98746",
+  "Cypher": "117ed9e3-49f3-6571-8249-2e838fd94a9b", "Raze": "f94c3b30-42be-e959-889c-5aa313dba261",
+  "Breach": "5f8d3a7f-467b-97f3-062c-13acf203c006", "Viper": "707eab51-4836-f488-046a-cda6bf494859",
+  "Phoenix": "eb93336a-449b-9c1b-0a54-a891f7921d69", "Brimstone": "9f0d8ba9-4140-b941-57d3-a7ad57c6b417",
+  "Astra": "41fb69c1-4189-7b37-f117-bcaf1e96f1bf", "Chamber": "22697a3d-45bf-8dd7-4fec-84a9e28c69d7",
+  "Fade": "dede67cb-4b97-53ac-b619-36b312847d61", "Gekko": "e370fa57-4757-3604-3648-499e1f642d3f",
+  "Neon": "bb2a4828-46eb-8cd1-e765-15848195d751", "Skye": "6f2a04ca-43e0-be17-7f36-b3908627744d",
+  "Yoru": "7f94d92c-4234-0a36-9646-3a87eb8b5c89", "Harbor": "95b78ed7-4637-86d9-7e41-71ba8c293152",
+  "Deadlock": "cc8b64c8-4b25-4ff3-6e48-d3b4a90eb341", "Iso": "0e38b510-41a8-5780-5e8f-568b2a4f2d6c",
+  "Clove": "1dbf2edd-4729-0984-3115-daa5eed44993", "Vyse": "efba5359-4016-a1e5-7626-b1ae76895940",
+  "Tejo": "d3ae4f48-4e4b-c72d-3f41-049c3c411b5f", "Waylay": "a929af56-4e36-258a-6da0-049ade310e1b",
+  "Miks": "d9fae8d0-4e9b-0c13-9e73-8ba0cf0f6949",
+  "KAY/O": "601dbbe7-43ce-be57-2a40-4abd24953621", "KAYO": "601dbbe7-43ce-be57-2a40-4abd24953621",
+};
+function getAgentIcon(agentName: string): string | null {
+  const uuid = AGENT_UUIDS[agentName] || AGENT_UUIDS[agentName.replace("/", "")];
+  return uuid ? `https://media.valorant-api.com/agents/${uuid}/displayicon.png` : null;
+}
+
 function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatch, tournamentId, isBracket = false, bestOf = 2 }: {
   m: any; teamMembers: Record<string, any[]>; teamLogoMap: Record<string, string>;
   expandedMatch: string | null; setExpandedMatch: (id: string | null) => void;
@@ -72,6 +95,15 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
     games.push(m[`game${i}`] || m.games?.[`game${i}`] || null);
   }
   const hasGameData = games.some(g => g?.playerStats);
+
+  // Build agent map from latest game data: puuid → agent name
+  const agentMap: Record<string, string> = {};
+  for (const g of games) {
+    if (!g?.playerStats) continue;
+    for (const ps of g.playerStats) {
+      if (ps.puuid && ps.agent) agentMap[ps.puuid] = ps.agent;
+    }
+  }
   const scheduledDate = m.scheduledTime ? new Date(m.scheduledTime) : null;
   const scheduledTime = scheduledDate ? scheduledDate.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
   const scheduledDay = scheduledDate ? scheduledDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
@@ -97,9 +129,13 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </div>
           <div className="vtd-mc-team-info">
             <div className="vtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>{isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}</div>
-            <div className="vtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}}>{m.team1Name}</div>
+            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}) }}>{m.team1Name}</div>
             <div className="vtd-mc-avatars">
-              {t1Members.map((p: any, i: number) => p.riotAvatar ? <img key={i} src={p.riotAvatar} alt="" /> : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>)}
+              {t1Members.map((p: any, i: number) => {
+                const agent = agentMap[p.riotPuuid || p.puuid];
+                const agentIcon = agent ? getAgentIcon(agent) : null;
+                return agentIcon ? <img key={i} src={agentIcon} alt={agent} title={`${p.riotGameName} — ${agent}`} style={{ borderRadius: "50%", background: "rgba(60,203,255,0.1)" }} /> : <div key={i} className="vtd-mc-av-init" title={p.riotGameName}>{(p.riotGameName || "?")[0]}</div>;
+              })}
             </div>
           </div>
         </div>
@@ -146,8 +182,12 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </div>
           <div className="vtd-mc-team-info" style={{ textAlign: "right" }}>
             <div className="vtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
-            <div className="vtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}}>{m.team2Name}</div>
-            <div className="vtd-mc-avatars">{t2Members.map((p: any, i: number) => p.riotAvatar ? <img key={i} src={p.riotAvatar} alt="" /> : <div key={i} className="vtd-mc-av-init">{(p.riotGameName || "?")[0]}</div>)}</div>
+            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}) }}>{m.team2Name}</div>
+            <div className="vtd-mc-avatars">{t2Members.map((p: any, i: number) => {
+              const agent = agentMap[p.riotPuuid || p.puuid];
+              const agentIcon = agent ? getAgentIcon(agent) : null;
+              return agentIcon ? <img key={i} src={agentIcon} alt={agent} title={`${p.riotGameName} — ${agent}`} style={{ borderRadius: "50%", background: "rgba(60,203,255,0.1)" }} /> : <div key={i} className="vtd-mc-av-init" title={p.riotGameName}>{(p.riotGameName || "?")[0]}</div>;
+            })}</div>
           </div>
         </div>
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#3CCBFF") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
