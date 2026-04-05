@@ -142,6 +142,8 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
   const isLive = match.status === "live";
   const t1Won = isComplete && match.team1Score > match.team2Score;
   const t2Won = isComplete && match.team2Score > match.team1Score;
+  // A losing team is eliminated if there's no loserGoesTo (they have nowhere to advance)
+  const loserEliminated = isComplete && !match.loserGoesTo;
 
   const t1 = {
     teamId: match.team1Id,
@@ -191,13 +193,13 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
       )}
 
       {/* Team 1 */}
-      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} y={2} />
+      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} isEliminated={t2Won && loserEliminated} y={2} />
 
       {/* Divider */}
       <line x1={6} y1={MATCH_H / 2} x2={MATCH_W - 6} y2={MATCH_H / 2} stroke={C.divider} strokeWidth={1} pointerEvents="none" />
 
       {/* Team 2 */}
-      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} y={MATCH_H / 2 + 1} />
+      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} isEliminated={t1Won && loserEliminated} y={MATCH_H / 2 + 1} />
 
       {/* Invisible click overlay */}
       {clickable && (
@@ -209,9 +211,9 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
   );
 }
 
-function TeamRow({ team, score, isWinner, isLoser, isComplete, y }: {
+function TeamRow({ team, score, isWinner, isLoser, isComplete, isEliminated, y }: {
   team: { teamId: string; teamName: string; seed: number }; score: number; isWinner: boolean; isLoser: boolean;
-  isComplete: boolean; y: number;
+  isComplete: boolean; isEliminated?: boolean; y: number;
 }) {
   const isTBD = team.teamId === "TBD";
   const isBye = team.teamId === "BYE";
@@ -221,7 +223,8 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, y }: {
 
   let nameColor = isEmpty ? C.textPlaceholder : C.text;
   if (isWinner) nameColor = C.win;
-  if (isLoser) nameColor = C.textMuted;
+  if (isEliminated) nameColor = "rgba(239,68,68,0.55)";
+  else if (isLoser) nameColor = C.textMuted;
 
   let logoBg = isEmpty ? C.divider : C.accentLight;
   let logoColor = isEmpty ? C.textPlaceholder : C.accent;
@@ -231,10 +234,12 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, y }: {
     <g transform={`translate(0, ${y})`} pointerEvents="none">
       {/* Winner highlight bar */}
       {isWinner && <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={5} fill={C.winBg} />}
+      {/* Eliminated highlight bar */}
+      {isEliminated && <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={5} fill="rgba(239,68,68,0.08)" />}
 
       {/* Logo */}
-      <rect x={8} y={3} width={24} height={24} rx={5} fill={logoBg} stroke={logoBorder} strokeWidth={0.5} />
-      <text x={20} y={19} fill={logoColor} fontSize={9} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
+      <rect x={8} y={3} width={24} height={24} rx={5} fill={isEliminated ? "rgba(239,68,68,0.1)" : logoBg} stroke={isEliminated ? "rgba(239,68,68,0.3)" : logoBorder} strokeWidth={0.5} />
+      <text x={20} y={19} fill={isEliminated ? "rgba(239,68,68,0.45)" : logoColor} fontSize={9} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
         {initials}
       </text>
 
@@ -249,9 +254,20 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, y }: {
       {/* Team name */}
       <text x={team.seed > 0 ? 56 : 38} y={isBye ? 19 : 19} fill={nameColor} fontSize={10.5}
         fontWeight={isWinner ? 800 : isEmpty ? 500 : 600} fontFamily="system-ui"
-        fontStyle={isBye ? "italic" : "normal"}>
+        fontStyle={isBye ? "italic" : "normal"}
+        textDecoration={isEliminated ? "line-through" : "none"}>
         {isBye ? "BYE" : isTBD ? "TBD" : (team.teamName.length > 22 ? team.teamName.slice(0, 20).toUpperCase() + "…" : team.teamName.toUpperCase())}
       </text>
+
+      {/* Eliminated badge */}
+      {isEliminated && !isEmpty && (
+        <>
+          <rect x={team.seed > 0 ? 56 : 38} y={21} width={46} height={9} rx={2} fill="rgba(239,68,68,0.15)" stroke="rgba(239,68,68,0.35)" strokeWidth={0.4} />
+          <text x={(team.seed > 0 ? 56 : 38) + 23} y={28} fill="rgba(239,68,68,0.7)" fontSize={5.5} fontWeight={700} textAnchor="middle" fontFamily="system-ui" letterSpacing={0.5}>
+            ELIMINATED
+          </text>
+        </>
+      )}
 
       {/* Score */}
       {!isBye && (

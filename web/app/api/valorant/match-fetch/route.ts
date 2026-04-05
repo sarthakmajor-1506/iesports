@@ -462,7 +462,7 @@ export async function POST(req: NextRequest) {
     const tData = tournamentDoc.data() || {};
     let bo = 2; // default
     if (existingMatch.bracketType === "grand_final") bo = tData.grandFinalBestOf || 3;
-    else if (existingMatch.id === "lb-final" && tData.lbFinalBestOf) bo = tData.lbFinalBestOf;
+    else if (matchDocId === "lb-final" && tData.lbFinalBestOf) bo = tData.lbFinalBestOf;
     else if (existingMatch.isBracket) bo = tData.bracketBestOf || 2;
     else bo = tData.matchesPerRound || 2;
 
@@ -487,9 +487,11 @@ export async function POST(req: NextRequest) {
       else if (gWinner === "team2") team2SeriesScore++;
     }
 
-    // Series completes when all BO games are fetched, or a team has clinched (won majority)
+    // Series completes when all BO games are fetched, or (for BO3/BO5) a team clinches majority
+    // BO1/BO2: must play ALL games (no early clinch — BO2 can draw 1-1)
     const winsNeeded = Math.ceil(bo / 2);
-    if (completedGames === bo || team1SeriesScore >= winsNeeded || team2SeriesScore >= winsNeeded) {
+    const canClinchEarly = bo >= 3; // only odd-BO series can clinch before all games
+    if (completedGames === bo || (canClinchEarly && (team1SeriesScore >= winsNeeded || team2SeriesScore >= winsNeeded))) {
       seriesComplete = true;
       updatePayload.team1Score = team1SeriesScore;
       updatePayload.team2Score = team2SeriesScore;

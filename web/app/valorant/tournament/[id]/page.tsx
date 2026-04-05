@@ -1393,14 +1393,56 @@ function ValorantTournamentDetailInner() {
                 </div>
                 {standings.length === 0 ? (
                   <div className="vtd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No standings yet</span><span className="vtd-empty-sub">Standings will appear once matches are played.</span></div>
-                ) : (
+                ) : (() => {
+                  const bracketCount = tournament.bracketTeamCount || tournament.bracketSize || standings.length;
+                  const ubCount = Math.ceil(bracketCount / 2);
+                  const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
+                  return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th></tr></thead>
-                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#3CCBFF" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <tbody>
+                        {standings.map((s: any, i: number) => {
+                          const inUB = i < ubCount;
+                          const inLB = i >= ubCount && i < bracketCount;
+                          const eliminated = i >= bracketCount;
+                          return (
+                            <tr key={s.id} style={inUB ? { background: "rgba(60,203,255,0.04)" } : inLB ? { background: "rgba(245,158,11,0.04)" } : eliminated ? { opacity: 0.5 } : {}}>
+                              <td style={{ fontWeight: 800, color: inUB ? "#3CCBFF" : inLB ? "#f59e0b" : "#555550" }}>{i + 1}</td>
+                              <td style={{ fontWeight: 700 }}>{s.teamName}</td>
+                              <td>{s.played || 0}</td>
+                              <td>{s.wins || 0}</td>
+                              <td>{s.draws || 0}</td>
+                              <td>{s.losses || 0}</td>
+                              <td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td>
+                              <td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td>
+                              <td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td>
+                              <td style={{ color: "#555550" }}>{s.buchholz || 0}</td>
+                              {hasBrackets && (
+                                <td>
+                                  {inUB ? (
+                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(60,203,255,0.12)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)", whiteSpace: "nowrap" }}>Upper</span>
+                                  ) : inLB ? (
+                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", whiteSpace: "nowrap" }}>Lower</span>
+                                  ) : (
+                                    <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#555550" }}>—</span>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
                     </table>
+                    {hasBrackets && (
+                      <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: "0.65rem", color: "#6b7280" }}>
+                        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(60,203,255,0.4)", marginRight: 4, verticalAlign: "middle" }} />Top {ubCount} — Upper Bracket</span>
+                        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(245,158,11,0.4)", marginRight: 4, verticalAlign: "middle" }} />Next {Math.min(bracketCount - ubCount, standings.length - ubCount)} — Lower Bracket</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                  );
+                })()}
               </div>
               <CommentSection tournamentId={id} section="standings" game="valorant" user={user} riotData={riotData} userProfile={userProfile} />
             </div>
