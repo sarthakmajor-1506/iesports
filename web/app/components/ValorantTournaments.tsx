@@ -38,8 +38,9 @@ export default function ValorantTournaments() {
 
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
 
+  const ordinal = (d: number) => { const s = ["th","st","nd","rd"]; const v = d % 100; return d + (s[(v - 20) % 10] || s[v] || s[0]); };
   const formatDate = (iso: string) => {
-    try { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }); } catch { return iso; }
+    try { const d = new Date(iso); const day = parseInt(d.toLocaleDateString("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" })); const month = d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }); const year = d.toLocaleDateString("en-IN", { year: "numeric", timeZone: "Asia/Kolkata" }); return `${ordinal(day)} ${month} ${year}`; } catch { return iso; }
   };
 
   const getRegistrationState = (t: ValorantTournament): "open" | "not_yet" | "closed" => {
@@ -206,7 +207,16 @@ export default function ValorantTournaments() {
                         {isRegistered ? (
                           <div className="vt-reg-done">✓ Registered</div>
                         ) : regState === "closed" ? (
-                          <button className="vt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=leaderboard`); }}>Leaderboard</button>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, padding: "2px 10px", whiteSpace: "nowrap" }}>Registration Closed</span>
+                            {t.schedule?.groupStageStart && new Date() < new Date(t.schedule.groupStageStart) && (
+                              <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)" }}>Group stage starts on {formatDate(t.schedule.groupStageStart)}</span>
+                            )}
+                            {t.schedule?.tourneyStageStart && new Date() >= new Date(t.schedule?.groupStageStart || "") && new Date() < new Date(t.schedule.tourneyStageStart) && (
+                              <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)" }}>Playoffs start on {formatDate(t.schedule.tourneyStageStart)}</span>
+                            )}
+                            <button className="vt-leaderboard-btn" style={{ padding: "6px 16px", minWidth: "unset", fontSize: "0.72rem" }} onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=leaderboard`); }}>Leaderboard</button>
+                          </div>
                         ) : regState === "not_yet" ? (
                           <div className="vt-coming-soon">
                             <div className="vt-coming-soon-label">Coming Soon</div>

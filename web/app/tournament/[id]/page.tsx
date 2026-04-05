@@ -8,6 +8,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import CommentSection from "@/app/components/CommentSection";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import Link from "next/link";
@@ -1143,6 +1144,7 @@ function DotaTournamentDetailInner() {
                   </div>
                 )}
               </div>
+              <CommentSection tournamentId={id} section="standings" game="dota2" user={user} userProfile={userProfile} />
             </div>
           )}
 
@@ -1236,6 +1238,7 @@ function DotaTournamentDetailInner() {
                   </div>
                 )}
               </div>
+              <CommentSection tournamentId={id} section="leaderboard" game="dota2" user={user} userProfile={userProfile} />
             </div>
           )}
 

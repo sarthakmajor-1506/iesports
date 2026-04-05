@@ -9,6 +9,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import CommentSection from "@/app/components/CommentSection";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import Link from "next/link";
 import {
@@ -1312,6 +1313,7 @@ function ValorantTournamentDetailInner() {
                   </div>
                 )}
               </div>
+              <CommentSection tournamentId={id} section="standings" game="valorant" user={user} riotData={riotData} userProfile={userProfile} />
             </div>
           )}
 
@@ -1405,6 +1407,7 @@ function ValorantTournamentDetailInner() {
                   </div>
                 )}
               </div>
+              <CommentSection tournamentId={id} section="leaderboard" game="valorant" user={user} riotData={riotData} userProfile={userProfile} />
             </div>
           )}
 

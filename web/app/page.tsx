@@ -10,6 +10,15 @@ interface Tournament {
   id: string; name: string; game: string; month: string; status: string;
   prizePool: string; entry: string; startDate: string; endDate: string;
   registrationDeadline: string; totalSlots: number; slotsBooked: number; desc: string;
+  schedule?: {
+    registrationOpens?: string;
+    registrationCloses?: string;
+    squadCreation?: string;
+    groupStageStart?: string;
+    groupStageEnd?: string;
+    tourneyStageStart?: string;
+    tourneyStageEnd?: string;
+  };
 }
 
 const HOW_IT_WORKS = [
@@ -99,6 +108,26 @@ export default function Home() {
 
   const valSlotsLeft = featuredValTournament ? featuredValTournament.totalSlots - featuredValTournament.slotsBooked : null;
   const valSlotPct   = featuredValTournament ? Math.round((featuredValTournament.slotsBooked / featuredValTournament.totalSlots) * 100) : 0;
+
+  const ordinal = (d: number) => { const s = ["th","st","nd","rd"]; const v = d % 100; return d + (s[(v - 20) % 10] || s[v] || s[0]); };
+  const formatDateShort = (iso: string) => {
+    try { const d = new Date(iso); const day = d.toLocaleDateString("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" }); const month = d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }); return `${ordinal(parseInt(day))} ${month}`; } catch { return iso; }
+  };
+
+  const getRegBadge = (t: Tournament): { label: string; isOpen: boolean } => {
+    const now = new Date();
+    if (t.registrationDeadline && now > new Date(t.registrationDeadline)) {
+      const s = t.schedule;
+      if (s?.groupStageStart && now < new Date(s.groupStageStart)) {
+        return { label: `Registration Closed · Group stage starts on ${formatDateShort(s.groupStageStart)}`, isOpen: false };
+      }
+      if (s?.tourneyStageStart && now < new Date(s.tourneyStageStart)) {
+        return { label: `Group Stage Live · Playoffs start on ${formatDateShort(s.tourneyStageStart)}`, isOpen: false };
+      }
+      return { label: "Registration Closed", isOpen: false };
+    }
+    return { label: "Registration Open", isOpen: true };
+  };
 
   return (
     <>
@@ -425,10 +454,12 @@ export default function Home() {
           ) : (
             <div className="ie-tourn-grid">
               {/* Dota 2 Tournament */}
-              {featuredTournament && (
-                <div className="ie-tourn-wrap" onClick={() => router.push("/dota2")} style={{ cursor: "pointer" }}>
+              {featuredTournament && (() => {
+                const dotaBadge = getRegBadge(featuredTournament);
+                return (
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${featuredTournament.id}`)} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge"><span className="ie-pulse" /> Registration Open</div>
+                    <div className="ie-tourn-badge">{dotaBadge.isOpen && <span className="ie-pulse" />} {dotaBadge.label}</div>
                     <div className="ie-tourn-title">{featuredTournament.name}</div>
                     <div className="ie-tourn-desc">{featuredTournament.desc}</div>
                     <div className="ie-tourn-meta">
@@ -448,18 +479,21 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "var(--orange)" }} />
                     </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push("/dota2"); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
                       View Tournament →
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Valorant Tournament */}
-              {featuredValTournament && (
-                <div className="ie-tourn-wrap" onClick={() => router.push("/valorant")} style={{ cursor: "pointer" }}>
+              {featuredValTournament && (() => {
+                const valBadge = getRegBadge(featuredValTournament);
+                return (
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer" }}>
                   <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge val"><span className="ie-pulse" style={{ background: "#ff4655" }} /> Registration Open</div>
+                    <div className="ie-tourn-badge val">{valBadge.isOpen && <span className="ie-pulse" style={{ background: "#ff4655" }} />} {valBadge.label}</div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
                     <div className="ie-tourn-desc">{featuredValTournament.desc}</div>
                     <div className="ie-tourn-meta">
@@ -479,12 +513,13 @@ export default function Home() {
                     <div className="ie-slots-bar">
                       <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
                     </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push("/valorant"); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
                       View Tournament →
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
           )}
           <div style={{ textAlign: "center", marginTop: 36 }}>
