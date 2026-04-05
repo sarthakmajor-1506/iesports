@@ -193,13 +193,13 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
       )}
 
       {/* Team 1 */}
-      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} isEliminated={t2Won && loserEliminated} y={2} />
+      <TeamRow team={t1} score={match.team1Score} isWinner={t1Won} isLoser={t2Won} isComplete={isComplete} isLive={isLive} isEliminated={t2Won && loserEliminated} y={2} />
 
       {/* Divider */}
       <line x1={6} y1={MATCH_H / 2} x2={MATCH_W - 6} y2={MATCH_H / 2} stroke={C.divider} strokeWidth={1} pointerEvents="none" />
 
       {/* Team 2 */}
-      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} isEliminated={t1Won && loserEliminated} y={MATCH_H / 2 + 1} />
+      <TeamRow team={t2} score={match.team2Score} isWinner={t2Won} isLoser={t1Won} isComplete={isComplete} isLive={isLive} isEliminated={t1Won && loserEliminated} y={MATCH_H / 2 + 1} />
 
       {/* Invisible click overlay */}
       {clickable && (
@@ -211,9 +211,9 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
   );
 }
 
-function TeamRow({ team, score, isWinner, isLoser, isComplete, isEliminated, y }: {
+function TeamRow({ team, score, isWinner, isLoser, isComplete, isLive, isEliminated, y }: {
   team: { teamId: string; teamName: string; seed: number }; score: number; isWinner: boolean; isLoser: boolean;
-  isComplete: boolean; isEliminated?: boolean; y: number;
+  isComplete: boolean; isLive?: boolean; isEliminated?: boolean; y: number;
 }) {
   const isTBD = team.teamId === "TBD";
   const isBye = team.teamId === "BYE";
@@ -273,11 +273,11 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, isEliminated, y }
       {!isBye && (
         <>
           <rect x={MATCH_W - 28} y={3} width={20} height={24} rx={4}
-            fill={isWinner ? C.winBg : isComplete ? C.lossBg : C.bg}
-            stroke={isWinner ? C.winBorder : isComplete ? "rgba(239,68,68,0.25)" : C.cardBorder} strokeWidth={0.5} />
-          <text x={MATCH_W - 18} y={19} fill={isWinner ? C.win : isComplete ? (isLoser ? C.loss : C.textMuted) : C.textPlaceholder}
+            fill={isWinner ? C.winBg : isComplete ? C.lossBg : isLive ? C.liveBg : C.bg}
+            stroke={isWinner ? C.winBorder : isComplete ? "rgba(239,68,68,0.25)" : isLive ? "rgba(245,158,11,0.3)" : C.cardBorder} strokeWidth={0.5} />
+          <text x={MATCH_W - 18} y={19} fill={isWinner ? C.win : isComplete ? (isLoser ? C.loss : C.textMuted) : isLive ? C.live : C.textPlaceholder}
             fontSize={11} fontWeight={800} textAnchor="middle" fontFamily="system-ui">
-            {isComplete ? score : "–"}
+            {(isComplete || isLive) ? score : "–"}
           </text>
         </>
       )}

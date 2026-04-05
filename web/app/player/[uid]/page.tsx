@@ -131,10 +131,11 @@ export default function PlayerProfile() {
               );
               for (const mDoc of matchesSnap.docs) {
                 const m = mDoc.data();
-                if (m.status !== "completed") continue;
+                if (m.status !== "completed" && m.status !== "live") continue;
                 const games: MatchHistoryItem["games"] = [];
                 let playerInMatch = false;
-                for (const gKey of ["game1", "game2"]) {
+                for (let gNum = 1; gNum <= 5; gNum++) {
+                  const gKey = `game${gNum}`;
                   const g = m[gKey] || m.games?.[gKey];
                   if (!g || !g.playerStats) continue;
                   const ps = g.playerStats.find((p: any) => {
@@ -146,7 +147,7 @@ export default function PlayerProfile() {
                     playerInMatch = true;
                     const roundsInGame = g.roundsPlayed || (g.redRoundsWon + g.blueRoundsWon) || 1;
                     games.push({
-                      gameNum: gKey === "game1" ? 1 : 2,
+                      gameNum: gNum,
                       mapName: g.mapName || "Unknown",
                       winner: g.winner || "",
                       team1Rounds: g.team1RoundsWon ?? 0,
@@ -353,7 +354,7 @@ export default function PlayerProfile() {
                     <div className="pp-detail-item"><span className="pp-detail-num">{vStats.totalAssists}</span><span className="pp-detail-lbl">Total Assists</span></div>
                     <div className="pp-detail-item"><span className="pp-detail-num" style={{ color: vStats.kd >= 1.0 ? "#4ade80" : "#f87171", fontWeight: 900 }}>{vStats.kd}</span><span className="pp-detail-lbl">K/D Ratio</span></div>
                     <div className="pp-detail-item"><span className="pp-detail-num">{vStats.hsPercent}%</span><span className="pp-detail-lbl">HS%</span></div>
-                    <div className="pp-detail-item"><span className="pp-detail-num">{vStats.totalDamageDealt?.toLocaleString()}</span><span className="pp-detail-lbl">Damage Dealt</span></div>
+                    <div className="pp-detail-item"><span className="pp-detail-num" style={{ color: "#a78bfa" }}>{vStats.acs || Math.round((vStats.totalScore || 0) / Math.max(1, vStats.totalRoundsPlayed || 1))}</span><span className="pp-detail-lbl">ACS</span></div>
                   </div>
                 </div>
               ) : (

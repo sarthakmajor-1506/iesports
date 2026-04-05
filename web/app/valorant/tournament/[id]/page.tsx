@@ -443,7 +443,7 @@ function ValorantTournamentDetailInner() {
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(() => searchParams.get("match") || null);
-  const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "acs" | "dmg" | "maps">("kd");
+  const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "acs" | "maps">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [teamNameLoading, setTeamNameLoading] = useState(false);
@@ -1544,7 +1544,6 @@ function ValorantTournamentDetailInner() {
                 case "fd": return p.totalFirstDeaths || 0;
                 case "adr": return (p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1);
                 case "acs": return p.acs || ((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1));
-                case "dmg": return p.totalDamageDealt || 0;
                 case "maps": return p.matchesPlayed || 0;
                 default: return 0;
               }
@@ -1574,11 +1573,30 @@ function ValorantTournamentDetailInner() {
                   <div className="vtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No stats yet</span><span className="vtd-empty-sub">Player stats will appear once match data is fetched.</span></div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
-                    <div style={{ marginBottom: 10, fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. MVP rank (#) is always by K/D.</div>
+                    {(() => {
+                      // Build player rank lookup from soloPlayers data
+                      const riotRankOrder: Record<string, number> = { "Iron": 1, "Bronze": 2, "Silver": 3, "Gold": 4, "Platinum": 5, "Diamond": 6, "Ascendant": 7, "Immortal": 8, "Radiant": 9 };
+                      const rankColors: Record<string, string> = { "Iron": "#8A8A8A", "Bronze": "#A5785D", "Silver": "#B4B9BF", "Gold": "#D4A843", "Platinum": "#3AA8B8", "Diamond": "#B07AE8", "Ascendant": "#1FAD6E", "Immortal": "#E05D6F", "Radiant": "#F5E6B8" };
+                      const playerRankMap: Record<string, { riotRank: string; riotTier: number; baseRank: string }> = {};
+                      players.forEach((p: any) => {
+                        if (p.riotPuuid || p.puuid) {
+                          playerRankMap[p.riotPuuid || p.puuid] = { riotRank: p.riotRank || "", riotTier: p.riotTier || 0, baseRank: (p.riotRank || "").split(" ")[0] };
+                        }
+                      });
+                      // Compute median tier to determine "lower rank" threshold
+                      const allTiers = sortedLb.map((p: any) => playerRankMap[p.id]?.riotTier || 0).filter(t => t > 0);
+                      const medianTier = allTiers.length > 0 ? allTiers.sort((a, b) => a - b)[Math.floor(allTiers.length / 2)] : 0;
+                      // Top 50% KDA position threshold
+                      const topHalfCutoff = Math.ceil(kdaRanked.length / 2);
+
+                      return (
+                      <>
+                    <div style={{ marginBottom: 10, fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. MVP rank (#) is always by K/D. <span style={{ color: "#4ade80" }}>Green glow</span> = lower-ranked player outperforming higher ranks.</div>
                     <table className="vtd-standings-table">
                       <thead><tr>
                         <th>#</th>
                         <th>Player</th>
+                        <th>Rank</th>
                         <th>Team</th>
                         <th>Agent(s)</th>
                         <th style={thStyle("maps")} onClick={() => setLbSort("maps")}>Maps{sortArrow("maps")}</th>
@@ -1591,15 +1609,27 @@ function ValorantTournamentDetailInner() {
                         <th style={thStyle("hs")} onClick={() => setLbSort("hs")}>HS%{sortArrow("hs")}</th>
                         <th style={thStyle("fk", "#f59e0b")} onClick={() => setLbSort("fk")}>FK{sortArrow("fk")}</th>
                         <th style={thStyle("fd", "#f87171")} onClick={() => setLbSort("fd")}>FD{sortArrow("fd")}</th>
-                        <th style={thStyle("dmg")} onClick={() => setLbSort("dmg")}>DMG{sortArrow("dmg")}</th>
                       </tr></thead>
                       <tbody>{sortedLb.map((p: any) => {
                         const rank = kdaRankMap[p.id] || 99;
                         const adr = Math.round((p.totalDamageDealt || 0) / Math.max(1, p.totalRoundsPlayed || 1));
+                        const pRank = playerRankMap[p.id];
+                        const playerTier = pRank?.riotTier || 0;
+                        const baseRank = pRank?.baseRank || "";
+                        // "Underdog" = player whose rank is below median but K/D rank is in top half
+                        const isUnderdog = playerTier > 0 && playerTier < medianTier && rank <= topHalfCutoff;
+                        const rColor = rankColors[baseRank] || "#555550";
+
+                        let rowBg: React.CSSProperties = {};
+                        if (rank === 1) rowBg = { background: "rgba(245,158,11,0.08)" };
+                        else if (rank <= 3) rowBg = { background: "rgba(60,203,255,0.04)" };
+                        else if (isUnderdog) rowBg = { background: "rgba(74,222,128,0.06)", boxShadow: "inset 2px 0 0 #4ade80" };
+
                         return (
-                        <tr key={p.id} style={rank === 1 ? { background: "rgba(245,158,11,0.08)" } : rank <= 3 ? { background: "rgba(60,203,255,0.04)" } : {}}>
-                          <td style={{ fontWeight: 800, color: rank === 1 ? "#f59e0b" : rank <= 3 ? "#3CCBFF" : "#555550" }}>{rank === 1 ? "👑" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}</td>
-                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
+                        <tr key={p.id} style={rowBg}>
+                          <td style={{ fontWeight: 800, color: rank === 1 ? "#f59e0b" : rank <= 3 ? "#3CCBFF" : "#555550" }}>{rank === 1 ? "\u{1F451}" : rank === 2 ? "\u{1F948}" : rank === 3 ? "\u{1F949}" : rank}</td>
+                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
+                          <td><span style={{ fontSize: "0.68rem", fontWeight: 700, color: rColor, padding: "2px 6px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></td>
                           <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
                           <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
                           <td>{p.matchesPlayed || 0}</td>
@@ -1612,13 +1642,16 @@ function ValorantTournamentDetailInner() {
                           <td>{p.hsPercent || 0}%</td>
                           <td style={{ fontWeight: 700, color: "#f59e0b" }}>{p.totalFirstKills || 0}</td>
                           <td style={{ color: "#f87171" }}>{p.totalFirstDeaths || 0}</td>
-                          <td style={{ fontSize: "0.82rem", color: "#8A8880" }}>{p.totalDamageDealt || 0}</td>
                         </tr>);
                       })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> 👑 MVP, 🥈 2nd, 🥉 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.
+                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> {"\u{1F451}"} MVP, {"\u{1F948}"} 2nd, {"\u{1F949}"} 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.<br />
+                      <span style={{ color: "#4ade80" }}>UNDERDOG</span> — lower-ranked players (below median tier) who are performing in the top half by K/D. These players are punching above their weight!
                     </div>
+                      </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
