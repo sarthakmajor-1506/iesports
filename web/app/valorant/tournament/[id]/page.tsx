@@ -664,10 +664,10 @@ function ValorantTournamentDetailInner() {
   const groupMatches = matches.filter((m: any) => !m.isBracket);
   const bracketMatches = matches.filter((m: any) => m.isBracket);
 
-  // ── Detect tournament champion from grand final ──
+  // ── Detect tournament champion from grand final or tournament doc ──
   const grandFinal = bracketMatches.find((m: any) => m.bracketType === "grand_final" && m.status === "completed");
-  const championTeamId = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Id : grandFinal.team2Id) : null;
-  const championTeamName = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Name : grandFinal.team2Name) : null;
+  const championTeamId = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Id : grandFinal.team2Id) : (tournament?.championTeamId || null);
+  const championTeamName = grandFinal ? (grandFinal.team1Score > grandFinal.team2Score ? grandFinal.team1Name : grandFinal.team2Name) : (tournament?.championTeamName || null);
   const championMembers = championTeamId ? (teamMembers[championTeamId] || []) : [];
 
   return (

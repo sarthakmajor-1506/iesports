@@ -945,6 +945,137 @@ export async function POST(req: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // 10b. TOURNAMENT COMPLETION — Discord announcement when Grand Final ends
+    // ═══════════════════════════════════════════════════════════════════════════
+    let discordAnnouncement = false;
+    if (seriesComplete && existingMatch.bracketType === "grand_final") {
+      try {
+        const botToken = process.env.DISCORD_BOT_TOKEN;
+        const channelId = process.env.Valorant_lobby || process.env.LOBBY_CONTROL_CHANNEL_ID || process.env.RESULTS_CHANNEL_ID;
+
+        if (botToken && channelId) {
+          const winnerId = team1SeriesScore > team2SeriesScore ? team1Id : team2Id;
+          const winnerName = team1SeriesScore > team2SeriesScore ? existingMatch.team1Name : existingMatch.team2Name;
+
+          // Fetch all teams to get winner members
+          const allTeamsSnap = await tournamentRef.collection("teams").get();
+          const winnerTeamDoc = allTeamsSnap.docs.find(d => d.id === winnerId);
+          const winnerMembers = winnerTeamDoc?.data()?.members || [];
+
+          // Build Discord ID map: uid → discordId
+          // UIDs are either "discord_<id>" or steam users with discordId in their user doc
+          const discordIdMap: Record<string, string> = {};
+          const allPlayersSnap = await tournamentRef.collection("soloPlayers").get();
+          const steamUids: string[] = [];
+          for (const pDoc of allPlayersSnap.docs) {
+            const uid = pDoc.id;
+            if (uid.startsWith("discord_")) {
+              discordIdMap[uid] = uid.replace("discord_", "");
+            } else if (uid.startsWith("steam_")) {
+              steamUids.push(uid);
+            }
+          }
+          // Fetch steam users' discord IDs from users collection
+          for (const sUid of steamUids) {
+            const userDoc = await adminDb.collection("users").doc(sUid).get();
+            if (userDoc.exists && userDoc.data()?.discordId) {
+              discordIdMap[sUid] = userDoc.data()!.discordId;
+            }
+          }
+
+          // Tag all players
+          const allTags = allPlayersSnap.docs
+            .map(d => discordIdMap[d.id])
+            .filter(Boolean)
+            .map(id => `<@${id}>`);
+
+          // Winner member tags
+          const winnerTags = winnerMembers
+            .map((m: any) => discordIdMap[m.uid])
+            .filter(Boolean)
+            .map((id: string) => `<@${id}> ${winnerMembers.find((m: any) => discordIdMap[m.uid] === id)?.riotGameName || ""}`)
+            .join(" · ");
+
+          // Game summaries
+          const gameSummaries: string[] = [];
+          const updatedMatch = { ...existingMatch, ...updatePayload };
+          for (let g = 1; g <= bo; g++) {
+            const gData = g === gameNumber
+              ? gameData
+              : (existingMatch[`game${g}`] || existingMatch.games?.[`game${g}`]);
+            if (!gData) continue;
+            const gMap = gData.mapName || "Unknown";
+            const gWinner = g === gameNumber ? gameWinner : (existingMatch[`game${g}Winner`] || gData.winner);
+            const gWinnerName = gWinner === "team1" ? existingMatch.team1Name : existingMatch.team2Name;
+            const t1R = gData.team1RoundsWon ?? 0;
+            const t2R = gData.team2RoundsWon ?? 0;
+            gameSummaries.push(`🗺️ Game ${g} — ${gMap}: ${gWinnerName} wins **${Math.max(t1R, t2R)}-${Math.min(t1R, t2R)}**`);
+          }
+
+          // Leaderboard top 3 (re-fetch after this game's stats are committed)
+          const lbSnap = await tournamentRef.collection("leaderboard").get();
+          const lb = lbSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+          lb.sort((a, b) => (b.kd || 0) - (a.kd || 0));
+          const top3 = lb.slice(0, 3);
+          const medals = ["🥇", "🥈", "🥉"];
+          const lbLines = top3.map((p, i) => {
+            const pTag = discordIdMap[p.uid] ? `<@${discordIdMap[p.uid]}>` : "";
+            return `${medals[i]} ${pTag} **${p.name}** — K/D: **${p.kd}** | ACS: ${p.acs} | ${p.totalKills}K/${p.totalDeaths}D/${p.totalAssists}A | ${p.matchesPlayed} maps`;
+          });
+
+          const message = [
+            `🏆 **LEAGUE OF RISING STARS — PRELIMS** 🏆\n`,
+            allTags.join(" ") + "\n",
+            `We want to make our LAN tournaments more fun and engaging — and you ${allTags.length} made this prelim something special. Thank you for showing up and trusting a brand new platform. This can't be expressed in words. 🙏\n`,
+            `Special thanks to Domin8 and Shrey bhaiya for making this possible, our OG streamer Shubh and team for the incredible energy, Vanshaj for always holding it down, and our photographers Isha and Mini for always showing up. 💛\n`,
+            `> *"Legends stay legends."*\n`,
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+            `🥇 **TOURNAMENT CHAMPIONS — ${winnerName}** 🥇`,
+            `💰 **Prize: ₹${tData.prizePool || "3,000"}**\n`,
+            winnerTags + "\n",
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+            `⚔️ **GRAND FINAL** — ${existingMatch.team1Name} vs ${existingMatch.team2Name}\n`,
+            gameSummaries.join("\n"),
+            `\n**Series: ${team1SeriesScore}-${team2SeriesScore}**\n`,
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+            `📊 **TOP 3 — TOURNAMENT LEADERBOARD** (by K/D)\n`,
+            lbLines.join("\n") + "\n",
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+            `📎 Full match details & stats → https://iesports.in/valorant/tournament/${tournamentId}\n`,
+            `Thanks for trusting the process. You guys are the best. 🫡`,
+            `This is just the beginning.\n`,
+            `— IEsports`,
+          ].join("\n");
+
+          const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bot ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ content: message }),
+          });
+
+          if (res.ok) {
+            discordAnnouncement = true;
+            // Also mark tournament as completed
+            await tournamentRef.update({
+              status: "completed",
+              championTeamId: winnerId,
+              championTeamName: winnerName,
+              completedAt: new Date().toISOString(),
+            });
+          } else {
+            const errText = await res.text();
+            console.error("[Discord] Tournament announcement failed:", errText);
+          }
+        }
+      } catch (discordErr: any) {
+        console.error("[Discord] Tournament announcement error:", discordErr.message);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // 11. RESPONSE
     // ═══════════════════════════════════════════════════════════════════════════
     return NextResponse.json({
@@ -972,6 +1103,7 @@ export async function POST(req: NextRequest) {
       } : {}),
       autoResolved,
       resolvedPairings: autoResolved ? resolvedPairings : undefined,
+      discordAnnouncement,
     });
   } catch (e: any) {
     console.error("Match fetch error:", e);
