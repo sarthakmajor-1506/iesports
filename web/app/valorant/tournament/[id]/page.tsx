@@ -757,6 +757,7 @@ function ValorantTournamentDetailInner() {
         .vtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(60,203,255,0.12); border: 1px solid rgba(60,203,255,0.3); color: #3CCBFF; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
         .vtd-hero-share-btn:hover { background: rgba(60,203,255,0.25); border-color: rgba(60,203,255,0.5); transform: scale(1.05); }
         @keyframes vtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes vtd-live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         /* ── Content wrapper ── */
         .vtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
@@ -1068,70 +1069,131 @@ function ValorantTournamentDetailInner() {
           <div className="vtd-hero-overlay" />
           <div className="vtd-hero-content">
             <div className="vtd-hero-inner">
-              <div className="vtd-hero-game-tag">Valorant Tournament</div>
+              <div className="vtd-hero-game-tag">
+                Valorant Tournament
+                {tournament.status === "ended" && (
+                  <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.12)", letterSpacing: "0.08em" }}>Completed</span>
+                )}
+                {tournament.status === "active" && (
+                  <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "rgba(34,197,94,0.12)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)", letterSpacing: "0.08em", animation: "vtd-live-pulse 2s ease-in-out infinite" }}>LIVE</span>
+                )}
+              </div>
               <div className="vtd-hero-title">{tournament.name}</div>
+              {tournament.status === "ended" && championTeamName && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, animation: "vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.06s both" }}>
+                  <span style={{ fontSize: "1.3rem" }}>🏆</span>
+                  <div>
+                    <div style={{ fontSize: "0.66rem", fontWeight: 800, color: "#ffd700", letterSpacing: "0.1em", textTransform: "uppercase" }}>Winner</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#ffd700" }}>{championTeamName}</div>
+                  </div>
+                </div>
+              )}
+              {tournament.status === "ended" && !championTeamName && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, animation: "vtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.06s both" }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>Tournament has ended</span>
+                </div>
+              )}
               {(tournament.description || tournament.desc) && (
                 <div className="vtd-hero-desc">{tournament.description || tournament.desc}</div>
               )}
               <div className="vtd-hero-actions">
-                {canRegister && <button className="vtd-reg-btn" onClick={() => {
-                  if (!user) {
-                    try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
-                    window.open("/api/auth/discord-login", "_blank");
-                    return;
-                  }
-                  setShowRegister(true);
-                }}>Register Now →</button>}
-                {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
+                {tournament.status === "ended" ? (
                   <>
-                    <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
-                    <button
-                      onClick={() => {
-                        if (!user) {
-                          try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
-                          window.open("/api/auth/discord-login", "_blank");
-                          return;
-                        }
-                        toggleWaitlist();
-                      }}
-                      disabled={waitlistLoading}
-                      style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                    >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
-                  </>
-                )}
-                {isRegistered && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div className="vtd-reg-done">✓ Registered</div>
-                    {!regClosed && !tournament?.bracketsComputed && tournament?.status === "upcoming" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button
-                        onClick={handleUnregister}
-                        disabled={unregLoading}
+                        onClick={() => setActiveTab("brackets")}
                         style={{
-                          padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#f87171",
-                          border: "1px solid rgba(239,68,68,0.3)", borderRadius: 100, fontSize: "0.82rem",
-                          fontWeight: 700, cursor: unregLoading ? "default" : "pointer", fontFamily: "inherit",
-                          transition: "all 0.15s", opacity: unregLoading ? 0.6 : 1,
+                          padding: "10px 24px", background: "rgba(255,215,0,0.12)", color: "#ffd700",
+                          border: "1px solid rgba(255,215,0,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
                         }}
-                      >{unregLoading ? "Withdrawing..." : "Withdraw"}</button>
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,215,0,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(255,215,0,0.25)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,215,0,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                      >View Brackets</button>
+                      <button
+                        onClick={() => setActiveTab("matches")}
+                        style={{
+                          padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                          border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                      >Match History</button>
+                      <button
+                        onClick={() => setActiveTab("leaderboard")}
+                        style={{
+                          padding: "10px 24px", background: "rgba(255,255,255,0.06)", color: "#8A8880",
+                          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 100, fontSize: "0.86rem",
+                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#E6E6E6"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#8A8880"; }}
+                      >Leaderboard</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {canRegister && <button className="vtd-reg-btn" onClick={() => {
+                      if (!user) {
+                        try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
+                        window.open("/api/auth/discord-login", "_blank");
+                        return;
+                      }
+                      setShowRegister(true);
+                    }}>Register Now →</button>}
+                    {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
+                      <>
+                        <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
+                        <button
+                          onClick={() => {
+                            if (!user) {
+                              try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
+                              window.open("/api/auth/discord-login", "_blank");
+                              return;
+                            }
+                            toggleWaitlist();
+                          }}
+                          disabled={waitlistLoading}
+                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                        >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
+                      </>
                     )}
-                  </div>
-                )}
-                {!isRegOpen && !isRegistered && (
-                  <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
-                    Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
-                  </div>
-                )}
-                {regClosed && !isRegistered && isRegOpen && (
-                  <button
-                    onClick={() => setActiveTab("leaderboard")}
-                    style={{
-                      padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
-                      border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
-                      fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
-                  >Leaderboard</button>
+                    {isRegistered && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div className="vtd-reg-done">✓ Registered</div>
+                        {!regClosed && !tournament?.bracketsComputed && tournament?.status === "upcoming" && (
+                          <button
+                            onClick={handleUnregister}
+                            disabled={unregLoading}
+                            style={{
+                              padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#f87171",
+                              border: "1px solid rgba(239,68,68,0.3)", borderRadius: 100, fontSize: "0.82rem",
+                              fontWeight: 700, cursor: unregLoading ? "default" : "pointer", fontFamily: "inherit",
+                              transition: "all 0.15s", opacity: unregLoading ? 0.6 : 1,
+                            }}
+                          >{unregLoading ? "Withdrawing..." : "Withdraw"}</button>
+                        )}
+                      </div>
+                    )}
+                    {!isRegOpen && !isRegistered && (
+                      <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
+                        Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
+                      </div>
+                    )}
+                    {regClosed && !isRegistered && isRegOpen && (
+                      <button
+                        onClick={() => setActiveTab("leaderboard")}
+                        style={{
+                          padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                          border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                      >Leaderboard</button>
+                    )}
+                  </>
                 )}
                 <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
@@ -1196,8 +1258,17 @@ function ValorantTournamentDetailInner() {
           </div>
           {/* Slots info strip */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, padding: "10px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, fontSize: "0.82rem", color: "#8A8880", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} filled</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} players</span>
+            {tournament.status === "ended" ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={14} strokeWidth={2} /> {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}</span>
+                {tournament.prizePool && tournament.prizePool !== "0" && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Trophy size={14} strokeWidth={2} color="#fbbf24" /> <strong style={{ color: "#fbbf24" }}>{tournament.prizePool.startsWith("₹") ? tournament.prizePool : `₹${tournament.prizePool}`}</strong></span>
+                )}
+              </span>
+            ) : (
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
+            )}
           </div>
 
           {/* ═══ OVERVIEW ═══ */}
