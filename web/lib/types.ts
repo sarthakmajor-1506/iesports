@@ -305,6 +305,8 @@ export interface ValorantTournament {
   upperBracketTeams?: number;
   lowerBracketTeams?: number;
   dummyDataSeeded?: boolean;
+  championTeamId?: string;
+  championTeamName?: string;
 }
 
 

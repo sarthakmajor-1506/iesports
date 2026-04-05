@@ -370,7 +370,8 @@ export default function Navbar() {
         .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
         .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
-        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } .ie-signin-btn { display: none !important; } }
+        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } .ie-signin-btn { display: none !important; } .ie-mobile-signin-cta { display: flex !important; } }
+        .ie-mobile-signin-cta { display: none !important; }
 
         .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #2A2A30; background: #121215; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
         .ie-hamburger span { display: block; width: 18px; height: 2px; background: #8A8880; border-radius: 2px; transition: all 0.2s; transform-origin: center; }
@@ -638,6 +639,22 @@ export default function Navbar() {
             </>
             )}
 
+            {!user && (
+              <button
+                className="ie-mobile-signin-cta"
+                onClick={() => window.open("/api/auth/discord-login", "_blank")}
+                style={{
+                  alignItems: "center", gap: 6,
+                  background: "#5865F2", color: "#fff",
+                  border: "none", borderRadius: 100,
+                  padding: "8px 14px", fontSize: "0.78rem", fontWeight: 800,
+                  cursor: "pointer", fontFamily: "inherit",
+                  whiteSpace: "nowrap", flexShrink: 0,
+                }}
+              >
+                <DiscordIcon size={14} color="#fff" /> Sign In
+              </button>
+            )}
             <button className="ie-hamburger" onClick={() => setMobileMenuOpen(p => !p)} aria-label="Toggle menu">
               <span style={{ transform: mobileMenuOpen ? "rotate(45deg) translate(5px, 5px)" : "none" }} />
               <span style={{ opacity: mobileMenuOpen ? 0 : 1 }} />
@@ -721,9 +738,20 @@ export default function Navbar() {
           </>
           ) : (
           <>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+              background: "rgba(88,101,242,0.08)", border: "1px solid rgba(88,101,242,0.25)",
+              borderRadius: 12, marginBottom: 4,
+            }}>
+              <DiscordIcon size={20} color="#818cf8" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#F0EEEA" }}>Sign in to Register</div>
+                <div style={{ fontSize: "0.72rem", color: "#8A8880", marginTop: 2 }}>Create an account to join tournaments</div>
+              </div>
+            </div>
             <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/discord-login", "_blank")}
-              style={{ background: "rgba(88,101,242,0.1)", borderColor: "rgba(88,101,242,0.35)", color: "#818cf8" }}>
-              <DiscordIcon size={20} color="#818cf8" /> Sign in with Discord
+              style={{ background: "#5865F2", borderColor: "#5865F2", color: "#fff" }}>
+              <DiscordIcon size={20} color="#fff" /> Sign in with Discord
             </button>
             <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/steam", "_blank")}
               style={{ background: "linear-gradient(135deg,#1b2838,#2a475e)", borderColor: "#3d6b8c", color: "#fff" }}>
