@@ -215,7 +215,7 @@ export default function ValorantTournaments() {
                             {t.schedule?.tourneyStageStart && new Date() >= new Date(t.schedule?.groupStageStart || "") && new Date() < new Date(t.schedule.tourneyStageStart) && (
                               <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)" }}>Playoffs start on {formatDate(t.schedule.tourneyStageStart)}</span>
                             )}
-                            <button className="vt-leaderboard-btn" style={{ padding: "6px 16px", minWidth: "unset", fontSize: "0.72rem" }} onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=leaderboard`); }}>Leaderboard</button>
+                            <button className="vt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=matches`); }}>Matches</button>
                           </div>
                         ) : regState === "not_yet" ? (
                           <div className="vt-coming-soon">

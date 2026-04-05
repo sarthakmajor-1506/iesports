@@ -208,7 +208,7 @@ export default function DotaTournaments() {
                         {isRegistered ? (
                           <div className="dt-reg-done">✓ Registered</div>
                         ) : regState === "closed" ? (
-                          <button className="dt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${t.id}?tab=leaderboard`); }}>Leaderboard</button>
+                          <button className="dt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${t.id}?tab=matches`); }}>Matches</button>
                         ) : regState === "not_yet" ? (
                           <div className="dt-coming-soon">
                             <div className="dt-coming-soon-label">Coming Soon</div>
