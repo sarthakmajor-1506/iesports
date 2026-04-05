@@ -121,6 +121,7 @@ export default function AdminPanel() {
   const [bracketTopTeams, setBracketTopTeams] = useState("4");
   const [bracketStartTime, setBracketStartTime] = useState("18:00");
   const [bracketStartDate, setBracketStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [standingsNotComplete, setStandingsNotComplete] = useState(false);
 
   // ─── Match Time Editing ─────────────────────────────────────────────────────
   const [editingMatchTime, setEditingMatchTime] = useState<string | null>(null);
@@ -1315,11 +1316,16 @@ export default function AdminPanel() {
                       <input value={bracketStartTime} onChange={e => setBracketStartTime(e.target.value)} style={inputStyle} type="time" />
                     </div>
                   </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: "0.78rem", color: standingsNotComplete ? "#f59e0b" : "#999" }}>
+                    <input type="checkbox" checked={standingsNotComplete} onChange={e => setStandingsNotComplete(e.target.checked)} style={{ accentColor: "#f59e0b", width: 16, height: 16, cursor: "pointer" }} />
+                    <span style={{ fontWeight: 700 }}>Standings not complete</span>
+                    <span style={{ fontWeight: 400, color: "#666" }}> — fills all team slots with TBD</span>
+                  </label>
                   <button disabled={loading} style={{ ...btnWarning, marginTop: 8 }}
                     onClick={async () => {
-                      if (!confirm(`Generate elimination bracket for top ${bracketTopTeams} teams?`)) return;
+                      if (!confirm(`Generate elimination bracket for top ${bracketTopTeams} teams${standingsNotComplete ? " (all TBD)" : ""}?`)) return;
                       await apiCall("/api/valorant/generate-brackets", {
-                        tournamentId, topTeams: parseInt(bracketTopTeams), startTime: bracketStartTime, startDate: bracketStartDate,
+                        tournamentId, topTeams: parseInt(bracketTopTeams), startTime: bracketStartTime, startDate: bracketStartDate, standingsNotComplete,
                       });
                     }}>Generate Brackets</button>
                 </div>

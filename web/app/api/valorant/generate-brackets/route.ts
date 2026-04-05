@@ -34,7 +34,7 @@ const TBD: TeamSeed = { teamId: "TBD", teamName: "TBD", seed: 0, members: [] };
 
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, topTeams, startTime, startDate } = await req.json();
+    const { tournamentId, adminKey, topTeams, startTime, startDate, standingsNotComplete } = await req.json();
 
     if (!tournamentId || !adminKey) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -49,37 +49,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
-    // ── Fetch standings (sorted by points, buchholz, map diff) ───────────────
-    const standingsSnap = await tournamentRef.collection("standings").get();
-    if (standingsSnap.empty) {
-      return NextResponse.json({ error: "No standings found. Complete group stage first." }, { status: 400 });
-    }
-
-    const allStandings = standingsSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a: any, b: any) => {
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
-        return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost);
-      });
-
-    const numAdvancing = Math.min(topTeams || 4, allStandings.length);
+    // ── Determine advancing teams ──────────────────────────────────────────────
+    const numAdvancing = topTeams || 4;
     if (numAdvancing < 2) {
       return NextResponse.json({ error: "Need at least 2 teams for brackets." }, { status: 400 });
     }
 
-    // ── Fetch team data for member info ──────────────────────────────────────
-    const teamsSnap = await tournamentRef.collection("teams").get();
-    const teamDataMap: Record<string, any> = {};
-    teamsSnap.docs.forEach(d => { teamDataMap[d.id] = d.data(); });
+    let seededTeams: TeamSeed[];
 
-    // ── Build seeded teams list ──────────────────────────────────────────────
-    const seededTeams: TeamSeed[] = allStandings.slice(0, numAdvancing).map((s: any, i: number) => ({
-      teamId: s.id || s.teamId,
-      teamName: s.teamName,
-      seed: i + 1,
-      members: teamDataMap[s.id]?.members || [],
-    }));
+    if (standingsNotComplete) {
+      // All slots filled with TBD — bracket structure only, no real teams
+      seededTeams = Array.from({ length: numAdvancing }, (_, i) => ({
+        teamId: "TBD",
+        teamName: "TBD",
+        seed: i + 1,
+        members: [],
+      }));
+    } else {
+      // ── Fetch standings (sorted by points, buchholz, map diff) ─────────────
+      const standingsSnap = await tournamentRef.collection("standings").get();
+      if (standingsSnap.empty) {
+        return NextResponse.json({ error: "No standings found. Complete group stage first." }, { status: 400 });
+      }
+
+      const allStandings = standingsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          if (b.points !== a.points) return b.points - a.points;
+          if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+          return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost);
+        });
+
+      const actualAdvancing = Math.min(numAdvancing, allStandings.length);
+      if (actualAdvancing < 2) {
+        return NextResponse.json({ error: "Need at least 2 teams for brackets." }, { status: 400 });
+      }
+
+      // ── Fetch team data for member info ────────────────────────────────────
+      const teamsSnap = await tournamentRef.collection("teams").get();
+      const teamDataMap: Record<string, any> = {};
+      teamsSnap.docs.forEach(d => { teamDataMap[d.id] = d.data(); });
+
+      seededTeams = allStandings.slice(0, actualAdvancing).map((s: any, i: number) => ({
+        teamId: s.id || s.teamId,
+        teamName: s.teamName,
+        seed: i + 1,
+        members: teamDataMap[s.id]?.members || [],
+      }));
+    }
 
     // ── Delete existing bracket matches ──────────────────────────────────────
     const existingBracket = await tournamentRef.collection("matches").where("isBracket", "==", true).get();
