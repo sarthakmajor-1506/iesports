@@ -237,7 +237,18 @@ export async function POST(req: NextRequest) {
       }
 
       let discordSent = false;
+      let discordSkipReason = "";
       let waitingRoomVcId: string | null = null;
+
+      if (!notifyDiscord) {
+        discordSkipReason = "notifyDiscord flag is false";
+      } else if (!botToken) {
+        discordSkipReason = "DISCORD_BOT_TOKEN env var missing";
+      } else if (!guildId) {
+        discordSkipReason = "DISCORD_GUILD_ID / DISCORD_SERVER_ID env var missing";
+      } else if (!notifyChannelId) {
+        discordSkipReason = "Valorant_lobby / LOBBY_CONTROL_CHANNEL_ID / RESULTS_CHANNEL_ID env var missing";
+      }
 
       if (notifyDiscord && botToken && guildId && notifyChannelId) {
         try {
@@ -300,6 +311,7 @@ export async function POST(req: NextRequest) {
           discordSent = await sendMessage(notifyChannelId, messagePayload);
 
         } catch (discordErr: any) {
+          discordSkipReason = `Discord error: ${discordErr.message}`;
           console.error("[Discord] set-lobby error:", discordErr.message);
         }
       }
@@ -313,6 +325,7 @@ export async function POST(req: NextRequest) {
         gameNumber: gameNumber || 1,
         lobbyName,
         discordNotified: discordSent,
+        ...(discordSkipReason ? { discordSkipReason } : {}),
         waitingRoomVcId,
       });
 
