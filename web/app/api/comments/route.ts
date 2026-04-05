@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         avatar: data.avatar || null,
         text: data.text,
         createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        likedBy: data.likedBy || [],
       };
     });
 
@@ -69,6 +70,38 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ id: docRef.id });
+  } catch (e: any) {
+    if (e.code === "auth/id-token-expired" || e.code === "auth/argument-error") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const token = req.headers.get("authorization")?.replace("Bearer ", "");
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const decoded = await adminAuth.verifyIdToken(token);
+    const uid = decoded.uid;
+
+    const { tournamentId, commentId, game } = await req.json();
+    if (!tournamentId || !commentId) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    const commentRef = adminDb.collection(getCollection(game)).doc(tournamentId).collection("comments").doc(commentId);
+    const snap = await commentRef.get();
+    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const likedBy: string[] = snap.data()?.likedBy || [];
+    const alreadyLiked = likedBy.includes(uid);
+
+    await commentRef.update({
+      likedBy: alreadyLiked ? FieldValue.arrayRemove(uid) : FieldValue.arrayUnion(uid),
+    });
+
+    return NextResponse.json({ liked: !alreadyLiked });
   } catch (e: any) {
     if (e.code === "auth/id-token-expired" || e.code === "auth/argument-error") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

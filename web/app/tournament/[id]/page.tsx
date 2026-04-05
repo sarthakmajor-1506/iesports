@@ -155,43 +155,123 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         const t1Sorted = [...(t1Members.length > 0 ? t1Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
         const t2Sorted = [...(t2Members.length > 0 ? t2Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
         return (
-        <div style={{ background: "#18181C", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "18px 16px", overflow: "hidden" }}>
-          {/* Animated 5v5 Player Lineup */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ background: "linear-gradient(180deg, #0A0A10 0%, #14141A 30%, #14141A 70%, #0A0A10 100%)", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "22px 14px 18px", overflow: "hidden", position: "relative" }}>
+          {/* Background diagonal streaks */}
+          <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(59,130,246,0.07), transparent)", transform: "translate(-50%, -50%) rotate(30deg)" }} />
+            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(59,130,246,0.05), transparent)", transform: "translate(-50%, -50%) rotate(-30deg)" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 10%, rgba(59,130,246,0.15) 50%, transparent 90%)" }} />
+          </div>
+          {/* Floating 2-2-1 Player Lineup */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
             {/* Team 1 Players */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-              {t1Sorted.map((p: any, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)", borderRadius: 8, animation: `dtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
-                  {p.steamAvatar ? (
-                    <img src={p.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(59,130,246,0.3)" }} />
-                  ) : (
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.steamName || "?")[0]}</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
-                    {p.dotaMMR ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.dotaMMR} MMR</div> : null}
-                  </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "dtd-streak-left 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
+              {[t1Sorted.slice(0, 2), t1Sorted.slice(2, 4), t1Sorted.slice(4, 5)].map((row, ri) => (
+                <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
+                  {row.map((p: any, pi: number) => {
+                    const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
+                    return (
+                      <div key={pi} className="dtd-fighter-card" style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                        animation: `dtd-player-reveal 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
+                      }}>
+                        {p.steamAvatar ? (
+                          <img src={p.steamAvatar} alt="" style={{
+                            width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
+                            border: "2px solid rgba(59,130,246,0.3)",
+                            boxShadow: "0 0 10px rgba(59,130,246,0.15), 0 3px 10px rgba(0,0,0,0.35)",
+                          }} />
+                        ) : (
+                          <div style={{
+                            width: 46, height: 46, borderRadius: "50%",
+                            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "0.95rem", fontWeight: 800, color: "#fff",
+                            border: "2px solid rgba(59,130,246,0.3)",
+                            boxShadow: "0 0 10px rgba(59,130,246,0.15)",
+                          }}>{(p.steamName || "?")[0]}</div>
+                        )}
+                        <div style={{ textAlign: "center", maxWidth: 56 }}>
+                          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
+                          {p.dotaMMR ? <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.dotaMMR} MMR</div> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
-            {/* VS Badge */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0, animation: "dtd-vs-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 900, color: "#fff", animation: "dtd-glow-pulse 2s ease-in-out infinite" }}>VS</div>
-              {isComplete && <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#4ade80", marginTop: 2 }}>{m.team1Score} - {m.team2Score}</div>}
+            {/* VS Center Column with Team Names */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "dtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px" }}>
+              {/* Team 1 Logo + Name */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 10, animation: "dtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(59,130,246,0.3)", background: "linear-gradient(135deg, #3b82f622, #2563eb22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#3b82f6" }}>{(m.team1Name || "?")[0]}</span>}
+                </div>
+                <div style={{
+                  fontSize: "0.78rem", fontWeight: 900, color: "#3b82f6", textAlign: "center",
+                  textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
+                  textShadow: "0 0 12px rgba(59,130,246,0.4), 0 0 24px rgba(59,130,246,0.15)",
+                  wordBreak: "break-word" as any,
+                }}>{m.team1Name}</div>
+              </div>
+              {/* VS Badge */}
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: "linear-gradient(135deg, #3b82f6, #6366f1, #1d4ed8)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.95rem", fontWeight: 900, color: "#fff", letterSpacing: "0.05em",
+                animation: "dtd-glow-pulse 2.5s ease-in-out infinite",
+                boxShadow: "0 0 28px rgba(59,130,246,0.3), inset 0 0 10px rgba(255,255,255,0.1)",
+              }}>VS</div>
+              {isComplete && <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#4ade80", textShadow: "0 0 8px rgba(74,222,128,0.4)", marginTop: 4 }}>{m.team1Score} - {m.team2Score}</div>}
+              {/* Team 2 Logo + Name */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: 10, animation: "dtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.25s both" }}>
+                <div style={{
+                  fontSize: "0.78rem", fontWeight: 900, color: "#ef4444", textAlign: "center",
+                  textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
+                  textShadow: "0 0 12px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",
+                  wordBreak: "break-word" as any,
+                }}>{m.team2Name}</div>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(239,68,68,0.3)", background: "linear-gradient(135deg, #ef444422, #dc262622)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#ef4444" }}>{(m.team2Name || "?")[0]}</span>}
+                </div>
+              </div>
             </div>
             {/* Team 2 Players */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-              {t2Sorted.map((p: any, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)", borderRadius: 8, flexDirection: "row-reverse", animation: `dtd-player-reveal 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s both` }}>
-                  {p.steamAvatar ? (
-                    <img src={p.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(59,130,246,0.3)" }} />
-                  ) : (
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 800, color: "#fff", flexShrink: 0 }}>{(p.steamName || "?")[0]}</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
-                    {p.dotaMMR ? <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "#8A8880" }}>{p.dotaMMR} MMR</div> : null}
-                  </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "dtd-streak-right 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
+              {[t2Sorted.slice(0, 2), t2Sorted.slice(2, 4), t2Sorted.slice(4, 5)].map((row, ri) => (
+                <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
+                  {row.map((p: any, pi: number) => {
+                    const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
+                    return (
+                      <div key={pi} className="dtd-fighter-card" style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                        animation: `dtd-player-reveal-right 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
+                      }}>
+                        {p.steamAvatar ? (
+                          <img src={p.steamAvatar} alt="" style={{
+                            width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
+                            border: "2px solid rgba(239,68,68,0.3)",
+                            boxShadow: "0 0 10px rgba(239,68,68,0.15), 0 3px 10px rgba(0,0,0,0.35)",
+                          }} />
+                        ) : (
+                          <div style={{
+                            width: 46, height: 46, borderRadius: "50%",
+                            background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "0.95rem", fontWeight: 800, color: "#fff",
+                            border: "2px solid rgba(239,68,68,0.3)",
+                            boxShadow: "0 0 10px rgba(239,68,68,0.15)",
+                          }}>{(p.steamName || "?")[0]}</div>
+                        )}
+                        <div style={{ textAlign: "center", maxWidth: 56 }}>
+                          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.steamName || "TBD"}</div>
+                          {p.dotaMMR ? <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.dotaMMR} MMR</div> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -701,9 +781,16 @@ function DotaTournamentDetailInner() {
 
         @keyframes dtd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes dtspin { to { transform: rotate(360deg); } }
-        @keyframes dtd-player-reveal { from { opacity: 0; transform: translateY(16px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes dtd-vs-pop { 0% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes dtd-glow-pulse { 0%,100% { box-shadow: 0 0 8px rgba(59,130,246,0.3); } 50% { box-shadow: 0 0 18px rgba(59,130,246,0.6); } }
+        @keyframes dtd-player-reveal { from { opacity: 0; transform: translateY(24px) scale(0.7) rotate(-2deg); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); filter: blur(0); } }
+        @keyframes dtd-player-reveal-right { from { opacity: 0; transform: translateY(24px) scale(0.7) rotate(2deg); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); filter: blur(0); } }
+        @keyframes dtd-vs-pop { 0% { opacity: 0; transform: scale(0.2) rotate(-180deg); filter: blur(8px); } 50% { opacity: 1; transform: scale(1.25) rotate(10deg); filter: blur(0); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
+        @keyframes dtd-glow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(59,130,246,0.4), 0 0 40px rgba(59,130,246,0.15); } 50% { box-shadow: 0 0 24px rgba(59,130,246,0.7), 0 0 60px rgba(59,130,246,0.25); } }
+        @keyframes dtd-streak-left { 0% { opacity: 0; transform: translateX(60px); } 100% { opacity: 1; transform: translateX(0); } }
+        @keyframes dtd-streak-right { 0% { opacity: 0; transform: translateX(-60px); } 100% { opacity: 1; transform: translateX(0); } }
+        @keyframes dtd-border-glow { 0%,100% { border-color: rgba(59,130,246,0.2); } 50% { border-color: rgba(59,130,246,0.5); } }
+        @keyframes dtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
+        .dtd-fighter-card { position: relative; transition: transform 0.2s; }
+        .dtd-fighter-card:hover { transform: translateY(-2px) scale(1.06); z-index: 2; }
 
         /* ── Share modal ── */
         .dtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }

@@ -10,6 +10,7 @@ interface Comment {
   avatar?: string;
   text: string;
   createdAt: string | null;
+  likedBy: string[];
 }
 
 interface CommentSectionProps {
@@ -77,7 +78,7 @@ export default function CommentSection({ tournamentId, section, game = "valorant
     setShowEmoji(false);
 
     const tempId = `temp-${Date.now()}`;
-    const optimistic: Comment = { id: tempId, uid: user.uid, displayName: info.name, avatar: info.avatar || undefined, text: commentText, createdAt: new Date().toISOString() };
+    const optimistic: Comment = { id: tempId, uid: user.uid, displayName: info.name, avatar: info.avatar || undefined, text: commentText, createdAt: new Date().toISOString(), likedBy: [] };
     setComments(prev => [optimistic, ...prev]);
 
     try {
@@ -120,6 +121,30 @@ export default function CommentSection({ tournamentId, section, game = "valorant
     inputRef.current?.focus();
   };
 
+  const handleLike = async (commentId: string) => {
+    if (!user) return;
+    const uid = user.uid;
+    setComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c;
+      const alreadyLiked = c.likedBy.includes(uid);
+      return { ...c, likedBy: alreadyLiked ? c.likedBy.filter(id => id !== uid) : [...c.likedBy, uid] };
+    }));
+    try {
+      const token = await user.getIdToken();
+      await fetch("/api/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ tournamentId, commentId, game }),
+      });
+    } catch (e) {
+      setComments(prev => prev.map(c => {
+        if (c.id !== commentId) return c;
+        const wasLiked = c.likedBy.includes(uid);
+        return { ...c, likedBy: wasLiked ? c.likedBy.filter(id => id !== uid) : [...c.likedBy, uid] };
+      }));
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
@@ -137,6 +162,10 @@ export default function CommentSection({ tournamentId, section, game = "valorant
         .cs-emoji-btn { transition: transform 0.1s; cursor: pointer; user-select: none; }
         .cs-emoji-btn:hover { transform: scale(1.3); }
         .cs-emoji-btn:active { transform: scale(0.9); animation: cs-pulse-send 0.2s; }
+        @keyframes cs-heart-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+        .cs-like-btn { transition: all 0.15s; cursor: pointer; }
+        .cs-like-btn:hover { transform: scale(1.15); }
+        .cs-like-btn:active { animation: cs-heart-pop 0.35s ease; }
         .cs-scrollbar::-webkit-scrollbar { width: 4px; }
         .cs-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .cs-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
@@ -332,6 +361,40 @@ export default function CommentSection({ tournamentId, section, game = "valorant
                       padding: "6px 12px",
                       maxWidth: "100%",
                     }}>{c.text}</div>
+                    {/* Like button */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      {user ? (
+                        <button
+                          className="cs-like-btn"
+                          onClick={(e) => { e.stopPropagation(); handleLike(c.id); }}
+                          style={{
+                            background: "none", border: "none", padding: "2px 6px",
+                            display: "flex", alignItems: "center", gap: 4,
+                            borderRadius: 100,
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24"
+                            fill={c.likedBy.includes(user.uid) ? "#ef4444" : "none"}
+                            stroke={c.likedBy.includes(user.uid) ? "#ef4444" : "rgba(255,255,255,0.25)"}
+                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          >
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                          </svg>
+                          {c.likedBy.length > 0 && (
+                            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: c.likedBy.includes(user.uid) ? "#ef4444" : "rgba(255,255,255,0.25)" }}>{c.likedBy.length}</span>
+                          )}
+                        </button>
+                      ) : (
+                        c.likedBy.length > 0 && (
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 6px", fontSize: "0.62rem", color: "rgba(255,255,255,0.2)" }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="#ef444466" stroke="#ef444466" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                            {c.likedBy.length}
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
                   {/* Delete */}
                   {isOwn && (
