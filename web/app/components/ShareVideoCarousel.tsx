@@ -23,7 +23,7 @@ const SLIDES = [
 ];
 
 const FPS = 30;
-const DURATION_FRAMES = 150; // 5 seconds
+const DURATION_FRAMES = 300; // 10 seconds (animations finish ~3s, holds for ~7s before loop)
 
 interface ShareVideoCarouselProps {
   tournament: ShareSlideData;
