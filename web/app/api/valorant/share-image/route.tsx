@@ -35,6 +35,16 @@ function fmtDate(iso?: string) {
   }
 }
 
+function fmtDateOnly(iso?: string) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  } catch {
+    return "";
+  }
+}
+
 const S = 1080; // canvas size
 
 export async function GET(req: NextRequest) {
@@ -1153,7 +1163,7 @@ export async function GET(req: NextRequest) {
     // ── CARD: RANKS & MAPS ──
     const minRank = t.eligibility?.minRank || "Gold";
     const maxRank = t.eligibility?.maxRank || "Immortal";
-    const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+    const COMP_MAPS = ["Bind", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split"];
     const groupPool = t.mapPool?.groupStage || "All Maps Veto";
     const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
 
@@ -1186,27 +1196,19 @@ export async function GET(req: NextRequest) {
           {name}
         </div>
 
-        {/* Rank Range Card */}
+        {/* Rank Range — All Tiers */}
         <div style={{ display: "flex", flexDirection: "column", padding: "28px 32px", background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`, border: `1.5px solid ${maxColor}30`, borderRadius: 24, marginBottom: 20 }}>
-          {/* Rank names */}
-          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
-            <div style={{ fontSize: 38, fontWeight: 900, color: minColor, display: "flex" }}>{minRank}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1, display: "flex" }} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", display: "flex" }}>to</div>
-              <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1, display: "flex" }} />
-            </div>
-            <div style={{ fontSize: 38, fontWeight: 900, color: maxColor, display: "flex" }}>{maxRank}</div>
-          </div>
-
-          {/* Rank tier visual bar */}
-          <div style={{ display: "flex", gap: 6, width: "100%" }}>
-            {ranksInRange.map((rank) => (
-              <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                <div style={{ width: "100%", height: 8, borderRadius: 4, background: `linear-gradient(90deg, ${rank.color}CC, ${rank.color})`, display: "flex" }} />
-                <div style={{ fontSize: 12, fontWeight: 800, color: rank.color, letterSpacing: "0.08em", display: "flex" }}>{rank.name.toUpperCase()}</div>
-              </div>
-            ))}
+          {/* All rank tier bars */}
+          <div style={{ display: "flex", gap: 5, width: "100%" }}>
+            {RANK_TIERS.map((rank, i) => {
+              const inRange = i >= minIdx && i <= maxIdx;
+              return (
+                <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: "100%", height: 36, borderRadius: 8, background: inRange ? `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)` : `${rank.color}20`, boxShadow: inRange ? `0 0 24px ${rank.color}60` : "none", border: inRange ? `2px solid ${rank.color}` : `1px solid ${rank.color}30`, display: "flex" }} />
+                  <div style={{ fontSize: 10, fontWeight: 900, color: inRange ? rank.color : `${rank.color}50`, letterSpacing: "0.06em", display: "flex" }}>{rank.name.toUpperCase()}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1356,12 +1358,13 @@ export async function GET(req: NextRequest) {
     );
   } else if (type === "format") {
     // ── CARD 5: COMBINED FORMAT & FLOW ──
+    const accentColor = CL.sky;
     const formatSteps = [
-      { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", color: CL.sage },
-      { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, color: CL.lavender },
-      { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, color: CL.steel },
-      { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: CL.amber },
-      { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, color: CL.rose },
+      { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
+      { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
+      { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, date: schedule.groupStageStart || t.startDate, color: accentColor },
+      { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, date: schedule.tourneyStageStart, color: accentColor },
+      { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
     ];
 
     content = (
@@ -1392,7 +1395,7 @@ export async function GET(req: NextRequest) {
                   <div style={{ width: 2, flex: 1, minHeight: 14, background: `linear-gradient(180deg, ${s.color}35, ${formatSteps[i + 1].color}35)`, display: "flex" }} />
                 )}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 10 : 0, justifyContent: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 10 : 0, justifyContent: "center", flex: 1 }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: "0.06em", lineHeight: 1.2, display: "flex" }}>
                   {s.lbl}
                 </div>
@@ -1400,6 +1403,11 @@ export async function GET(req: NextRequest) {
                   {s.sub}
                 </div>
               </div>
+              {fmtDateOnly(s.date) && (
+                <div style={{ display: "flex", alignItems: "center", fontSize: 22, fontWeight: 900, color: s.color, letterSpacing: "0.02em" }}>
+                  {fmtDateOnly(s.date)}
+                </div>
+              )}
             </div>
           ))}
         </div>

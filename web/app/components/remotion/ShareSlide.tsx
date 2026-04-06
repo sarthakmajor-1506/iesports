@@ -98,6 +98,16 @@ function fmtDate(iso?: string) {
   }
 }
 
+function fmtDateOnly(iso?: string) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  } catch {
+    return "";
+  }
+}
+
 function fade(frame: number, start: number, dur = 15) {
   return interpolate(frame, [start, start + dur], [0, 1], {
     extrapolateLeft: "clamp",
@@ -968,7 +978,7 @@ function RanksMapSlide({
   const minRank = t.eligibility?.minRank || "Gold";
   const maxRank = t.eligibility?.maxRank || "Immortal";
 
-  const COMP_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+  const COMP_MAPS = ["Bind", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split"];
 
   const groupPool = t.mapPool?.groupStage || "All Maps Veto";
   const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
@@ -1023,7 +1033,7 @@ function RanksMapSlide({
         {name}
       </div>
 
-      {/* ── Rank Range Card ── */}
+      {/* ── Rank Range — All Tiers ── */}
       <div
         style={{
           display: "flex",
@@ -1037,25 +1047,11 @@ function RanksMapSlide({
           transform: `translateX(${interpolate(frame, [24, 39], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
       >
-        {/* Rank names: Gold → Immortal */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
-          <div style={{ fontSize: 38, fontWeight: 900, color: minColor, textShadow: `0 0 24px ${minColor}50` }}>
-            {minRank}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1 }} />
-            <div style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em" }}>to</div>
-            <div style={{ width: 36, height: 2, background: `linear-gradient(90deg, ${minColor}, ${maxColor})`, borderRadius: 1 }} />
-          </div>
-          <div style={{ fontSize: 38, fontWeight: 900, color: maxColor, textShadow: `0 0 24px ${maxColor}50` }}>
-            {maxRank}
-          </div>
-        </div>
-
-        {/* Rank tier visual bar */}
-        <div style={{ display: "flex", gap: 6, width: "100%" }}>
-          {ranksInRange.map((rank, i) => {
-            const d = 32 + i * 5;
+        {/* All rank tier bars */}
+        <div style={{ display: "flex", gap: 5, width: "100%" }}>
+          {RANK_TIERS.map((rank, i) => {
+            const inRange = i >= minIdx && i <= maxIdx;
+            const d = 28 + i * 4;
             return (
               <div
                 key={rank.name}
@@ -1064,7 +1060,7 @@ function RanksMapSlide({
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 8,
+                  gap: 6,
                   opacity: fade(frame, d, 10),
                   transform: `translateY(${slideY(frame, d, 12, 12)}px)`,
                 }}
@@ -1072,18 +1068,22 @@ function RanksMapSlide({
                 <div
                   style={{
                     width: "100%",
-                    height: 8,
-                    borderRadius: 4,
-                    background: `linear-gradient(90deg, ${rank.color}CC, ${rank.color})`,
-                    boxShadow: `0 0 16px ${rank.color}40`,
+                    height: 36,
+                    borderRadius: 8,
+                    background: inRange
+                      ? `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)`
+                      : `${rank.color}20`,
+                    boxShadow: inRange ? `0 0 24px ${rank.color}60` : "none",
+                    border: inRange ? `2px solid ${rank.color}` : `1px solid ${rank.color}30`,
                   }}
                 />
                 <div
                   style={{
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: rank.color,
-                    letterSpacing: "0.08em",
+                    fontSize: 10,
+                    fontWeight: 900,
+                    color: inRange ? rank.color : `${rank.color}50`,
+                    letterSpacing: "0.06em",
+                    textAlign: "center",
                   }}
                 >
                   {rank.name.toUpperCase()}
@@ -1448,12 +1448,15 @@ function FormatFlowSlide({
   const fmtLabel =
     t.format === "shuffle" ? "SHUFFLE" : t.format === "auction" ? "AUCTION" : "STANDARD";
 
+  const sc = t.schedule || {};
+  const accentColor = C.sky;
+
   const steps = [
-    { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", color: C.sage },
-    { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, color: C.lavender },
-    { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, color: C.steel },
-    { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, color: C.amber },
-    { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, color: C.rose },
+    { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },
+    { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: sc.squadCreation, color: accentColor },
+    { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, date: sc.groupStageStart || t.startDate, color: accentColor },
+    { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, date: sc.tourneyStageStart, color: accentColor },
+    { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
   ];
 
   return (
@@ -1540,6 +1543,7 @@ function FormatFlowSlide({
                   paddingLeft: 20,
                   paddingBottom: i < steps.length - 1 ? 10 : 0,
                   justifyContent: "center",
+                  flex: 1,
                 }}
               >
                 <div
@@ -1557,6 +1561,22 @@ function FormatFlowSlide({
                   {s.sub}
                 </div>
               </div>
+              {fmtDateOnly(s.date) && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: 22,
+                    fontWeight: 900,
+                    color: s.color,
+                    whiteSpace: "nowrap",
+                    paddingRight: 4,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {fmtDateOnly(s.date)}
+                </div>
+              )}
             </div>
           );
         })}
