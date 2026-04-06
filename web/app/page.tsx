@@ -10,6 +10,8 @@ interface Tournament {
   id: string; name: string; game: string; month: string; status: string;
   prizePool: string; entry: string; startDate: string; endDate: string;
   registrationDeadline: string; totalSlots: number; slotsBooked: number; desc: string;
+  championTeamName?: string; championTeamId?: string; entryFee?: number;
+  format?: string;
   schedule?: {
     registrationOpens?: string;
     registrationCloses?: string;
@@ -114,19 +116,24 @@ export default function Home() {
     try { const d = new Date(iso); const day = d.toLocaleDateString("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" }); const month = d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }); return `${ordinal(parseInt(day))} ${month}`; } catch { return iso; }
   };
 
-  const getRegBadge = (t: Tournament): { label: string; isOpen: boolean } => {
+  const isEnded = (t: Tournament) => t.status === "ended" || (t.endDate && new Date() > new Date(t.endDate));
+
+  const getRegBadge = (t: Tournament): { label: string; isOpen: boolean; ended: boolean } => {
+    if (isEnded(t)) {
+      return { label: t.championTeamName ? `Completed · Winner: ${t.championTeamName}` : "Tournament Completed", isOpen: false, ended: true };
+    }
     const now = new Date();
     if (t.registrationDeadline && now > new Date(t.registrationDeadline)) {
       const s = t.schedule;
       if (s?.groupStageStart && now < new Date(s.groupStageStart)) {
-        return { label: `Registration Closed · Group stage starts on ${formatDateShort(s.groupStageStart)}`, isOpen: false };
+        return { label: `Registration Closed · Group stage starts on ${formatDateShort(s.groupStageStart)}`, isOpen: false, ended: false };
       }
       if (s?.tourneyStageStart && now < new Date(s.tourneyStageStart)) {
-        return { label: `Group Stage Live · Playoffs start on ${formatDateShort(s.tourneyStageStart)}`, isOpen: false };
+        return { label: `Group Stage Live · Playoffs start on ${formatDateShort(s.tourneyStageStart)}`, isOpen: false, ended: false };
       }
-      return { label: "Registration Closed", isOpen: false };
+      return { label: "Registration Closed", isOpen: false, ended: false };
     }
-    return { label: "Registration Open", isOpen: true };
+    return { label: "Registration Open", isOpen: true, ended: false };
   };
 
   return (
@@ -490,32 +497,55 @@ export default function Home() {
               {/* Valorant Tournament */}
               {featuredValTournament && (() => {
                 const valBadge = getRegBadge(featuredValTournament);
+                const valEnded = valBadge.ended;
                 return (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer" }}>
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer", ...(valEnded ? { opacity: 0.85 } : {}) }}>
                   <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge val">{valBadge.isOpen && <span className="ie-pulse" style={{ background: "#ff4655" }} />} {valBadge.label}</div>
+                    <div className="ie-tourn-badge val" style={valEnded ? { background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" } : {}}>
+                      {valBadge.isOpen && <span className="ie-pulse" style={{ background: "#ff4655" }} />}
+                      {valEnded && <span style={{ fontSize: "0.72rem" }}>🏆</span>}
+                      {valBadge.label}
+                    </div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
+                    {valEnded && featuredValTournament.championTeamName && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: "1.1rem" }}>🏆</span>
+                        <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredValTournament.championTeamName}</span>
+                      </div>
+                    )}
                     <div className="ie-tourn-desc">{featuredValTournament.desc}</div>
                     <div className="ie-tourn-meta">
                       {[
                         { icon: "🎮", label: featuredValTournament.game || "Valorant" },
                         { icon: "🏆", label: featuredValTournament.prizePool || "TBD" },
-                        { icon: "🎟️", label: (featuredValTournament as any).entryFee > 0 ? `₹${(featuredValTournament as any).entryFee}` : featuredValTournament.entry || "Free" },
+                        { icon: "🎟️", label: featuredValTournament.entryFee && featuredValTournament.entryFee > 0 ? `₹${featuredValTournament.entryFee}` : featuredValTournament.entry || "Free" },
                         { icon: "📅", label: featuredValTournament.startDate?.includes("T") ? new Date(featuredValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredValTournament.startDate },
+                        ...(valEnded ? [{ icon: "👥", label: `${featuredValTournament.slotsBooked} players` }] : []),
                       ].map(c => (
                         <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
                       ))}
                     </div>
                   </div>
                   <div className="ie-tourn-right">
-                    <div className="ie-slots-num" style={{ color: "#ff4655" }}>{valSlotsLeft}</div>
-                    <div className="ie-slots-label">slots remaining</div>
-                    <div className="ie-slots-bar">
-                      <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
-                    </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
-                      View Tournament →
-                    </button>
+                    {valEnded ? (
+                      <>
+                        <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Tournament Completed</div>
+                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                          View Results →
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="ie-slots-num" style={{ color: "#ff4655" }}>{valSlotsLeft}</div>
+                        <div className="ie-slots-label">slots remaining</div>
+                        <div className="ie-slots-bar">
+                          <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#ff4655" }} />
+                        </div>
+                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+                          View Tournament →
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 );

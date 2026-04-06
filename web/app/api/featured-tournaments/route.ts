@@ -11,15 +11,26 @@ export async function GET() {
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     // ── Valorant: fetch from "valorantTournaments" collection ──
+    const now = new Date();
     const valSnap = await adminDb.collection("valorantTournaments").get();
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const valIsEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
     const valFeatured = valAll
-      .filter((t: any) => !t.isTestTournament && (t.status === "upcoming" || t.status === "active"))
+      .filter((t: any) => !t.isTestTournament && !valIsEnded(t))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+    // If no active/upcoming Valorant tournament, show the most recent ended one
+    let valResult = valFeatured.length > 0 ? valFeatured[0] : null;
+    if (!valResult) {
+      const valEnded = valAll
+        .filter((t: any) => !t.isTestTournament && valIsEnded(t))
+        .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      if (valEnded.length > 0) valResult = valEnded[0];
+    }
 
     return NextResponse.json({
       dota: dotaFeatured.length > 0 ? dotaFeatured[0] : null,
-      valorant: valFeatured.length > 0 ? valFeatured[0] : null,
+      valorant: valResult,
       debug: {
         dotaTotal: dotaSnap.size,
         dotaFiltered: dotaFeatured.length,

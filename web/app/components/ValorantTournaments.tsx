@@ -43,6 +43,8 @@ export default function ValorantTournaments() {
     try { const d = new Date(iso); const day = parseInt(d.toLocaleDateString("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" })); const month = d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }); const year = d.toLocaleDateString("en-IN", { year: "numeric", timeZone: "Asia/Kolkata" }); return `${ordinal(day)} ${month} ${year}`; } catch { return iso; }
   };
 
+  const isEffectivelyEnded = (t: ValorantTournament) => t.status === "ended" || (t.endDate && new Date() > new Date(t.endDate));
+
   const getRegistrationState = (t: ValorantTournament): "open" | "not_yet" | "closed" => {
     const now = new Date();
     const deadline = new Date(t.registrationDeadline);
@@ -153,10 +155,10 @@ export default function ValorantTournaments() {
           <div className="vt-empty"><div className="vt-empty-icon">🎯</div><p className="vt-empty-text">No Valorant tournaments yet. Check back soon!</p></div>
         ) : (
           <>
-            {tournaments.filter(t => t.status !== "ended").length > 0 && (
+            {tournaments.filter(t => !isEffectivelyEnded(t)).length > 0 && (
               <>
                 <div className="vt-section-label">Upcoming & Active</div>
-                {tournaments.filter(t => t.status !== "ended").map((t) => {
+                {tournaments.filter(t => !isEffectivelyEnded(t)).map((t) => {
                   const slotsLeft = t.totalSlots - t.slotsBooked;
                   const isRegistered = registeredIds.has(t.id);
                   const regState = getRegistrationState(t);
@@ -236,10 +238,10 @@ export default function ValorantTournaments() {
                 })}
               </>
             )}
-            {tournaments.filter(t => t.status === "ended").length > 0 && (
+            {tournaments.filter(t => isEffectivelyEnded(t)).length > 0 && (
               <>
                 <div className="vt-section-label" style={{ marginTop: 24 }}>Past Tournaments</div>
-                {tournaments.filter(t => t.status === "ended").map((t) => {
+                {tournaments.filter(t => isEffectivelyEnded(t)).map((t) => {
                   const hasWinner = !!(t as any).championTeamName;
                   const winnerName = (t as any).championTeamName || null;
                   return (

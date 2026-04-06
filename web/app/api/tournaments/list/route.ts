@@ -14,13 +14,15 @@ export async function GET(req: NextRequest) {
     const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     if (game === "valorant") {
+      const now = new Date();
       const visible = all.filter((t: any) => !t.isTestTournament);
+      const isEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
       const ended = visible
-        .filter((t: any) => t.status === "ended")
+        .filter((t: any) => isEnded(t))
         .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
         .slice(0, 1);
       const upcoming = visible
-        .filter((t: any) => t.status === "upcoming" || t.status === "active")
+        .filter((t: any) => !isEnded(t))
         .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
         .slice(0, 3);
       return NextResponse.json({ tournaments: [...ended, ...upcoming] });
