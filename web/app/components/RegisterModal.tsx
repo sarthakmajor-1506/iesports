@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, getDocFromServer, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import {
   RecaptchaVerifier,
@@ -165,7 +165,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const hasRiot = riotStatus === "verified";
   const riotPending = riotStatus === "pending";
   const hasDiscord = !!userProfile?.discordId || !!user?.discordId || !!dotaProfile?.discordId || localDiscord;
-  const hasPhone = !!userProfile?.phone || !!user?.phoneNumber || phoneDone || localPhone;
+  const hasPhone = (!!userProfile?.phone && userProfile.phone.length > 3) || phoneDone || localPhone;
   const hasFullName = fullNameSaved && fullName.trim().length >= 2;
 
   // Keep fullName in sync if userProfile loads after mount
@@ -180,13 +180,15 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const refreshUserState = async () => {
     if (!user) return;
     try {
-      const snap = await getDoc(doc(db, "users", user.uid));
+      let snap;
+      try { snap = await getDocFromServer(doc(db, "users", user.uid)); } catch { snap = await getDoc(doc(db, "users", user.uid)); }
       const d = snap.data();
       if (!d) return;
       if (d.discordId) setLocalDiscord(true);
       if (d.steamId) setLocalSteam(true);
-      if (d.phone) setLocalPhone(true);
+      if (d.phone && d.phone.length > 3) setLocalPhone(true);
       if (d.riotVerified) setLocalRiot(d.riotVerified);
+      if (d.riotGameName && !d.riotVerified) setLocalRiot("pending");
       if (d.fullName && !fullNameSaved) {
         setFullName(d.fullName);
         setFullNameSaved(true);
@@ -466,13 +468,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {/* ── FULL NAME ── */}
             {currentReq?.id === "fullName" && (
               <div style={{ animation: "reg-fade-in 0.3s ease" }}>
-                <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u{1F9D1}\u200D\u{1F4BB}"}</div>
-                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>What&apos;s your name?</h3>
-                  <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>Used for team rosters, match results, and prize payouts</p>
-                </div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 6 }}>Enter your full name</p>
+                <p style={{ fontSize: 11, color: "#666", marginBottom: 12, lineHeight: 1.4 }}>Used for team rosters, match results, and prize payouts</p>
                 <input
-                  type="text" placeholder="Enter your full name" value={fullName}
+                  type="text" placeholder="Full name" value={fullName}
                   onChange={(e) => { setFullName(e.target.value); setFullNameSaved(false); }}
                   disabled={fullNameSaving}
                   onKeyDown={(e) => { if (e.key === "Enter" && fullName.trim().length >= 2) saveFullName(); }}
