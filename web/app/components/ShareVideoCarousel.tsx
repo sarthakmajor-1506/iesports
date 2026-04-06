@@ -23,7 +23,7 @@ const SLIDES = [
 ];
 
 const FPS = 30;
-const DURATION_FRAMES = 300; // 10 seconds (animations finish ~3s, holds for ~7s before loop)
+const DURATION_FRAMES = 300; // 10 seconds at 30fps
 
 interface ShareVideoCarouselProps {
   tournament: ShareSlideData;
@@ -97,12 +97,11 @@ export default function ShareVideoCarousel({
     }
   }, [tournamentId, current.type, onToast, copying]);
 
-  // Two-phase video recording:
-  // Phase 1: Capture keyframes (every CAPTURE_STEP-th frame) as ImageBitmaps — ~5x fewer html2canvas calls
-  // Phase 2: Encode at full framerate by holding each capture for CAPTURE_STEP encoded frames
-  const CAPTURE_STEP = 5; // capture every 5th frame → 30 captures instead of 150
+  // MP4 video recording using WebCodecs VideoEncoder + mp4-muxer
+  // Captures every 3rd frame via html2canvas, encodes H.264, outputs .mp4
+  const CAPTURE_STEP = 3;
   const CAPTURE_COUNT = Math.ceil(DURATION_FRAMES / CAPTURE_STEP);
-  const ENCODE_SIZE = 720; // encode at 720p instead of 1080p for speed
+  const ENCODE_SIZE = 1080;
 
   const recordVideo = useCallback(async () => {
     if (recording) return;
@@ -116,10 +115,11 @@ export default function ShareVideoCarousel({
 
       player.pause();
       const html2canvas = (await import("html2canvas")).default;
+      const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
       const el = container as HTMLElement;
       const captureScale = ENCODE_SIZE / el.clientWidth;
 
-      // ── Phase 1: Capture keyframes ──
+      // ── Phase 1: Capture keyframes as ImageBitmaps ──
       const frameBitmaps: ImageBitmap[] = [];
 
       for (let k = 0; k < CAPTURE_COUNT; k++) {
@@ -141,65 +141,84 @@ export default function ShareVideoCarousel({
 
         const bitmap = await createImageBitmap(captured);
         frameBitmaps.push(bitmap);
-        setRecordProgress(Math.round(((k + 1) / CAPTURE_COUNT) * 85));
+        setRecordProgress(Math.round(((k + 1) / CAPTURE_COUNT) * 50));
       }
 
-      // ── Phase 2: Encode at full framerate ──
-      const canvas = document.createElement("canvas");
-      canvas.width = ENCODE_SIZE;
-      canvas.height = ENCODE_SIZE;
-      const ctx = canvas.getContext("2d")!;
-
-      const stream = canvas.captureStream(0);
-      const track = stream.getVideoTracks()[0];
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm",
-        videoBitsPerSecond: 4_000_000,
+      // ── Phase 2: Encode to MP4 using WebCodecs + mp4-muxer ──
+      const target = new ArrayBufferTarget();
+      const muxer = new Muxer({
+        target,
+        video: {
+          codec: "avc",
+          width: ENCODE_SIZE,
+          height: ENCODE_SIZE,
+        },
+        fastStart: "in-memory",
       });
 
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-
-      const done = new Promise<Blob>((resolve) => {
-        recorder.onstop = () =>
-          resolve(new Blob(chunks, { type: recorder.mimeType }));
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => {
+          muxer.addVideoChunk(chunk, meta);
+        },
+        error: (e) => console.error("VideoEncoder error:", e),
       });
 
-      recorder.start();
+      encoder.configure({
+        codec: "avc1.640028", // H.264 High Profile Level 4.0
+        width: ENCODE_SIZE,
+        height: ENCODE_SIZE,
+        bitrate: 8_000_000,
+        framerate: FPS,
+      });
 
-      // Write DURATION_FRAMES encoded frames, holding each bitmap for CAPTURE_STEP frames
+      // Draw each frame to an offscreen canvas and encode
+      const offscreen = new OffscreenCanvas(ENCODE_SIZE, ENCODE_SIZE);
+      const ctx = offscreen.getContext("2d")!;
+
       for (let i = 0; i < DURATION_FRAMES; i++) {
-        const bitmapIdx = Math.min(Math.floor(i / CAPTURE_STEP), frameBitmaps.length - 1);
+        const bitmapIdx = Math.min(
+          Math.floor(i / CAPTURE_STEP),
+          frameBitmaps.length - 1
+        );
         ctx.clearRect(0, 0, ENCODE_SIZE, ENCODE_SIZE);
         ctx.drawImage(frameBitmaps[bitmapIdx], 0, 0, ENCODE_SIZE, ENCODE_SIZE);
 
-        if ("requestFrame" in track) {
-          (track as any).requestFrame();
-        }
+        const frame = new VideoFrame(offscreen, {
+          timestamp: (i * 1_000_000) / FPS, // microseconds
+          duration: 1_000_000 / FPS,
+        });
 
-        await new Promise((r) => setTimeout(r, 1000 / FPS));
-        setRecordProgress(85 + Math.round(((i + 1) / DURATION_FRAMES) * 15));
+        const keyFrame = i % (FPS * 2) === 0; // keyframe every 2 seconds
+        encoder.encode(frame, { keyFrame });
+        frame.close();
+
+        // Flush periodically to prevent memory buildup
+        if (i % 30 === 29) await encoder.flush();
+
+        setRecordProgress(50 + Math.round(((i + 1) / DURATION_FRAMES) * 48));
       }
 
-      recorder.stop();
-      const blob = await done;
+      await encoder.flush();
+      encoder.close();
+      muxer.finalize();
 
       frameBitmaps.forEach((b) => b.close());
 
-      const url = URL.createObjectURL(blob);
+      const mp4Blob = new Blob([target.buffer], { type: "video/mp4" });
+      const url = URL.createObjectURL(mp4Blob);
       const a = document.createElement("a");
-      a.download = `${(tournament.name || "tournament").replace(/\s+/g, "_")}_${current.type}.webm`;
+      a.download = `${(tournament.name || "tournament").replace(/\s+/g, "_")}_${current.type}.mp4`;
       a.href = url;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
 
       player.seekTo(0);
       player.play();
+      setRecordProgress(100);
     } catch (err) {
       console.error("Video recording failed:", err);
       downloadPng();

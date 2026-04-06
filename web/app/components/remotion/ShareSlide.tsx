@@ -671,7 +671,7 @@ function OverviewSlide({
     t.format === "shuffle" ? "SHUFFLE" : t.format === "auction" ? "AUCTION" : "STANDARD";
   const hasPrize = t.prizePool && t.prizePool !== "0";
   const prizeDisplay = hasPrize
-    ? String(t.prizePool).replace(/^Rs\.?\s?/, "Rs.")
+    ? "Rs. " + String(t.prizePool).replace(/^Rs\.?\s?/, "").trim()
     : "";
 
   return (

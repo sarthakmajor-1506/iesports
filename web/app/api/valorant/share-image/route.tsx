@@ -608,7 +608,7 @@ export async function GET(req: NextRequest) {
     // ── CARD 1: TOURNAMENT OVERVIEW (hero card) ──
     const hasPrize = t.prizePool && t.prizePool !== "0";
     const prizeDisplay = hasPrize
-      ? String(t.prizePool).replace(/^Rs\.?\s?/, "Rs.")
+      ? "Rs. " + String(t.prizePool).replace(/^Rs\.?\s?/, "").trim()
       : "";
 
     content = (
