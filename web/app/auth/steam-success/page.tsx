@@ -19,7 +19,11 @@ function SteamSuccessInner() {
     signInWithCustomToken(auth, token)
       .then(() => {
         let dest = "/valorant";
-        try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
+        try {
+          const pending = localStorage.getItem("pendingRegistration");
+          if (pending) { dest = pending + "?register=true"; localStorage.removeItem("pendingRegistration"); }
+          else { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } }
+        } catch {}
         router.replace(dest);
       })
       .catch((e) => {

@@ -490,7 +490,13 @@ function ValorantTournamentDetailInner() {
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [unregLoading, setUnregLoading] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
+  const [showRegister, setShowRegister] = useState(() => {
+    if (typeof window !== "undefined" && searchParams.get("register") === "true") {
+      try { localStorage.removeItem("pendingRegistration"); } catch {}
+      return true;
+    }
+    return false;
+  });
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);

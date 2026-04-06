@@ -778,8 +778,14 @@ export default function ConnectRiot() {
                   You can browse Valorant tournaments while you wait.
                 </div>
                 <span className="cr-status-badge pending">⏳ Pending Review</span>
-                <button className="cr-btn" onClick={() => router.push("/valorant")} style={{ marginTop: 24 }}>
-                  Browse Valorant Tournaments →
+                <button className="cr-btn" onClick={() => {
+                  try {
+                    const pending = localStorage.getItem("pendingRegistration");
+                    if (pending) { localStorage.removeItem("pendingRegistration"); router.push(pending + "?register=true"); return; }
+                  } catch {}
+                  router.push("/valorant");
+                }} style={{ marginTop: 24 }}>
+                  {typeof window !== "undefined" && localStorage.getItem("pendingRegistration") ? "Return to Registration →" : "Browse Valorant Tournaments →"}
                 </button>
               </div>
             </div>

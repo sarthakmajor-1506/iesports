@@ -299,7 +299,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       met: hasRiot,
       pending: riotPending,
       actionLabel: "Connect Riot ID",
-      action: () => { window.open("/connect-riot", "_blank"); },
+      action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open("/connect-riot", "_blank"); },
     });
   } else {
     requirements.push({
@@ -309,7 +309,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       emoji: "\u{1F3AE}",
       met: hasSteam,
       actionLabel: "Connect Steam",
-      action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); },
+      action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); },
     });
   }
 
@@ -321,10 +321,20 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     emoji: "\u{1F4AC}",
     met: hasDiscord,
     actionLabel: "Connect Discord",
-    action: () => { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); window.open(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname)}`, "_blank"); },
+    action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname + "?register=true")}`, "_blank"); },
   });
 
   const unmetRequirements = requirements.filter(r => !r.met && !r.pending);
+
+  // ── Wizard navigation ──
+  const currentReqIdx = requirements.findIndex(r => !r.met && !r.pending);
+  const currentReq = currentReqIdx >= 0 ? requirements[currentReqIdx] : null;
+  const completedCount = requirements.filter(r => r.met || r.pending).length;
+  const currentDcMatch = currentReq?.id === "steam" && !hasSteam && discordSteam
+    ? discordSteam
+    : currentReq?.id === "riot" && !hasRiot && !riotPending && discordRiot
+      ? discordRiot
+      : null;
 
   const handleCreateTeam = async () => {
     setLoading(true); setError("");
@@ -368,58 +378,157 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   };
 
   return (
-    <div style={{
+    <>
+    <style>{`
+      @media(max-width:480px){
+        .reg-overlay{align-items:flex-end !important}
+        .reg-modal{max-width:100% !important;border-radius:20px 20px 0 0 !important;max-height:90vh !important;padding:20px 16px 28px !important;border-bottom:none !important}
+      }
+      @keyframes reg-fade-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes reg-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    `}</style>
+    <div className="reg-overlay" style={{
       position: "fixed", inset: 0, zIndex: 100,
       background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
+      <div className="reg-modal" style={{
         background: "#0e0e0e", border: "1px solid #1a1a1a", borderRadius: 16,
-        padding: 32, width: "100%", maxWidth: 460, position: "relative",
+        padding: 24, width: "100%", maxWidth: 400, position: "relative",
+        maxHeight: "90vh", overflowY: "auto" as const,
       }}>
         <button onClick={onClose} style={{
-          position: "absolute", top: 16, right: 16,
+          position: "absolute", top: 14, right: 14,
           background: "transparent", border: "none", color: "#444",
-          fontSize: 20, cursor: "pointer", lineHeight: 1,
+          fontSize: 18, cursor: "pointer", lineHeight: 1, zIndex: 2,
         }}>✕</button>
 
-        <p style={{ color: accentColor, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>🏆 REGISTER</p>
-        <h2 style={{ fontSize: 18, fontWeight: 800, marginTop: 4, marginBottom: 16, color: "#fff" }}>{tournament.name}</h2>
+        <p style={{ color: accentColor, fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 2 }}>REGISTER</p>
+        <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 0, color: "#fff", paddingRight: 24 }}>{tournament.name}</h2>
 
-        {/* ═══════ CONNECT STEP — shows when any requirements are missing ═══════ */}
+        {/* Progress stepper — only during connect wizard */}
+        {actualStep === "connect" && (
+          <div style={{ display: "flex", gap: 4, marginTop: 14, marginBottom: 18 }}>
+            {requirements.map((req, i) => (
+              <div key={req.id} style={{
+                flex: 1, height: 3, borderRadius: 2,
+                background: req.met || req.pending ? "#4ade80" : i === currentReqIdx ? accentColor : "#222",
+                transition: "background 0.4s ease",
+              }} />
+            ))}
+          </div>
+        )}
+        {actualStep !== "connect" && <div style={{ height: 16 }} />}
+
+        <div id="reg-recaptcha" style={{ position: "absolute", opacity: 0, pointerEvents: "none" as const }} />
+
+        {/* ═══════ CONNECT WIZARD — one step at a time ═══════ */}
         {actualStep === "connect" && (
           <div>
-            {!showPhoneOtp && <div style={{
-              background: "linear-gradient(135deg, rgba(59,130,246,0.08), #0e0e0e)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 12,
-              padding: "16px 18px", marginBottom: 20, position: "relative", overflow: "hidden",
-            }}>
-              <div style={{ position: "absolute", top: -20, right: -10, fontSize: 60, opacity: 0.05 }}>{"\u{1F6E1}\uFE0F"}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 16 }}>{"\u2728"}</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#93c5fd" }}>Almost there! Complete these to register</span>
+            {/* All steps — done / current / pending */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
+              {requirements.map((req, i) => {
+                const isCurrent = i === currentReqIdx;
+                const isDone = req.met;
+                const isPending = req.pending;
+                return (
+                  <div key={req.id} style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 12px", borderRadius: 8,
+                    background: isCurrent ? `${accentColor}10` : "transparent",
+                    border: isCurrent ? `1px solid ${accentColor}30` : "1px solid transparent",
+                    transition: "all 0.3s ease",
+                  }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 10, fontWeight: 800, flexShrink: 0,
+                      background: isDone ? "#0a2a0a" : isPending ? "#1a1200" : isCurrent ? `${accentColor}20` : "#111",
+                      color: isDone ? "#4ade80" : isPending ? "#fbbf24" : isCurrent ? accentColor : "#444",
+                      border: `1.5px solid ${isDone ? "#22c55e" : isPending ? "#fbbf24" : isCurrent ? accentColor : "#222"}`,
+                    }}>
+                      {isDone ? "\u2713" : isPending ? "\u23F3" : i + 1}
+                    </div>
+                    <span style={{
+                      fontSize: 12, fontWeight: isCurrent ? 700 : 500,
+                      color: isDone ? "#4ade80" : isPending ? "#fbbf24" : isCurrent ? "#fff" : "#555",
+                    }}>
+                      {req.label}
+                    </span>
+                    {isDone && <span style={{ fontSize: 10, color: "#4ade80", marginLeft: "auto", fontWeight: 600 }}>Done</span>}
+                    {isPending && <span style={{ fontSize: 10, color: "#fbbf24", marginLeft: "auto", fontWeight: 600 }}>Verifying</span>}
+                    {isCurrent && <span style={{ fontSize: 10, color: accentColor, marginLeft: "auto", fontWeight: 600, animation: "reg-pulse 2s ease infinite" }}>Current</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── FULL NAME ── */}
+            {currentReq?.id === "fullName" && (
+              <div style={{ animation: "reg-fade-in 0.3s ease" }}>
+                <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u{1F9D1}\u200D\u{1F4BB}"}</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>What&apos;s your name?</h3>
+                  <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>Used for team rosters, match results, and prize payouts</p>
+                </div>
+                <input
+                  type="text" placeholder="Enter your full name" value={fullName}
+                  onChange={(e) => { setFullName(e.target.value); setFullNameSaved(false); }}
+                  disabled={fullNameSaving}
+                  onKeyDown={(e) => { if (e.key === "Enter" && fullName.trim().length >= 2) saveFullName(); }}
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "13px 16px", background: "#111",
+                    border: "1.5px solid #222", borderRadius: 10,
+                    color: "#fff", fontSize: 15, outline: "none", boxSizing: "border-box" as const,
+                    marginBottom: 12,
+                  }}
+                />
+                {fullName.trim().length > 0 && fullName.trim().length < 2 && (
+                  <p style={{ fontSize: 11, color: "#dc2626", marginBottom: 8 }}>Name must be at least 2 characters</p>
+                )}
+                <button onClick={saveFullName} disabled={fullNameSaving || fullName.trim().length < 2} style={{
+                  width: "100%", padding: 14,
+                  background: fullNameSaving || fullName.trim().length < 2 ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                  border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
+                  cursor: fullNameSaving || fullName.trim().length < 2 ? "default" : "pointer",
+                  opacity: fullName.trim().length < 2 ? 0.4 : 1,
+                  transition: "opacity 0.2s ease",
+                }}>
+                  {fullNameSaving ? "Saving..." : "Continue \u2192"}
+                </button>
               </div>
-              <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
-                We need a few details to ensure fair play, coordinate matches, and deliver prizes.
-              </p>
-            </div>}
+            )}
 
-            <style>{`@keyframes reg-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
-
-            <div id="reg-recaptcha" />
-
-            {/* ── Inline Phone OTP Flow ── */}
-            {showPhoneOtp && (
-              <div style={{ marginBottom: 16 }}>
-                {phoneStep === "phone" && (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <p style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>Connect Phone Number</p>
+            {/* ── PHONE ── */}
+            {currentReq?.id === "phone" && (
+              <div style={{ animation: "reg-fade-in 0.3s ease" }}>
+                {phoneStep === "phone" && !showPhoneOtp && (
+                  <div>
+                    <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
+                      <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u{1F4F2}"}</div>
+                      <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Verify your phone</h3>
+                      <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>For match reminders and prize claim verification</p>
+                    </div>
+                    <button onClick={() => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); }} style={{
+                      width: "100%", padding: 14,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    }}>
+                      {"Verify Phone Number \u2192"}
+                    </button>
+                  </div>
+                )}
+                {showPhoneOtp && phoneStep === "phone" && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                      <h3 style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>Enter phone number</h3>
                       <button onClick={() => setShowPhoneOtp(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                     </div>
-                    <p style={{ fontSize: 12, color: "#888", marginBottom: 14, lineHeight: 1.5 }}>We'll send a 6-digit OTP to verify your number.</p>
+                    <p style={{ fontSize: 12, color: "#888", marginBottom: 14, lineHeight: 1.5 }}>We&apos;ll send a 6-digit OTP to verify.</p>
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                       <select value={countryCode} onChange={e => setCountryCode(e.target.value)} style={{
-                        flex: "0 0 88px", padding: "10px 6px", border: "1.5px solid #333", borderRadius: 8,
+                        flex: "0 0 84px", padding: "12px 6px", border: "1.5px solid #222", borderRadius: 10,
                         fontSize: 13, background: "#111", color: "#fff", fontFamily: "inherit",
                       }}>
                         {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
@@ -427,258 +536,169 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                       <input ref={phoneRef} type="tel" inputMode="numeric" placeholder="9876543210"
                         value={phoneNum} onChange={e => setPhoneNum(e.target.value.replace(/\D/g, "").slice(0, 10))}
                         onKeyDown={e => { if (e.key === "Enter") sendOtp(); }} maxLength={10}
+                        autoFocus
                         style={{
-                          flex: 1, padding: "10px 14px", border: "1.5px solid #333", borderRadius: 8,
-                          fontSize: 14, background: "#111", color: "#fff", outline: "none",
+                          flex: 1, padding: "12px 14px", border: "1.5px solid #222", borderRadius: 10,
+                          fontSize: 15, background: "#111", color: "#fff", outline: "none",
                         }}
                       />
                     </div>
                     {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
                     <button onClick={sendOtp} disabled={phoneLoading} style={{
-                      width: "100%", padding: 12, background: phoneLoading ? "#333" : "#3B82F6",
-                      border: "none", borderRadius: 100, color: "#fff", fontWeight: 700, fontSize: 14,
+                      width: "100%", padding: 14,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
-                      {phoneLoading ? "Sending OTP..." : "Send OTP →"}
+                      {phoneLoading ? "Sending OTP..." : "Send OTP \u2192"}
                     </button>
-                  </>
+                  </div>
                 )}
-                {phoneStep === "otp" && (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <button onClick={() => { setPhoneStep("phone"); setPhoneError(""); setOtp(["","","","","",""]); clearRecaptcha(); setVerificationId(""); }} style={{ background: "none", border: "none", color: "#3B82F6", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>← Back</button>
+                {showPhoneOtp && phoneStep === "otp" && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                      <button onClick={() => { setPhoneStep("phone"); setPhoneError(""); setOtp(["","","","","",""]); clearRecaptcha(); setVerificationId(""); }} style={{ background: "none", border: "none", color: accentColor, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>{"\u2190 Back"}</button>
                       <button onClick={() => setShowPhoneOtp(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                     </div>
-                    <p style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Enter OTP</p>
-                    <p style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>6-digit code sent to {countryCode} {phoneNum}</p>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "space-between", marginBottom: 8 }} onPaste={handleOtpPaste}>
+                    <div style={{ textAlign: "center" as const, marginBottom: 14 }}>
+                      <h3 style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Enter OTP</h3>
+                      <p style={{ fontSize: 12, color: "#888" }}>Sent to {countryCode} {phoneNum}</p>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 10 }} onPaste={handleOtpPaste}>
                       {otp.map((digit, i) => (
                         <input key={i} ref={el => { otpRefs.current[i] = el; }}
                           type="tel" inputMode="numeric" maxLength={1} value={digit}
                           onChange={e => handleOtpChange(i, e.target.value)}
                           onKeyDown={e => handleOtpKeyDown(i, e)}
                           style={{
-                            width: 44, height: 50, textAlign: "center" as const, border: "1.5px solid #333",
-                            borderRadius: 8, fontSize: 20, fontWeight: 700, fontFamily: "inherit",
+                            width: 42, height: 48, textAlign: "center" as const, border: "1.5px solid #222",
+                            borderRadius: 10, fontSize: 20, fontWeight: 700, fontFamily: "inherit",
                             background: "#111", color: "#fff", outline: "none",
                           }}
-                          onFocus={e => { e.currentTarget.style.borderColor = "#3B82F6"; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = "#333"; }}
+                          onFocus={e => { e.currentTarget.style.borderColor = accentColor; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = "#222"; }}
                         />
                       ))}
                     </div>
-                    {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
+                    {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8, textAlign: "center" as const }}>{phoneError}</p>}
                     <button onClick={() => verifyOtpStr(otp.join(""))} disabled={phoneLoading} style={{
-                      width: "100%", padding: 12, background: phoneLoading ? "#333" : "#3B82F6",
-                      border: "none", borderRadius: 100, color: "#fff", fontWeight: 700, fontSize: 14,
-                      cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit", marginTop: 4,
+                      width: "100%", padding: 14,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
+                      cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
-                      {phoneLoading ? "Verifying..." : "Verify & Link"}
+                      {phoneLoading ? "Verifying..." : "Verify \u2192"}
                     </button>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                      <span />
                       <button disabled={resendTimer > 0} onClick={() => { setOtp(["","","","","",""]); setPhoneError(""); clearRecaptcha(); setVerificationId(""); sendOtp(); }} style={{
-                        background: "none", border: "none", color: resendTimer > 0 ? "#555" : "#3B82F6",
+                        background: "none", border: "none", color: resendTimer > 0 ? "#333" : accentColor,
                         fontSize: 12, fontWeight: 600, cursor: resendTimer > 0 ? "default" : "pointer", fontFamily: "inherit",
-                      }}>Resend OTP</button>
-                      {resendTimer > 0 && <span style={{ fontSize: 12, color: "#555" }}>Resend in {resendTimer}s</span>}
+                      }}>{resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}</button>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Full Name Input */}
-            {!showPhoneOtp && <div style={{
-              marginBottom: 14, padding: "14px 16px",
-              background: hasFullName ? "linear-gradient(135deg, #0a1a0a, #0e1a0e)" : "#111",
-              border: `1px solid ${hasFullName ? "#166534" : "#333"}`, borderRadius: 12,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: hasFullName ? 0 : 10 }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{"\u{1F9D1}\u200D\u{1F4BB}"}</span>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, fontSize: 13, color: hasFullName ? "#4ade80" : "#fff", marginBottom: 2 }}>
-                    Full Name
-                    {hasFullName && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "3px 8px", borderRadius: 100, border: "1px solid #166534", marginLeft: 8 }}>{"\u2705"} Saved</span>}
-                  </p>
-                  <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>Used for team rosters, match results, and prize payouts</p>
+            {/* ── RIOT / STEAM ── */}
+            {(currentReq?.id === "riot" || currentReq?.id === "steam") && (
+              <div style={{ animation: "reg-fade-in 0.3s ease" }}>
+                <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>{currentReq.emoji}</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Connect {currentReq.label}</h3>
+                  <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>{currentReq.desc}</p>
                 </div>
-              </div>
-              {!hasFullName && (
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <input
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChange={(e) => { setFullName(e.target.value); setFullNameSaved(false); }}
-                    disabled={fullNameSaving}
-                    style={{
-                      flex: 1, padding: "10px 14px", background: "#0a0a0a",
-                      border: "1px solid #222", borderRadius: 8,
-                      color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" as const,
-                    }}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveFullName(); }}
-                  />
-                  {fullName.trim().length >= 2 && (
-                    <button onClick={saveFullName} disabled={fullNameSaving} style={{
-                      padding: "10px 16px", background: fullNameSaving ? "#333" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
-                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12,
-                      cursor: fullNameSaving ? "default" : "pointer", whiteSpace: "nowrap" as const,
+
+                {currentDcMatch && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{
+                      padding: "12px 14px", background: "rgba(88,101,242,0.08)", borderRadius: 10,
+                      border: "1px solid rgba(88,101,242,0.2)", marginBottom: 10,
+                      display: "flex", alignItems: "center", gap: 10,
                     }}>
-                      {fullNameSaving ? "..." : "Save"}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#818cf8" style={{ flexShrink: 0 }}><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.12-.098.246-.198.373-.292a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419s.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419s.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#a5b4fc" }}>Found on your Discord</p>
+                        <p style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginTop: 2 }}>{currentDcMatch.name}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => linkFromDiscord(currentReq.id === "steam" ? "steam" : "riot")} disabled={!!linkingFromDiscord} style={{
+                      width: "100%", padding: 13,
+                      background: linkingFromDiscord ? "#222" : "linear-gradient(135deg, #5865F2, #4752C4)",
+                      border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 13,
+                      cursor: linkingFromDiscord ? "default" : "pointer", fontFamily: "inherit", marginBottom: 8,
+                    }}>
+                      {linkingFromDiscord === (currentReq.id === "steam" ? "steam" : "riot") ? "Linking..." : `Use ${currentDcMatch.name}`}
                     </button>
-                  )}
-                </div>
-              )}
-              {!hasFullName && fullName.trim().length > 0 && fullName.trim().length < 2 && (
-                <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Name must be at least 2 characters</p>
-              )}
-            </div>}
+                    {linkFromDiscordError && <p style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>{linkFromDiscordError}</p>}
+                    <div style={{ textAlign: "center" as const }}>
+                      <button onClick={currentReq.action} style={{
+                        background: "none", border: "none", color: "#555", fontSize: 12,
+                        cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" as const,
+                      }}>Connect manually instead</button>
+                    </div>
+                  </div>
+                )}
 
-            {/* Connection Requirements */}
-            {!showPhoneOtp && <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              {requirements.filter(r => r.id !== "fullName").map(req => {
-                if (req.met) {
-                  return (
-                    <div key={req.id} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "14px 16px", background: "linear-gradient(135deg, #0a1a0a, #0e1a0e)", borderRadius: 12,
-                      border: "1px solid #166534",
+                {!currentDcMatch && (
+                  <div>
+                    <button onClick={currentReq.action} style={{
+                      width: "100%", padding: 14,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
+                      cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
                     }}>
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontWeight: 700, fontSize: 13, color: "#4ade80", marginBottom: 2 }}>{req.label}</p>
-                        <p style={{ fontSize: 11, color: "#3a6b3a", lineHeight: 1.4 }}>{req.desc}</p>
-                      </div>
-                      <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 800, background: "#0a2a0a", padding: "4px 10px", borderRadius: 100, border: "1px solid #166534", flexShrink: 0 }}>{"\u2705"} Done</span>
-                    </div>
-                  );
-                }
-                if (req.pending) {
-                  return (
-                    <div key={req.id} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "14px 16px", background: "linear-gradient(135deg, #1a1200, #161000)", borderRadius: 12,
-                      border: "1px solid #854d0e",
-                    }}>
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontWeight: 700, fontSize: 13, color: "#fbbf24", marginBottom: 2 }}>{req.label}</p>
-                        <p style={{ fontSize: 11, color: "#7a6520", lineHeight: 1.4 }}>System is verifying your account — nothing needed from you</p>
-                      </div>
-                      <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800, background: "#1a1200", padding: "4px 10px", borderRadius: 100, border: "1px solid #854d0e", flexShrink: 0 }}>{"\u23F3"} Verifying</span>
-                    </div>
-                  );
-                }
-                // Check if Discord has this account linked
-                const dcMatch = (req.id === "steam" && !hasSteam && discordSteam)
-                  ? discordSteam
-                  : (req.id === "riot" && !hasRiot && !riotPending && discordRiot)
-                    ? discordRiot
-                    : null;
-                const isLinking = linkingFromDiscord === (req.id === "steam" ? "steam" : req.id === "riot" ? "riot" : null);
-
-                if (dcMatch) {
-                  // ── "Found on Discord" card with one-click link ──
-                  return (
-                    <div key={req.id} style={{
-                      padding: "14px 16px", background: "linear-gradient(135deg, rgba(88,101,242,0.08), #111)", borderRadius: 12,
-                      border: "1.5px solid rgba(88,101,242,0.3)",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                        <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2 }}>{req.label}</p>
-                          <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{req.desc}</p>
-                        </div>
-                      </div>
-                      {/* Found on Discord banner */}
-                      <div style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "10px 12px", background: "rgba(88,101,242,0.1)", borderRadius: 8,
-                        border: "1px solid rgba(88,101,242,0.2)", marginBottom: 10,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#818cf8" style={{ flexShrink: 0 }}>
-                          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.12-.098.246-.198.373-.292a.074.074 0 0 1 .078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419s.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419s.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-                        </svg>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc" }}>Found on your Discord</p>
-                          <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginTop: 2 }}>{dcMatch.name}</p>
-                        </div>
-                      </div>
-                      {/* Action buttons */}
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => linkFromDiscord(req.id === "steam" ? "steam" : "riot")} disabled={!!linkingFromDiscord} style={{
-                          flex: 2, padding: "10px 14px",
-                          background: isLinking ? "#333" : `linear-gradient(135deg, #5865F2, #4752C4)`,
-                          border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12,
-                          cursor: isLinking ? "default" : "pointer", fontFamily: "inherit",
-                        }}>
-                          {isLinking ? "Linking..." : `Use ${dcMatch.name}`}
-                        </button>
-                        <button onClick={req.action} style={{
-                          flex: 1, padding: "10px 14px",
-                          background: "transparent", border: "1px solid #333", borderRadius: 8,
-                          color: "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                        }}>
-                          Connect manually
-                        </button>
-                      </div>
-                      {linkFromDiscordError && !linkingFromDiscord && (
-                        <p style={{ fontSize: 11, color: "#f87171", marginTop: 8 }}>{linkFromDiscordError}</p>
-                      )}
-                    </div>
-                  );
-                }
-
-                // ── Default unmet requirement card (no Discord match) ──
-                return (
-                  <button key={req.id} onClick={req.action} style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "14px 16px", background: "#111", borderRadius: 12,
-                    border: "1.5px solid #333", cursor: "pointer", textAlign: "left" as const, width: "100%",
-                    transition: "all 0.2s ease",
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = accentColor; e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.background = "#111"; e.currentTarget.style.transform = "translateY(0)"; }}
-                  >
-                    <span style={{ fontSize: 20, flexShrink: 0 }}>{req.emoji}</span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2 }}>{req.actionLabel || `Connect ${req.label}`}</p>
-                      <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{req.desc}</p>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}33`, flexShrink: 0 }}>Connect {"\u2192"}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>}
-
-            {!showPhoneOtp && error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
-
-            {/* Continue button — only when ALL requirements met */}
-            {!showPhoneOtp && allRequirementsMet && (
-              <button onClick={() => {
-                if (isShuffle) { handleSolo(); } else { setStep("choose"); }
-              }} disabled={loading} style={{
-                width: "100%", padding: 14,
-                background: loading ? "#333" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
-                border: "none", borderRadius: 10, color: "#fff",
-                fontWeight: 700, fontSize: 15, cursor: loading ? "default" : "pointer", marginTop: 4,
-                boxShadow: `0 4px 20px ${accentColor}33`,
-              }}>
-                {loading ? "Registering..." : isShuffle ? `${"\u{1F680}"} Register Now` : `${"\u{1F680}"} Continue to Register`}
-              </button>
+                      {currentReq.actionLabel} {"\u2192"}
+                    </button>
+                    <p style={{ fontSize: 11, color: "#444", textAlign: "center" as const, lineHeight: 1.5 }}>
+                      Opens in a new tab. Return here when done — we detect it automatically.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Summary of what's still missing */}
-            {!showPhoneOtp && !allRequirementsMet && unmetRequirements.length > 0 && (
-              <div style={{ textAlign: "center", marginTop: 10, padding: "8px 12px", background: "#111", borderRadius: 8, border: "1px solid #222" }}>
-                <p style={{ fontSize: 12, color: "#888" }}>
-                  🔒 {unmetRequirements.length} requirement{unmetRequirements.length > 1 ? "s" : ""} remaining to unlock registration
+            {/* ── DISCORD ── */}
+            {currentReq?.id === "discord" && (
+              <div style={{ animation: "reg-fade-in 0.3s ease" }}>
+                <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u{1F4AC}"}</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Connect Discord</h3>
+                  <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>{currentReq.desc}</p>
+                </div>
+                <button onClick={currentReq.action} style={{
+                  width: "100%", padding: 14,
+                  background: "linear-gradient(135deg, #5865F2, #4752C4)",
+                  border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
+                  cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
+                }}>
+                  {"Connect Discord \u2192"}
+                </button>
+                <p style={{ fontSize: 11, color: "#444", textAlign: "center" as const, lineHeight: 1.5 }}>
+                  Opens in a new tab. Return here when done.
                 </p>
               </div>
             )}
+
+            {/* ── ALL MET — auto-continue ── */}
+            {!currentReq && allRequirementsMet && (
+              <div style={{ textAlign: "center" as const, animation: "reg-fade-in 0.3s ease" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u2705"}</div>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 14 }}>All set!</h3>
+                <button onClick={() => { if (isShuffle) handleSolo(); else setStep("choose"); }} disabled={loading} style={{
+                  width: "100%", padding: 14,
+                  background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                  border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15,
+                  cursor: loading ? "default" : "pointer",
+                  boxShadow: `0 4px 20px ${accentColor}33`,
+                }}>
+                  {loading ? "Registering..." : isShuffle ? "Register Now \u2192" : "Continue \u2192"}
+                </button>
+              </div>
+            )}
+
+            {error && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 12, textAlign: "center" as const }}>{error}</p>}
           </div>
         )}
 
@@ -897,5 +917,6 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         )}
       </div>
     </div>
+    </>
   );
 }
