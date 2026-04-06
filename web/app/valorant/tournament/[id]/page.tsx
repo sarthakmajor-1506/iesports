@@ -1224,7 +1224,7 @@ function ValorantTournamentDetailInner() {
               {championMembers.length > 0 && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                   {championMembers.map((p: any, i: number) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, padding: "4px 12px 4px 4px" }}>
+                    <div key={i} onClick={() => { if (p.uid) router.push(`/player/${p.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, padding: "4px 12px 4px 4px", cursor: p.uid ? "pointer" : "default" }}>
                       {p.riotAvatar ? (
                         <img src={p.riotAvatar} alt="" style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid rgba(255,215,0,0.3)" }} />
                       ) : (
@@ -1277,17 +1277,6 @@ function ValorantTournamentDetailInner() {
             <div className="vtd-tab-pane" ref={tabContentRef}>
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
-                {championTeamName && (
-                  <div className="vtd-stat-tile gold" style={{ animationDelay: "0s", gridColumn: "1 / -1" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "center", width: "100%" }}>
-                      <span style={{ fontSize: "1.4rem" }}>👑</span>
-                      <div>
-                        <div className="vtd-stat-tile-val" style={{ color: "#ffd700", fontSize: "1.15rem" }}>{championTeamName}</div>
-                        <div className="vtd-stat-tile-lbl" style={{ color: "#fbbf24" }}>Tournament Winner</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>
                   <div className="vtd-stat-tile-icon"><Zap size={24} color="#3CCBFF" /></div>
                   <div className="vtd-stat-tile-val">{tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>
@@ -1437,14 +1426,7 @@ function ValorantTournamentDetailInner() {
                               <span className="vtd-tier-header-count">{rankPlayers.length}</span>
                             </div>
                             {rankPlayers.map((p: any, pi: number) => (
-                              <div key={p.uid} onClick={() => {
-                                if (!user) {
-                                  try { sessionStorage.setItem("redirectAfterLogin", `/player/${p.uid}`); } catch {}
-                                  window.open("/api/auth/discord-login", "_blank");
-                                } else {
-                                  router.push(`/player/${p.uid}`);
-                                }
-                              }} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
+                              <div key={p.uid} onClick={() => router.push(`/player/${p.uid}`)} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
                                 <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s` }}>
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">

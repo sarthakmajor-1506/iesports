@@ -11,6 +11,7 @@ interface Tournament {
   prizePool: string; entry: string; startDate: string; endDate: string;
   registrationDeadline: string; totalSlots: number; slotsBooked: number; desc: string;
   championTeamName?: string; championTeamId?: string; entryFee?: number;
+  championMembers?: { name: string; tag?: string; avatar?: string; uid?: string }[];
   format?: string;
   schedule?: {
     registrationOpens?: string;
@@ -591,9 +592,21 @@ export default function Home() {
                       </div>
                       <div className="ie-tourn-title">{completedValTournament.name}</div>
                       {completedValTournament.championTeamName && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
-                          <span style={{ fontSize: "1.1rem" }}>👑</span>
-                          <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{completedValTournament.championTeamName}</span>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: 1 }}>Winner:</span>
+                            <span style={{ fontSize: "0.95rem", fontWeight: 900, color: "#ffd700" }}>{completedValTournament.championTeamName}</span>
+                          </div>
+                          {completedValTournament.championMembers && completedValTournament.championMembers.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, overflowX: "auto" }}>
+                              {completedValTournament.championMembers.map((m, i) => (
+                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                  {m.avatar ? <img src={m.avatar} alt="" width={14} height={14} style={{ borderRadius: "50%", display: "block" }} /> : <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(255,215,0,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", color: "#ffd700", fontWeight: 800 }}>{(m.name || "?")[0].toUpperCase()}</span>}
+                                  <span style={{ fontWeight: 600 }}>{m.name}</span>{m.tag && <span style={{ color: "rgba(255,215,0,0.35)", fontWeight: 500 }}>#{m.tag}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="ie-tourn-meta">
@@ -609,7 +622,7 @@ export default function Home() {
                     </div>
                     <div className="ie-tourn-right">
                       <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>
-                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${completedValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)" }}>
+                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${completedValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)", whiteSpace: "nowrap" }}>
                         View Results →
                       </button>
                     </div>
@@ -623,9 +636,21 @@ export default function Home() {
                       </div>
                       <div className="ie-tourn-title">{completedDotaTournament.name}</div>
                       {completedDotaTournament.championTeamName && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
-                          <span style={{ fontSize: "1.1rem" }}>👑</span>
-                          <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{completedDotaTournament.championTeamName}</span>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: 1 }}>Winner:</span>
+                            <span style={{ fontSize: "0.95rem", fontWeight: 900, color: "#ffd700" }}>{completedDotaTournament.championTeamName}</span>
+                          </div>
+                          {completedDotaTournament.championMembers && completedDotaTournament.championMembers.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, overflowX: "auto" }}>
+                              {completedDotaTournament.championMembers.map((m, i) => (
+                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                  {m.avatar ? <img src={m.avatar} alt="" width={14} height={14} style={{ borderRadius: "50%", display: "block" }} /> : <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(255,215,0,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", color: "#ffd700", fontWeight: 800 }}>{(m.name || "?")[0].toUpperCase()}</span>}
+                                  <span style={{ fontWeight: 600 }}>{m.name}</span>{m.tag && <span style={{ color: "rgba(255,215,0,0.35)", fontWeight: 500 }}>#{m.tag}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="ie-tourn-meta">
@@ -641,7 +666,7 @@ export default function Home() {
                     </div>
                     <div className="ie-tourn-right">
                       <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>
-                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${completedDotaTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)" }}>
+                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${completedDotaTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)", whiteSpace: "nowrap" }}>
                         View Results →
                       </button>
                     </div>

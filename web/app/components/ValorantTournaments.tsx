@@ -260,8 +260,26 @@ export default function ValorantTournaments() {
                             {t.name}
                             <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(255,215,0,0.1)", color: "#fbbf24", border: "1px solid rgba(255,215,0,0.25)", whiteSpace: "nowrap" }}>Completed</span>
                           </div>
+                          {hasWinner && (
+                            <div style={{ marginBottom: 6 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                <span style={{ fontSize: "0.85rem" }}>👑</span>
+                                <span style={{ fontSize: "0.92rem", fontWeight: 900, color: "#ffd700" }}>{winnerName}</span>
+                              </div>
+                              {(t as any).championMembers && (t as any).championMembers.length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginLeft: 2, overflowX: "auto" }}>
+                                  {(t as any).championMembers.map((m: any, i: number) => (
+                                    <span key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, fontSize: "0.72rem", color: "#e2c66d", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                      {m.avatar ? <img src={m.avatar} alt="" width={14} height={14} style={{ borderRadius: "50%", display: "block" }} /> : <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(255,215,0,0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.55rem", color: "#ffd700", fontWeight: 800 }}>{(m.name || "?")[0].toUpperCase()}</span>}
+                                      <span style={{ fontWeight: 700 }}>{m.name}</span>{m.tag && <span style={{ color: "rgba(255,215,0,0.4)", fontWeight: 500 }}>#{m.tag}</span>}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div className="vt-card-meta">
-                            {hasWinner && (
+                            {hasWinner && !((t as any).championMembers?.length > 0) && (
                               <div className="vt-meta-item">
                                 <span className="vt-meta-key" style={{ color: "#fbbf24" }}>Winner</span>
                                 <span className="vt-meta-val" style={{ color: "#ffd700", display: "flex", alignItems: "center", gap: 4, fontWeight: 900 }}>

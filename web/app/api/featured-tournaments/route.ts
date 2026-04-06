@@ -37,11 +37,71 @@ export async function GET() {
       .filter((t: any) => !t.isTestTournament && valIsEnded(t))
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
 
+    // ── Detect champion from grand final if not set on tournament doc ──
+    const detectChampion = async (tournament: any, game: "valorant" | "dota") => {
+      if (tournament.championTeamId && tournament.championTeamName) return tournament;
+      try {
+        const col = game === "valorant" ? "valorantTournaments" : "tournaments";
+        const matchesSnap = await adminDb.collection(col).doc(tournament.id).collection("matches")
+          .where("isBracket", "==", true).where("bracketType", "==", "grand_final").where("status", "==", "completed").get();
+        if (!matchesSnap.empty) {
+          const gf = matchesSnap.docs[0].data();
+          const winnerId = gf.team1Score > gf.team2Score ? gf.team1Id : gf.team2Id;
+          const winnerName = gf.team1Score > gf.team2Score ? gf.team1Name : gf.team2Name;
+          return { ...tournament, championTeamId: winnerId, championTeamName: winnerName };
+        }
+      } catch { /* skip */ }
+      return tournament;
+    };
+
+    // ── Fetch champion team members for completed tournaments ──
+    const enrichWithChampionMembers = async (tournament: any, game: "valorant" | "dota") => {
+      // First detect champion if not already set
+      tournament = await detectChampion(tournament, game);
+      if (!tournament?.championTeamId) return tournament;
+      try {
+        const col = game === "valorant" ? "valorantTournaments" : "tournaments";
+        // Teams are stored as subcollection under the tournament doc
+        const teamDoc = await adminDb.collection(col).doc(tournament.id).collection("teams").doc(tournament.championTeamId).get();
+        if (teamDoc.exists) {
+          const teamData = teamDoc.data();
+          const members = teamData?.members || [];
+          const memberNames: { name: string; tag?: string; avatar?: string; uid?: string }[] = [];
+          for (const m of members.slice(0, 5)) {
+            if (typeof m === "object" && m !== null) {
+              memberNames.push({
+                name: m.riotGameName || m.steamName || m.displayName || "Unknown",
+                tag: m.riotTagLine || undefined,
+                avatar: m.riotAvatar || m.steamAvatar || undefined,
+                uid: m.uid || undefined,
+              });
+            } else if (typeof m === "string") {
+              const userDoc = await adminDb.collection("users").doc(m).get();
+              if (userDoc.exists) {
+                const u = userDoc.data();
+                memberNames.push({
+                  name: u?.riotGameName || u?.steamName || u?.displayName || "Unknown",
+                  tag: u?.riotTagLine || undefined,
+                  avatar: u?.riotAvatar || u?.steamAvatar || undefined,
+                  uid: m,
+                });
+              }
+            }
+          }
+          return { ...tournament, championMembers: memberNames };
+        }
+      } catch { /* skip enrichment on error */ }
+      return tournament;
+    };
+
+    const completedVal = valCompleted.length > 0 ? await enrichWithChampionMembers(valCompleted[0], "valorant") : null;
+    const completedDota2 = dotaCompleted.length > 0 ? await enrichWithChampionMembers(dotaCompleted[0], "dota") : null;
+
     return NextResponse.json({
       dota: dotaFeatured.length > 0 ? dotaFeatured[0] : null,
       valorant: valResult,
-      completedValorant: valCompleted.length > 0 ? valCompleted[0] : null,
-      completedDota: dotaCompleted.length > 0 ? dotaCompleted[0] : null,
+      completedValorant: completedVal,
+      completedDota: completedDota2,
     });
   } catch (e: any) {
     console.error("[API] Featured tournaments error:", e);
