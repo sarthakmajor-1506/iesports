@@ -321,38 +321,22 @@ export async function GET(req: NextRequest) {
         {/* VALORANT badge with logo */}
         <div
           style={{
-            fontSize: 13,
+            fontSize: 18,
             fontWeight: 900,
             letterSpacing: "0.15em",
-            padding: "8px 18px",
+            padding: "10px 24px",
             background: "rgba(255,70,85,0.10)",
             border: "1px solid rgba(255,70,85,0.25)",
             borderRadius: 100,
             color: CL.rose,
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: 10,
           }}
         >
           {/* @ts-ignore — next/og JSX */}
-          <img src={valLogoUrl} style={{ width: 16, height: 16 }} />
+          <img src={valLogoUrl} style={{ width: 24, height: 24 }} />
           VALORANT
-        </div>
-        {/* Type label */}
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 900,
-            letterSpacing: "0.12em",
-            padding: "8px 18px",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 100,
-            color: CL.muted,
-            display: "flex",
-          }}
-        >
-          {label}
         </div>
       </div>
     </div>
