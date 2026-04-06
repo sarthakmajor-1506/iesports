@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import {
   RecaptchaVerifier,
@@ -215,7 +215,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     if (trimmed.length < 2) return;
     setFullNameSaving(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), { fullName: trimmed });
+      await setDoc(doc(db, "users", user.uid), { fullName: trimmed }, { merge: true });
       setFullNameSaved(true);
     } catch {
       setError("Failed to save name. Please try again.");
