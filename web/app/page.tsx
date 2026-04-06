@@ -611,9 +611,9 @@ export default function Home() {
                             <span style={{ fontSize: "0.95rem", fontWeight: 900, color: "#ffd700" }}>{completedValTournament.championTeamName}</span>
                           </div>
                           {completedValTournament.championMembers && completedValTournament.championMembers.length > 0 && (
-                            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, overflowX: "auto" }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                               {completedValTournament.championMembers.map((m, i) => (
-                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap" }}>
                                   {m.avatar ? <img src={m.avatar} alt="" width={14} height={14} style={{ borderRadius: "50%", display: "block" }} /> : <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(255,215,0,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", color: "#ffd700", fontWeight: 800 }}>{(m.name || "?")[0].toUpperCase()}</span>}
                                   <span style={{ fontWeight: 600 }}>{m.name}</span>{m.tag && <span style={{ color: "rgba(255,215,0,0.35)", fontWeight: 500 }}>#{m.tag}</span>}
                                 </div>
@@ -645,9 +645,9 @@ export default function Home() {
                             <span style={{ fontSize: "0.95rem", fontWeight: 900, color: "#ffd700" }}>{completedDotaTournament.championTeamName}</span>
                           </div>
                           {completedDotaTournament.championMembers && completedDotaTournament.championMembers.length > 0 && (
-                            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, overflowX: "auto" }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                               {completedDotaTournament.championMembers.map((m, i) => (
-                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                <div key={i} onClick={(e) => { e.stopPropagation(); if (m.uid) router.push(`/player/${m.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.12)", borderRadius: 100, fontSize: "0.68rem", color: "#d4b85c", cursor: m.uid ? "pointer" : "default", whiteSpace: "nowrap" }}>
                                   {m.avatar ? <img src={m.avatar} alt="" width={14} height={14} style={{ borderRadius: "50%", display: "block" }} /> : <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(255,215,0,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.5rem", color: "#ffd700", fontWeight: 800 }}>{(m.name || "?")[0].toUpperCase()}</span>}
                                   <span style={{ fontWeight: 600 }}>{m.name}</span>{m.tag && <span style={{ color: "rgba(255,215,0,0.35)", fontWeight: 500 }}>#{m.tag}</span>}
                                 </div>

@@ -133,7 +133,7 @@ export default function Navbar() {
   const discordUsername = steamData?.discordUsername || "";
   const hasPhone        = !!steamData?.phone;
   const hasSteam        = !!steamData?.steamId;
-  const riotStatus      = riotData?.riotVerified || "unlinked";
+  const riotStatus      = riotData?.riotVerified || (steamData?.riotGameName ? "pending" : "unlinked");
 
   const unlinkedCount = [!hasSteam, !discordLinked, riotStatus === "unlinked", !hasPhone].filter(Boolean).length;
 
@@ -711,6 +711,12 @@ export default function Navbar() {
               <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
               <span style={{ flex: 1, fontWeight: 600, color: "#3CCBFF" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
               <span className="ie-verified-badge">✓</span>
+            </div>
+          ) : riotStatus === "pending" ? (
+            <div className="ie-mobile-row">
+              <img src={riotData?.riotAvatar || steamData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
+              <span style={{ flex: 1, fontWeight: 600, color: "#3CCBFF" }}>{riotData?.riotGameName || steamData?.riotGameName}#{riotData?.riotTagLine || steamData?.riotTagLine}</span>
+              <span style={{ fontSize: "0.58rem", fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.12)", padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
             </div>
           ) : (
             <button className="ie-mobile-connect-btn" onClick={handleConnectRiot} style={{ borderColor: "rgba(60,203,255,0.3)", background: "rgba(60,203,255,0.06)", color: "#3CCBFF" }}>
