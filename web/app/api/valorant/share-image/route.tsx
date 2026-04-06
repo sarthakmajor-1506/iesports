@@ -1354,7 +1354,7 @@ export async function GET(req: NextRequest) {
     );
   } else if (type === "format") {
     // ── CARD 5: COMBINED FORMAT & FLOW ──
-    const accentColor = CL.sky;
+    const accentColor = "#F0B232";
     const formatSteps = [
       { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
       { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
@@ -1388,10 +1388,10 @@ export async function GET(req: NextRequest) {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 52, flexShrink: 0 }}>
                 <Num n={s.n} color={s.color} size={48} />
                 {i < formatSteps.length - 1 && (
-                  <div style={{ width: 2, flex: 1, minHeight: 14, background: `linear-gradient(180deg, ${s.color}35, ${formatSteps[i + 1].color}35)`, display: "flex" }} />
+                  <div style={{ width: 2, flex: 1, minHeight: 22, background: `linear-gradient(180deg, ${s.color}35, ${formatSteps[i + 1].color}35)`, display: "flex" }} />
                 )}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 10 : 0, justifyContent: "center", flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 20 : 0, justifyContent: "center", flex: 1 }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: "0.06em", lineHeight: 1.2, display: "flex" }}>
                   {s.lbl}
                 </div>

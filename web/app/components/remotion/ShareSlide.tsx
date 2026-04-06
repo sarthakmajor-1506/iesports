@@ -1463,7 +1463,7 @@ function FormatFlowSlide({
     t.format === "shuffle" ? "SHUFFLE" : t.format === "auction" ? "AUCTION" : "STANDARD";
 
   const sc = t.schedule || {};
-  const accentColor = C.sky;
+  const accentColor = "#F0B232";
 
   const steps = [
     { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },
@@ -1544,7 +1544,7 @@ function FormatFlowSlide({
                     style={{
                       width: 2,
                       flex: 1,
-                      minHeight: 14,
+                      minHeight: 22,
                       background: `linear-gradient(180deg, ${s.color}35, ${steps[i + 1].color}35)`,
                     }}
                   />
@@ -1555,7 +1555,7 @@ function FormatFlowSlide({
                   display: "flex",
                   flexDirection: "column",
                   paddingLeft: 20,
-                  paddingBottom: i < steps.length - 1 ? 10 : 0,
+                  paddingBottom: i < steps.length - 1 ? 20 : 0,
                   justifyContent: "center",
                   flex: 1,
                 }}
