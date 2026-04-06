@@ -1388,14 +1388,14 @@ export async function GET(req: NextRequest) {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 52, flexShrink: 0 }}>
                 <Num n={s.n} color={s.color} size={48} />
                 {i < formatSteps.length - 1 && (
-                  <div style={{ width: 2, flex: 1, minHeight: 22, background: `linear-gradient(180deg, ${s.color}35, ${formatSteps[i + 1].color}35)`, display: "flex" }} />
+                  <div style={{ width: 2, flex: 1, minHeight: 32, background: `linear-gradient(180deg, ${s.color}35, ${formatSteps[i + 1].color}35)`, display: "flex" }} />
                 )}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 20 : 0, justifyContent: "center", flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", paddingLeft: 20, paddingBottom: i < formatSteps.length - 1 ? 32 : 0, justifyContent: "center", flex: 1 }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: "0.06em", lineHeight: 1.2, display: "flex" }}>
                   {s.lbl}
                 </div>
-                <div style={{ fontSize: 17, color: CL.cream, fontWeight: 500, display: "flex" }}>
+                <div style={{ fontSize: 17, color: "#F0B232", fontWeight: 600, display: "flex" }}>
                   {s.sub}
                 </div>
               </div>

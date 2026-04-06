@@ -1544,7 +1544,7 @@ function FormatFlowSlide({
                     style={{
                       width: 2,
                       flex: 1,
-                      minHeight: 22,
+                      minHeight: 32,
                       background: `linear-gradient(180deg, ${s.color}35, ${steps[i + 1].color}35)`,
                     }}
                   />
@@ -1555,7 +1555,7 @@ function FormatFlowSlide({
                   display: "flex",
                   flexDirection: "column",
                   paddingLeft: 20,
-                  paddingBottom: i < steps.length - 1 ? 20 : 0,
+                  paddingBottom: i < steps.length - 1 ? 32 : 0,
                   justifyContent: "center",
                   flex: 1,
                 }}
@@ -1571,7 +1571,7 @@ function FormatFlowSlide({
                 >
                   {s.lbl}
                 </div>
-                <div style={{ fontSize: 17, color: C.cream, fontWeight: 500 }}>
+                <div style={{ fontSize: 17, color: "#F0B232", fontWeight: 600 }}>
                   {s.sub}
                 </div>
               </div>
