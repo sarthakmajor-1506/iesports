@@ -150,6 +150,7 @@ export default function Home() {
       <style>{`
       
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        html, body { overflow-x:hidden; width:100%; }
         :root {
           --accent:#3B82F6; --accent-dark:#2563EB; --accent-light:#60A5FA;
           --orange:#3B82F6; --orange-dark:#2563EB;
@@ -219,7 +220,7 @@ export default function Home() {
         .ie-section-title .accent { color:var(--accent); }
         .ie-section-sub { font-size:1rem; color:var(--text-secondary); margin-top:8px; max-width:480px; }
         .ie-section-header { margin-bottom:44px; }
-        .ie-container { max-width:1120px; margin:0 auto; }
+        .ie-container { max-width:1120px; margin:0 auto; overflow:hidden; }
 
         /* Games */
         .ie-games-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
@@ -266,8 +267,8 @@ export default function Home() {
         .ie-tourn-detail-link { display:block; text-align:center; margin-top:10px; font-size:.82rem; color:rgba(255,255,255,.32); text-decoration:none; transition:color .2s; }
         .ie-tourn-detail-link:hover { color:rgba(255,255,255,.65); }
         .ie-tourn-grid { display:flex; flex-direction:column; gap:28px; }
-        @media (max-width:700px) { .ie-tourn-wrap { padding:36px 24px; flex-direction:column; } .ie-tourn-right { width:100%; } }
-        @media (max-width:480px) { .ie-tourn-wrap { padding:24px 16px; } .ie-section { padding:48px 14px; } .ie-tourn-title { font-size:1.3rem !important; } }
+        @media (max-width:700px) { .ie-tourn-wrap { padding:36px 24px; flex-direction:column; } .ie-tourn-right { width:100%; min-width:0; } }
+        @media (max-width:480px) { .ie-tourn-wrap { padding:24px 16px; } .ie-section { padding:48px 14px; } .ie-tourn-title { font-size:1.3rem !important; } .ie-tourn-meta { gap:6px; } .ie-tourn-chip { font-size:.72rem; padding:5px 10px; } }
 
         /* Modal overlay */
         @keyframes riot-modal-in { from { opacity:0; transform:scale(.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }

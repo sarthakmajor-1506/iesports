@@ -697,10 +697,11 @@ function OverviewSlide({
         flex: 1,
         padding: "40px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
       {/* Format badge */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 28 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
         <Badge text={fmtLabel} color={C.rose} frame={frame} delay={10} fps={fps} />
       </div>
 
@@ -712,7 +713,8 @@ function OverviewSlide({
           color: "#fff",
           lineHeight: 1.0,
           letterSpacing: "-0.03em",
-          marginBottom: 16,
+          marginBottom: 20,
+          textAlign: "center",
           opacity: fade(frame, 15, 15),
           transform: `translateY(${slideY(frame, 15, 25, 18)}px)`,
         }}
@@ -726,8 +728,9 @@ function OverviewSlide({
           fontSize: 24,
           color: C.cream,
           fontWeight: 500,
-          marginBottom: 32,
+          marginBottom: 40,
           lineHeight: 1.4,
+          textAlign: "center",
           opacity: fade(frame, 25, 15),
         }}
       >
@@ -735,7 +738,7 @@ function OverviewSlide({
       </div>
 
       {/* Prize Pool & Entry Fee — hero boxes */}
-      <div style={{ display: "flex", gap: 18, marginBottom: 28 }}>
+      <div style={{ display: "flex", gap: 18, marginBottom: 32, width: "100%" }}>
         {/* Entry Fee */}
         <div
           style={{
@@ -794,10 +797,10 @@ function OverviewSlide({
       </div>
 
       {/* Stats row */}
-      <div style={{ display: "flex", gap: 16 }}>
+      <div style={{ display: "flex", gap: 16, width: "100%" }}>
         <StatBox val={`${t.totalSlots || "?"}`} label="PLAYERS" color={C.rose} frame={frame} delay={42} fps={fps} />
-        <StatBox val={fmtDate(t.schedule?.groupStageStart || t.startDate)} label="STARTS" color={C.sky} frame={frame} delay={46} fps={fps} />
-        <StatBox val={fmtDate(t.endDate || t.registrationDeadline)} label="ENDS" color={C.lavender} frame={frame} delay={50} fps={fps} />
+        <StatBox val={fmtDateOnly(t.schedule?.groupStageStart || t.startDate)} label="STARTS" color={C.sky} frame={frame} delay={46} fps={fps} />
+        <StatBox val={fmtDateOnly(t.endDate || t.registrationDeadline)} label="ENDS" color={C.lavender} frame={frame} delay={50} fps={fps} />
         <StatBox val={`${t.totalTeams || "?"}`} label="TEAMS" color={C.sage} frame={frame} delay={54} fps={fps} />
       </div>
     </div>
@@ -828,10 +831,26 @@ function RegisterSlide({
         flex: 1,
         padding: "40px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <Badge text="HOW TO REGISTER" color={C.rose} frame={frame} delay={10} fps={fps} />
+      {/* Tournament name — smaller, golden */}
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 800,
+          color: "#F0B232",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+          textAlign: "center",
+          textShadow: "0 0 20px rgba(240,178,50,0.25)",
+          opacity: fade(frame, 10, 12),
+        }}
+      >
+        {name}
+      </div>
 
+      {/* Primary heading */}
       <div
         style={{
           fontSize: 56,
@@ -839,27 +858,28 @@ function RegisterSlide({
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 28,
-          marginBottom: 12,
+          marginBottom: 8,
+          textAlign: "center",
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
       >
-        Join {name}
+        How to Register
       </div>
 
       <div
         style={{
-          fontSize: 22,
+          fontSize: 20,
           color: C.cream,
-          marginBottom: 44,
+          marginBottom: 36,
+          textAlign: "center",
           opacity: fade(frame, 22, 15),
         }}
       >
         Solo registration. 3 simple steps. Completely free.
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 40, width: "100%" }}>
         {steps.map((s, i) => {
           const delay = 30 + i * 8;
           const o = fade(frame, delay, 12);
@@ -916,6 +936,7 @@ function RegisterSlide({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "22px 32px",
+          width: "100%",
           background: `linear-gradient(135deg, ${C.rose}10, ${C.rose}04)`,
           border: `2px solid ${C.rose}25`,
           borderRadius: 22,
@@ -929,7 +950,7 @@ function RegisterSlide({
             Registration closes
           </div>
           <div style={{ fontSize: 26, color: C.rose, fontWeight: 900 }}>
-            {fmtDate(t.registrationDeadline)}
+            {fmtDateOnly(t.registrationDeadline)}
           </div>
         </div>
         <div
@@ -1013,42 +1034,40 @@ function RanksMapSlide({
         flex: 1,
         padding: "36px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
+      {/* Tournament name — smaller, golden */}
       <div
         style={{
-          display: "inline-flex",
           fontSize: 22,
-          fontWeight: 900,
-          padding: "12px 32px",
-          borderRadius: 100,
-          background: `linear-gradient(135deg, ${C.rose}22, ${C.rose}0C)`,
-          border: `2px solid ${C.rose}50`,
-          color: C.rose,
-          letterSpacing: "0.14em",
-          boxShadow: `0 0 28px ${C.rose}18`,
-          transform: `scale(${scaleIn(frame, 10, fps)})`,
-          opacity: fade(frame, 10, 10),
-          textShadow: `0 0 12px ${C.rose}40`,
+          fontWeight: 800,
+          color: "#F0B232",
+          letterSpacing: "0.06em",
+          marginBottom: 16,
+          textAlign: "center",
+          textShadow: "0 0 20px rgba(240,178,50,0.25)",
+          opacity: fade(frame, 10, 12),
         }}
       >
-        ELIGIBLE RANKS
+        {name}
       </div>
 
+      {/* Primary heading */}
       <div
         style={{
-          fontSize: 44,
+          fontSize: 48,
           fontWeight: 900,
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 20,
-          marginBottom: 24,
+          marginBottom: 32,
+          textAlign: "center",
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
       >
-        {name}
+        Eligible Ranks & Maps
       </div>
 
       {/* ── Eligible Rank Bars Only ── */}
@@ -1056,11 +1075,12 @@ function RanksMapSlide({
         style={{
           display: "flex",
           flexDirection: "column",
-          padding: "28px 32px",
+          padding: "32px 32px",
+          width: "100%",
           background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`,
           border: `1.5px solid ${maxColor}25`,
           borderRadius: 24,
-          marginBottom: 20,
+          marginBottom: 32,
           opacity: fade(frame, 24, 12),
           transform: `translateX(${interpolate(frame, [24, 39], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
@@ -1113,11 +1133,12 @@ function RanksMapSlide({
         style={{
           display: "flex",
           flexDirection: "column",
-          padding: "20px 28px",
+          padding: "24px 28px",
+          width: "100%",
           background: `linear-gradient(135deg, ${C.sky}0A, transparent)`,
           border: `1.5px solid ${C.sky}20`,
           borderRadius: 20,
-          marginBottom: 16,
+          marginBottom: 28,
           opacity: fade(frame, 50, 12),
           transform: `translateX(${interpolate(frame, [50, 65], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
@@ -1153,34 +1174,35 @@ function RanksMapSlide({
       <div
         style={{
           display: "flex",
-          gap: 14,
+          gap: 16,
+          width: "100%",
           opacity: fade(frame, 78, 12),
         }}
       >
         <div
           style={{
             flex: 1,
-            padding: "16px 22px",
+            padding: "20px 22px",
             background: `${C.steel}0A`,
             border: `1px solid ${C.steel}20`,
             borderRadius: 16,
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>GROUP STAGE FORMAT</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 8 }}>GROUP STAGE FORMAT</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.steel }}>{groupPool}</div>
         </div>
         <div
           style={{
             flex: 1,
-            padding: "16px 22px",
+            padding: "20px 22px",
             background: `${C.amber}0A`,
             border: `1px solid ${C.amber}20`,
             borderRadius: 16,
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>PLAY-OFF FORMAT</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 8 }}>PLAY-OFF FORMAT</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{bracketPool}</div>
         </div>
       </div>
@@ -1221,10 +1243,26 @@ function TeamsSlide({
         flex: 1,
         padding: "40px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <Badge text="TEAM STRUCTURE" color={C.lavender} frame={frame} delay={10} fps={fps} />
+      {/* Tournament name — smaller, golden */}
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 800,
+          color: "#F0B232",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+          textAlign: "center",
+          textShadow: "0 0 20px rgba(240,178,50,0.25)",
+          opacity: fade(frame, 10, 12),
+        }}
+      >
+        {name}
+      </div>
 
+      {/* Primary heading */}
       <div
         style={{
           fontSize: 56,
@@ -1232,17 +1270,17 @@ function TeamsSlide({
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 28,
-          marginBottom: 48,
+          marginBottom: 44,
+          textAlign: "center",
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
       >
-        {name}
+        Team Structure
       </div>
 
       {/* Big stat boxes */}
-      <div style={{ display: "flex", gap: 18, marginBottom: 40 }}>
+      <div style={{ display: "flex", gap: 18, marginBottom: 44 }}>
         {bigStats.map((s, i) => {
           const delay = 30 + i * 7;
           const sc = scaleIn(frame, delay, fps);
@@ -1299,6 +1337,7 @@ function TeamsSlide({
         style={{
           display: "flex",
           flexDirection: "column",
+          width: "100%",
           background: "rgba(255,255,255,0.03)",
           border: "1px solid rgba(255,255,255,0.06)",
           borderRadius: 22,
@@ -1378,10 +1417,26 @@ function ScheduleSlide({
         flex: 1,
         padding: "36px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <Badge text="SCHEDULE" color={C.sky} frame={frame} delay={10} fps={fps} />
+      {/* Tournament name — smaller, golden */}
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 800,
+          color: "#F0B232",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+          textAlign: "center",
+          textShadow: "0 0 20px rgba(240,178,50,0.25)",
+          opacity: fade(frame, 10, 12),
+        }}
+      >
+        {name}
+      </div>
 
+      {/* Primary heading */}
       <div
         style={{
           fontSize: 52,
@@ -1389,16 +1444,16 @@ function ScheduleSlide({
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 24,
           marginBottom: 40,
+          textAlign: "center",
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
       >
-        {name}
+        Schedule
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
         {events.slice(0, 7).map((e, i) => {
           const delay = 28 + i * 6;
           const o = fade(frame, delay, 12);
@@ -1439,7 +1494,7 @@ function ScheduleSlide({
                 {e.lbl}
               </div>
               <div style={{ fontSize: 22, fontWeight: 800, color: e.color }}>
-                {fmtDate(e.date)}
+                {fmtDateOnly(e.date)}
               </div>
             </div>
           );
@@ -1481,10 +1536,26 @@ function FormatFlowSlide({
         flex: 1,
         padding: "36px 60px",
         justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <Badge text="TOURNAMENT FORMAT" color={C.amber} frame={frame} delay={10} fps={fps} />
+      {/* Tournament name — smaller, golden */}
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 800,
+          color: "#F0B232",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+          textAlign: "center",
+          textShadow: "0 0 20px rgba(240,178,50,0.25)",
+          opacity: fade(frame, 10, 12),
+        }}
+      >
+        {name}
+      </div>
 
+      {/* Primary heading */}
       <div
         style={{
           fontSize: 52,
@@ -1492,20 +1563,21 @@ function FormatFlowSlide({
           color: "#fff",
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          marginTop: 24,
           marginBottom: 12,
+          textAlign: "center",
           opacity: fade(frame, 16, 15),
           transform: `translateY(${slideY(frame, 16, 25, 18)}px)`,
         }}
       >
-        {name}
+        Tournament Format
       </div>
 
       <div
         style={{
-          fontSize: 22,
+          fontSize: 20,
           color: C.cream,
           marginBottom: 36,
+          textAlign: "center",
           opacity: fade(frame, 22, 15),
         }}
       >
@@ -1513,7 +1585,7 @@ function FormatFlowSlide({
       </div>
 
       {/* Vertical timeline */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
         {steps.map((s, i) => {
           const delay = 28 + i * 9;
           const o = fade(frame, delay, 12);

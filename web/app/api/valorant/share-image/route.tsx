@@ -635,10 +635,11 @@ export async function GET(req: NextRequest) {
           flex: 1,
           padding: "40px 60px",
           justifyContent: "center",
+          alignItems: "center",
         }}
       >
         {/* Format badge */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 28 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
           <Badge text={fmtLabel} color={CL.rose} />
         </div>
 
@@ -651,7 +652,8 @@ export async function GET(req: NextRequest) {
             lineHeight: 1.0,
             letterSpacing: "-0.03em",
             display: "flex",
-            marginBottom: 16,
+            marginBottom: 20,
+            textAlign: "center",
           }}
         >
           {name}
@@ -664,15 +666,16 @@ export async function GET(req: NextRequest) {
             color: CL.cream,
             fontWeight: 500,
             display: "flex",
-            marginBottom: 32,
+            marginBottom: 40,
             lineHeight: 1.4,
+            textAlign: "center",
           }}
         >
           {highlight || tagline}
         </div>
 
         {/* Prize Pool & Entry Fee — hero boxes */}
-        <div style={{ display: "flex", gap: 18, marginBottom: 28 }}>
+        <div style={{ display: "flex", gap: 18, marginBottom: 32, width: "100%" }}>
           {/* Entry Fee */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(160deg, ${CL.lavender}0A, transparent)`, border: `1.5px solid ${CL.lavender}25`, borderRadius: 22, padding: "24px 20px", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, background: `linear-gradient(90deg, ${CL.lavender}, ${CL.lavender}30, transparent)`, display: "flex" }} />
@@ -694,19 +697,19 @@ export async function GET(req: NextRequest) {
         </div>
 
         {/* Stats row */}
-        <div style={{ display: "flex", gap: 16 }}>
+        <div style={{ display: "flex", gap: 16, width: "100%" }}>
           <StatBox
             val={`${t.totalSlots || "?"}`}
             label="PLAYERS"
             color={CL.rose}
           />
           <StatBox
-            val={fmtDate(t.schedule?.groupStageStart || t.startDate)}
+            val={fmtDateOnly(t.schedule?.groupStageStart || t.startDate)}
             label="STARTS"
             color={CL.sky}
           />
           <StatBox
-            val={fmtDate(t.endDate || t.registrationDeadline)}
+            val={fmtDateOnly(t.endDate || t.registrationDeadline)}
             label="ENDS"
             color={CL.lavender}
           />
@@ -749,9 +752,24 @@ export async function GET(req: NextRequest) {
           flex: 1,
           padding: "40px 60px",
           justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <Badge text="HOW TO REGISTER" color={CL.rose} />
+        {/* Tournament name — smaller, golden */}
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            color: "#F0B232",
+            letterSpacing: "0.06em",
+            marginBottom: 12,
+            display: "flex",
+            textAlign: "center",
+          }}
+        >
+          {name}
+        </div>
+        {/* Primary heading */}
         <div
           style={{
             fontSize: 56,
@@ -759,19 +777,20 @@ export async function GET(req: NextRequest) {
             color: "#fff",
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
-            marginTop: 28,
-            marginBottom: 12,
+            marginBottom: 8,
             display: "flex",
+            textAlign: "center",
           }}
         >
-          Join {name}
+          How to Register
         </div>
         <div
           style={{
-            fontSize: 22,
+            fontSize: 20,
             color: CL.muted,
-            marginBottom: 44,
+            marginBottom: 36,
             display: "flex",
+            textAlign: "center",
           }}
         >
           Solo registration. 3 simple steps. Completely free.
@@ -784,6 +803,7 @@ export async function GET(req: NextRequest) {
             flexDirection: "column",
             gap: 20,
             marginBottom: 40,
+            width: "100%",
           }}
         >
           {steps.map((s) => (
@@ -847,6 +867,7 @@ export async function GET(req: NextRequest) {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "22px 32px",
+            width: "100%",
             background:
               "linear-gradient(135deg, rgba(224,86,114,0.14), rgba(224,86,114,0.05))",
             border: "2px solid rgba(224,86,114,0.35)",
@@ -873,7 +894,7 @@ export async function GET(req: NextRequest) {
                 display: "flex",
               }}
             >
-              {fmtDate(t.registrationDeadline)}
+              {fmtDateOnly(t.registrationDeadline)}
             </div>
           </div>
           <div
@@ -915,9 +936,24 @@ export async function GET(req: NextRequest) {
           flex: 1,
           padding: "40px 60px",
           justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <Badge text="TEAM STRUCTURE" color={CL.lavender} />
+        {/* Tournament name — smaller, golden */}
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            color: "#F0B232",
+            letterSpacing: "0.06em",
+            marginBottom: 12,
+            display: "flex",
+            textAlign: "center",
+          }}
+        >
+          {name}
+        </div>
+        {/* Primary heading */}
         <div
           style={{
             fontSize: 56,
@@ -925,16 +961,16 @@ export async function GET(req: NextRequest) {
             color: "#fff",
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
-            marginTop: 28,
-            marginBottom: 48,
+            marginBottom: 44,
             display: "flex",
+            textAlign: "center",
           }}
         >
-          {name}
+          Team Structure
         </div>
 
         {/* Big stats */}
-        <div style={{ display: "flex", gap: 18, marginBottom: 40 }}>
+        <div style={{ display: "flex", gap: 18, marginBottom: 44, width: "100%" }}>
           <div
             style={{
               flex: 1,
@@ -1094,6 +1130,7 @@ export async function GET(req: NextRequest) {
           style={{
             display: "flex",
             flexDirection: "column",
+            width: "100%",
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 22,
@@ -1190,14 +1227,18 @@ export async function GET(req: NextRequest) {
     const maxColor = RANK_TIERS.find(rt => rt.name === maxBase)?.color || CL.rose;
 
     content = (
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 60px", justifyContent: "center" }}>
-        <div style={{ display: "flex", fontSize: 22, fontWeight: 900, padding: "12px 32px", borderRadius: 100, background: `linear-gradient(135deg, ${CL.rose}22, ${CL.rose}0C)`, border: `2px solid ${CL.rose}50`, color: CL.rose, letterSpacing: "0.14em", boxShadow: `0 0 28px ${CL.rose}18` }}>ELIGIBLE RANKS</div>
-        <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 20, marginBottom: 24, display: "flex" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 60px", justifyContent: "center", alignItems: "center" }}>
+        {/* Tournament name — smaller, golden */}
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#F0B232", letterSpacing: "0.06em", marginBottom: 16, display: "flex", textAlign: "center" }}>
           {name}
+        </div>
+        {/* Primary heading */}
+        <div style={{ fontSize: 48, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 32, display: "flex", textAlign: "center" }}>
+          Eligible Ranks & Maps
         </div>
 
         {/* Eligible Rank Bars Only */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "28px 32px", background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`, border: `1.5px solid ${maxColor}30`, borderRadius: 24, marginBottom: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", padding: "32px 32px", width: "100%", background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`, border: `1.5px solid ${maxColor}30`, borderRadius: 24, marginBottom: 32 }}>
           <div style={{ display: "flex", gap: 8, width: "100%" }}>
             {ranksInRange.map((rank) => (
               <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
@@ -1209,7 +1250,7 @@ export async function GET(req: NextRequest) {
         </div>
 
         {/* Competitive maps */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "20px 28px", background: `linear-gradient(135deg, ${CL.sky}0C, transparent)`, border: `1.5px solid ${CL.sky}30`, borderRadius: 20, marginBottom: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", padding: "24px 28px", width: "100%", background: `linear-gradient(135deg, ${CL.sky}0C, transparent)`, border: `1.5px solid ${CL.sky}30`, borderRadius: 20, marginBottom: 28 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: CL.muted, letterSpacing: "0.1em", marginBottom: 12, display: "flex" }}>COMPETITIVE MAP POOL</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {COMP_MAPS.map((m) => (
@@ -1219,13 +1260,13 @@ export async function GET(req: NextRequest) {
         </div>
 
         {/* Map pool rules */}
-        <div style={{ display: "flex", gap: 14 }}>
-          <div style={{ flex: 1, padding: "16px 22px", background: `${CL.steel}0C`, border: `1px solid ${CL.steel}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>GROUP STAGE FORMAT</div>
+        <div style={{ display: "flex", gap: 16, width: "100%" }}>
+          <div style={{ flex: 1, padding: "20px 22px", background: `${CL.steel}0C`, border: `1px solid ${CL.steel}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 8, display: "flex" }}>GROUP STAGE FORMAT</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.steel, display: "flex" }}>{groupPool}</div>
           </div>
-          <div style={{ flex: 1, padding: "16px 22px", background: `${CL.amber}0C`, border: `1px solid ${CL.amber}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>PLAY-OFF FORMAT</div>
+          <div style={{ flex: 1, padding: "20px 22px", background: `${CL.amber}0C`, border: `1px solid ${CL.amber}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 8, display: "flex" }}>PLAY-OFF FORMAT</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.amber, display: "flex" }}>{bracketPool}</div>
           </div>
         </div>
@@ -1280,9 +1321,24 @@ export async function GET(req: NextRequest) {
           flex: 1,
           padding: "36px 60px",
           justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <Badge text="SCHEDULE" color={CL.sky} />
+        {/* Tournament name — smaller, golden */}
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            color: "#F0B232",
+            letterSpacing: "0.06em",
+            marginBottom: 12,
+            display: "flex",
+            textAlign: "center",
+          }}
+        >
+          {name}
+        </div>
+        {/* Primary heading */}
         <div
           style={{
             fontSize: 52,
@@ -1290,15 +1346,15 @@ export async function GET(req: NextRequest) {
             color: "#fff",
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
-            marginTop: 24,
             marginBottom: 40,
             display: "flex",
+            textAlign: "center",
           }}
         >
-          {name}
+          Schedule
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
           {events.slice(0, 7).map((e) => (
             <div
               key={e.n}
@@ -1345,7 +1401,7 @@ export async function GET(req: NextRequest) {
                   display: "flex",
                 }}
               >
-                {fmtDate(e.date)}
+                {fmtDateOnly(e.date)}
               </div>
             </div>
           ))}
@@ -1371,18 +1427,23 @@ export async function GET(req: NextRequest) {
           flex: 1,
           padding: "36px 60px",
           justifyContent: "center",
+          alignItems: "center",
         }}
       >
-        <Badge text="TOURNAMENT FORMAT" color={CL.amber} />
-        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 24, marginBottom: 12, display: "flex" }}>
+        {/* Tournament name — smaller, golden */}
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#F0B232", letterSpacing: "0.06em", marginBottom: 12, display: "flex", textAlign: "center" }}>
           {name}
         </div>
-        <div style={{ fontSize: 22, color: CL.cream, marginBottom: 36, display: "flex" }}>
+        {/* Primary heading */}
+        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 12, display: "flex", textAlign: "center" }}>
+          Tournament Format
+        </div>
+        <div style={{ fontSize: 20, color: CL.cream, marginBottom: 36, display: "flex", textAlign: "center" }}>
           From signup to champion
         </div>
 
         {/* Vertical timeline */}
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
           {formatSteps.map((s, i) => (
             <div key={s.n} style={{ display: "flex", alignItems: "stretch" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 52, flexShrink: 0 }}>
