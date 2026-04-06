@@ -198,7 +198,7 @@ export default function Navbar() {
       const result: ConfirmationResult = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
       setVerificationId(result.verificationId);
       setPhoneStep("otp"); startTimer();
-      setTimeout(() => otpRefs.current[0]?.focus(), 150);
+      setTimeout(() => otpRefs.current[0]?.focus({ preventScroll: true }), 150);
     } catch (e: any) {
       clearRecaptcha();
       setPhoneError(e.message || "Error sending OTP. Please try again.");
@@ -227,19 +227,19 @@ export default function Navbar() {
   const handleOtpChange = (i: number, val: string) => {
     const d = val.replace(/\D/g, "").slice(-1);
     const n = [...otp]; n[i] = d; setOtp(n);
-    if (d && i < 5) otpRefs.current[i + 1]?.focus();
+    if (d && i < 5) otpRefs.current[i + 1]?.focus({ preventScroll: true });
     if (n.every(x => x) && d) setTimeout(() => verifyOtpStr(n.join("")), 100);
   };
 
   const handleOtpKeyDown = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus();
+    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus({ preventScroll: true });
   };
 
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (p.length === 6) {
       setOtp(p.split("")); e.preventDefault();
-      setTimeout(() => { otpRefs.current[5]?.focus(); verifyOtpStr(p); }, 50);
+      setTimeout(() => { otpRefs.current[5]?.focus({ preventScroll: true }); verifyOtpStr(p); }, 50);
     }
   };
 
@@ -395,10 +395,9 @@ export default function Navbar() {
         .ie-private-warning p { color: #fbbf24; font-size: 0.76rem; line-height: 1.5; }
         .ie-private-warning code { background: rgba(251,191,36,0.15); padding: 1px 5px; border-radius: 4px; font-size: 0.72rem; color: #fbbf24; }
 
-        .ph-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
-        @media (min-width: 600px) { .ph-overlay { align-items: center; } }
-        .ph-modal { background: #18181C; border-radius: 20px 20px 0 0; padding: 32px 28px 40px; width: 100%; max-width: 400px; position: relative; }
-        @media (min-width: 600px) { .ph-modal { border-radius: 20px; } }
+        .ph-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: flex; align-items: flex-start; justify-content: center; padding-top: 15vh; }
+        @media (min-width: 600px) { .ph-overlay { align-items: center; padding-top: 0; } }
+        .ph-modal { background: #18181C; border-radius: 20px; padding: 32px 28px 40px; width: 100%; max-width: 400px; position: relative; min-height: 320px; margin: 0 16px; }
         .ph-close { position: absolute; top: 14px; right: 16px; background: #121215; border: 1px solid #2A2A30; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; color: #8A8880; display: flex; align-items: center; justify-content: center; }
         .ph-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 6px; color: #F0EEEA; }
         .ph-sub { font-size: .85rem; color: #8A8880; margin-bottom: 24px; line-height: 1.5; }
