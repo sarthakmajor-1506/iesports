@@ -980,8 +980,8 @@ function RanksMapSlide({
 
   const COMP_MAPS = ["Bind", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split"];
 
-  const groupPool = t.mapPool?.groupStage || "All Maps Veto";
-  const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
+  const groupPool = t.mapPool?.groupStage || "All Maps [Random]";
+  const bracketPool = t.mapPool?.tourneyStage || "Competitive Maps [Veto]";
 
   // Valorant rank tier colors
   const RANK_TIERS = [
@@ -1015,7 +1015,25 @@ function RanksMapSlide({
         justifyContent: "center",
       }}
     >
-      <Badge text="ELIGIBLE RANKS" color={C.rose} frame={frame} delay={10} fps={fps} />
+      <div
+        style={{
+          display: "inline-flex",
+          fontSize: 22,
+          fontWeight: 900,
+          padding: "12px 32px",
+          borderRadius: 100,
+          background: `linear-gradient(135deg, ${C.rose}22, ${C.rose}0C)`,
+          border: `2px solid ${C.rose}50`,
+          color: C.rose,
+          letterSpacing: "0.14em",
+          boxShadow: `0 0 28px ${C.rose}18`,
+          transform: `scale(${scaleIn(frame, 10, fps)})`,
+          opacity: fade(frame, 10, 10),
+          textShadow: `0 0 12px ${C.rose}40`,
+        }}
+      >
+        ELIGIBLE RANKS
+      </div>
 
       <div
         style={{
@@ -1033,7 +1051,7 @@ function RanksMapSlide({
         {name}
       </div>
 
-      {/* ── Rank Range — All Tiers ── */}
+      {/* ── Eligible Rank Bars Only ── */}
       <div
         style={{
           display: "flex",
@@ -1047,11 +1065,9 @@ function RanksMapSlide({
           transform: `translateX(${interpolate(frame, [24, 39], [-30, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
         }}
       >
-        {/* All rank tier bars */}
-        <div style={{ display: "flex", gap: 5, width: "100%" }}>
-          {RANK_TIERS.map((rank, i) => {
-            const inRange = i >= minIdx && i <= maxIdx;
-            const d = 28 + i * 4;
+        <div style={{ display: "flex", gap: 8, width: "100%" }}>
+          {ranksInRange.map((rank, i) => {
+            const d = 28 + i * 5;
             return (
               <div
                 key={rank.name}
@@ -1060,7 +1076,7 @@ function RanksMapSlide({
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 8,
                   opacity: fade(frame, d, 10),
                   transform: `translateY(${slideY(frame, d, 12, 12)}px)`,
                 }}
@@ -1068,21 +1084,19 @@ function RanksMapSlide({
                 <div
                   style={{
                     width: "100%",
-                    height: 36,
-                    borderRadius: 8,
-                    background: inRange
-                      ? `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)`
-                      : `${rank.color}20`,
-                    boxShadow: inRange ? `0 0 24px ${rank.color}60` : "none",
-                    border: inRange ? `2px solid ${rank.color}` : `1px solid ${rank.color}30`,
+                    height: 48,
+                    borderRadius: 10,
+                    background: `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)`,
+                    boxShadow: `0 0 28px ${rank.color}60`,
+                    border: `2.5px solid ${rank.color}`,
                   }}
                 />
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 13,
                     fontWeight: 900,
-                    color: inRange ? rank.color : `${rank.color}50`,
-                    letterSpacing: "0.06em",
+                    color: rank.color,
+                    letterSpacing: "0.08em",
                     textAlign: "center",
                   }}
                 >
@@ -1153,7 +1167,7 @@ function RanksMapSlide({
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>GROUP STAGE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>GROUP STAGE FORMAT</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.steel }}>{groupPool}</div>
         </div>
         <div
@@ -1166,7 +1180,7 @@ function RanksMapSlide({
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>PLAY-OFF STAGE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em", marginBottom: 6 }}>PLAY-OFF FORMAT</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.amber }}>{bracketPool}</div>
         </div>
       </div>
@@ -1452,11 +1466,11 @@ function FormatFlowSlide({
   const accentColor = C.sky;
 
   const steps = [
-    { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },
-    { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: sc.squadCreation, color: accentColor },
-    { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, date: sc.groupStageStart || t.startDate, color: accentColor },
-    { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, date: sc.tourneyStageStart, color: accentColor },
-    { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
+    { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },
+    { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: sc.squadCreation, color: accentColor },
+    { n: "3", lbl: "Group Stage", sub: `Swiss  /  BO${t.matchesPerRound || 2}`, date: sc.groupStageStart || t.startDate, color: accentColor },
+    { n: "4", lbl: "Play-off Stage", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}`, date: sc.tourneyStageStart, color: accentColor },
+    { n: "5", lbl: "Grand Final", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
   ];
 
   return (

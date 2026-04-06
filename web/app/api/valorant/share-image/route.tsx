@@ -1164,8 +1164,8 @@ export async function GET(req: NextRequest) {
     const minRank = t.eligibility?.minRank || "Gold";
     const maxRank = t.eligibility?.maxRank || "Immortal";
     const COMP_MAPS = ["Bind", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split"];
-    const groupPool = t.mapPool?.groupStage || "All Maps Veto";
-    const bracketPool = t.mapPool?.tourneyStage || "Competitive Map Veto";
+    const groupPool = t.mapPool?.groupStage || "All Maps [Random]";
+    const bracketPool = t.mapPool?.tourneyStage || "Competitive Maps [Veto]";
 
     // Valorant rank tier colors
     const RANK_TIERS = [
@@ -1191,24 +1191,20 @@ export async function GET(req: NextRequest) {
 
     content = (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "36px 60px", justifyContent: "center" }}>
-        <Badge text="ELIGIBLE RANKS" color={CL.rose} />
+        <div style={{ display: "flex", fontSize: 22, fontWeight: 900, padding: "12px 32px", borderRadius: 100, background: `linear-gradient(135deg, ${CL.rose}22, ${CL.rose}0C)`, border: `2px solid ${CL.rose}50`, color: CL.rose, letterSpacing: "0.14em", boxShadow: `0 0 28px ${CL.rose}18` }}>ELIGIBLE RANKS</div>
         <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 20, marginBottom: 24, display: "flex" }}>
           {name}
         </div>
 
-        {/* Rank Range — All Tiers */}
+        {/* Eligible Rank Bars Only */}
         <div style={{ display: "flex", flexDirection: "column", padding: "28px 32px", background: `linear-gradient(135deg, ${minColor}0C, ${maxColor}0C, transparent)`, border: `1.5px solid ${maxColor}30`, borderRadius: 24, marginBottom: 20 }}>
-          {/* All rank tier bars */}
-          <div style={{ display: "flex", gap: 5, width: "100%" }}>
-            {RANK_TIERS.map((rank, i) => {
-              const inRange = i >= minIdx && i <= maxIdx;
-              return (
-                <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: "100%", height: 36, borderRadius: 8, background: inRange ? `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)` : `${rank.color}20`, boxShadow: inRange ? `0 0 24px ${rank.color}60` : "none", border: inRange ? `2px solid ${rank.color}` : `1px solid ${rank.color}30`, display: "flex" }} />
-                  <div style={{ fontSize: 10, fontWeight: 900, color: inRange ? rank.color : `${rank.color}50`, letterSpacing: "0.06em", display: "flex" }}>{rank.name.toUpperCase()}</div>
-                </div>
-              );
-            })}
+          <div style={{ display: "flex", gap: 8, width: "100%" }}>
+            {ranksInRange.map((rank) => (
+              <div key={rank.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                <div style={{ width: "100%", height: 48, borderRadius: 10, background: `linear-gradient(180deg, ${rank.color}, ${rank.color}BB)`, boxShadow: `0 0 28px ${rank.color}60`, border: `2.5px solid ${rank.color}`, display: "flex" }} />
+                <div style={{ fontSize: 13, fontWeight: 900, color: rank.color, letterSpacing: "0.08em", display: "flex" }}>{rank.name.toUpperCase()}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1225,11 +1221,11 @@ export async function GET(req: NextRequest) {
         {/* Map pool rules */}
         <div style={{ display: "flex", gap: 14 }}>
           <div style={{ flex: 1, padding: "16px 22px", background: `${CL.steel}0C`, border: `1px solid ${CL.steel}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>GROUP STAGE</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>GROUP STAGE FORMAT</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.steel, display: "flex" }}>{groupPool}</div>
           </div>
           <div style={{ flex: 1, padding: "16px 22px", background: `${CL.amber}0C`, border: `1px solid ${CL.amber}25`, borderRadius: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>PLAY-OFF STAGE</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: CL.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex" }}>PLAY-OFF FORMAT</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: CL.amber, display: "flex" }}>{bracketPool}</div>
           </div>
         </div>
@@ -1360,11 +1356,11 @@ export async function GET(req: NextRequest) {
     // ── CARD 5: COMBINED FORMAT & FLOW ──
     const accentColor = CL.sky;
     const formatSteps = [
-      { n: "1", lbl: "REGISTER", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
-      { n: "2", lbl: "TEAMS FORMED", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
-      { n: "3", lbl: "GROUP STAGE", sub: `Swiss System  /  BO${t.matchesPerRound || 2}  /  ${t.groupStageRounds || 3} Rounds`, date: schedule.groupStageStart || t.startDate, color: accentColor },
-      { n: "4", lbl: "PLAY-OFF STAGE", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}  /  Top ${t.bracketTeamCount || "50%"} advance`, date: schedule.tourneyStageStart, color: accentColor },
-      { n: "5", lbl: "GRAND FINAL", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
+      { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
+      { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
+      { n: "3", lbl: "Group Stage", sub: `Swiss  /  BO${t.matchesPerRound || 2}`, date: schedule.groupStageStart || t.startDate, color: accentColor },
+      { n: "4", lbl: "Play-off Stage", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}`, date: schedule.tourneyStageStart, color: accentColor },
+      { n: "5", lbl: "Grand Final", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
     ];
 
     content = (
