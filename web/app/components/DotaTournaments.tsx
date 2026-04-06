@@ -136,7 +136,7 @@ export default function DotaTournaments() {
         .dt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
         @media (max-width: 700px) { .dt-card-body { gap: 12px; padding: 13px 14px; } .dt-card-right { padding-right: 14px; gap: 10px; } .dt-card-icon { width: 38px; height: 38px; } .dt-card-icon img { width: 26px; height: 26px; } .dt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } .dt-meta-item { display: none; } .dt-card-meta { gap: 6px; } .dt-card-meta .dt-meta-item:nth-child(-n+3) { display: flex; } }
-        @media (max-width: 500px) { .dt-wrap { padding: 16px 16px 44px; } .dt-card { flex-direction: column; } .dt-card-accent { width: 100%; height: 3px; } .dt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .dt-slots { min-width: unset; width: 100%; } .dt-slots-text { text-align: left; } .dt-card-meta .dt-meta-item { display: flex; } }
+        @media (max-width: 500px) { .dt-wrap { padding: 16px 16px 44px; } .dt-card { flex-direction: column; } .dt-card-accent { width: 100%; height: 3px; } .dt-card-body { padding: 13px 14px; } .dt-card-name { white-space: normal; } .dt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .dt-slots { min-width: unset; width: 100%; } .dt-slots-text { text-align: left; } .dt-card-meta .dt-meta-item { display: flex; } .dt-reg-btn, .dt-reg-done, .dt-coming-soon, .dt-leaderboard-btn { min-width: unset; } }
       `}</style>
 
       <div className="dt-wrap">

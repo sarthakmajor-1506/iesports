@@ -834,28 +834,27 @@ function RegisterSlide({
         alignItems: "center",
       }}
     >
-      {/* Tournament name — smaller, golden */}
+      {/* Tournament name — smaller, muted warm white */}
       <div
         style={{
           fontSize: 22,
           fontWeight: 800,
-          color: "#F0B232",
-          letterSpacing: "0.06em",
+          color: "rgba(255,255,255,0.50)",
+          letterSpacing: "0.08em",
           marginBottom: 12,
           textAlign: "center",
-          textShadow: "0 0 20px rgba(240,178,50,0.25)",
           opacity: fade(frame, 10, 12),
         }}
       >
         {name}
       </div>
 
-      {/* Primary heading */}
+      {/* Primary heading — bright accent */}
       <div
         style={{
           fontSize: 56,
           fontWeight: 900,
-          color: "#fff",
+          color: C.gold,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           marginBottom: 8,
@@ -1037,28 +1036,27 @@ function RanksMapSlide({
         alignItems: "center",
       }}
     >
-      {/* Tournament name — smaller, golden */}
+      {/* Tournament name — smaller, muted warm white */}
       <div
         style={{
           fontSize: 22,
           fontWeight: 800,
-          color: "#F0B232",
-          letterSpacing: "0.06em",
+          color: "rgba(255,255,255,0.50)",
+          letterSpacing: "0.08em",
           marginBottom: 16,
           textAlign: "center",
-          textShadow: "0 0 20px rgba(240,178,50,0.25)",
           opacity: fade(frame, 10, 12),
         }}
       >
         {name}
       </div>
 
-      {/* Primary heading */}
+      {/* Primary heading — bright accent */}
       <div
         style={{
           fontSize: 48,
           fontWeight: 900,
-          color: "#fff",
+          color: C.gold,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           marginBottom: 32,
@@ -1246,28 +1244,27 @@ function TeamsSlide({
         alignItems: "center",
       }}
     >
-      {/* Tournament name — smaller, golden */}
+      {/* Tournament name — smaller, muted warm white */}
       <div
         style={{
           fontSize: 22,
           fontWeight: 800,
-          color: "#F0B232",
-          letterSpacing: "0.06em",
+          color: "rgba(255,255,255,0.50)",
+          letterSpacing: "0.08em",
           marginBottom: 12,
           textAlign: "center",
-          textShadow: "0 0 20px rgba(240,178,50,0.25)",
           opacity: fade(frame, 10, 12),
         }}
       >
         {name}
       </div>
 
-      {/* Primary heading */}
+      {/* Primary heading — bright accent */}
       <div
         style={{
           fontSize: 56,
           fontWeight: 900,
-          color: "#fff",
+          color: C.gold,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           marginBottom: 44,
@@ -1420,28 +1417,27 @@ function ScheduleSlide({
         alignItems: "center",
       }}
     >
-      {/* Tournament name — smaller, golden */}
+      {/* Tournament name — smaller, muted warm white */}
       <div
         style={{
           fontSize: 22,
           fontWeight: 800,
-          color: "#F0B232",
-          letterSpacing: "0.06em",
+          color: "rgba(255,255,255,0.50)",
+          letterSpacing: "0.08em",
           marginBottom: 12,
           textAlign: "center",
-          textShadow: "0 0 20px rgba(240,178,50,0.25)",
           opacity: fade(frame, 10, 12),
         }}
       >
         {name}
       </div>
 
-      {/* Primary heading */}
+      {/* Primary heading — bright accent */}
       <div
         style={{
           fontSize: 52,
           fontWeight: 900,
-          color: "#fff",
+          color: C.gold,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           marginBottom: 40,
@@ -1539,28 +1535,27 @@ function FormatFlowSlide({
         alignItems: "center",
       }}
     >
-      {/* Tournament name — smaller, golden */}
+      {/* Tournament name — smaller, muted warm white */}
       <div
         style={{
           fontSize: 22,
           fontWeight: 800,
-          color: "#F0B232",
-          letterSpacing: "0.06em",
+          color: "rgba(255,255,255,0.50)",
+          letterSpacing: "0.08em",
           marginBottom: 12,
           textAlign: "center",
-          textShadow: "0 0 20px rgba(240,178,50,0.25)",
           opacity: fade(frame, 10, 12),
         }}
       >
         {name}
       </div>
 
-      {/* Primary heading */}
+      {/* Primary heading — bright accent */}
       <div
         style={{
           fontSize: 52,
           fontWeight: 900,
-          color: "#fff",
+          color: C.gold,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           marginBottom: 12,

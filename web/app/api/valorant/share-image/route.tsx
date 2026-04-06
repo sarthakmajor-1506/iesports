@@ -760,8 +760,8 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 22,
             fontWeight: 800,
-            color: "#F0B232",
-            letterSpacing: "0.06em",
+            color: "rgba(255,255,255,0.50)",
+            letterSpacing: "0.08em",
             marginBottom: 12,
             display: "flex",
             textAlign: "center",
@@ -774,7 +774,7 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 56,
             fontWeight: 900,
-            color: "#fff",
+            color: CL.gold,
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
             marginBottom: 8,
@@ -944,8 +944,8 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 22,
             fontWeight: 800,
-            color: "#F0B232",
-            letterSpacing: "0.06em",
+            color: "rgba(255,255,255,0.50)",
+            letterSpacing: "0.08em",
             marginBottom: 12,
             display: "flex",
             textAlign: "center",
@@ -958,7 +958,7 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 56,
             fontWeight: 900,
-            color: "#fff",
+            color: CL.gold,
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
             marginBottom: 44,
@@ -1233,7 +1233,7 @@ export async function GET(req: NextRequest) {
           {name}
         </div>
         {/* Primary heading */}
-        <div style={{ fontSize: 48, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 32, display: "flex", textAlign: "center" }}>
+        <div style={{ fontSize: 48, fontWeight: 900, color: CL.gold, lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 32, display: "flex", textAlign: "center" }}>
           Eligible Ranks & Maps
         </div>
 
@@ -1329,8 +1329,8 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 22,
             fontWeight: 800,
-            color: "#F0B232",
-            letterSpacing: "0.06em",
+            color: "rgba(255,255,255,0.50)",
+            letterSpacing: "0.08em",
             marginBottom: 12,
             display: "flex",
             textAlign: "center",
@@ -1343,7 +1343,7 @@ export async function GET(req: NextRequest) {
           style={{
             fontSize: 52,
             fontWeight: 900,
-            color: "#fff",
+            color: CL.gold,
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
             marginBottom: 40,
@@ -1435,7 +1435,7 @@ export async function GET(req: NextRequest) {
           {name}
         </div>
         {/* Primary heading */}
-        <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 12, display: "flex", textAlign: "center" }}>
+        <div style={{ fontSize: 52, fontWeight: 900, color: CL.gold, lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 12, display: "flex", textAlign: "center" }}>
           Tournament Format
         </div>
         <div style={{ fontSize: 20, color: CL.cream, marginBottom: 36, display: "flex", textAlign: "center" }}>

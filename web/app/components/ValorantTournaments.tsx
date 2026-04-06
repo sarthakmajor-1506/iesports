@@ -141,7 +141,7 @@ export default function ValorantTournaments() {
         .vt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
         @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 13px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 38px; height: 38px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } .vt-meta-item { display: none; } .vt-card-meta { gap: 6px; } .vt-card-meta .vt-meta-item:nth-child(-n+3) { display: flex; } }
-        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .vt-slots { min-width: unset; width: 100%; } .vt-slots-text { text-align: left; } .vt-card-meta .vt-meta-item { display: flex; } }
+        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-body { padding: 13px 14px; } .vt-card-name { white-space: normal; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .vt-slots { min-width: unset; width: 100%; } .vt-slots-text { text-align: left; } .vt-card-meta .vt-meta-item { display: flex; } .vt-reg-btn, .vt-reg-done, .vt-coming-soon, .vt-leaderboard-btn { min-width: unset; } }
       `}</style>
 
       <div className="vt-wrap">
