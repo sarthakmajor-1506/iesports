@@ -1339,13 +1339,13 @@ function ValorantTournamentDetailInner() {
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.3s" }}>
                   <div className="vtd-stat-tile-icon"><Shield size={24} color="#8A8880" /></div>
-                  <div className="vtd-stat-tile-val">{tournament.groupStageRounds || 3}</div>
-                  <div className="vtd-stat-tile-lbl">Group Rounds</div>
+                  <div className="vtd-stat-tile-val">Swiss</div>
+                  <div className="vtd-stat-tile-lbl">Group Stage Format</div>
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.35s" }}>
                   <div className="vtd-stat-tile-icon"><GitBranch size={24} color="#8A8880" /></div>
                   <div className="vtd-stat-tile-val">{tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</div>
-                  <div className="vtd-stat-tile-lbl">Play-off Type</div>
+                  <div className="vtd-stat-tile-lbl">Play-Off Format</div>
                 </div>
               </div>
 

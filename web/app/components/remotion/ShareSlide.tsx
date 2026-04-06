@@ -1463,7 +1463,7 @@ function FormatFlowSlide({
     t.format === "shuffle" ? "SHUFFLE" : t.format === "auction" ? "AUCTION" : "STANDARD";
 
   const sc = t.schedule || {};
-  const accentColor = "#F0B232";
+  const accentColor = C.sky;
 
   const steps = [
     { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },

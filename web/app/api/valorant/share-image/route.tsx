@@ -1354,7 +1354,7 @@ export async function GET(req: NextRequest) {
     );
   } else if (type === "format") {
     // ── CARD 5: COMBINED FORMAT & FLOW ──
-    const accentColor = "#F0B232";
+    const accentColor = CL.sky;
     const formatSteps = [
       { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
       { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
