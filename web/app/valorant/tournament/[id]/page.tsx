@@ -1811,6 +1811,7 @@ function ValorantTournamentDetailInner() {
             );
           })()}
 
+          <div style={{ height: 80 }} />
         </div>
       </div>
 
