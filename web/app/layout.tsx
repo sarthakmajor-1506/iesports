@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
-import DiscordFAB from "./components/DiscordFAB";
+
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -31,7 +31,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Suspense fallback={null}>
           <AuthProvider>{children}</AuthProvider>
-          <DiscordFAB />
+
           <Analytics />
         </Suspense>
       </body>
