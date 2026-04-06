@@ -522,18 +522,19 @@ export default function Home() {
                         <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredValTournament.championTeamName}</span>
                       </div>
                     )}
-                    <div className="ie-tourn-desc">{featuredValTournament.desc}</div>
+                    {!valEnded && <div className="ie-tourn-desc">{featuredValTournament.desc}</div>}
+                    {!valEnded && (
                     <div className="ie-tourn-meta">
                       {[
                         { icon: "🎮", label: featuredValTournament.game || "Valorant" },
                         { icon: "🏆", label: featuredValTournament.prizePool || "TBD" },
                         { icon: "🎟️", label: featuredValTournament.entryFee && featuredValTournament.entryFee > 0 ? `₹${featuredValTournament.entryFee}` : featuredValTournament.entry || "Free" },
                         { icon: "📅", label: featuredValTournament.startDate?.includes("T") ? new Date(featuredValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredValTournament.startDate },
-                        ...(valEnded ? [{ icon: "👥", label: `${featuredValTournament.slotsBooked} players` }] : []),
                       ].map(c => (
                         <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
                       ))}
                     </div>
+                    )}
                   </div>
                   <div className="ie-tourn-right">
                     {valEnded ? (
@@ -609,16 +610,6 @@ export default function Home() {
                           )}
                         </div>
                       )}
-                      <div className="ie-tourn-meta">
-                        {[
-                          { icon: "🎮", label: "Valorant" },
-                          { icon: "🏆", label: completedValTournament.prizePool || "TBD" },
-                          { icon: "👥", label: `${completedValTournament.slotsBooked} players` },
-                          { icon: "📅", label: completedValTournament.startDate?.includes("T") ? new Date(completedValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : completedValTournament.startDate },
-                        ].map(c => (
-                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
-                        ))}
-                      </div>
                     </div>
                     <div className="ie-tourn-right">
                       <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>
@@ -653,16 +644,6 @@ export default function Home() {
                           )}
                         </div>
                       )}
-                      <div className="ie-tourn-meta">
-                        {[
-                          { icon: "🎮", label: "Dota 2" },
-                          { icon: "🏆", label: completedDotaTournament.prizePool || "TBD" },
-                          { icon: "👥", label: `${completedDotaTournament.slotsBooked} players` },
-                          { icon: "📅", label: completedDotaTournament.startDate?.includes("T") ? new Date(completedDotaTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : completedDotaTournament.startDate },
-                        ].map(c => (
-                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
-                        ))}
-                      </div>
                     </div>
                     <div className="ie-tourn-right">
                       <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>

@@ -155,7 +155,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         const t1Sorted = [...(t1Members.length > 0 ? t1Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
         const t2Sorted = [...(t2Members.length > 0 ? t2Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
         return (
-        <div style={{ background: "linear-gradient(180deg, #0A0A10 0%, #14141A 30%, #14141A 70%, #0A0A10 100%)", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "22px 14px 18px", overflow: "hidden", position: "relative" }}>
+        <div className="dtd-mc-expanded" style={{ background: "linear-gradient(180deg, #0A0A10 0%, #14141A 30%, #14141A 70%, #0A0A10 100%)", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "22px 14px 18px", overflow: "hidden", position: "relative" }}>
           {/* Background diagonal streaks */}
           <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
             <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(59,130,246,0.07), transparent)", transform: "translate(-50%, -50%) rotate(30deg)" }} />
@@ -167,7 +167,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             {/* Team 1 Players */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "dtd-streak-left 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
               {[t1Sorted.slice(0, 2), t1Sorted.slice(2, 4), t1Sorted.slice(4, 5)].map((row, ri) => (
-                <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
+                <div key={ri} className="dtd-mc-player-row" style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
                   {row.map((p: any, pi: number) => {
                     const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
                     return (
@@ -202,7 +202,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               ))}
             </div>
             {/* VS Center Column with Team Names */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "dtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px" }}>
+            <div className="dtd-mc-vs-col" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "dtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px" }}>
               {/* Team 1 Logo + Name */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 10, animation: "dtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>
                 <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(59,130,246,0.3)", background: "linear-gradient(135deg, #3b82f622, #2563eb22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -216,7 +216,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                 }}>{m.team1Name}</div>
               </div>
               {/* VS Badge */}
-              <div style={{
+              <div className="dtd-mc-vs" style={{
                 width: 48, height: 48, borderRadius: "50%",
                 background: "linear-gradient(135deg, #3b82f6, #6366f1, #1d4ed8)",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -241,7 +241,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             {/* Team 2 Players */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "dtd-streak-right 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
               {[t2Sorted.slice(0, 2), t2Sorted.slice(2, 4), t2Sorted.slice(4, 5)].map((row, ri) => (
-                <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
+                <div key={ri} className="dtd-mc-player-row" style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
                   {row.map((p: any, pi: number) => {
                     const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
                     return (
@@ -791,6 +791,7 @@ function DotaTournamentDetailInner() {
         @keyframes dtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
         .dtd-fighter-card { position: relative; transition: transform 0.2s; }
         .dtd-fighter-card:hover { transform: translateY(-2px) scale(1.06); z-index: 2; }
+        .dtd-page { overflow-x: hidden; }
 
         /* ── Share modal ── */
         .dtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
@@ -850,6 +851,16 @@ function DotaTournamentDetailInner() {
           .dtd-stat-tile { padding: 14px 10px; border-radius: 12px; }
           .dtd-stat-tile-val { font-size: 1.15rem; }
           .dtd-share-modal { padding: 20px; border-radius: 16px; }
+          /* Expanded match section */
+          .dtd-mc-expanded { padding: 14px 8px 12px !important; }
+          .dtd-mc-player-row { gap: 6px !important; }
+          .dtd-fighter-card { gap: 2px !important; }
+          .dtd-fighter-card > img { width: 32px !important; height: 32px !important; }
+          .dtd-fighter-card > div:first-child { width: 32px !important; height: 32px !important; font-size: 0.75rem !important; }
+          .dtd-fighter-card > div:last-child { max-width: 40px !important; }
+          .dtd-fighter-card > div:last-child > div:first-child { font-size: 0.52rem !important; }
+          .dtd-mc-vs-col { padding: 0 2px !important; }
+          .dtd-mc-vs { width: 34px !important; height: 34px !important; font-size: 0.75rem !important; }
         }
         @media (max-width: 400px) {
           .dtd-hero-content { padding: 0 12px 20px; min-height: 300px; }
@@ -858,6 +869,22 @@ function DotaTournamentDetailInner() {
           .dtd-tab { min-height: 38px; padding: 0 4px; font-size: 0.7rem; }
           .dtd-hero-title { font-size: 1.4rem; }
           .dtd-stat-tiles { gap: 8px; }
+          /* Match cards at tiny screens */
+          .dtd-mc-team { padding: 6px 6px !important; gap: 6px !important; }
+          .dtd-mc-team-logo { width: 26px !important; height: 26px !important; font-size: 8px !important; border-radius: 7px !important; }
+          .dtd-mc-center { min-width: 54px !important; }
+          .dtd-mc-index { width: 28px !important; }
+          .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
+          .dtd-mc-team-name { font-size: 0.7rem !important; }
+          .dtd-mc-team-tag { font-size: 0.56rem !important; }
+          /* Expanded match section */
+          .dtd-mc-expanded { padding: 10px 4px 8px !important; }
+          .dtd-mc-player-row { gap: 3px !important; }
+          .dtd-fighter-card > img { width: 26px !important; height: 26px !important; }
+          .dtd-fighter-card > div:first-child { width: 26px !important; height: 26px !important; font-size: 0.65rem !important; }
+          .dtd-fighter-card > div:last-child { max-width: 32px !important; }
+          .dtd-mc-vs-col { padding: 0 !important; }
+          .dtd-mc-vs { width: 28px !important; height: 28px !important; font-size: 0.6rem !important; }
         }
       `}</style>
 

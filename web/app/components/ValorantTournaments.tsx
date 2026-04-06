@@ -278,32 +278,16 @@ export default function ValorantTournaments() {
                               )}
                             </div>
                           )}
+                          {hasWinner && !((t as any).championMembers?.length > 0) && (
                           <div className="vt-card-meta">
-                            {hasWinner && !((t as any).championMembers?.length > 0) && (
                               <div className="vt-meta-item">
                                 <span className="vt-meta-key" style={{ color: "#fbbf24" }}>Winner</span>
                                 <span className="vt-meta-val" style={{ color: "#ffd700", display: "flex", alignItems: "center", gap: 4, fontWeight: 900 }}>
                                   <span style={{ fontSize: "0.8rem" }}>👑</span> {winnerName}
                                 </span>
                               </div>
-                            )}
-                            <div className="vt-meta-item">
-                              <span className="vt-meta-key">Prize</span>
-                              <span className="vt-meta-val prize">{t.prizePool ? (String(t.prizePool).match(/^[₹Rs]/) ? t.prizePool : `₹${t.prizePool}`) : "TBD"}</span>
-                            </div>
-                            <div className="vt-meta-item">
-                              <span className="vt-meta-key">Format</span>
-                              <span className="vt-meta-val">{t.format === "auction" ? "Auction" : t.format === "shuffle" ? "Shuffle" : "Standard"}</span>
-                            </div>
-                            <div className="vt-meta-item">
-                              <span className="vt-meta-key">Players</span>
-                              <span className="vt-meta-val">{t.slotsBooked}/{t.totalSlots}</span>
-                            </div>
-                            <div className="vt-meta-item">
-                              <span className="vt-meta-key">Date</span>
-                              <span className="vt-meta-val">{formatDate(t.startDate)}</span>
-                            </div>
                           </div>
+                          )}
                         </div>
                       </div>
                       <div className="vt-card-right" style={{ position: "relative", zIndex: 1 }}>

@@ -524,7 +524,7 @@ function findUidByPuuid(puuid: string, playerName: string, teams: Record<string,
   return "";
 }
 const styles = `
-  .md-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+  .md-page { min-height: 100vh; background: #0A0A0C; font-family: var(--font-geist-sans), system-ui, sans-serif; overflow-x: hidden; }
   .md-content { max-width: 1400px; margin: 0 auto; padding: 20px 48px 60px; }
   .md-loading { text-align: center; padding: 80px 20px; color: #555550; }
 
@@ -566,11 +566,11 @@ const styles = `
   .md-rs-loss { color: #8A8880; }
   .md-rs-sep { color: #555550; font-weight: 400; }
 
-  .md-team-section { background: #121215; border: 1px solid #2A2A30; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
+  .md-team-section { background: #121215; border: 1px solid #2A2A30; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; overflow-x: auto; }
   .md-team-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
   .md-team-winner { font-size: 0.56rem; padding: 2px 8px; background: rgba(22,163,74,0.12); color: #4ade80; border-radius: 100px; border: 1px solid rgba(34,197,94,0.3); }
 
-  .md-stats-table { width: 100%; }
+  .md-stats-table { width: 100%; min-width: 520px; }
   .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
   .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; cursor: pointer; user-select: none; transition: color 0.15s; }
   .md-stats-header .md-stats-cell:hover { color: #3CCBFF; }
@@ -598,11 +598,30 @@ const styles = `
 
   @media (max-width: 700px) {
     .md-header { flex-direction: column; gap: 16px; padding: 20px; }
-    .md-header-team { align-items: center !important; }
+    .md-header-team { align-items: center !important; min-width: auto !important; }
     .md-header-score { font-size: 1.8rem; }
     .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.5fr 0.4fr 0.4fr 0.4fr; }
     .md-stats-cell { font-size: 0.72rem; }
     .md-stats-agent { font-size: 0.62rem; }
     .md-content { padding: 20px 16px 60px; }
+    .md-header-team-name { font-size: 0.78rem; max-width: 120px; }
+    .md-header-team-logo { width: 42px; height: 42px; }
+    .md-map-banner { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+    .md-round-score { font-size: 1.3rem; }
+    .md-team-section { padding: 12px 14px; }
+    .md-game-tabs { gap: 8px; }
+    .md-game-tab { padding: 10px 8px; }
+  }
+  @media (max-width: 400px) {
+    .md-content { padding: 16px 10px 48px; }
+    .md-header { padding: 16px; }
+    .md-header-score { font-size: 1.5rem; gap: 6px; }
+    .md-header-team-logo { width: 36px; height: 36px; font-size: 13px; }
+    .md-header-team-name { font-size: 0.72rem; max-width: 100px; }
+    .md-game-tab-num { font-size: 0.64rem; }
+    .md-game-tab-info { font-size: 0.68rem; }
+    .md-map-banner { padding: 10px 12px; border-radius: 10px; }
+    .md-map-name { font-size: 0.86rem; }
+    .md-round-score { font-size: 1.1rem; }
   }
 `;
