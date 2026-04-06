@@ -117,17 +117,18 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           <span style={{ fontSize: "0.56rem", fontWeight: 700, color: "#8A8880" }}>M{m.matchIndex || ""} · BO{bestOf}</span>
         </div>
       )}
+      {!isBracket && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, paddingLeft: 2 }}>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", letterSpacing: "0.06em" }}>M{m.matchIndex || ""}</span>
+          <span style={{ fontSize: "0.56rem", fontWeight: 700, color: "#8A8880" }}>BO{bestOf}</span>
+          {scheduledDay && <span style={{ fontSize: "0.54rem", fontWeight: 600, color: "#555550" }}>· {scheduledDay} {scheduledTime}</span>}
+        </div>
+      )}
       <div className="vtd-mc" style={{
         cursor: "pointer",
         ...(isLive ? { borderColor: "rgba(34,197,94,0.25)" } : {}),
         ...(isExpanded ? { borderColor: "rgba(60,203,255,0.25)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
       }} onClick={() => setExpandedMatch(isExpanded ? null : m.id)}>
-        {!isBracket && <div className="vtd-mc-index">
-          <span className="vtd-mc-index-num">
-            {`M${m.matchIndex || ""}`}
-          </span>
-          <span className="vtd-mc-index-fmt">BO{bestOf}</span>
-        </div>}
         <div className="vtd-mc-team">
           <div className="vtd-mc-team-logo">
             {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
@@ -1276,6 +1277,17 @@ function ValorantTournamentDetailInner() {
             <div className="vtd-tab-pane" ref={tabContentRef}>
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
+                {championTeamName && (
+                  <div className="vtd-stat-tile gold" style={{ animationDelay: "0s", gridColumn: "1 / -1" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "center", width: "100%" }}>
+                      <span style={{ fontSize: "1.4rem" }}>👑</span>
+                      <div>
+                        <div className="vtd-stat-tile-val" style={{ color: "#ffd700", fontSize: "1.15rem" }}>{championTeamName}</div>
+                        <div className="vtd-stat-tile-lbl" style={{ color: "#fbbf24" }}>Tournament Winner</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>
                   <div className="vtd-stat-tile-icon"><Zap size={24} color="#3CCBFF" /></div>
                   <div className="vtd-stat-tile-val">{tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>

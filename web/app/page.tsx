@@ -54,6 +54,8 @@ export default function Home() {
   const [activeSection,      setActiveSection]      = useState("home");
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | null>(null);
   const [featuredValTournament, setFeaturedValTournament] = useState<Tournament | null>(null);
+  const [completedValTournament, setCompletedValTournament] = useState<Tournament | null>(null);
+  const [completedDotaTournament, setCompletedDotaTournament] = useState<Tournament | null>(null);
   const [tournamentLoading,  setTournamentLoading]  = useState(true);
   const [riotModalOpen, setRiotModalOpen] = useState(false);
 
@@ -77,6 +79,12 @@ export default function Home() {
         }
         if (data.valorant) {
           setFeaturedValTournament(data.valorant as Tournament);
+        }
+        if (data.completedValorant) {
+          setCompletedValTournament(data.completedValorant as Tournament);
+        }
+        if (data.completedDota) {
+          setCompletedDotaTournament(data.completedDota as Tournament);
         }
       } catch (e) { console.error("[Landing] Featured tournament fetch error:", e); }
       finally { setTournamentLoading(false); }
@@ -567,6 +575,81 @@ export default function Home() {
               Browse All Tournaments
             </button>
           </div>
+
+          {/* ═══ RECENT RESULTS ═══ */}
+          {(completedValTournament || completedDotaTournament) && (
+            <div style={{ marginTop: 56 }}>
+              <div className="ie-section-header">
+                <h2 className="ie-section-title">Recent <span className="accent">Results</span></h2>
+              </div>
+              <div className="ie-tourn-grid">
+                {completedValTournament && (
+                  <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${completedValTournament.id}`)} style={{ cursor: "pointer", borderColor: "rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.03)" }}>
+                    <div className="ie-tourn-left">
+                      <div className="ie-tourn-badge val" style={{ background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" }}>
+                        <span style={{ fontSize: "0.72rem" }}>👑</span> Tournament Completed
+                      </div>
+                      <div className="ie-tourn-title">{completedValTournament.name}</div>
+                      {completedValTournament.championTeamName && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
+                          <span style={{ fontSize: "1.1rem" }}>👑</span>
+                          <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{completedValTournament.championTeamName}</span>
+                        </div>
+                      )}
+                      <div className="ie-tourn-meta">
+                        {[
+                          { icon: "🎮", label: "Valorant" },
+                          { icon: "🏆", label: completedValTournament.prizePool || "TBD" },
+                          { icon: "👥", label: `${completedValTournament.slotsBooked} players` },
+                          { icon: "📅", label: completedValTournament.startDate?.includes("T") ? new Date(completedValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : completedValTournament.startDate },
+                        ].map(c => (
+                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="ie-tourn-right">
+                      <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>
+                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${completedValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)" }}>
+                        View Results →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {completedDotaTournament && (
+                  <div className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${completedDotaTournament.id}`)} style={{ cursor: "pointer", borderColor: "rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.03)" }}>
+                    <div className="ie-tourn-left">
+                      <div className="ie-tourn-badge" style={{ background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" }}>
+                        <span style={{ fontSize: "0.72rem" }}>👑</span> Tournament Completed
+                      </div>
+                      <div className="ie-tourn-title">{completedDotaTournament.name}</div>
+                      {completedDotaTournament.championTeamName && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
+                          <span style={{ fontSize: "1.1rem" }}>👑</span>
+                          <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{completedDotaTournament.championTeamName}</span>
+                        </div>
+                      )}
+                      <div className="ie-tourn-meta">
+                        {[
+                          { icon: "🎮", label: "Dota 2" },
+                          { icon: "🏆", label: completedDotaTournament.prizePool || "TBD" },
+                          { icon: "👥", label: `${completedDotaTournament.slotsBooked} players` },
+                          { icon: "📅", label: completedDotaTournament.startDate?.includes("T") ? new Date(completedDotaTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : completedDotaTournament.startDate },
+                        ].map(c => (
+                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="ie-tourn-right">
+                      <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffd700" }}>Completed</div>
+                      <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${completedDotaTournament.id}`); }} style={{ background: "linear-gradient(135deg, #b8860b, #8b6914)", borderColor: "rgba(255,215,0,0.5)", boxShadow: "0 4px 22px rgba(255,215,0,.2)" }}>
+                        View Results →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

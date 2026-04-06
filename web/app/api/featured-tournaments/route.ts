@@ -28,15 +28,20 @@ export async function GET() {
       if (valEnded.length > 0) valResult = valEnded[0];
     }
 
+    // ── Completed tournaments for "Recent Results" section ──
+    const dotaIsEnded = (t: any) => t.status === "ended" || t.status === "completed" || (t.endDate && now > new Date(t.endDate));
+    const dotaCompleted = dotaAll
+      .filter((t: any) => dotaIsEnded(t))
+      .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    const valCompleted = valAll
+      .filter((t: any) => !t.isTestTournament && valIsEnded(t))
+      .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+
     return NextResponse.json({
       dota: dotaFeatured.length > 0 ? dotaFeatured[0] : null,
       valorant: valResult,
-      debug: {
-        dotaTotal: dotaSnap.size,
-        dotaFiltered: dotaFeatured.length,
-        valTotal: valSnap.size,
-        valFiltered: valFeatured.length,
-      },
+      completedValorant: valCompleted.length > 0 ? valCompleted[0] : null,
+      completedDota: dotaCompleted.length > 0 ? dotaCompleted[0] : null,
     });
   } catch (e: any) {
     console.error("[API] Featured tournaments error:", e);
