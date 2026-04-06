@@ -760,8 +760,8 @@ function OverviewSlide({
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: `linear-gradient(160deg, ${C.gold}0C, transparent)`,
-              border: `1.5px solid ${C.gold}30`,
+              background: "linear-gradient(160deg, rgba(240,178,50,0.05), transparent)",
+              border: "1.5px solid rgba(240,178,50,0.20)",
               borderRadius: 22,
               padding: "24px 20px",
               position: "relative",
@@ -770,8 +770,8 @@ function OverviewSlide({
               transform: `scale(${scaleIn(frame, 34, fps)})`,
             }}
           >
-            <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.gold}30, transparent)` }} />
-            <div style={{ fontSize: 44, fontWeight: 900, color: C.gold, lineHeight: 1 }}>
+            <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, background: "linear-gradient(90deg, #F0B232, rgba(240,178,50,0.2), transparent)" }} />
+            <div style={{ fontSize: 44, fontWeight: 900, color: "#F0B232", lineHeight: 1 }}>
               {prizeDisplay}
             </div>
             <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.12em", color: C.muted, marginTop: 8 }}>
@@ -1672,10 +1672,10 @@ function FormatFlowSlide({
             justifyContent: "center",
             gap: 20,
             padding: "20px 32px",
-            background: `linear-gradient(135deg, ${C.gold}0C, ${C.gold}04)`,
-            border: `2px solid ${C.gold}25`,
+            background: "linear-gradient(135deg, rgba(240,178,50,0.05), rgba(240,178,50,0.02))",
+            border: "2px solid rgba(240,178,50,0.18)",
             borderRadius: 22,
-            boxShadow: `0 0 30px ${C.gold}08`,
+            boxShadow: "0 0 30px rgba(240,178,50,0.06)",
             opacity: fade(frame, 78, 15),
             transform: `scale(${scaleIn(frame, 78, fps)})`,
           }}
@@ -1683,7 +1683,7 @@ function FormatFlowSlide({
           <div style={{ fontSize: 14, fontWeight: 800, color: C.muted, letterSpacing: "0.12em" }}>
             PRIZE POOL
           </div>
-          <div style={{ fontSize: 36, fontWeight: 900, color: C.gold }}>
+          <div style={{ fontSize: 36, fontWeight: 900, color: "#F0B232" }}>
             {String(t.prizePool).startsWith("Rs.") ? t.prizePool : "Rs." + t.prizePool}
           </div>
         </div>

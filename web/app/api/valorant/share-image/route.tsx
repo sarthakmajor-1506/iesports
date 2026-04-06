@@ -670,9 +670,9 @@ export async function GET(req: NextRequest) {
           </div>
           {/* Prize Pool */}
           {hasPrize && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(160deg, ${CL.gold}0C, transparent)`, border: `1.5px solid ${CL.gold}30`, borderRadius: 22, padding: "24px 20px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, background: `linear-gradient(90deg, ${CL.gold}, ${CL.gold}30, transparent)`, display: "flex" }} />
-              <div style={{ fontSize: 44, fontWeight: 900, color: CL.gold, lineHeight: 1, display: "flex" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg, rgba(240,178,50,0.05), transparent)", border: "1.5px solid rgba(240,178,50,0.20)", borderRadius: 22, padding: "24px 20px", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, background: "linear-gradient(90deg, #F0B232, rgba(240,178,50,0.2), transparent)", display: "flex" }} />
+              <div style={{ fontSize: 44, fontWeight: 900, color: "#F0B232", lineHeight: 1, display: "flex" }}>
                 {prizeDisplay}
               </div>
               <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.12em", color: CL.muted, marginTop: 8, display: "flex" }}>PRIZE POOL</div>
@@ -1460,9 +1460,9 @@ export async function GET(req: NextRequest) {
 
         {/* Prize callout */}
         {t.prizePool && t.prizePool !== "0" && (
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 20, padding: "20px 32px", background: `linear-gradient(135deg, ${CL.gold}0C, ${CL.gold}04)`, border: `2px solid ${CL.gold}25`, borderRadius: 22, boxShadow: `0 0 30px ${CL.gold}08` }}>
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 20, padding: "20px 32px", background: "linear-gradient(135deg, rgba(240,178,50,0.05), rgba(240,178,50,0.02))", border: "2px solid rgba(240,178,50,0.18)", borderRadius: 22, boxShadow: "0 0 30px rgba(240,178,50,0.06)" }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: CL.muted, letterSpacing: "0.12em", display: "flex" }}>PRIZE POOL</div>
-            <div style={{ fontSize: 36, fontWeight: 900, color: CL.gold, display: "flex" }}>
+            <div style={{ fontSize: 36, fontWeight: 900, color: "#F0B232", display: "flex" }}>
               {String(t.prizePool).startsWith("Rs.") ? t.prizePool : "Rs." + t.prizePool}
             </div>
           </div>
