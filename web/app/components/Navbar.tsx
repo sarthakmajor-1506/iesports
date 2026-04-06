@@ -744,17 +744,6 @@ export default function Navbar() {
           </>
           ) : (
           <>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
-              background: "rgba(88,101,242,0.08)", border: "1px solid rgba(88,101,242,0.25)",
-              borderRadius: 12, marginBottom: 4,
-            }}>
-              <DiscordIcon size={20} color="#818cf8" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#F0EEEA" }}>Sign in to Register</div>
-                <div style={{ fontSize: "0.72rem", color: "#8A8880", marginTop: 2 }}>Create an account to join tournaments</div>
-              </div>
-            </div>
             <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/discord-login", "_blank")}
               style={{ background: "#5865F2", borderColor: "#5865F2", color: "#fff" }}>
               <DiscordIcon size={20} color="#fff" /> Sign in with Discord
