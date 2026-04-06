@@ -51,6 +51,30 @@ export default function AdminPanel() {
   // ─── Auth ───────────────────────────────────────────────────────────────────
   const [adminKey, setAdminKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleAdminAuth = async () => {
+    if (!adminKey) return;
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/admin/list-tournaments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey }),
+      });
+      if (res.ok) {
+        setAuthenticated(true);
+      } else {
+        setAuthError("Wrong password. Access denied.");
+      }
+    } catch {
+      setAuthError("Connection error. Try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   // ─── Active tab ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<AdminTab>("tournament");
@@ -652,13 +676,14 @@ export default function AdminPanel() {
             <h1 style={{ fontSize: "1.4rem", fontWeight: 900, marginBottom: 8, color: "#f0f0f0" }}>Admin Panel</h1>
             <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: 24 }}>Enter the admin key to access tournament management.</p>
             <input type="password" placeholder="Admin Key" value={adminKey}
-              onChange={e => setAdminKey(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && adminKey) setAuthenticated(true); }}
-              style={{ width: "100%", padding: 12, border: "1.5px solid #2a2a2e", borderRadius: 10, fontSize: "0.95rem", marginBottom: 12, outline: "none", boxSizing: "border-box", background: "#1a1a1e", color: "#e0e0e0" }}
+              onChange={e => { setAdminKey(e.target.value); setAuthError(""); }}
+              onKeyDown={e => { if (e.key === "Enter" && adminKey) handleAdminAuth(); }}
+              style={{ width: "100%", padding: 12, border: `1.5px solid ${authError ? "#dc2626" : "#2a2a2e"}`, borderRadius: 10, fontSize: "0.95rem", marginBottom: 4, outline: "none", boxSizing: "border-box", background: "#1a1a1e", color: "#e0e0e0", transition: "border-color 0.2s" }}
             />
-            <button onClick={() => { if (adminKey) setAuthenticated(true); }}
-              style={{ width: "100%", padding: 12, background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer" }}>
-              Authenticate →
+            {authError && <p style={{ fontSize: "0.8rem", color: "#f87171", marginBottom: 8, textAlign: "left" }}>{authError}</p>}
+            <button onClick={handleAdminAuth} disabled={authLoading}
+              style={{ width: "100%", padding: 12, background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: authLoading ? "default" : "pointer", opacity: authLoading ? 0.6 : 1, marginTop: 8 }}>
+              {authLoading ? "Verifying..." : "Authenticate →"}
             </button>
           </div>
         </div>

@@ -499,17 +499,17 @@ export default function Home() {
                 const valBadge = getRegBadge(featuredValTournament);
                 const valEnded = valBadge.ended;
                 return (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer", ...(valEnded ? { opacity: 0.85 } : {}) }}>
+                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer", ...(valEnded ? { borderColor: "rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.04)" } : {}) }}>
                   <div className="ie-tourn-left">
                     <div className="ie-tourn-badge val" style={valEnded ? { background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" } : {}}>
                       {valBadge.isOpen && <span className="ie-pulse" style={{ background: "#ff4655" }} />}
-                      {valEnded && <span style={{ fontSize: "0.72rem" }}>🏆</span>}
+                      {valEnded && <span style={{ fontSize: "0.72rem" }}>👑</span>}
                       {valBadge.label}
                     </div>
                     <div className="ie-tourn-title">{featuredValTournament.name}</div>
                     {valEnded && featuredValTournament.championTeamName && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: "1.1rem" }}>🏆</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
+                        <span style={{ fontSize: "1.1rem" }}>👑</span>
                         <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredValTournament.championTeamName}</span>
                       </div>
                     )}

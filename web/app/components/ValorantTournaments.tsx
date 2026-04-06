@@ -95,8 +95,8 @@ export default function ValorantTournaments() {
           animation: vt-card-up 0.35s ease both;
         }
         .vt-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(60,203,255,0.15); border-color: rgba(60,203,255,0.3); }
-        .vt-card.ended { opacity: 0.75; }
-        .vt-card.ended:hover { box-shadow: 0 8px 30px rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+        .vt-card.ended { opacity: 0.9; border-color: rgba(255,215,0,0.15); background: rgba(255,215,0,0.03); }
+        .vt-card.ended:hover { box-shadow: 0 8px 30px rgba(255,215,0,0.12); border-color: rgba(255,215,0,0.3); }
         .vt-card.registered { border-color: rgba(34,197,94,0.35); background: rgba(22,163,74,0.07); }
         .vt-card.registered:hover { box-shadow: 0 8px 30px rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
 
@@ -252,20 +252,20 @@ export default function ValorantTournaments() {
                           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,15,42,0.9) 0%, rgba(10,15,42,0.6) 50%, rgba(10,15,42,0.9) 100%)", borderRadius: 16, pointerEvents: "none" }} />
                         </>
                       )}
-                      <div className="vt-card-accent" style={{ background: hasWinner ? "#fbbf24" : "#555550", position: "relative", zIndex: 1 }} />
+                      <div className="vt-card-accent" style={{ background: "#fbbf24", position: "relative", zIndex: 1 }} />
                       <div className="vt-card-body" style={{ position: "relative", zIndex: 1 }}>
                         <div className="vt-card-icon"><img src="/valorantlogo.png" alt="Valorant" /></div>
                         <div className="vt-card-info">
                           <div className="vt-card-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             {t.name}
-                            <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.1)", whiteSpace: "nowrap" }}>Completed</span>
+                            <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(255,215,0,0.1)", color: "#fbbf24", border: "1px solid rgba(255,215,0,0.25)", whiteSpace: "nowrap" }}>Completed</span>
                           </div>
                           <div className="vt-card-meta">
                             {hasWinner && (
                               <div className="vt-meta-item">
                                 <span className="vt-meta-key" style={{ color: "#fbbf24" }}>Winner</span>
-                                <span className="vt-meta-val" style={{ color: "#fbbf24", display: "flex", alignItems: "center", gap: 4 }}>
-                                  <span style={{ fontSize: "0.75rem" }}>🏆</span> {winnerName}
+                                <span className="vt-meta-val" style={{ color: "#ffd700", display: "flex", alignItems: "center", gap: 4, fontWeight: 900 }}>
+                                  <span style={{ fontSize: "0.8rem" }}>👑</span> {winnerName}
                                 </span>
                               </div>
                             )}
