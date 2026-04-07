@@ -8,7 +8,10 @@ import { fetchAndSyncPlayer } from "@/lib/fetchAndSyncPlayer";
 
 export async function GET(req: NextRequest) {
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
-  const returnUrl = `${realm}/api/auth/steam-callback`;
+  const linkUid = req.nextUrl.searchParams.get("linkUid") || "";
+  const returnUrl = linkUid
+    ? `${realm}/api/auth/steam-callback?linkUid=${encodeURIComponent(linkUid)}`
+    : `${realm}/api/auth/steam-callback`;
 
   const relyingParty = new openid.RelyingParty(returnUrl, realm, true, true, []);
 
@@ -36,47 +39,58 @@ export async function GET(req: NextRequest) {
         );
         const profile = steamRes.data.response.players[0];
 
-        // Check for existing user
-        const existingQuery = await adminDb
-          .collection("users")
-          .where("steamId", "==", steamId)
-          .limit(1)
-          .get();
-
         let firebaseUid: string;
 
-        if (!existingQuery.empty) {
-          firebaseUid = existingQuery.docs[0].id;
-          await adminDb.collection("users").doc(firebaseUid).update({
-            steamName: profile.personaname,
-            steamAvatar: profile.avatarfull,
-          });
-        } else {
-          const firebaseUser = await adminAuth
-            .createUser({
-              uid: `steam_${steamId}`,
-              displayName: profile.personaname,
-              photoURL: profile.avatarfull,
-            })
-            .catch(async () => adminAuth.getUser(`steam_${steamId}`));
-
-          firebaseUid = firebaseUser.uid;
-
+        if (linkUid) {
+          // ── Linking Steam to an existing user (e.g. Discord-login user) ──
+          firebaseUid = linkUid;
           await adminDb.collection("users").doc(firebaseUid).set({
             steamId,
             steamName: profile.personaname,
             steamAvatar: profile.avatarfull,
             steamLinkedAt: new Date(),
-            createdAt: new Date(),
-            phone: null,
-            dotaRankTier: null,
-            dotaBracket: null,
-            dotaMMR: null,
-            smurfRiskScore: 0,
-          });
+          }, { merge: true });
+        } else {
+          // ── Standalone Steam login (no existing user) ──
+          const existingQuery = await adminDb
+            .collection("users")
+            .where("steamId", "==", steamId)
+            .limit(1)
+            .get();
+
+          if (!existingQuery.empty) {
+            firebaseUid = existingQuery.docs[0].id;
+            await adminDb.collection("users").doc(firebaseUid).update({
+              steamName: profile.personaname,
+              steamAvatar: profile.avatarfull,
+            });
+          } else {
+            const firebaseUser = await adminAuth
+              .createUser({
+                uid: `steam_${steamId}`,
+                displayName: profile.personaname,
+                photoURL: profile.avatarfull,
+              })
+              .catch(async () => adminAuth.getUser(`steam_${steamId}`));
+
+            firebaseUid = firebaseUser.uid;
+
+            await adminDb.collection("users").doc(firebaseUid).set({
+              steamId,
+              steamName: profile.personaname,
+              steamAvatar: profile.avatarfull,
+              steamLinkedAt: new Date(),
+              createdAt: new Date(),
+              phone: null,
+              dotaRankTier: null,
+              dotaBracket: null,
+              dotaMMR: null,
+              smurfRiskScore: 0,
+            });
+          }
         }
 
-        // ── NEW: Fetch rank + matches immediately on Steam link ──────────
+        // ── Fetch rank + matches immediately on Steam link ──────────
         try {
           await fetchAndSyncPlayer({
             uid: firebaseUid,

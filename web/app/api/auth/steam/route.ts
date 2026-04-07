@@ -3,7 +3,10 @@ import openid from "openid";
 
 export async function GET(req: NextRequest) {
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
-  const returnUrl = `${realm}/api/auth/steam-callback`;
+  const uid = req.nextUrl.searchParams.get("uid") || "";
+  const returnUrl = uid
+    ? `${realm}/api/auth/steam-callback?linkUid=${encodeURIComponent(uid)}`
+    : `${realm}/api/auth/steam-callback`;
 
   const relyingParty = new openid.RelyingParty(returnUrl, realm, true, true, []);
 
