@@ -618,23 +618,6 @@ export default function Navbar() {
               >
                 <DiscordIcon size={16} color="#818cf8" /> Sign In
               </button>
-              <button
-                className="ie-signin-btn"
-                onClick={() => window.open("/api/auth/steam", "_blank")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: "linear-gradient(135deg,#1b2838,#2a475e)", color: "#fff",
-                  border: "1px solid #3d6b8c", borderRadius: 100,
-                  padding: "8px 16px", fontSize: "0.84rem", fontWeight: 700,
-                  cursor: "pointer", fontFamily: "inherit", transition: "opacity 0.2s",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.85"; }}
-                onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
-              >
-                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" width={16} height={16} style={{ display: "block" }} />
-                Steam
-              </button>
             </>
             )}
 
@@ -746,11 +729,6 @@ export default function Navbar() {
             <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/discord-login", "_blank")}
               style={{ background: "#5865F2", borderColor: "#5865F2", color: "#fff" }}>
               <DiscordIcon size={20} color="#fff" /> Sign in with Discord
-            </button>
-            <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/steam", "_blank")}
-              style={{ background: "linear-gradient(135deg,#1b2838,#2a475e)", borderColor: "#3d6b8c", color: "#fff" }}>
-              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20 }} />
-              Sign in with Steam
             </button>
           </>
           )}

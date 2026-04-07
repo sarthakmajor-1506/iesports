@@ -687,7 +687,7 @@ export default function Home() {
               <img src="/riot-games.png" alt="Riot Games" style={{ width: 56, height: 56, borderRadius: 12, marginBottom: 14 }} />
               <h2 style={{ fontSize: 20, fontWeight: 800, color: "#111", marginBottom: 6 }}>Riot Sign-On Coming Soon</h2>
               <p style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>
-                Direct Riot authentication (RSO) is not available yet. Sign in with Steam or Discord to get started, then link your Riot ID from your profile.
+                Direct Riot authentication (RSO) is not available yet. Sign in with Discord to get started, then link your Riot ID from your profile.
               </p>
             </div>
 
@@ -696,17 +696,6 @@ export default function Home() {
 
             {/* Sign in options */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={() => { setRiotModalOpen(false); loginWithSteam(); }} style={{
-                width: "100%", padding: "14px 20px",
-                background: "linear-gradient(135deg, #1b2838, #2a475e)",
-                border: "1px solid #3d6b8c", borderRadius: 12,
-                color: "#fff", fontWeight: 700, fontSize: 15,
-                cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", gap: 10, fontFamily: "inherit",
-              }}>
-                <SteamIcon size={20} />
-                Sign in with Steam
-              </button>
               <button onClick={() => { setRiotModalOpen(false); window.open("/api/auth/discord-login", "_blank"); }} style={{
                 width: "100%", padding: "14px 20px",
                 background: "#5865F2",
