@@ -428,7 +428,7 @@ export default function PlayerProfile() {
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {rh.type === "seed" ? (
-                        <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Rating Seeded</div>
+                        <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Rating Started</div>
                       ) : rh.type === "riot_refresh" ? (
                         <>
                           <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Riot Rank Refresh</div>

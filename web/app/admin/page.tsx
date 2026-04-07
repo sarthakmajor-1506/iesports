@@ -1949,7 +1949,14 @@ export default function AdminPanel() {
                         {/* ── Edit form ── */}
                         {regEditUid === p.uid ? (
                           <div style={{ background: "#18181c", border: "1px solid #3B82F6", borderRadius: 10, padding: 14, marginTop: 12 }}>
-                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Edit Player</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1 }}>Edit Player</div>
+                              {(p as any).iesportsRating && (
+                                <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#3CCBFF" }}>
+                                  iE Rating: <span style={{ fontWeight: 900, color: "#F0EEEA" }}>{(p as any).iesportsRating}</span> ({(p as any).iesportsRank || "?"})
+                                </div>
+                              )}
+                            </div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                               {[
                                 { key: "fullName", label: "Full Name" },
