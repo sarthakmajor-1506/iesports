@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
-import DiscordAccountsPrompt, { triggerDiscordPrompt, hasDiscordAccount } from "./DiscordAccountsPrompt";
+import DiscordAccountsPrompt from "./DiscordAccountsPrompt";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
@@ -68,22 +68,10 @@ export default function Navbar() {
   const [resendTimer,    setResendTimer]    = useState(0);
   const [verificationId, setVerificationId] = useState("");
 
-  const [hoveredAcc, setHoveredAcc] = useState<string | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const phoneRef     = useRef<HTMLInputElement>(null);
   const otpRefs      = useRef<(HTMLInputElement | null)[]>([]);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const handleAccHoverIn = (id: string) => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setHoveredAcc(id);
-  };
-  const handleAccHoverOut = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => setHoveredAcc(null), 800);
-  };
 
   useEffect(() => {
     if (!user) {
@@ -123,6 +111,13 @@ export default function Navbar() {
 
   useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
 
+  // Allow profile page to trigger phone modal via custom event
+  useEffect(() => {
+    const handler = () => { setPhoneModalOpen(true); setPhoneStep("phone"); setPhoneError(""); setTimeout(() => phoneRef.current?.focus(), 300); };
+    window.addEventListener("ie-open-phone-modal", handler);
+    return () => window.removeEventListener("ie-open-phone-modal", handler);
+  }, []);
+
   const activeGame = games.find((g) =>
     g.id === "dota2"
       ? pathname === "/dota2" || pathname === "/dashboard" || pathname.startsWith("/tournament")
@@ -135,28 +130,9 @@ export default function Navbar() {
   const hasSteam        = !!steamData?.steamId;
   const riotStatus      = riotData?.riotVerified || (steamData?.riotGameName ? "pending" : "unlinked");
 
-  const unlinkedCount = [!hasSteam, !discordLinked, riotStatus === "unlinked", !hasPhone].filter(Boolean).length;
-
-  // Intercept Connect Steam/Riot — show Discord prompt if Discord has the account
-  const handleConnectSteam = () => {
-    if (hasDiscordAccount(discordConnections, "steam", hasSteam)) {
-      triggerDiscordPrompt();
-    } else {
-      window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank");
-    }
-  };
-  const handleConnectRiot = () => {
-    if (hasDiscordAccount(discordConnections, "riot", riotStatus !== "unlinked")) {
-      triggerDiscordPrompt();
-    } else {
-      window.open("/connect-riot", "_blank");
-    }
-  };
-
-  const handleDiscordConnect = () => {
-    if (!user) return;
-    window.open(`/api/auth/discord?uid=${user.uid}`, "_blank");
-  };
+  // Best available profile photo: Steam > Riot > Discord (fallback to initial)
+  const profilePhoto = steamData?.steamAvatar || riotData?.riotAvatar || steamData?.riotAvatar || null;
+  const profileName = steamData?.steamName || riotData?.riotGameName || steamData?.riotGameName || steamData?.discordUsername || "User";
 
   const clearRecaptcha = () => {
     try { recaptchaRef.current?.clear(); } catch (_) {}
@@ -243,79 +219,6 @@ export default function Navbar() {
     }
   };
 
-  const AccBadge = ({ id, linked, pending, icon, iconEl, name, label, onClick }: {
-    id: string; linked: boolean; pending?: boolean; icon?: string; iconEl?: React.ReactNode;
-    name?: string; label: string; onClick?: () => void;
-  }) => {
-    const isHovered = hoveredAcc === id;
-    const isUnlinked = !linked && !pending;
-
-    return (
-      <div
-        className={`ie-acc2 ${linked ? "linked" : pending ? "pending" : "unlinked"}`}
-        onMouseEnter={() => handleAccHoverIn(id)}
-        onMouseLeave={handleAccHoverOut}
-        onClick={onClick}
-        style={{
-          display: "flex", alignItems: "center", height: 36, borderRadius: 100,
-          cursor: onClick ? "pointer" : "default", overflow: "hidden", flexShrink: 0,
-          transition: isHovered
-            ? "width 1.5s cubic-bezier(0.16,1,0.3,1), padding-right 1.5s cubic-bezier(0.16,1,0.3,1), background 0.3s, border-color 0.3s, box-shadow 0.3s"
-            : "width 1.5s cubic-bezier(0.4,0,0.2,1), padding-right 1.5s cubic-bezier(0.4,0,0.2,1), background 0.3s, border-color 0.3s, box-shadow 0.3s",
-          width: isHovered ? "auto" : 36, minWidth: 36,
-          maxWidth: isHovered ? 220 : 36,
-          paddingRight: isHovered ? 14 : 0,
-          background: linked ? "rgba(22,163,74,0.12)" : pending ? "rgba(251,191,36,0.1)" : "rgba(239,68,68,0.1)",
-          border: `1.5px ${isUnlinked ? "dashed" : "solid"} ${linked ? "rgba(34,197,94,0.3)" : pending ? "rgba(251,191,36,0.3)" : "rgba(239,68,68,0.35)"}`,
-          ...(isUnlinked ? { animation: "ie-acc-pulse 2.5s ease-in-out infinite" } : {}),
-        }}
-      >
-        <div style={{
-          width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0, margin: "0 2px",
-          transition: "opacity 0.3s",
-        }}>
-          {iconEl || (icon && <img src={icon} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: "cover", opacity: isUnlinked ? 0.4 : 1 }} />)}
-        </div>
-
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-          overflow: "hidden",
-          opacity: isHovered ? 1 : 0,
-          maxWidth: isHovered ? 180 : 0,
-          transition: isHovered
-            ? "opacity 0.8s cubic-bezier(0.16,1,0.3,1) 0.35s, max-width 1.5s cubic-bezier(0.16,1,0.3,1)"
-            : "opacity 0.2s ease 0s, max-width 1.5s cubic-bezier(0.4,0,0.2,1)",
-        }}>
-          {linked ? (
-            <>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#e0e0da", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "rgba(22,163,74,0.2)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span>
-            </>
-          ) : pending ? (
-            <>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#fbbf24", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-              <span style={{ fontSize: "0.56rem", fontWeight: 800, padding: "2px 6px", borderRadius: 20, background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
-            </>
-          ) : (
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f87171" }}>Connect {label}</span>
-          )}
-        </div>
-
-        {isUnlinked && (
-          <div style={{
-            position: "absolute", top: -3, right: -3, width: 11, height: 11,
-            borderRadius: "50%", background: "#ef4444", border: "2px solid #0A0A0C",
-            boxShadow: "0 0 4px rgba(239,68,68,0.5)",
-            transition: "opacity 0.3s",
-            opacity: isHovered ? 0 : 1,
-            pointerEvents: "none",
-          }} />
-        )}
-      </div>
-    );
-  };
-
   return (
     <>
       {user && <DiscordAccountsPrompt />}
@@ -337,22 +240,9 @@ export default function Navbar() {
         .ie-soon-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; background: #1a1a1f; color: #555550; }
         .ie-nav-right { display: flex; align-items: center; gap: 8px; }
 
-        .ie-accounts-row2 { display: flex; align-items: center; gap: 5px; position: relative; }
-        .ie-acc2 { position: relative; }
-
-        @keyframes ie-acc-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: rgba(239,68,68,0.35); }
-          50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.6); }
-        }
-        @keyframes ie-acc-fade-in {
-          from { opacity: 0; transform: translateX(-6px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-
-        .ie-dropdown-wrap { position: relative; }
-        .ie-dots-btn { width: 36px; height: 36px; border-radius: 100px; border: 1px solid #2A2A30; background: #121215; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; flex-shrink: 0; position: relative; }
-        .ie-dots-btn:hover { background: #18181C; }
-        .ie-dots-btn span { width: 4px; height: 4px; border-radius: 50%; background: #8A8880; display: block; }
+        .ie-profile-wrap { position: relative; }
+        .ie-profile-btn { display: flex; align-items: center; gap: 10px; background: none; border: 1px solid transparent; border-radius: 12px; padding: 4px 12px 4px 4px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .ie-profile-btn:hover { background: #18181C; border-color: #2A2A30; }
         .ie-dropdown { position: absolute; top: calc(100% + 10px); right: 0; background: #121215; border: 1px solid #2A2A30; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 276px; overflow: hidden; z-index: 200; animation: ie-dd-in 0.15s ease; }
         @keyframes ie-dd-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         .ie-dd-section { padding: 8px; border-bottom: 1px solid #1e1e22; }
@@ -370,7 +260,18 @@ export default function Navbar() {
         .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
         .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
-        @media (max-width: 900px) { .ie-nav-tabs { display: none; } .ie-accounts-row2 { display: none; } .ie-signin-btn { display: none !important; } .ie-mobile-signin-cta { display: flex !important; } }
+        @media (max-width: 900px) {
+          .ie-nav-tabs { display: none; }
+          .ie-signin-btn { display: none !important; }
+          .ie-mobile-signin-cta { display: flex !important; }
+          .ie-nav-logo .ie-logo-img { width: 32px !important; height: 32px !important; }
+          .ie-nav-logo-name { font-size: 1.05rem !important; }
+          .ie-nav-logo-sub { display: none !important; }
+          .ie-nav-row { padding: 0 16px !important; height: 54px !important; }
+          .ie-profile-name-text { display: none !important; }
+          .ie-profile-chevron { display: none !important; }
+          .ie-profile-btn { padding: 2px !important; border-radius: 50% !important; }
+        }
         .ie-mobile-signin-cta { display: none !important; }
 
         .ie-hamburger { display: none; flex-direction: column; gap: 5px; width: 36px; height: 36px; border: 1px solid #2A2A30; background: #121215; border-radius: 9px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -424,7 +325,7 @@ export default function Navbar() {
         <div className="ie-nav-row">
 
           <div className="ie-nav-logo" onClick={() => router.push("/")}>
-            <Image src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
+            <Image className="ie-logo-img" src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
               <div className="ie-nav-logo-sub">Competitive Gaming</div>
@@ -453,147 +354,49 @@ export default function Navbar() {
           <div className="ie-nav-right">
             {user ? (
             <>
-            <div className="ie-accounts-row2">
-              <AccBadge
-                id="steam"
-                linked={hasSteam}
-                icon={hasSteam ? (steamData?.steamAvatar || "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg") : "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"}
-                name={steamData?.steamName}
-                label="Steam"
-                onClick={hasSteam ? undefined : handleConnectSteam}
-              />
-              <AccBadge
-                id="discord"
-                linked={discordLinked}
-                iconEl={<DiscordIcon size={18} color={discordLinked ? "#818cf8" : "#555550"} />}
-                name={discordUsername}
-                label="Discord"
-                onClick={discordLinked ? undefined : handleDiscordConnect}
-              />
-              <AccBadge
-                id="riot"
-                linked={riotStatus === "verified"}
-                pending={riotStatus === "pending"}
-                icon={riotData?.riotAvatar || "/riot-games.png"}
-                name={riotData?.riotGameName ? `${riotData.riotGameName}#${riotData.riotTagLine}` : undefined}
-                label="Riot ID"
-                onClick={handleConnectRiot}
-              />
-            </div>
-
-            <div className="ie-dropdown-wrap" ref={dropdownRef}>
-              <button className="ie-dots-btn" onClick={() => setDropdownOpen(p => !p)} aria-label="More options">
-                <span /><span /><span />
-                {unlinkedCount > 0 && (
-                  <div style={{
-                    position: "absolute", top: -4, right: -4, minWidth: 16, height: 16,
-                    borderRadius: 100, background: "#dc2626", border: "2px solid #0A0A0C",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "0.52rem", fontWeight: 900, color: "#fff",
-                  }}>{unlinkedCount}</div>
+            <div className="ie-profile-wrap" ref={dropdownRef}>
+              <button className="ie-profile-btn" onClick={() => setDropdownOpen(p => !p)}>
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt="" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30" }} />
+                ) : (
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                    {profileName[0]?.toUpperCase()}
+                  </div>
                 )}
+                <span className="ie-profile-name-text" style={{ fontSize: "0.92rem", fontWeight: 900, color: "#F0EEEA", letterSpacing: "0.05em", whiteSpace: "nowrap", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {profileName.toUpperCase()}
+                </span>
+                <svg className="ie-profile-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                  <path d="M2 4L5 7L8 4" stroke="#8A8880" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </button>
 
               {dropdownOpen && (
-                <div className="ie-dropdown">
-                  {unlinkedCount > 0 && (
-                    <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", borderBottom: "1px solid rgba(239,68,68,0.2)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
-                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f87171" }}>{unlinkedCount} account{unlinkedCount > 1 ? "s" : ""} not connected</span>
+                <div className="ie-dropdown" style={{ minWidth: 220 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 16px 12px" }}>
+                    {profilePhoto ? (
+                      <img src={profilePhoto} alt="" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                        {profileName[0]?.toUpperCase()}
                       </div>
-                      <p style={{ fontSize: "0.64rem", color: "#555550", lineHeight: 1.5 }}>Connect all accounts to participate in tournaments and receive notifications.</p>
-                    </div>
-                  )}
-
-                  {hasSteam && (
-                    <div className="ie-dd-section">
-                      <span className="ie-dd-label">Steam</span>
-                      <div className="ie-dd-item">
-                        <img src={steamData.steamAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #22c55e" }} />
-                        <span style={{ fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem", flex: 1 }}>{steamData.steamName}</span>
-                        <span className="ie-verified-badge">✓</span>
+                    )}
+                    <div style={{ overflow: "hidden" }}>
+                      <div style={{ fontSize: "1rem", fontWeight: 900, color: "#F0EEEA", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {profileName.toUpperCase()}
                       </div>
                     </div>
-                  )}
-                  {!hasSteam && (
-                    <div className="ie-dd-section">
-                      <span className="ie-dd-label">Steam</span>
-                      <button className="ie-dd-btn" onClick={() => { handleConnectSteam(); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 18, height: 18, opacity: 0.5 }} />
-                        Connect Steam
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="ie-dd-section">
-                    <span className="ie-dd-label">Phone</span>
-                    {hasPhone ? (
-                      <div className="ie-dd-item">
-                        <span style={{ fontSize: 16 }}>📱</span>
-                        <span style={{ fontWeight: 600, color: "#ddd", fontSize: "0.84rem", flex: 1 }}>
-                          {steamData.phone.replace(/(\+\d{1,3})(\d{3})(\d+)(\d{3})$/, (_: string, code: string, a: string, _m: string, last: string) => `${code} ${a}*****${last}`)}
-                        </span>
-                        <span className="ie-verified-badge">✓</span>
-                      </div>
-                    ) : (
-                      <button className="ie-dd-btn" onClick={openPhoneModal} style={{ color: "#f87171" }}>
-                        <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
-                      </button>
-                    )}
                   </div>
-
-                  <div className="ie-dd-section">
-                    <span className="ie-dd-label">Riot / Valorant</span>
-                    {riotStatus === "verified" ? (
-                      <div className="ie-dd-item">
-                        <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #22c55e" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
-                        <span className="ie-verified-badge">✓</span>
-                      </div>
-                    ) : riotStatus === "pending" ? (
-                      <div className="ie-dd-item">
-                        <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, border: "2px solid #f59e0b" }} />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da", fontSize: "0.85rem" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
-                        <span style={{ fontSize: "0.62rem", color: "#fbbf24", fontWeight: 800, background: "rgba(251,191,36,0.12)", padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
-                      </div>
-                    ) : (
-                      <button className="ie-dd-btn" onClick={() => { handleConnectRiot(); setDropdownOpen(false); }} style={{ color: "#f87171" }}>
-                        <img src="/riot-games.png" alt="" style={{ width: 18, height: 18, borderRadius: 3, opacity: 0.5 }} />
-                        Connect Riot ID
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="ie-dd-section">
-                    <span className="ie-dd-label">Discord</span>
-                    {discordLinked ? (
-                      <div className="ie-dd-item">
-                        <DiscordIcon size={18} color="#818cf8" />
-                        <span style={{ flex: 1, fontWeight: 600, color: "#818cf8" }}>{discordUsername}</span>
-                        <span className="ie-discord-verified">✓</span>
-                      </div>
-                    ) : (
-                      <button className="ie-dd-btn discord" onClick={() => { handleDiscordConnect(); setDropdownOpen(false); }}>
-                        <DiscordIcon size={18} color="#818cf8" /> Connect Discord
-                        <span style={{ marginLeft: "auto", fontSize: "0.58rem", fontWeight: 800, padding: "2px 6px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>Required</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="ie-dd-section" style={{ padding: "10px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div className="ie-dd-section" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 4, borderTop: "1px solid #1e1e22" }}>
                     <button className="ie-dd-btn profile"
                       onClick={() => { router.push(`/player/${user?.uid}`); setDropdownOpen(false); }}
-                      style={{ justifyContent: "center", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "100px", padding: "10px 0" }}>
-                      👤 Profile
+                      style={{ justifyContent: "center", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 100, padding: "10px 0" }}>
+                      Profile
                     </button>
                     <button className="ie-dd-btn logout"
                       onClick={async () => { await logout(); setDropdownOpen(false); }}
-                      style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "100px", padding: "10px 0" }}>
-                      🚪 Logout
+                      style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, padding: "10px 0" }}>
+                      Logout
                     </button>
                   </div>
                 </div>
@@ -661,67 +464,23 @@ export default function Navbar() {
 
           {user ? (
           <>
-          {hasSteam ? (
-            <div className="ie-mobile-row">
-              <img src={steamData.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #22c55e" }} />
-              <span style={{ flex: 1, fontWeight: 600, color: "#e0e0da" }}>{steamData.steamName}</span>
-              <span className="ie-verified-badge">✓</span>
-            </div>
-          ) : (
-            <button className="ie-mobile-connect-btn" onClick={handleConnectSteam}>
-              <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="" style={{ width: 20, height: 20, opacity: 0.5 }} />
-              Connect Steam
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
-            </button>
-          )}
-
-          {discordLinked ? (
-            <div className="ie-mobile-row">
-              <DiscordIcon size={18} color="#818cf8" />
-              <span style={{ flex: 1, fontWeight: 600, color: "#818cf8" }}>{discordUsername}</span>
-              <span className="ie-discord-verified">✓</span>
-            </div>
-          ) : (
-            <button className="ie-mobile-connect-btn" onClick={handleDiscordConnect} style={{ borderColor: "rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.06)", color: "#818cf8" }}>
-              <DiscordIcon size={20} color="#818cf8" /> Connect Discord
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
-            </button>
-          )}
-
-          {riotStatus === "verified" ? (
-            <div className="ie-mobile-row">
-              <img src={riotData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
-              <span style={{ flex: 1, fontWeight: 600, color: "#3CCBFF" }}>{riotData?.riotGameName}#{riotData?.riotTagLine}</span>
-              <span className="ie-verified-badge">✓</span>
-            </div>
-          ) : riotStatus === "pending" ? (
-            <div className="ie-mobile-row">
-              <img src={riotData?.riotAvatar || steamData?.riotAvatar || "/riot-games.png"} alt="" style={{ width: 22, height: 22, borderRadius: 4 }} />
-              <span style={{ flex: 1, fontWeight: 600, color: "#3CCBFF" }}>{riotData?.riotGameName || steamData?.riotGameName}#{riotData?.riotTagLine || steamData?.riotTagLine}</span>
-              <span style={{ fontSize: "0.58rem", fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.12)", padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(251,191,36,0.3)" }}>Pending</span>
-            </div>
-          ) : (
-            <button className="ie-mobile-connect-btn" onClick={handleConnectRiot} style={{ borderColor: "rgba(60,203,255,0.3)", background: "rgba(60,203,255,0.06)", color: "#3CCBFF" }}>
-              <img src="/riot-games.png" alt="" style={{ width: 20, height: 20, borderRadius: 3, opacity: 0.6 }} />
-              Connect Riot ID
-              <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: "#f87171" }}>Required</span>
-            </button>
-          )}
-
-          {hasPhone ? (
-            <div className="ie-mobile-row">
-              <span style={{ fontSize: 16 }}>📱</span>
-              <span style={{ fontWeight: 600, flex: 1 }}>{steamData?.phone}</span>
-              <span className="ie-verified-badge">✓</span>
-            </div>
-          ) : (
-            <button className="ie-mobile-action-btn" onClick={openPhoneModal}>
-              <span style={{ fontSize: 16 }}>📱</span> Connect Phone Number
-            </button>
-          )}
-
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px" }}>
+            {profilePhoto ? (
+              <img src={profilePhoto} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30" }} />
+            ) : (
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                {profileName[0]?.toUpperCase()}
+              </div>
+            )}
+            <span style={{ fontSize: "0.96rem", fontWeight: 900, color: "#F0EEEA", letterSpacing: "0.05em" }}>
+              {profileName.toUpperCase()}
+            </span>
+          </div>
+          <button className="ie-mobile-action-btn" onClick={() => router.push(`/player/${user?.uid}`)}>
+            Profile
+          </button>
           <button className="ie-mobile-logout" onClick={async () => { await logout(); }}>
-            <span style={{ fontSize: 16 }}>🚪</span> Logout
+            Logout
           </button>
           </>
           ) : (
@@ -801,3 +560,7 @@ export default function Navbar() {
 }
 
 export { Navbar };
+
+export function triggerPhoneModal() {
+  window.dispatchEvent(new Event("ie-open-phone-modal"));
+}

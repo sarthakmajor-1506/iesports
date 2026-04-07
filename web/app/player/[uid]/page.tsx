@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Navbar from "@/app/components/Navbar";
+import Navbar, { triggerPhoneModal } from "@/app/components/Navbar";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
@@ -642,7 +642,7 @@ export default function PlayerProfile() {
                     </div>
                     {profile.phone
                       ? <span className="pp-acc-badge pp-acc-linked">✓ Added</span>
-                      : <span className="pp-acc-badge pp-acc-missing">Required</span>}
+                      : <button className="pp-acc-link-btn" onClick={() => triggerPhoneModal()}>Connect</button>}
                   </div>
 
                 </div>
