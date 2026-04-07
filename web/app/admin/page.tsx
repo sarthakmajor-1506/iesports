@@ -852,7 +852,7 @@ export default function AdminPanel() {
         .adm-match-status.pending { background: #2a1e0d; color: #f59e0b; border: 1px solid #5c3a14; }
         .adm-match-status.live { background: #2a1215; color: #ef4444; border: 1px solid #5c1f28; }
         .adm-match-status.completed { background: #0d2a15; color: #22c55e; border: 1px solid #1e5c2a; }
-        .adm-player-row { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 1.2fr 0.6fr 0.6fr 0.6fr; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
+        .adm-player-row { display: grid; grid-template-columns: 3fr 0.7fr 0.7fr 1fr 0.7fr; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
         .adm-player-row:hover { background: #1a1a1e; }
         .adm-player-header { font-weight: 800; color: #555; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; }
         .adm-check { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; }
@@ -861,10 +861,10 @@ export default function AdminPanel() {
         .adm-tourney-row { display: grid; grid-template-columns: 60px 2fr 0.8fr 0.8fr 0.8fr 60px; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
         .adm-tourney-row:hover { background: #1a1a1e; }
         .adm-tourney-header { font-weight: 800; color: #555; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; }
-        .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .adm-table-scroll { overflow-x: hidden; }
         @media (max-width: 700px) {
           .adm-content { padding: 16px 12px 40px; }
-          .adm-player-row { grid-template-columns: 1.5fr 0.7fr 0.7fr 1.2fr 0.5fr 0.5fr 0.5fr; font-size: 0.68rem; min-width: 600px; }
+          .adm-player-row { grid-template-columns: 2.5fr 0.6fr 0.6fr 0.8fr 0.6fr; font-size: 0.68rem; }
           .adm-tourney-row { grid-template-columns: 50px 1.5fr 0.7fr 0.7fr 50px; font-size: 0.68rem; }
           .adm-tourney-row > :nth-child(4) { display: none; }
           .adm-tab { padding: 8px 16px; font-size: 0.8rem; }
@@ -1699,8 +1699,7 @@ export default function AdminPanel() {
               {/* ── Table header ── */}
               <div className="adm-player-row adm-player-header" style={{ borderBottom: "2px solid #2a2a2e" }}>
                 <div>Player</div><div>Joined</div><div>Onboarding</div><div style={{ textAlign: "center" }}>Riot</div>
-                <div style={{ textAlign: "center" }}>Steam</div><div style={{ textAlign: "center" }}>Discord</div>
-                <div style={{ textAlign: "center" }}>Phone</div>
+                <div style={{ textAlign: "center" }}>Connections</div>
               </div>
 
               {/* ── Player list ── */}
@@ -1718,11 +1717,16 @@ export default function AdminPanel() {
                         <div style={{ fontWeight: 700, color: "#e0e0e0", fontSize: "0.82rem" }}>
                           {p.fullName || p.riotGameName || p.steamName || p.discordUsername || "Unknown"}
                         </div>
-                        {p.fullName && p.riotGameName && (
+                        {p.riotGameName && (
                           <div style={{ fontSize: "0.62rem", color: "#888" }}>{p.riotGameName}#{p.riotTagLine}</div>
                         )}
-                        <div style={{ fontSize: "0.58rem", color: "#555", marginTop: 1 }}>
-                          {p.riotRank || p.dotaBracket || "No rank"}
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
+                          {(p as any).iesportsRank && (
+                            <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#3CCBFF" }}>iE: {(p as any).iesportsRank} ({(p as any).iesportsRating})</span>
+                          )}
+                          {p.riotRank && (
+                            <span style={{ fontSize: "0.58rem", color: "#555" }}>Riot: {p.riotRank}</span>
+                          )}
                         </div>
                       </div>
                       <div style={{ fontSize: "0.62rem", color: "#888" }}>
@@ -1770,19 +1774,10 @@ export default function AdminPanel() {
                           <span style={{ color: "#888", fontSize: "0.72rem" }}>Linked</span>
                         )}
                       </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div className={`adm-check ${p.steamId ? "yes" : "no"}`}>{p.steamId ? "✓" : "✗"}</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div className={`adm-check ${p.discordId ? "yes" : "no"}`}>{p.discordId ? "✓" : "✗"}</div>
-                        {p.discordConnections && p.discordConnections.length > 0 && (
-                          <div style={{ fontSize: "0.5rem", color: "#a78bfa", fontWeight: 700, marginTop: 2 }}>
-                            {p.discordConnections.length} linked
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div className={`adm-check ${p.phone && p.phone.length > 3 ? "yes" : "no"}`}>{p.phone && p.phone.length > 3 ? "✓" : "✗"}</div>
+                      <div style={{ textAlign: "center", display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+                        <span title="Steam" className={`adm-check ${p.steamId ? "yes" : "no"}`} style={{ fontSize: "0.6rem" }}>S</span>
+                        <span title="Discord" className={`adm-check ${p.discordId ? "yes" : "no"}`} style={{ fontSize: "0.6rem" }}>D</span>
+                        <span title="Phone" className={`adm-check ${p.phone && p.phone.length > 3 ? "yes" : "no"}`} style={{ fontSize: "0.6rem" }}>P</span>
                       </div>
                     </div>
 

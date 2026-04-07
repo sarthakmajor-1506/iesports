@@ -111,19 +111,11 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
 
   return (
     <div style={{ marginBottom: 8 }}>
-      {isBracket && m.bracketLabel && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, paddingLeft: 2 }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: bracketAccent, letterSpacing: "0.06em" }}>{m.bracketLabel}</span>
-          <span style={{ fontSize: "0.56rem", fontWeight: 700, color: "#8A8880" }}>M{m.matchIndex || ""} · BO{bestOf}</span>
-        </div>
-      )}
-      {!isBracket && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, paddingLeft: 2 }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", letterSpacing: "0.06em" }}>M{m.matchIndex || ""}</span>
-          <span style={{ fontSize: "0.56rem", fontWeight: 700, color: "#8A8880" }}>BO{bestOf}</span>
-          {scheduledDay && <span style={{ fontSize: "0.54rem", fontWeight: 600, color: "#555550" }}>· {scheduledDay} {scheduledTime}</span>}
-        </div>
-      )}
+      {/* match label — centred */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 4 }}>
+        {isBracket && m.bracketLabel && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: bracketAccent, letterSpacing: "0.06em" }}>{m.bracketLabel}</span>}
+        <span style={{ fontSize: "0.56rem", fontWeight: 700, color: "#8A8880" }}>{isBracket ? `M${m.matchIndex || ""}` : `M${m.matchIndex || ""}`} · BO{bestOf}</span>
+      </div>
       <div className="vtd-mc" style={{
         cursor: "pointer",
         ...(isLive ? { borderColor: "rgba(34,197,94,0.25)" } : {}),
@@ -134,35 +126,35 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
           </div>
           <div className="vtd-mc-team-info">
-            <div className="vtd-mc-team-tag">{getTeamTag(m.team1Name)}</div>
-            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t1Win ? { color: "#4ade80" } : t2Win ? { color: "#f87171" } : {}) }}>{m.team1Name}</div>
-            <div className="vtd-mc-avatars">
-              {t1Members.map((p: any, i: number) => {
-                const agent = agentMap[p.riotPuuid || p.puuid];
-                const agentIcon = agent ? getAgentIcon(agent) : null;
-                return agentIcon ? <img key={i} src={agentIcon} alt={agent} title={`${p.riotGameName} — ${agent}`} style={{ borderRadius: "50%", background: "rgba(60,203,255,0.1)" }} /> : <div key={i} className="vtd-mc-av-init" title={p.riotGameName}>{(p.riotGameName || "?")[0]}</div>;
-              })}
-            </div>
+            {/* tag removed — full name shown below */}
+            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t1Win ? { color: "#8ad4a0" } : t2Win ? { color: "#b8726e" } : {}) }}>{m.team1Name}</div>
+            {/* avatars shown in expanded view */}
           </div>
         </div>
         <div className="vtd-mc-center">
-          {isComplete ? (
+          {isComplete ? (() => {
+            // BO1: show round score (e.g. 13-6). BO2+: show map score (e.g. 2-0)
+            const isBo1 = bestOf === 1;
+            const g1 = games[0];
+            const t1Display = isBo1 && g1 ? (g1.team1RoundsWon ?? m.team1Score) : m.team1Score;
+            const t2Display = isBo1 && g1 ? (g1.team2RoundsWon ?? m.team2Score) : m.team2Score;
+            return (
             <>
               <div className="vtd-mc-score-box">
-                <span className={`s ${t1Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team1Score}</span>
+                <span className={`s ${t1Win ? "win" : isDraw ? "draw" : "loss"}`}>{t1Display}</span>
                 <span className="dash">-</span>
-                <span className={`s ${t2Win ? "win" : isDraw ? "draw" : "loss"}`}>{m.team2Score}</span>
+                <span className={`s ${t2Win ? "win" : isDraw ? "draw" : "loss"}`}>{t2Display}</span>
               </div>
-              <span className="vtd-mc-status-badge" style={{ background: "rgba(22,163,74,0.12)", color: "#4ade80" }}>✓ Played</span>
-            </>
-          ) : isLive ? (
+              <span className="vtd-mc-status-badge" style={{ background: "rgba(111,207,138,0.08)", color: "#6fcf8a" }}>FT</span>
+            </>);
+          })() : isLive ? (
             <>
               <div className="vtd-mc-score-box">
                 <span className="s">{m.team1Score || 0}</span><span className="dash">-</span><span className="s">{m.team2Score || 0}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
                 <div className="vtd-mc-live-dot" />
-                <span className="vtd-mc-status-badge" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80", padding: "1px 6px" }}>LIVE</span>
+                <span className="vtd-mc-status-badge" style={{ background: "rgba(34,197,94,0.15)", color: "#6fcf8a", padding: "1px 6px" }}>LIVE</span>
               </div>
             </>
           ) : (
@@ -180,20 +172,16 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               <span className="vtd-mc-status-badge" style={{ background: "#1a1a1f", color: "#555550" }}>{isBracket ? "Pending" : "Upcoming"}</span>
             </>
           )}
-          {(isComplete || isLive) && scheduledDay && <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{scheduledDay} · {scheduledTime}</div>}
+          {/* date already shown in header */}
         </div>
         <div className="vtd-mc-team right">
           <div className="vtd-mc-team-logo">
             {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" /> : getTeamInitials(m.team2Name)}
           </div>
           <div className="vtd-mc-team-info" style={{ textAlign: "right" }}>
-            <div className="vtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
-            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t2Win ? { color: "#4ade80" } : t1Win ? { color: "#f87171" } : {}) }}>{m.team2Name}</div>
-            <div className="vtd-mc-avatars">{t2Members.map((p: any, i: number) => {
-              const agent = agentMap[p.riotPuuid || p.puuid];
-              const agentIcon = agent ? getAgentIcon(agent) : null;
-              return agentIcon ? <img key={i} src={agentIcon} alt={agent} title={`${p.riotGameName} — ${agent}`} style={{ borderRadius: "50%", background: "rgba(60,203,255,0.1)" }} /> : <div key={i} className="vtd-mc-av-init" title={p.riotGameName}>{(p.riotGameName || "?")[0]}</div>;
-            })}</div>
+            {/* tag removed — full name shown below */}
+            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t2Win ? { color: "#8ad4a0" } : t1Win ? { color: "#b8726e" } : {}) }}>{m.team2Name}</div>
+            {/* avatars shown in expanded view */}
           </div>
         </div>
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? "#3CCBFF" : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
@@ -276,17 +264,17 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                 animation: "vtd-glow-pulse 2.5s ease-in-out infinite",
                 boxShadow: "0 0 28px rgba(60,203,255,0.3), inset 0 0 10px rgba(255,255,255,0.1)",
               }}>VS</div>
-              {isComplete && <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#4ade80", textShadow: "0 0 8px rgba(74,222,128,0.4)", marginTop: 4 }}>{m.team1Score} - {m.team2Score}</div>}
+              {isComplete && <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#6fcf8a", textShadow: "0 0 8px rgba(111,207,138,0.3)", marginTop: 4 }}>{m.team1Score} - {m.team2Score}</div>}
               {/* Team 2 Logo + Name */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: 10, animation: "vtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.25s both" }}>
                 <div style={{
-                  fontSize: "0.78rem", fontWeight: 900, color: "#ef4444", textAlign: "center",
+                  fontSize: "0.78rem", fontWeight: 900, color: "#d07070", textAlign: "center",
                   textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
                   textShadow: "0 0 12px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",
                   wordBreak: "break-word" as any,
                 }}>{m.team2Name}</div>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(239,68,68,0.3)", background: "linear-gradient(135deg, #ef444422, #dc262622)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#ef4444" }}>{(m.team2Name || "?")[0]}</span>}
+                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(208,112,112,0.3)", background: "linear-gradient(135deg, #ef444422, #dc262622)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#d07070" }}>{(m.team2Name || "?")[0]}</span>}
                 </div>
               </div>
             </div>
@@ -305,7 +293,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         {p.riotAvatar ? (
                           <img src={p.riotAvatar} alt="" style={{
                             width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
-                            border: "2px solid rgba(239,68,68,0.3)",
+                            border: "2px solid rgba(208,112,112,0.3)",
                             boxShadow: "0 0 10px rgba(239,68,68,0.15), 0 3px 10px rgba(0,0,0,0.35)",
                           }} />
                         ) : (
@@ -314,7 +302,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                             background: "linear-gradient(135deg, #ef4444, #dc2626)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: "0.95rem", fontWeight: 800, color: "#fff",
-                            border: "2px solid rgba(239,68,68,0.3)",
+                            border: "2px solid rgba(208,112,112,0.3)",
                             boxShadow: "0 0 10px rgba(239,68,68,0.15)",
                           }}>{(p.riotGameName || "?")[0]}</div>
                         )}
@@ -849,11 +837,9 @@ function ValorantTournamentDetailInner() {
         /* ── Players tier columns ── */
         @keyframes vtd-fadeSlideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes vtd-slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
-        .vtd-tier-columns { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
-        .vtd-tier-columns::-webkit-scrollbar { height: 4px; }
-        .vtd-tier-columns::-webkit-scrollbar-track { background: transparent; }
-        .vtd-tier-columns::-webkit-scrollbar-thumb { background: rgba(60,203,255,0.35); border-radius: 4px; }
-        .vtd-tier-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+        .vtd-tier-columns { display: flex; gap: 10px; flex-wrap: wrap; }
+        /* scrollbar removed — columns wrap instead */
+        .vtd-tier-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .vtd-tier-header { padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; }
         .vtd-tier-header-count { font-size: 0.72rem; font-weight: 600; opacity: 0.7; }
         .vtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; animation: vtd-fadeSlideIn 0.35s ease both; }
@@ -885,7 +871,7 @@ function ValorantTournamentDetailInner() {
         .vtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
         .vtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
         .vtd-team-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .vtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
+        .vtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; text-transform: capitalize; }
         .vtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
         .vtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
         .vtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; }
@@ -931,7 +917,7 @@ function ValorantTournamentDetailInner() {
         .vtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .vtd-mc-team-info { flex: 1; min-width: 0; }
         .vtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #3CCBFF; text-transform: uppercase; }
-        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #c8c8c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
         .vtd-mc-avatars { display: flex; gap: 0; margin-top: 4px; }
         .vtd-mc-avatars img, .vtd-mc-avatars .vtd-mc-av-init { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(18,18,21,0.9); margin-left: -4px; object-fit: cover; }
         .vtd-mc-avatars img:first-child, .vtd-mc-avatars .vtd-mc-av-init:first-child { margin-left: 0; }
@@ -939,10 +925,10 @@ function ValorantTournamentDetailInner() {
         .vtd-mc-team.right .vtd-mc-avatars { justify-content: flex-end; }
         .vtd-mc-center { min-width: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 4px; flex-shrink: 0; }
         .vtd-mc-score-box { display: flex; align-items: center; gap: 6px; font-size: 1.15rem; font-weight: 900; }
-        .vtd-mc-score-box .s { min-width: 22px; text-align: center; color: #E6E6E6; }
-        .vtd-mc-score-box .s.win { color: #4ade80; }
-        .vtd-mc-score-box .s.loss { color: #f87171; }
-        .vtd-mc-score-box .s.draw { color: #f59e0b; }
+        .vtd-mc-score-box .s { min-width: 22px; text-align: center; color: #c0c0b8; }
+        .vtd-mc-score-box .s.win { color: #6fcf8a; }
+        .vtd-mc-score-box .s.loss { color: #d07070; }
+        .vtd-mc-score-box .s.draw { color: #d4a64a; }
         .vtd-mc-score-box .dash { color: #555550; font-weight: 400; }
         .vtd-mc-status-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 8px; border-radius: 100px; margin-top: 3px; }
         .vtd-mc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: vtd-pulse 1.5s ease-in-out infinite; }
@@ -1183,7 +1169,7 @@ function ValorantTournamentDetailInner() {
                             toggleWaitlist();
                           }}
                           disabled={waitlistLoading}
-                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
                         >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
                       </>
                     )}
@@ -1195,8 +1181,8 @@ function ValorantTournamentDetailInner() {
                             onClick={handleUnregister}
                             disabled={unregLoading}
                             style={{
-                              padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#f87171",
-                              border: "1px solid rgba(239,68,68,0.3)", borderRadius: 100, fontSize: "0.82rem",
+                              padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#d07070",
+                              border: "1px solid rgba(208,112,112,0.3)", borderRadius: 100, fontSize: "0.82rem",
                               fontWeight: 700, cursor: unregLoading ? "default" : "pointer", fontFamily: "inherit",
                               transition: "all 0.15s", opacity: unregLoading ? 0.6 : 1,
                             }}
@@ -1457,8 +1443,8 @@ function ValorantTournamentDetailInner() {
                                 <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s` }}>
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
-                                    <span className="vtd-tier-player-name">{p.riotGameName}<span className="tag"> #{p.riotTagLine}</span></span>
-                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}{p.riotTier ? ` (${p.riotTier})` : ""}</span>
+                                    <span className="vtd-tier-player-name">{p.riotGameName}</span>
+                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1498,12 +1484,12 @@ function ValorantTournamentDetailInner() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {isEditing ? (
                             <div>
-                              <input className="vtd-team-edit-input" value={newTeamName} onChange={e => setNewTeamName(e.target.value.toUpperCase())} placeholder="Enter team name" maxLength={24} autoFocus style={{ textTransform: "uppercase" }} onKeyDown={e => { if (e.key === "Enter") handleUpdateTeamName(team.id); }} />
-                              {teamNameError && <div style={{ fontSize: "0.68rem", color: "#f87171", marginTop: 4 }}>{teamNameError}</div>}
+                              <input className="vtd-team-edit-input" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} placeholder="Enter team name" maxLength={24} autoFocus style={{ textTransform: "capitalize" }} onKeyDown={e => { if (e.key === "Enter") handleUpdateTeamName(team.id); }} />
+                              {teamNameError && <div style={{ fontSize: "0.68rem", color: "#d07070", marginTop: 4 }}>{teamNameError}</div>}
                               <div className="vtd-team-edit-actions"><button className="vtd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="vtd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
                           ) : (
-                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#f87171", marginTop: 4 }}>{logoError}</div>}</>
+                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
                           )}
                         </div>
                       </div>
@@ -1522,8 +1508,8 @@ function ValorantTournamentDetailInner() {
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           {canEdit && !isEditing && <button className="vtd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>✏️ Set Name</button>}
                           {isMyTeam && !team.teamLogoSet && !logoUploading && <button className="vtd-team-edit-btn" onClick={() => logoInputRef.current?.click()}>📷 Logo</button>}
-                          {team.teamNameSet && <span style={{ fontSize: "0.62rem", color: "#4ade80" }}>✓ Name</span>}
-                          {team.teamLogoSet && <span style={{ fontSize: "0.62rem", color: "#4ade80" }}>✓ Logo</span>}
+                          {team.teamNameSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Name</span>}
+                          {team.teamLogoSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Logo</span>}
                         </div>
                       </div>
                     </div>
@@ -1551,7 +1537,7 @@ function ValorantTournamentDetailInner() {
                   return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>MW</th><th style={{ color: "#d07070" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
                           const inUB = i < ubCount;
@@ -1560,13 +1546,13 @@ function ValorantTournamentDetailInner() {
                           return (
                             <tr key={s.id} style={inUB ? { background: "rgba(60,203,255,0.04)" } : inLB ? { background: "rgba(245,158,11,0.04)" } : eliminated ? { opacity: 0.5 } : {}}>
                               <td style={{ fontWeight: 800, color: inUB ? "#3CCBFF" : inLB ? "#f59e0b" : "#555550" }}>{i + 1}</td>
-                              <td style={{ fontWeight: 700 }}>{s.teamName}</td>
+                              <td style={{ fontWeight: 700, textTransform: "capitalize" }}>{s.teamName}</td>
                               <td>{s.played || 0}</td>
                               <td>{s.wins || 0}</td>
                               <td>{s.draws || 0}</td>
                               <td>{s.losses || 0}</td>
-                              <td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td>
-                              <td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td>
+                              <td style={{ color: "#6fcf8a" }}>{s.mapsWon || 0}</td>
+                              <td style={{ color: "#d07070" }}>{s.mapsLost || 0}</td>
                               <td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td>
                               <td style={{ color: "#555550" }}>{s.buchholz || 0}</td>
                               {hasBrackets && (
@@ -1612,14 +1598,14 @@ function ValorantTournamentDetailInner() {
                   </div>
                   {groupMatches.length > 0 && (
                     <div>
-                      <div className="vtd-section-header group">Group Stage Fixtures</div>
-                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">Round {day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length} matches</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
+                      <div className="vtd-section-header group">Groups</div>
+                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">R{day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length}</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
                     </div>
                   )}
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
-                      <div className="vtd-section-header bracket">Play-off Fixtures</div>
-                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; let globalIdx = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">Bracket Round {bracketRoundNum}</span><span>· {dayMatches.length} matches</span></div>{dayMatches.map((m: any) => { const idx = globalIdx++; return (<div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both` }}><MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} /></div>); })}</div>); }); })()}
+                      <div className="vtd-section-header bracket">Playoffs</div>
+                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; let globalIdx = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">R{bracketRoundNum}</span><span>· {dayMatches.length}</span></div>{dayMatches.map((m: any) => { const idx = globalIdx++; return (<div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both` }}><MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} /></div>); })}</div>); }); })()}
                     </div>
                   )}
                 </>
@@ -1742,7 +1728,7 @@ function ValorantTournamentDetailInner() {
 
                       return (
                       <>
-                    <div style={{ marginBottom: 10, fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. MVP rank (#) is always by K/D. <span style={{ color: "#4ade80" }}>Green glow</span> = lower-ranked player outperforming higher ranks.</div>
+                    <div style={{ marginBottom: 10, fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. MVP rank (#) is always by K/D. <span style={{ color: "#6fcf8a" }}>Green glow</span> = lower-ranked player outperforming higher ranks.</div>
                     <table className="vtd-standings-table">
                       <thead><tr>
                         <th>#</th>
@@ -1751,15 +1737,15 @@ function ValorantTournamentDetailInner() {
                         <th>Team</th>
                         <th>Agent(s)</th>
                         <th style={thStyle("maps")} onClick={() => setLbSort("maps")}>Maps{sortArrow("maps")}</th>
-                        <th style={thStyle("kills", "#4ade80")} onClick={() => setLbSort("kills")}>K{sortArrow("kills")}</th>
-                        <th style={thStyle("deaths", "#f87171")} onClick={() => setLbSort("deaths")}>D{sortArrow("deaths")}</th>
+                        <th style={thStyle("kills", "#6fcf8a")} onClick={() => setLbSort("kills")}>K{sortArrow("kills")}</th>
+                        <th style={thStyle("deaths", "#d07070")} onClick={() => setLbSort("deaths")}>D{sortArrow("deaths")}</th>
                         <th style={thStyle("assists")} onClick={() => setLbSort("assists")}>A{sortArrow("assists")}</th>
                         <th style={thStyle("kd", "#3CCBFF")} onClick={() => setLbSort("kd")}>K/D{sortArrow("kd")}</th>
                         <th style={thStyle("acs", "#a78bfa")} onClick={() => setLbSort("acs")}>ACS{sortArrow("acs")}</th>
                         <th style={thStyle("adr")} onClick={() => setLbSort("adr")}>ADR{sortArrow("adr")}</th>
                         <th style={thStyle("hs")} onClick={() => setLbSort("hs")}>HS%{sortArrow("hs")}</th>
                         <th style={thStyle("fk", "#f59e0b")} onClick={() => setLbSort("fk")}>FK{sortArrow("fk")}</th>
-                        <th style={thStyle("fd", "#f87171")} onClick={() => setLbSort("fd")}>FD{sortArrow("fd")}</th>
+                        <th style={thStyle("fd", "#d07070")} onClick={() => setLbSort("fd")}>FD{sortArrow("fd")}</th>
                       </tr></thead>
                       <tbody>{sortedLb.map((p: any) => {
                         const rank = kdaRankMap[p.id] || 99;
@@ -1774,31 +1760,31 @@ function ValorantTournamentDetailInner() {
                         let rowBg: React.CSSProperties = {};
                         if (rank === 1) rowBg = { background: "rgba(245,158,11,0.08)" };
                         else if (rank <= 3) rowBg = { background: "rgba(60,203,255,0.04)" };
-                        else if (isUnderdog) rowBg = { background: "rgba(74,222,128,0.06)", boxShadow: "inset 2px 0 0 #4ade80" };
+                        else if (isUnderdog) rowBg = { background: "rgba(111,207,138,0.06)", boxShadow: "inset 2px 0 0 #4ade80" };
 
                         return (
                         <tr key={p.id} style={rowBg}>
                           <td style={{ fontWeight: 800, color: rank === 1 ? "#f59e0b" : rank <= 3 ? "#3CCBFF" : "#555550" }}>{rank === 1 ? "\u{1F451}" : rank === 2 ? "\u{1F948}" : rank === 3 ? "\u{1F949}" : rank}</td>
-                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
+                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
                           <td><span style={{ fontSize: "0.68rem", fontWeight: 700, color: rColor, padding: "2px 6px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></td>
                           <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
                           <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
                           <td>{p.matchesPlayed || 0}</td>
-                          <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
-                          <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
+                          <td style={{ fontWeight: 700, color: "#6fcf8a" }}>{p.totalKills || 0}</td>
+                          <td style={{ color: "#d07070" }}>{p.totalDeaths || 0}</td>
                           <td>{p.totalAssists || 0}</td>
-                          <td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#4ade80" : "#f87171" }}>{p.kd || 0}</td>
+                          <td style={{ fontWeight: 800, color: (p.kd || 0) >= 1.0 ? "#6fcf8a" : "#d07070" }}>{p.kd || 0}</td>
                           <td style={{ fontWeight: 700, color: "#a78bfa" }}>{p.acs || Math.round((p.totalScore || 0) / Math.max(1, p.totalRoundsPlayed || 1))}</td>
                           <td style={{ fontWeight: 600 }}>{adr}</td>
                           <td>{p.hsPercent || 0}%</td>
                           <td style={{ fontWeight: 700, color: "#f59e0b" }}>{p.totalFirstKills || 0}</td>
-                          <td style={{ color: "#f87171" }}>{p.totalFirstDeaths || 0}</td>
+                          <td style={{ color: "#d07070" }}>{p.totalFirstDeaths || 0}</td>
                         </tr>);
                       })}</tbody>
                     </table>
                     <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
                       <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> {"\u{1F451}"} MVP, {"\u{1F948}"} 2nd, {"\u{1F949}"} 3rd — always ranked by K/D ratio. Click any column to re-sort the table view. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.<br />
-                      <span style={{ color: "#4ade80" }}>UNDERDOG</span> — lower-ranked players (below median tier) who are performing in the top half by K/D. These players are punching above their weight!
+                      <span style={{ color: "#6fcf8a" }}>UNDERDOG</span> — lower-ranked players (below median tier) who are performing in the top half by K/D. These players are punching above their weight!
                     </div>
                       </>
                       );
@@ -1973,20 +1959,20 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, position: "relative" }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: gameNum === 1 ? "#3CCBFF" : "#3b82f6" }}>Game {gameNum}</span>
         <span style={{ fontSize: "0.72rem", color: "#8A8880", fontWeight: 600 }}>{mapName}</span>
-        {isPlayed ? <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span> : <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#1a1a1f", color: "#555550" }}>Pending</span>}
+        {isPlayed ? <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(22,163,74,0.12)", color: "#6fcf8a", border: "1px solid rgba(34,197,94,0.3)" }}>✓</span> : <span style={{ fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#1a1a1f", color: "#555550" }}>Pending</span>}
       </div>
 
       {/* Score header */}
       {isPlayed && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ textAlign: "center", flex: 1 }}>
-            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t1Won ? "#4ade80" : "#555550", marginBottom: 2 }}>{team1Name.length > 14 ? team1Name.slice(0, 12) + "…" : team1Name}</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t1Won ? "#4ade80" : "#f87171" }}>{t1Rounds}</div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t1Won ? "#8ad4a0" : "#555550", marginBottom: 2, textTransform: "capitalize" }}>{team1Name.length > 14 ? team1Name.slice(0, 12) + "…" : team1Name}</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t1Won ? "#6fcf8a" : "#d07070" }}>{t1Rounds}</div>
           </div>
           <div style={{ fontSize: "0.72rem", color: "#555550", fontWeight: 700 }}>vs</div>
           <div style={{ textAlign: "center", flex: 1 }}>
-            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t2Won ? "#4ade80" : "#555550", marginBottom: 2 }}>{team2Name.length > 14 ? team2Name.slice(0, 12) + "…" : team2Name}</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t2Won ? "#4ade80" : "#f87171" }}>{t2Rounds}</div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: t2Won ? "#8ad4a0" : "#555550", marginBottom: 2, textTransform: "capitalize" }}>{team2Name.length > 14 ? team2Name.slice(0, 12) + "…" : team2Name}</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 900, color: t2Won ? "#6fcf8a" : "#d07070" }}>{t2Rounds}</div>
           </div>
         </div>
       )}
@@ -2007,15 +1993,15 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
             <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#8A8880", marginBottom: 8 }}>{mvp.agent || ""}</div>
             <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 6 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: mvpKd >= 1.0 ? "#4ade80" : "#f87171", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both" }}>{mvpKd}</div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: mvpKd >= 1.0 ? "#6fcf8a" : "#d07070", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both" }}>{mvpKd}</div>
                 <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>K/D</div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#4ade80", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>{mvp.kills ?? 0}</div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#6fcf8a", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>{mvp.kills ?? 0}</div>
                 <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>K</div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#f87171", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>{mvp.deaths ?? 0}</div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#d07070", animation: "gdc-num-pop 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>{mvp.deaths ?? 0}</div>
                 <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", letterSpacing: "0.08em" }}>D</div>
               </div>
               <div style={{ textAlign: "center" }}>
