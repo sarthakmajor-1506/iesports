@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         // Meta
         createdAt: d.createdAt?.toDate?.()?.toISOString?.() || d.createdAt || null,
         upiId: d.upiId || null,
+        personalPhoto: d.personalPhoto || null,
       };
     });
 

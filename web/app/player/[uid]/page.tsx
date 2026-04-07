@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import { triggerDiscordPrompt, hasDiscordAccount } from "@/app/components/DiscordAccountsPrompt";
 
@@ -37,7 +38,7 @@ interface UserProfile {
   discordUsername?: string; discordId?: string;
   discordConnections?: DiscordConnection[];
   steamName?: string; steamId?: string; steamAvatar?: string;
-  phone?: string; upiId?: string; displayName?: string;
+  phone?: string; upiId?: string; displayName?: string; personalPhoto?: string;
 }
 
 interface MatchHistoryItem {
@@ -80,6 +81,10 @@ export default function PlayerProfile() {
   const [fullNameEditing, setFullNameEditing] = useState(false);
   const [fullNameSaving, setFullNameSaving] = useState(false);
   const [fullNameSaved, setFullNameSaved] = useState(false);
+
+  // Personal photo state
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoSaved, setPhotoSaved] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -200,6 +205,25 @@ export default function PlayerProfile() {
     setFullNameEditing(false);
     setFullNameSaved(true);
     setTimeout(() => setFullNameSaved(false), 2500);
+  };
+
+  const uploadPersonalPhoto = async (file: File) => {
+    if (!user || !file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) return; // 5MB max
+    setPhotoUploading(true);
+    try {
+      const storage = getStorage();
+      const ext = file.name.split(".").pop() || "jpg";
+      const storageRef = ref(storage, `personal-photos/${user.uid}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await setDoc(doc(db, "users", user.uid), { personalPhoto: url }, { merge: true });
+      setProfile(prev => prev ? { ...prev, personalPhoto: url } : prev);
+      setPhotoSaved(true);
+      setTimeout(() => setPhotoSaved(false), 2500);
+    } catch (e) { console.error("Photo upload error:", e); }
+    setPhotoUploading(false);
   };
 
   const saveUpi = async () => {
@@ -503,6 +527,37 @@ export default function PlayerProfile() {
                   </div>
                 )}
                 {fullNameSaved && <span style={{ fontSize: "0.72rem", color: "#4ade80", marginTop: 8, display: "block", fontWeight: 600 }}>Saved!</span>}
+              </div>
+
+              {/* Personal Photo */}
+              <div className="pp-section">
+                <span className="pp-section-label">Personal Photo</span>
+                <p style={{ fontSize: "0.82rem", color: "#8A8880", marginBottom: 16, marginTop: 0 }}>
+                  Upload a photo of yourself. This is only used for tournament winner showcases and will not be displayed publicly on your profile.
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  {profile?.personalPhoto ? (
+                    <img src={profile.personalPhoto} alt="" style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", border: "2px solid #2A2A30" }} />
+                  ) : (
+                    <div style={{ width: 64, height: 64, borderRadius: 12, background: "#18181C", border: "2px dashed #2A2A30", display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: "0.72rem" }}>
+                      No photo
+                    </div>
+                  )}
+                  <div>
+                    <label style={{
+                      display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10,
+                      background: "rgba(96,165,250,0.1)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.3)",
+                      fontSize: "0.76rem", fontWeight: 700, cursor: photoUploading ? "default" : "pointer", fontFamily: "inherit",
+                      opacity: photoUploading ? 0.6 : 1,
+                    }}>
+                      {photoUploading ? "Uploading..." : profile?.personalPhoto ? "Change Photo" : "Upload Photo"}
+                      <input type="file" accept="image/*" style={{ display: "none" }} disabled={photoUploading}
+                        onChange={e => { if (e.target.files?.[0]) uploadPersonalPhoto(e.target.files[0]); }} />
+                    </label>
+                    {photoSaved && <span style={{ fontSize: "0.72rem", color: "#4ade80", marginLeft: 10, fontWeight: 600 }}>Saved!</span>}
+                    <div style={{ fontSize: "0.62rem", color: "#555", marginTop: 6 }}>Max 5MB. JPG or PNG.</div>
+                  </div>
+                </div>
               </div>
 
               {/* Connected Accounts */}

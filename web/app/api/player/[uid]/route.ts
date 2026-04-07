@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       steamAvatar: d.steamAvatar || null,
       phone: d.phone ? "redacted" : null,   // never expose raw phone to public
       upiId: null,                           // never expose UPI publicly
+      personalPhoto: d.personalPhoto || null,
       discordConnections: d.discordConnections || [],
       registeredValorantTournaments: d.registeredValorantTournaments || [],
     });

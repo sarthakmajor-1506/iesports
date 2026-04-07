@@ -10,7 +10,7 @@ import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "fi
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
-interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; }
+interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
 
 type AdminTab = "tournament" | "players" | "create";
@@ -91,8 +91,12 @@ export default function AdminPanel() {
   const [allPlayers, setAllPlayers] = useState<PlayerData[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
   const [riotFilter, setRiotFilter] = useState<"all" | "pending" | "verified" | "rejected">("all");
+  const [playerSort, setPlayerSort] = useState<"newest" | "oldest" | "name" | "status">("newest");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [editSaving, setEditSaving] = useState(false);
 
   // ─── Log ────────────────────────────────────────────────────────────────────
   const [log, setLog] = useState<string[]>([]);
@@ -473,6 +477,18 @@ export default function AdminPanel() {
       (p.steamId?.includes(q))
     );
   }).sort((a, b) => {
+    if (playerSort === "newest") {
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    }
+    if (playerSort === "oldest") {
+      return (a.createdAt || "").localeCompare(b.createdAt || "");
+    }
+    if (playerSort === "name") {
+      const an = (a.fullName || a.riotGameName || a.discordUsername || "zzz").toLowerCase();
+      const bn = (b.fullName || b.riotGameName || b.discordUsername || "zzz").toLowerCase();
+      return an.localeCompare(bn);
+    }
+    // status
     const order: Record<string, number> = { pending: 0, verified: 2, rejected: 3 };
     const av = order[a.riotVerified || ""] ?? 1;
     const bv = order[b.riotVerified || ""] ?? 1;
@@ -494,6 +510,43 @@ export default function AdminPanel() {
       }
     } catch (e) { console.error("Verify riot error:", e); }
     setVerifyingUid(null);
+  };
+
+  const startEditPlayer = (p: PlayerData) => {
+    setEditingPlayer(p.uid);
+    setEditFields({
+      fullName: p.fullName || "",
+      phone: p.phone || "",
+      upiId: p.upiId || "",
+      riotGameName: p.riotGameName || "",
+      riotTagLine: p.riotTagLine || "",
+      riotRank: p.riotRank || "",
+      steamName: p.steamName || "",
+      discordUsername: p.discordUsername || "",
+    });
+  };
+
+  const saveEditPlayer = async (uid: string) => {
+    setEditSaving(true);
+    try {
+      const updates: Record<string, string> = {};
+      const orig = allPlayers.find(p => p.uid === uid);
+      if (!orig) return;
+      for (const [key, val] of Object.entries(editFields)) {
+        if (val !== ((orig as any)[key] || "")) updates[key] = val;
+      }
+      if (Object.keys(updates).length === 0) { setEditingPlayer(null); setEditSaving(false); return; }
+      const res = await fetch("/api/admin/update-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, uid, updates }),
+      });
+      if (res.ok) {
+        setAllPlayers(prev => prev.map(p => p.uid === uid ? { ...p, ...updates } : p));
+        setEditingPlayer(null);
+      }
+    } catch (e) { console.error("Edit player error:", e); }
+    setEditSaving(false);
   };
 
   const filteredTournaments = allTournaments.filter(t => {
@@ -740,7 +793,7 @@ export default function AdminPanel() {
         .adm-match-status.pending { background: #2a1e0d; color: #f59e0b; border: 1px solid #5c3a14; }
         .adm-match-status.live { background: #2a1215; color: #ef4444; border: 1px solid #5c1f28; }
         .adm-match-status.completed { background: #0d2a15; color: #22c55e; border: 1px solid #1e5c2a; }
-        .adm-player-row { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
+        .adm-player-row { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 1.2fr 0.6fr 0.6fr 0.6fr; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1e1e22; font-size: 0.76rem; align-items: center; }
         .adm-player-row:hover { background: #1a1a1e; }
         .adm-player-header { font-weight: 800; color: #555; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; }
         .adm-check { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; }
@@ -752,7 +805,7 @@ export default function AdminPanel() {
         .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         @media (max-width: 700px) {
           .adm-content { padding: 16px 12px 40px; }
-          .adm-player-row { grid-template-columns: 1.5fr 1fr 1.2fr 0.6fr 0.6fr 0.6fr; font-size: 0.68rem; min-width: 520px; }
+          .adm-player-row { grid-template-columns: 1.5fr 0.7fr 0.7fr 1.2fr 0.5fr 0.5fr 0.5fr; font-size: 0.68rem; min-width: 600px; }
           .adm-tourney-row { grid-template-columns: 50px 1.5fr 0.7fr 0.7fr 50px; font-size: 0.68rem; }
           .adm-tourney-row > :nth-child(4) { display: none; }
           .adm-tab { padding: 8px 16px; font-size: 0.8rem; }
@@ -1524,16 +1577,51 @@ export default function AdminPanel() {
                 ))}
               </div>
 
-              {/* ── Search & filter ── */}
+              {/* ── Join timeline ── */}
+              {(() => {
+                const now = new Date();
+                const days: { label: string; count: number }[] = [];
+                for (let i = 6; i >= 0; i--) {
+                  const d = new Date(now); d.setDate(d.getDate() - i);
+                  const ds = d.toISOString().slice(0, 10);
+                  const label = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                  const count = allPlayers.filter(p => p.createdAt?.slice(0, 10) === ds).length;
+                  days.push({ label, count });
+                }
+                const max = Math.max(...days.map(d => d.count), 1);
+                return (
+                  <div style={{ background: "#111114", border: "1px solid #2a2a2e", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Joins — Last 7 Days</div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 48 }}>
+                      {days.map(d => (
+                        <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                          <span style={{ fontSize: "0.58rem", fontWeight: 700, color: d.count > 0 ? "#3B82F6" : "#444" }}>{d.count || ""}</span>
+                          <div style={{ width: "100%", height: Math.max(d.count / max * 36, 2), background: d.count > 0 ? "#3B82F6" : "#2a2a2e", borderRadius: 3 }} />
+                          <span style={{ fontSize: "0.52rem", color: "#555" }}>{d.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Search, filter & sort ── */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                 <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
-                  placeholder="Search name, Discord, Riot ID, Steam, UID, phone..." style={{ ...inputStyle, flex: 1, minWidth: 240, marginBottom: 0 }} />
+                  placeholder="Search name, Discord, Riot ID, Steam, UID, phone..." style={{ ...inputStyle, flex: 1, minWidth: 200, marginBottom: 0 }} />
                 <select value={riotFilter} onChange={e => setRiotFilter(e.target.value as any)}
-                  style={{ ...inputStyle, width: "auto", minWidth: 140, marginBottom: 0, cursor: "pointer" }}>
+                  style={{ ...inputStyle, width: "auto", minWidth: 130, marginBottom: 0, cursor: "pointer" }}>
                   <option value="all">All Statuses</option>
                   <option value="pending">Pending</option>
                   <option value="verified">Verified</option>
                   <option value="rejected">Rejected</option>
+                </select>
+                <select value={playerSort} onChange={e => setPlayerSort(e.target.value as any)}
+                  style={{ ...inputStyle, width: "auto", minWidth: 130, marginBottom: 0, cursor: "pointer" }}>
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="name">By Name</option>
+                  <option value="status">By Status</option>
                 </select>
               </div>
               <div style={{ fontSize: "0.68rem", color: "#555", marginBottom: 10 }}>
@@ -1542,7 +1630,7 @@ export default function AdminPanel() {
 
               {/* ── Table header ── */}
               <div className="adm-player-row adm-player-header" style={{ borderBottom: "2px solid #2a2a2e" }}>
-                <div>Player</div><div>Onboarding</div><div style={{ textAlign: "center" }}>Riot</div>
+                <div>Player</div><div>Joined</div><div>Onboarding</div><div style={{ textAlign: "center" }}>Riot</div>
                 <div style={{ textAlign: "center" }}>Steam</div><div style={{ textAlign: "center" }}>Discord</div>
                 <div style={{ textAlign: "center" }}>Phone</div>
               </div>
@@ -1567,6 +1655,12 @@ export default function AdminPanel() {
                         )}
                         <div style={{ fontSize: "0.58rem", color: "#555", marginTop: 1 }}>
                           {p.riotRank || p.dotaBracket || "No rank"}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "0.62rem", color: "#888" }}>
+                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+                        <div style={{ fontSize: "0.54rem", color: "#555" }}>
+                          {p.createdAt ? new Date(p.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : ""}
                         </div>
                       </div>
                       <div>
@@ -1738,13 +1832,51 @@ export default function AdminPanel() {
 
                         </div>
 
-                        {/* Profile link */}
-                        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                          <a href={`/player/${p.uid}`} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: "0.72rem", color: "#3B82F6", fontWeight: 600, textDecoration: "none" }}>
-                            View Public Profile &rarr;
-                          </a>
-                        </div>
+                        {/* ── Edit form ── */}
+                        {editingPlayer === p.uid ? (
+                          <div style={{ background: "#18181c", border: "1px solid #3B82F6", borderRadius: 10, padding: 14, marginTop: 12 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Edit Player</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                              {[
+                                { key: "fullName", label: "Full Name" },
+                                { key: "phone", label: "Phone" },
+                                { key: "upiId", label: "UPI ID" },
+                                { key: "riotGameName", label: "Riot Game Name" },
+                                { key: "riotTagLine", label: "Riot Tag" },
+                                { key: "riotRank", label: "Riot Rank" },
+                                { key: "steamName", label: "Steam Name" },
+                                { key: "discordUsername", label: "Discord Username" },
+                              ].map(f => (
+                                <div key={f.key}>
+                                  <label style={{ fontSize: "0.62rem", color: "#888", display: "block", marginBottom: 3 }}>{f.label}</label>
+                                  <input value={editFields[f.key] || ""} onChange={e => setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                    style={{ width: "100%", padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                              <button onClick={() => saveEditPlayer(p.uid)} disabled={editSaving}
+                                style={{ padding: "7px 20px", borderRadius: 8, border: "none", background: "#3B82F6", color: "#fff", fontSize: "0.76rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                {editSaving ? "Saving..." : "Save Changes"}
+                              </button>
+                              <button onClick={() => setEditingPlayer(null)}
+                                style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
+                            <button onClick={() => startEditPlayer(p)}
+                              style={{ padding: "6px 16px", borderRadius: 8, border: "1px solid #3B82F6", background: "rgba(59,130,246,0.1)", color: "#3B82F6", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                              Edit Profile
+                            </button>
+                            <a href={`/player/${p.uid}`} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: "0.72rem", color: "#888", fontWeight: 600, textDecoration: "none" }}>
+                              View Public Profile &rarr;
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
