@@ -93,6 +93,7 @@ export default function AdminPanel() {
   const [allPlayers, setAllPlayers] = useState<PlayerData[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
   const [riotFilter, setRiotFilter] = useState<"all" | "pending" | "verified" | "rejected">("all");
+  const [tournamentFilter, setTournamentFilter] = useState<string>("all");
   const [playerSort, setPlayerSort] = useState<"newest" | "oldest" | "name" | "status">("newest");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
@@ -467,6 +468,12 @@ export default function AdminPanel() {
       if (riotFilter === "verified" && p.riotVerified !== "verified") return false;
       if (riotFilter === "rejected" && p.riotVerified !== "rejected") return false;
     }
+    if (tournamentFilter !== "all") {
+      const inVal = p.registeredValorantTournaments?.includes(tournamentFilter);
+      const inDota = p.registeredTournaments?.includes(tournamentFilter);
+      const inSolo = p.registeredSoloTournaments?.includes(tournamentFilter);
+      if (!inVal && !inDota && !inSolo) return false;
+    }
     if (!playerSearch) return true;
     const q = playerSearch.toLowerCase();
     return (
@@ -802,7 +809,7 @@ export default function AdminPanel() {
     <>
       <style>{`
         .adm-page { min-height: 100vh; background: #0a0a0b; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #e0e0e0; }
-        .adm-content { max-width: 900px; margin: 0 auto; padding: 20px 24px 60px; }
+        .adm-content { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
         .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .adm-grid { grid-template-columns: 1fr; } }
         .adm-log { background: #000; border-radius: 10px; padding: 14px; max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.72rem; color: #888; line-height: 1.8; }
@@ -1636,6 +1643,13 @@ export default function AdminPanel() {
               <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                 <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
                   placeholder="Search name, Discord, Riot ID, Steam, UID, phone..." style={{ ...inputStyle, flex: 1, minWidth: 200, marginBottom: 0 }} />
+                <select value={tournamentFilter} onChange={e => setTournamentFilter(e.target.value)}
+                  style={{ ...inputStyle, width: "auto", minWidth: 160, marginBottom: 0, cursor: "pointer" }}>
+                  <option value="all">All Tournaments</option>
+                  {tournaments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
                 <select value={riotFilter} onChange={e => setRiotFilter(e.target.value as any)}
                   style={{ ...inputStyle, width: "auto", minWidth: 130, marginBottom: 0, cursor: "pointer" }}>
                   <option value="all">All Statuses</option>
