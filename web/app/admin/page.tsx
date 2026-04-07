@@ -4,13 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/app/components/Navbar";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
-interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
+interface DiscordConnection { type: string; name: string; id: string; verified: boolean; }
+interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
 
 type AdminTab = "tournament" | "players" | "create";
@@ -97,6 +99,7 @@ export default function AdminPanel() {
   const [regEditUid, setRegEditUid] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
+  const [photoUploadingUid, setPhotoUploadingUid] = useState<string | null>(null);
 
   // ─── Log ────────────────────────────────────────────────────────────────────
   const [log, setLog] = useState<string[]>([]);
@@ -523,6 +526,7 @@ export default function AdminPanel() {
       riotRank: p.riotRank || "",
       steamName: p.steamName || "",
       discordUsername: p.discordUsername || "",
+      personalPhoto: p.personalPhoto || "",
     });
   };
 
@@ -547,6 +551,27 @@ export default function AdminPanel() {
       }
     } catch (e) { console.error("Edit player error:", e); }
     setEditSaving(false);
+  };
+
+  const adminUploadPhoto = async (uid: string, file: File) => {
+    if (!file || !file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) return;
+    setPhotoUploadingUid(uid);
+    try {
+      const storage = getStorage();
+      const ext = file.name.split(".").pop() || "jpg";
+      const storageRef = ref(storage, `personal-photos/${uid}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      const res = await fetch("/api/admin/update-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, uid, updates: { personalPhoto: url } }),
+      });
+      if (res.ok) {
+        setAllPlayers(prev => prev.map(p => p.uid === uid ? { ...p, personalPhoto: url } : p));
+      }
+    } catch (e) { console.error("Admin photo upload error:", e); }
+    setPhotoUploadingUid(null);
   };
 
   const filteredTournaments = allTournaments.filter(t => {
@@ -1568,7 +1593,9 @@ export default function AdminPanel() {
                   { label: "Pending", val: allPlayers.filter(p => p.riotVerified === "pending").length, color: "#f59e0b" },
                   { label: "Steam", val: allPlayers.filter(p => p.steamId).length, color: "#66c0f4" },
                   { label: "Discord", val: allPlayers.filter(p => p.discordId).length, color: "#818cf8" },
+                  { label: "Discord Conns", val: allPlayers.filter(p => p.discordConnections && p.discordConnections.length > 0).length, color: "#a78bfa" },
                   { label: "Phone", val: allPlayers.filter(p => p.phone && p.phone.length > 3).length, color: "#f472b6" },
+                  { label: "Photo", val: allPlayers.filter(p => p.personalPhoto).length, color: "#fb923c" },
                 ].map(s => (
                   <div key={s.label} style={{ padding: "8px 14px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 8, textAlign: "center", minWidth: 80 }}>
                     <div style={{ fontSize: "1.1rem", fontWeight: 900, color: s.color }}>{s.val}</div>
@@ -1707,6 +1734,11 @@ export default function AdminPanel() {
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <div className={`adm-check ${p.discordId ? "yes" : "no"}`}>{p.discordId ? "✓" : "✗"}</div>
+                        {p.discordConnections && p.discordConnections.length > 0 && (
+                          <div style={{ fontSize: "0.5rem", color: "#a78bfa", fontWeight: 700, marginTop: 2 }}>
+                            {p.discordConnections.length} linked
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <div className={`adm-check ${p.phone && p.phone.length > 3 ? "yes" : "no"}`}>{p.phone && p.phone.length > 3 ? "✓" : "✗"}</div>
@@ -1721,6 +1753,20 @@ export default function AdminPanel() {
                           {/* Identity */}
                           <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
                             <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Identity</div>
+                            {/* Personal Photo */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                              {p.personalPhoto ? (
+                                <img src={p.personalPhoto} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "2px solid #2a2a2e" }} />
+                              ) : (
+                                <div style={{ width: 48, height: 48, borderRadius: 10, background: "#1e1e22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", color: "#555" }}>No Photo</div>
+                              )}
+                              <label style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #fb923c", background: "rgba(251,146,60,0.1)", color: "#fb923c", fontSize: "0.64rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                {photoUploadingUid === p.uid ? "Uploading..." : p.personalPhoto ? "Change Photo" : "Upload Photo"}
+                                <input type="file" accept="image/*" style={{ display: "none" }}
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) adminUploadPhoto(p.uid, f); e.target.value = ""; }}
+                                  disabled={photoUploadingUid === p.uid} />
+                              </label>
+                            </div>
                             {[
                               { label: "Full Name", val: p.fullName },
                               { label: "UID", val: p.uid, mono: true },
@@ -1805,6 +1851,33 @@ export default function AdminPanel() {
                                 <span style={{ fontSize: "0.72rem", color: r.val ? "#e0e0e0" : "#444", fontWeight: 600, fontFamily: r.mono ? "monospace" : "inherit" }}>{r.val || "—"}</span>
                               </div>
                             ))}
+                            {/* Discord Connected Accounts */}
+                            {p.discordConnections && p.discordConnections.length > 0 && (
+                              <div style={{ marginTop: 12, borderTop: "1px solid #2a2a2e", paddingTop: 10 }}>
+                                <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#a78bfa", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                  Linked Accounts ({p.discordConnections.length})
+                                </div>
+                                {p.discordConnections.map((conn, i) => {
+                                  const typeLabel: Record<string, string> = { steam: "Steam", riotgames: "Riot Games", twitch: "Twitch", youtube: "YouTube", twitter: "Twitter", github: "GitHub", spotify: "Spotify", xbox: "Xbox", playstation: "PlayStation", epicgames: "Epic Games", battlenet: "Battle.net" };
+                                  const typeColor: Record<string, string> = { steam: "#66c0f4", riotgames: "#ff4655", twitch: "#9146ff", youtube: "#ff0000", twitter: "#1da1f2", github: "#e0e0e0", spotify: "#1db954", xbox: "#107c10", playstation: "#003087", epicgames: "#e0e0e0", battlenet: "#00AEFF" };
+                                  return (
+                                    <div key={`${conn.type}-${i}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #1e1e22" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <span style={{ fontSize: "0.66rem", fontWeight: 700, color: typeColor[conn.type] || "#888" }}>{typeLabel[conn.type] || conn.type}</span>
+                                        <span style={{ fontSize: "0.66rem", color: "#e0e0e0" }}>{conn.name}</span>
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        {conn.verified && <span style={{ fontSize: "0.56rem", color: "#22c55e", fontWeight: 700 }}>✓ Verified</span>}
+                                        <span style={{ fontSize: "0.54rem", color: "#555", fontFamily: "monospace" }}>{conn.id}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {(!p.discordConnections || p.discordConnections.length === 0) && p.discordId && (
+                              <div style={{ marginTop: 10, fontSize: "0.62rem", color: "#555", fontStyle: "italic" }}>No linked accounts found on Discord</div>
+                            )}
                           </div>
 
                           {/* Tournaments */}
@@ -1846,6 +1919,7 @@ export default function AdminPanel() {
                                 { key: "riotRank", label: "Riot Rank" },
                                 { key: "steamName", label: "Steam Name" },
                                 { key: "discordUsername", label: "Discord Username" },
+                                { key: "personalPhoto", label: "Personal Photo URL" },
                               ].map(f => (
                                 <div key={f.key}>
                                   <label style={{ fontSize: "0.62rem", color: "#888", display: "block", marginBottom: 3 }}>{f.label}</label>

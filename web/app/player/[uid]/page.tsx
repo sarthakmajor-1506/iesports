@@ -106,6 +106,7 @@ export default function PlayerProfile() {
           steamName: d.steamName, steamId: d.steamId, steamAvatar: d.steamAvatar,
           phone: d.phone, upiId: undefined, // loaded separately for owner only
           displayName: d.displayName,
+          personalPhoto: d.personalPhoto,
         });
 
         // Load private owner-only fields via client SDK
@@ -113,7 +114,7 @@ export default function PlayerProfile() {
           const ownerDoc = await getDoc(doc(db, "users", uid));
           if (ownerDoc.exists()) {
             const od = ownerDoc.data();
-            setProfile(prev => prev ? { ...prev, phone: od.phone || null, upiId: od.upiId || null, fullName: od.fullName || prev.fullName || null } : prev);
+            setProfile(prev => prev ? { ...prev, phone: od.phone || null, upiId: od.upiId || null, fullName: od.fullName || prev.fullName || null, personalPhoto: od.personalPhoto || prev.personalPhoto || null } : prev);
             if (od.upiId) setUpiInput(od.upiId);
             if (od.displayName) setNameInput(od.displayName);
             if (od.fullName) setFullNameInput(od.fullName);
