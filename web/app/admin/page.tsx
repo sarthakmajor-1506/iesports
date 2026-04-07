@@ -94,7 +94,7 @@ export default function AdminPanel() {
   const [playerSort, setPlayerSort] = useState<"newest" | "oldest" | "name" | "status">("newest");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
-  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [regEditUid, setRegEditUid] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
 
@@ -513,7 +513,7 @@ export default function AdminPanel() {
   };
 
   const startEditPlayer = (p: PlayerData) => {
-    setEditingPlayer(p.uid);
+    setRegEditUid(p.uid);
     setEditFields({
       fullName: p.fullName || "",
       phone: p.phone || "",
@@ -535,7 +535,7 @@ export default function AdminPanel() {
       for (const [key, val] of Object.entries(editFields)) {
         if (val !== ((orig as any)[key] || "")) updates[key] = val;
       }
-      if (Object.keys(updates).length === 0) { setEditingPlayer(null); setEditSaving(false); return; }
+      if (Object.keys(updates).length === 0) { setRegEditUid(null); setEditSaving(false); return; }
       const res = await fetch("/api/admin/update-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -543,7 +543,7 @@ export default function AdminPanel() {
       });
       if (res.ok) {
         setAllPlayers(prev => prev.map(p => p.uid === uid ? { ...p, ...updates } : p));
-        setEditingPlayer(null);
+        setRegEditUid(null);
       }
     } catch (e) { console.error("Edit player error:", e); }
     setEditSaving(false);
@@ -989,7 +989,7 @@ export default function AdminPanel() {
                       <tbody>
                         {regPlayers.map((p: any, idx: number) => {
                           const uid = p.uid || p.id;
-                          const isEditing = editingPlayer === uid;
+                          const isEditing = regEditUid === uid;
                           const ev = editValues[uid] || {};
                           const riotName = p.riotGameName || p._user?.riotGameName || "—";
                           const riotTag = p.riotTagLine || p._user?.riotTagLine || "";
@@ -1833,7 +1833,7 @@ export default function AdminPanel() {
                         </div>
 
                         {/* ── Edit form ── */}
-                        {editingPlayer === p.uid ? (
+                        {regEditUid === p.uid ? (
                           <div style={{ background: "#18181c", border: "1px solid #3B82F6", borderRadius: 10, padding: 14, marginTop: 12 }}>
                             <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Edit Player</div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
@@ -1859,7 +1859,7 @@ export default function AdminPanel() {
                                 style={{ padding: "7px 20px", borderRadius: 8, border: "none", background: "#3B82F6", color: "#fff", fontSize: "0.76rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                                 {editSaving ? "Saving..." : "Save Changes"}
                               </button>
-                              <button onClick={() => setEditingPlayer(null)}
+                              <button onClick={() => setRegEditUid(null)}
                                 style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                 Cancel
                               </button>
