@@ -25,26 +25,42 @@ export async function POST(req: NextRequest) {
       return {
         uid: doc.id,
         // Identity
+        fullName: d.fullName || null,
         phone: d.phone || null,
         // Riot
         riotGameName: d.riotGameName || null,
         riotTagLine: d.riotTagLine || null,
         riotRank: d.riotRank || null,
         riotTier: d.riotTier || null,
+        riotPuuid: d.riotPuuid || null,
+        riotRegion: d.riotRegion || null,
+        riotAccountLevel: d.riotAccountLevel || null,
         riotVerified: d.riotVerified || null,
+        riotVerificationNote: d.riotVerificationNote || null,
         riotAvatar: d.riotAvatar || null,
         riotScreenshotUrl: d.riotScreenshotUrl || null,
+        riotLinkedAt: d.riotLinkedAt?.toDate?.()?.toISOString?.() || d.riotLinkedAt || null,
         // Steam
         steamId: d.steamId || null,
         steamName: d.steamName || null,
+        steamAvatar: d.steamAvatar || null,
+        steamLinkedAt: d.steamLinkedAt?.toDate?.()?.toISOString?.() || d.steamLinkedAt || null,
+        // Dota
+        dotaRankTier: d.dotaRankTier || null,
+        dotaBracket: d.dotaBracket || null,
+        dotaMMR: d.dotaMMR || null,
         // Discord
         discordId: d.discordId || null,
         discordUsername: d.discordUsername || null,
+        discordAvatar: d.discordAvatar || null,
+        discordConnectedAt: d.discordConnectedAt?.toDate?.()?.toISOString?.() || d.discordConnectedAt || null,
         // Tournaments
         registeredValorantTournaments: d.registeredValorantTournaments || [],
         registeredTournaments: d.registeredTournaments || [],
+        registeredSoloTournaments: d.registeredSoloTournaments || [],
         // Meta
         createdAt: d.createdAt?.toDate?.()?.toISOString?.() || d.createdAt || null,
+        upiId: d.upiId || null,
       };
     });
 

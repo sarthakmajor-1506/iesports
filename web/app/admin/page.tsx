@@ -10,7 +10,7 @@ import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "fi
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
-interface PlayerData { uid: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotVerified?: string; riotScreenshotUrl?: string; steamId?: string; steamName?: string; discordId?: string; discordUsername?: string; phone?: string; registeredValorantTournaments?: string[]; }
+interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
 
 type AdminTab = "tournament" | "players" | "create";
@@ -463,11 +463,14 @@ export default function AdminPanel() {
     if (!playerSearch) return true;
     const q = playerSearch.toLowerCase();
     return (
+      (p.fullName?.toLowerCase().includes(q)) ||
       (p.riotGameName?.toLowerCase().includes(q)) ||
       (p.discordUsername?.toLowerCase().includes(q)) ||
       (p.steamName?.toLowerCase().includes(q)) ||
       (p.uid?.toLowerCase().includes(q)) ||
-      (p.phone?.includes(q))
+      (p.phone?.includes(q)) ||
+      (p.discordId?.includes(q)) ||
+      (p.steamId?.includes(q))
     );
   }).sort((a, b) => {
     const order: Record<string, number> = { pending: 0, verified: 2, rejected: 3 };
@@ -1503,9 +1506,28 @@ export default function AdminPanel() {
           {activeTab === "players" && (
             <div style={sectionStyle}>
               <span style={labelStyle}>All Registered Players ({allPlayers.length})</span>
+
+              {/* ── Stats row ── */}
+              <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                {[
+                  { label: "Total", val: allPlayers.length, color: "#3B82F6" },
+                  { label: "Riot Verified", val: allPlayers.filter(p => p.riotVerified === "verified").length, color: "#22c55e" },
+                  { label: "Pending", val: allPlayers.filter(p => p.riotVerified === "pending").length, color: "#f59e0b" },
+                  { label: "Steam", val: allPlayers.filter(p => p.steamId).length, color: "#66c0f4" },
+                  { label: "Discord", val: allPlayers.filter(p => p.discordId).length, color: "#818cf8" },
+                  { label: "Phone", val: allPlayers.filter(p => p.phone && p.phone.length > 3).length, color: "#f472b6" },
+                ].map(s => (
+                  <div key={s.label} style={{ padding: "8px 14px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 8, textAlign: "center", minWidth: 80 }}>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 900, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: "0.62rem", color: "#888", fontWeight: 600, marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Search & filter ── */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                 <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
-                  placeholder="Search by name, UID, discord, phone..." style={{ ...inputStyle, flex: 1, minWidth: 200, marginBottom: 0 }} />
+                  placeholder="Search name, Discord, Riot ID, Steam, UID, phone..." style={{ ...inputStyle, flex: 1, minWidth: 240, marginBottom: 0 }} />
                 <select value={riotFilter} onChange={e => setRiotFilter(e.target.value as any)}
                   style={{ ...inputStyle, width: "auto", minWidth: 140, marginBottom: 0, cursor: "pointer" }}>
                   <option value="all">All Statuses</option>
@@ -1514,26 +1536,48 @@ export default function AdminPanel() {
                   <option value="rejected">Rejected</option>
                 </select>
               </div>
+              <div style={{ fontSize: "0.68rem", color: "#555", marginBottom: 10 }}>
+                Showing {filteredPlayers.length} of {allPlayers.length} players — click any row to expand full details
+              </div>
+
+              {/* ── Table header ── */}
               <div className="adm-player-row adm-player-header" style={{ borderBottom: "2px solid #2a2a2e" }}>
-                <div>Player</div><div>UID</div><div style={{ textAlign: "center" }}>Riot Verification</div>
+                <div>Player</div><div>Onboarding</div><div style={{ textAlign: "center" }}>Riot</div>
                 <div style={{ textAlign: "center" }}>Steam</div><div style={{ textAlign: "center" }}>Discord</div>
                 <div style={{ textAlign: "center" }}>Phone</div>
               </div>
-              <div className="adm-table-scroll" style={{ maxHeight: 600, overflowY: "auto" }}>
-                {filteredPlayers.map(p => (
+
+              {/* ── Player list ── */}
+              <div className="adm-table-scroll" style={{ maxHeight: 700, overflowY: "auto" }}>
+                {filteredPlayers.map(p => {
+                  const onboardSteps = [!!p.fullName, !!p.discordId, !!p.steamId, !!(p.riotGameName), !!(p.phone && p.phone.length > 3)];
+                  const onboardDone = onboardSteps.filter(Boolean).length;
+                  const onboardTotal = onboardSteps.length;
+                  const isExpanded = expandedPlayer === p.uid;
+                  return (
                   <div key={p.uid}>
-                    <div className="adm-player-row" style={{ cursor: p.riotVerified === "pending" ? "pointer" : undefined }}
-                      onClick={() => p.riotVerified === "pending" && setExpandedPlayer(expandedPlayer === p.uid ? null : p.uid)}>
+                    <div className="adm-player-row" style={{ cursor: "pointer", background: isExpanded ? "#16161a" : undefined }}
+                      onClick={() => setExpandedPlayer(isExpanded ? null : p.uid)}>
                       <div>
-                        <div style={{ fontWeight: 700, color: "#e0e0e0" }}>
-                          {p.riotGameName || p.steamName || p.discordUsername || "Unknown"}
+                        <div style={{ fontWeight: 700, color: "#e0e0e0", fontSize: "0.82rem" }}>
+                          {p.fullName || p.riotGameName || p.steamName || p.discordUsername || "Unknown"}
                         </div>
-                        <div style={{ fontSize: "0.62rem", color: "#555" }}>
-                          {p.riotRank || "No rank"}
+                        {p.fullName && p.riotGameName && (
+                          <div style={{ fontSize: "0.62rem", color: "#888" }}>{p.riotGameName}#{p.riotTagLine}</div>
+                        )}
+                        <div style={{ fontSize: "0.58rem", color: "#555", marginTop: 1 }}>
+                          {p.riotRank || p.dotaBracket || "No rank"}
                         </div>
                       </div>
-                      <div style={{ fontSize: "0.64rem", color: "#666", fontFamily: "monospace", wordBreak: "break-all" }}>
-                        {p.uid}
+                      <div>
+                        <div style={{ display: "flex", gap: 2, marginBottom: 3 }}>
+                          {onboardSteps.map((done, i) => (
+                            <div key={i} style={{ width: 16, height: 4, borderRadius: 2, background: done ? "#22c55e" : "#2a2a2e" }} />
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "0.6rem", color: onboardDone === onboardTotal ? "#22c55e" : "#888", fontWeight: 600 }}>
+                          {onboardDone}/{onboardTotal}
+                        </div>
                       </div>
                       <div style={{ textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
                         {p.riotVerified === "verified" && (
@@ -1571,45 +1615,141 @@ export default function AdminPanel() {
                         <div className={`adm-check ${p.discordId ? "yes" : "no"}`}>{p.discordId ? "✓" : "✗"}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <div className={`adm-check ${p.phone ? "yes" : "no"}`}>{p.phone ? "✓" : "✗"}</div>
+                        <div className={`adm-check ${p.phone && p.phone.length > 3 ? "yes" : "no"}`}>{p.phone && p.phone.length > 3 ? "✓" : "✗"}</div>
                       </div>
                     </div>
-                    {/* Expanded screenshot preview for pending players */}
-                    {expandedPlayer === p.uid && p.riotVerified === "pending" && (
-                      <div style={{ padding: "12px 16px 16px", background: "#16161a", borderBottom: "1px solid #2a2a2e" }}>
-                        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-                          <div style={{ flex: "0 0 auto" }}>
-                            {p.riotScreenshotUrl ? (
-                              <a href={p.riotScreenshotUrl} target="_blank" rel="noopener noreferrer">
-                                <img src={p.riotScreenshotUrl} alt="Riot screenshot" style={{ maxWidth: 320, maxHeight: 240, borderRadius: 8, border: "1px solid #2a2a2e", cursor: "pointer" }} />
+
+                    {/* ── Expanded detail card ── */}
+                    {isExpanded && (
+                      <div style={{ padding: "16px 20px 20px", background: "#111114", borderBottom: "1px solid #2a2a2e" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+
+                          {/* Identity */}
+                          <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#3B82F6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Identity</div>
+                            {[
+                              { label: "Full Name", val: p.fullName },
+                              { label: "UID", val: p.uid, mono: true },
+                              { label: "Phone", val: p.phone && p.phone.length > 3 ? p.phone : null },
+                              { label: "UPI ID", val: p.upiId },
+                              { label: "Joined", val: p.createdAt ? new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null },
+                            ].map(r => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                                <span style={{ fontSize: "0.72rem", color: "#888" }}>{r.label}</span>
+                                <span style={{ fontSize: "0.72rem", color: r.val ? "#e0e0e0" : "#444", fontWeight: r.val ? 600 : 400, fontFamily: r.mono ? "monospace" : "inherit", maxWidth: "60%", textAlign: "right", wordBreak: "break-all" }}>{r.val || "—"}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Riot / Valorant */}
+                          <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#ff4655", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Riot / Valorant</div>
+                            {p.riotAvatar && <img src={p.riotAvatar} alt="" style={{ width: 36, height: 36, borderRadius: 6, marginBottom: 8, border: "2px solid #2a2a2e" }} />}
+                            {[
+                              { label: "Riot ID", val: p.riotGameName ? `${p.riotGameName}#${p.riotTagLine}` : null },
+                              { label: "Rank", val: p.riotRank },
+                              { label: "Tier", val: p.riotTier },
+                              { label: "Region", val: p.riotRegion },
+                              { label: "Account Level", val: p.riotAccountLevel != null ? String(p.riotAccountLevel) : null },
+                              { label: "Verified", val: p.riotVerified || "unlinked" },
+                              { label: "Linked At", val: p.riotLinkedAt ? new Date(p.riotLinkedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null },
+                            ].map(r => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                                <span style={{ fontSize: "0.72rem", color: "#888" }}>{r.label}</span>
+                                <span style={{ fontSize: "0.72rem", color: r.val && r.val !== "unlinked" ? "#e0e0e0" : "#444", fontWeight: 600 }}>{r.val || "—"}</span>
+                              </div>
+                            ))}
+                            {p.riotScreenshotUrl && (
+                              <a href={p.riotScreenshotUrl} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 10 }}>
+                                <img src={p.riotScreenshotUrl} alt="Screenshot" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6, border: "1px solid #2a2a2e" }} />
                               </a>
-                            ) : (
-                              <div style={{ padding: "20px 32px", background: "#1a1a1e", borderRadius: 8, border: "1px solid #2a2a2e", color: "#555", fontSize: "0.78rem" }}>No screenshot uploaded</div>
+                            )}
+                            {p.riotVerified === "pending" && (
+                              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                                <button onClick={() => handleVerifyRiot(p.uid, "verify")} disabled={verifyingUid === p.uid}
+                                  style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: "#22c55e", color: "#fff", fontSize: "0.76rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                  {verifyingUid === p.uid ? "..." : "Verify"}
+                                </button>
+                                <button onClick={() => handleVerifyRiot(p.uid, "reject")} disabled={verifyingUid === p.uid}
+                                  style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: "0.76rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                  {verifyingUid === p.uid ? "..." : "Reject"}
+                                </button>
+                              </div>
                             )}
                           </div>
-                          <div style={{ flex: 1, minWidth: 200 }}>
-                            <div style={{ fontSize: "0.72rem", color: "#888", marginBottom: 4 }}>Riot ID</div>
-                            <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e0e0e0", marginBottom: 10 }}>{p.riotGameName}#{p.riotTagLine}</div>
-                            <div style={{ fontSize: "0.72rem", color: "#888", marginBottom: 4 }}>Rank</div>
-                            <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e0e0e0", marginBottom: 16 }}>{p.riotRank || "Unknown"}</div>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button onClick={() => handleVerifyRiot(p.uid, "verify")}
-                                disabled={verifyingUid === p.uid}
-                                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#22c55e", color: "#fff", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                                {verifyingUid === p.uid ? "..." : "Verify"}
-                              </button>
-                              <button onClick={() => handleVerifyRiot(p.uid, "reject")}
-                                disabled={verifyingUid === p.uid}
-                                style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                                {verifyingUid === p.uid ? "..." : "Reject"}
-                              </button>
-                            </div>
+
+                          {/* Steam / Dota */}
+                          <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#66c0f4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Steam / Dota 2</div>
+                            {p.steamAvatar && <img src={p.steamAvatar} alt="" style={{ width: 36, height: 36, borderRadius: "50%", marginBottom: 8, border: "2px solid #2a2a2e" }} />}
+                            {[
+                              { label: "Steam Name", val: p.steamName },
+                              { label: "Steam ID", val: p.steamId, mono: true },
+                              { label: "Dota Rank Tier", val: p.dotaRankTier != null ? String(p.dotaRankTier) : null },
+                              { label: "Dota Bracket", val: p.dotaBracket },
+                              { label: "Dota MMR", val: p.dotaMMR != null ? String(p.dotaMMR) : null },
+                              { label: "Linked At", val: p.steamLinkedAt ? new Date(p.steamLinkedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null },
+                            ].map(r => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                                <span style={{ fontSize: "0.72rem", color: "#888" }}>{r.label}</span>
+                                <span style={{ fontSize: "0.72rem", color: r.val ? "#e0e0e0" : "#444", fontWeight: 600, fontFamily: r.mono ? "monospace" : "inherit" }}>{r.val || "—"}</span>
+                              </div>
+                            ))}
                           </div>
+
+                          {/* Discord */}
+                          <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#818cf8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Discord</div>
+                            {p.discordAvatar && <img src={p.discordAvatar} alt="" style={{ width: 36, height: 36, borderRadius: "50%", marginBottom: 8, border: "2px solid #2a2a2e" }} />}
+                            {[
+                              { label: "Username", val: p.discordUsername },
+                              { label: "Discord ID", val: p.discordId, mono: true },
+                              { label: "Connected At", val: p.discordConnectedAt ? new Date(p.discordConnectedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null },
+                            ].map(r => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                                <span style={{ fontSize: "0.72rem", color: "#888" }}>{r.label}</span>
+                                <span style={{ fontSize: "0.72rem", color: r.val ? "#e0e0e0" : "#444", fontWeight: 600, fontFamily: r.mono ? "monospace" : "inherit" }}>{r.val || "—"}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Tournaments */}
+                          <div style={{ background: "#18181c", border: "1px solid #2a2a2e", borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Tournaments</div>
+                            {[
+                              { label: "Valorant", val: p.registeredValorantTournaments?.length || 0 },
+                              { label: "Dota 5v5", val: p.registeredTournaments?.length || 0 },
+                              { label: "Dota Solo", val: p.registeredSoloTournaments?.length || 0 },
+                            ].map(r => (
+                              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                                <span style={{ fontSize: "0.72rem", color: "#888" }}>{r.label}</span>
+                                <span style={{ fontSize: "0.72rem", color: r.val > 0 ? "#e0e0e0" : "#444", fontWeight: 600 }}>{r.val}</span>
+                              </div>
+                            ))}
+                            {(p.registeredValorantTournaments?.length || 0) > 0 && (
+                              <div style={{ marginTop: 8 }}>
+                                <div style={{ fontSize: "0.62rem", color: "#666", marginBottom: 4 }}>Valorant IDs:</div>
+                                {p.registeredValorantTournaments!.map(tid => (
+                                  <div key={tid} style={{ fontSize: "0.62rem", color: "#888", fontFamily: "monospace", padding: "2px 0" }}>{tid}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+
+                        {/* Profile link */}
+                        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                          <a href={`/player/${p.uid}`} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: "0.72rem", color: "#3B82F6", fontWeight: 600, textDecoration: "none" }}>
+                            View Public Profile &rarr;
+                          </a>
                         </div>
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 {filteredPlayers.length === 0 && (
                   <div style={{ padding: 20, textAlign: "center", color: "#555", fontSize: "0.82rem" }}>
                     {playerSearch ? "No players match your search." : "No players registered yet."}
