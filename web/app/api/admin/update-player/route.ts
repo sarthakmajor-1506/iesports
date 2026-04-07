@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     // Whitelist of editable fields
     const allowed = [
       "riotRank", "riotTier", "riotGameName", "riotTagLine", "riotVerified",
+      "iesportsRating", "iesportsRank", "iesportsTier",
       "dotaRankTier", "dotaBracket", "dotaMMR",
       "steamId", "steamName",
       "fullName", "phone", "discordUsername",
@@ -47,8 +48,12 @@ export async function POST(req: NextRequest) {
     if ("dotaRankTier" in safeUpdates) safeUpdates.dotaRankTier = Number(safeUpdates.dotaRankTier);
     if ("dotaMMR" in safeUpdates) safeUpdates.dotaMMR = Number(safeUpdates.dotaMMR);
 
+    // Ensure iesports numeric fields are stored as numbers
+    if ("iesportsRating" in safeUpdates) safeUpdates.iesportsRating = Number(safeUpdates.iesportsRating);
+    if ("iesportsTier" in safeUpdates) safeUpdates.iesportsTier = Number(safeUpdates.iesportsTier);
+
     // 1. Update tournament soloPlayers doc (only rank-related fields that exist there)
-    const tournamentPlayerFields = ["riotRank", "riotTier", "riotGameName", "riotTagLine"];
+    const tournamentPlayerFields = ["riotRank", "riotTier", "riotGameName", "riotTagLine", "iesportsRating", "iesportsRank", "iesportsTier"];
     const tournamentUpdates: Record<string, any> = {};
     for (const key of tournamentPlayerFields) {
       if (key in safeUpdates) tournamentUpdates[key] = safeUpdates[key];

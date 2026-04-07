@@ -163,6 +163,12 @@ export interface RiotProfile {
   riotScreenshotUrl?: string;   // Firebase Storage path for manual verification
   riotLinkedAt?: string;        // ISO timestamp
   riotPuuid?: string;           // Riot PUUID for future API calls
+  riotPeakRank?: string;        // highest rank ever seen from Henrik API
+  riotPeakTier?: number;        // highest tier ever seen (0-27)
+  iesportsRating?: number;      // internal ELO rating (tier*100 scale, 300-2700)
+  iesportsRank?: string;        // derived display rank (e.g. "Diamond 3")
+  iesportsTier?: number;        // derived integer tier (0-27)
+  iesportsMatchesPlayed?: number; // count of rated matches played
 }
 
 
@@ -520,3 +526,33 @@ export interface ShuffleTeam {
 //     tourneyStageStart?: string;
 //     tourneyStageEnd?: string;
 //   };
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IESPORTS RANKING SYSTEM
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** A single entry in a player's rank history (users/{uid}/rankHistory/{autoId}) */
+export interface RankHistoryEntry {
+  timestamp: string;           // ISO timestamp
+  type: "seed" | "match" | "riot_refresh" | "admin_override";
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  // match details (type === "match")
+  matchId?: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  teamName?: string;
+  opponentTeamName?: string;
+  result?: "win" | "draw" | "loss";
+  mapScore?: string;           // e.g. "2-0"
+  opponentAvgRating?: number;
+  // riot refresh details (type === "riot_refresh")
+  riotRankBefore?: string;
+  riotRankAfter?: string;
+  riotTierBefore?: number;
+  riotTierAfter?: number;
+  // admin override details (type === "admin_override")
+  adminNote?: string;
+}

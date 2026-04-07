@@ -10,6 +10,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
     if (!userDoc.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const d = userDoc.data()!;
+
+    // Fetch rank history via admin SDK (client SDK blocked by security rules)
+    const rhSnap = await adminDb.collection("users").doc(uid)
+      .collection("rankHistory")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
+    const rankHistory = rhSnap.docs.map(doc => doc.data());
+
     return NextResponse.json({
       uid,
       fullName: d.fullName || null,
@@ -21,6 +30,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       riotTier: d.riotTier || 0,
       riotPuuid: d.riotPuuid || null,
       riotVerified: d.riotVerified || null,
+      riotPeakRank: d.riotPeakRank || null,
+      riotPeakTier: d.riotPeakTier || 0,
+      iesportsRating: d.iesportsRating || null,
+      iesportsRank: d.iesportsRank || null,
+      iesportsTier: d.iesportsTier || 0,
+      iesportsMatchesPlayed: d.iesportsMatchesPlayed || 0,
       discordUsername: d.discordUsername || null,
       discordId: d.discordId || null,
       steamName: d.steamName || null,
@@ -31,6 +46,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       personalPhoto: d.personalPhoto || null,
       discordConnections: d.discordConnections || [],
       registeredValorantTournaments: d.registeredValorantTournaments || [],
+      rankHistory,
     });
   } catch (e) {
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });

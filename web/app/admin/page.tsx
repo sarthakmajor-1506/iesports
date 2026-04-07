@@ -100,6 +100,9 @@ export default function AdminPanel() {
   const [regEditUid, setRegEditUid] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
+  const [ratingDelta, setRatingDelta] = useState("");
+  const [ratingNote, setRatingNote] = useState("");
+  const [ratingAdjusting, setRatingAdjusting] = useState(false);
   const [photoUploadingUid, setPhotoUploadingUid] = useState<string | null>(null);
 
   // ─── Log ────────────────────────────────────────────────────────────────────
@@ -558,6 +561,30 @@ export default function AdminPanel() {
       }
     } catch (e) { console.error("Edit player error:", e); }
     setEditSaving(false);
+  };
+
+  const adjustRating = async (uid: string) => {
+    const delta = parseInt(ratingDelta);
+    if (isNaN(delta) || delta === 0) return;
+    setRatingAdjusting(true);
+    try {
+      const res = await fetch("/api/admin/adjust-rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, uid, delta, note: ratingNote }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setAllPlayers(prev => prev.map(p => p.uid === uid ? {
+          ...p,
+          iesportsRating: result.ratingAfter,
+          iesportsRank: result.iesportsRank,
+        } : p));
+        setRatingDelta("");
+        setRatingNote("");
+      }
+    } catch (e) { console.error("Adjust rating error:", e); }
+    setRatingAdjusting(false);
   };
 
   const adminUploadPhoto = async (uid: string, file: File) => {
@@ -1942,12 +1969,31 @@ export default function AdminPanel() {
                                 </div>
                               ))}
                             </div>
+                            {/* ── IEsports Rating Adjustment ── */}
+                            <div style={{ marginTop: 14, padding: 12, background: "rgba(60,203,255,0.04)", border: "1px solid rgba(60,203,255,0.15)", borderRadius: 8 }}>
+                              <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>IEsports Rating</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#F0EEEA" }}>{(p as any).iesportsRating || "Not seeded"}</span>
+                                <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>{(p as any).iesportsRank || ""}</span>
+                              </div>
+                              <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                                <input type="number" placeholder="+/- points" value={ratingDelta} onChange={e => setRatingDelta(e.target.value)}
+                                  style={{ width: 100, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
+                                <input placeholder="Reason (visible to player)" value={ratingNote} onChange={e => setRatingNote(e.target.value)}
+                                  style={{ flex: 1, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
+                                <button onClick={() => adjustRating(p.uid)} disabled={ratingAdjusting || !ratingDelta}
+                                  style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: ratingDelta && parseInt(ratingDelta) > 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.15)", color: ratingDelta && parseInt(ratingDelta) > 0 ? "#4ade80" : "#f87171", fontSize: "0.72rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                                  {ratingAdjusting ? "..." : "Adjust"}
+                                </button>
+                              </div>
+                            </div>
+
                             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                               <button onClick={() => saveEditPlayer(p.uid)} disabled={editSaving}
                                 style={{ padding: "7px 20px", borderRadius: 8, border: "none", background: "#3B82F6", color: "#fff", fontSize: "0.76rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                                 {editSaving ? "Saving..." : "Save Changes"}
                               </button>
-                              <button onClick={() => setRegEditUid(null)}
+                              <button onClick={() => { setRegEditUid(null); setRatingDelta(""); setRatingNote(""); }}
                                 style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontSize: "0.76rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                 Cancel
                               </button>

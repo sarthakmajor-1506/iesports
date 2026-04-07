@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     const allowed = [
       "fullName", "phone", "upiId", "personalPhoto",
       "riotGameName", "riotTagLine", "riotRank", "riotTier", "riotVerified", "riotRegion",
+      "iesportsRating", "iesportsRank", "iesportsTier",
       "steamId", "steamName",
       "discordUsername",
       "dotaRankTier", "dotaBracket", "dotaMMR",

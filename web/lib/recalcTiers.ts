@@ -17,9 +17,16 @@ export async function recalcTiers(tournamentId: string): Promise<void> {
   const snap = await playersRef.get();
   if (snap.empty) return;
 
-  // Sort by riotTier descending (highest rank first), break ties by registeredAt
+  // Sort by iesportsTier (fallback to riotTier) descending, break ties by registeredAt
   const players = snap.docs
-    .map((d) => ({ uid: d.id, riotTier: d.data().riotTier || 0, registeredAt: d.data().registeredAt || "" }))
+    .map((d) => {
+      const data = d.data();
+      return {
+        uid: d.id,
+        riotTier: data.iesportsTier || data.riotTier || 0,
+        registeredAt: data.registeredAt || "",
+      };
+    })
     .sort((a, b) => b.riotTier - a.riotTier || a.registeredAt.localeCompare(b.registeredAt));
 
   const n = players.length;

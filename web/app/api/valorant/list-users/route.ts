@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
         discordUsername: d.discordUsername || null,
         discordAvatar: d.discordAvatar || null,
         discordConnectedAt: d.discordConnectedAt?.toDate?.()?.toISOString?.() || d.discordConnectedAt || null,
+        discordConnections: d.discordConnections || [],
         // Tournaments
         registeredValorantTournaments: d.registeredValorantTournaments || [],
         registeredTournaments: d.registeredTournaments || [],

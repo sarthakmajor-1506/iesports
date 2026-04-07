@@ -35,10 +35,33 @@ interface UserProfile {
   fullName?: string;
   riotGameName?: string; riotTagLine?: string; riotAvatar?: string;
   riotRank?: string; riotTier?: number; riotPuuid?: string; riotVerified?: string;
+  riotPeakRank?: string; riotPeakTier?: number;
+  iesportsRating?: number; iesportsRank?: string; iesportsTier?: number; iesportsMatchesPlayed?: number;
   discordUsername?: string; discordId?: string;
   discordConnections?: DiscordConnection[];
   steamName?: string; steamId?: string; steamAvatar?: string;
   phone?: string; upiId?: string; displayName?: string; personalPhoto?: string;
+}
+
+interface RankHistoryItem {
+  timestamp: string;
+  type: "seed" | "match" | "riot_refresh" | "admin_override";
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  matchId?: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  teamName?: string;
+  opponentTeamName?: string;
+  result?: "win" | "draw" | "loss";
+  mapScore?: string;
+  roundScore?: string;
+  gameNum?: number;
+  opponentAvgRating?: number;
+  riotRankBefore?: string;
+  riotRankAfter?: string;
+  adminNote?: string;
 }
 
 interface MatchHistoryItem {
@@ -61,6 +84,7 @@ export default function PlayerProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
+  const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProfileTab>(isOwnProfile ? "account" : "valorant");
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
@@ -102,6 +126,9 @@ export default function PlayerProfile() {
           riotGameName: d.riotGameName, riotTagLine: d.riotTagLine,
           riotAvatar: d.riotAvatar, riotRank: d.riotRank,
           riotTier: d.riotTier, riotPuuid: d.riotPuuid, riotVerified: d.riotVerified,
+          riotPeakRank: d.riotPeakRank, riotPeakTier: d.riotPeakTier,
+          iesportsRating: d.iesportsRating, iesportsRank: d.iesportsRank,
+          iesportsTier: d.iesportsTier, iesportsMatchesPlayed: d.iesportsMatchesPlayed,
           discordUsername: d.discordUsername, discordId: d.discordId, discordConnections: d.discordConnections,
           steamName: d.steamName, steamId: d.steamId, steamAvatar: d.steamAvatar,
           phone: d.phone, upiId: undefined, // loaded separately for owner only
@@ -180,6 +207,11 @@ export default function PlayerProfile() {
           history.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
           setMatchHistory(history);
         }
+
+        // Rank history comes from API (admin SDK — bypasses security rules)
+        if (d.rankHistory?.length > 0) {
+          setRankHistory(d.rankHistory as RankHistoryItem[]);
+        }
       } catch (e) { /* profile load failed */ }
       finally { setLoading(false); }
     };
@@ -236,7 +268,7 @@ export default function PlayerProfile() {
     setTimeout(() => setUpiSaved(false), 2500);
   };
 
-  const displayName = profile?.displayName || profile?.riotGameName || profile?.discordUsername || profile?.steamName || "Unknown";
+  const displayName = profile?.riotGameName || profile?.discordUsername || profile?.steamName || "Unknown";
   const displayTag = profile?.riotTagLine || "";
   const vStats = globalStats?.valorant;
   const totalGames = vStats?.matchesPlayed || 0;
@@ -309,43 +341,20 @@ export default function PlayerProfile() {
                 <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
               )}
               <div className="pp-header-info">
-                {nameEditing ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input
-                      value={nameInput}
-                      onChange={e => setNameInput(e.target.value)}
-                      placeholder="Enter your name"
-                      maxLength={30}
-                      autoFocus
-                      onKeyDown={e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setNameEditing(false); }}
-                      style={{
-                        padding: "6px 12px", background: "#111", border: "1px solid #333",
-                        borderRadius: 8, color: "#fff", fontSize: "1.1rem", fontWeight: 800,
-                        outline: "none", width: 200, fontFamily: "inherit",
-                      }}
-                    />
-                    <button onClick={saveName} disabled={nameSaving} style={{
-                      padding: "6px 14px", background: "#3CCBFF", color: "#fff", border: "none",
-                      borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                    }}>{nameSaving ? "..." : "Save"}</button>
-                    <button onClick={() => setNameEditing(false)} style={{
-                      padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid #333",
-                      borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                    }}>Cancel</button>
+                <h1 className="pp-name">
+                  {displayName}{displayTag && <span className="pp-tag">#{displayTag}</span>}
+                </h1>
+                {profile.iesportsRank ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+                    <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#3CCBFF" }}>{profile.iesportsRank}</span>
+                    <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#555550", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: 100, letterSpacing: "0.04em" }}>iE RANK</span>
+                    {profile.riotRank && (
+                      <span style={{ fontSize: "0.68rem", color: "#555550", fontWeight: 600 }}>Riot: {profile.riotRank}</span>
+                    )}
                   </div>
                 ) : (
-                  <h1 className="pp-name">
-                    {displayName}{displayTag && <span className="pp-tag">#{displayTag}</span>}
-                    {isOwnProfile && (
-                      <button onClick={() => { setNameInput(profile?.displayName || ""); setNameEditing(true); }} style={{
-                        background: "transparent", border: "none", color: "#555550", cursor: "pointer",
-                        fontSize: "0.7rem", marginLeft: 8, padding: "2px 6px", verticalAlign: "middle",
-                      }} title="Edit display name">✏️</button>
-                    )}
-                    {nameSaved && <span style={{ fontSize: "0.65rem", color: "#4ade80", marginLeft: 8, fontWeight: 600 }}>Saved!</span>}
-                  </h1>
+                  <div className="pp-rank">{profile.riotRank || "Unranked"}</div>
                 )}
-                <div className="pp-rank">{profile.riotRank || "Unranked"}</div>
                 {isOwnProfile && (
                   <div style={{ fontSize: "0.62rem", color: "#555550", marginTop: 4, fontWeight: 700, letterSpacing: "0.06em" }}>
                     YOUR PROFILE
@@ -358,7 +367,7 @@ export default function PlayerProfile() {
           {/* ═══ STATS CARDS ═══ */}
           {vStats ? (
             <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value">{computedAcs}</div><div className="pp-stat-label">ACS</div></div>
+              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value">{totalGames}</div><div className="pp-stat-label">Games Played</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value pp-stat-green">{gamesWon}</div><div className="pp-stat-label">Wins</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value pp-stat-red">{gamesLost}</div><div className="pp-stat-label">Losses</div></div>
@@ -366,11 +375,125 @@ export default function PlayerProfile() {
             </div>
           ) : (
             <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value">{profile.riotRank || "Unranked"}</div><div className="pp-stat-label">Valorant Rank</div></div>
+              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value">0</div><div className="pp-stat-label">Official Games</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">ACS</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">K/D</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
+            </div>
+          )}
+
+          {/* ═══ IESPORTS RANK CARD (always visible) ═══ */}
+          {profile.iesportsRank && (
+            <div className="pp-section" style={{ borderColor: "rgba(60,203,255,0.2)", background: "linear-gradient(135deg, rgba(60,203,255,0.04) 0%, #121215 100%)" }}>
+              <span className="pp-section-label">IEsports Rank</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ fontSize: "2rem", fontWeight: 900, color: "#3CCBFF" }}>{profile.iesportsRank}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: "0.68rem", color: "#8A8880", fontWeight: 700 }}>Rating: <span style={{ color: "#F0EEEA" }}>{profile.iesportsRating}</span></span>
+                    <span style={{ fontSize: "0.68rem", color: "#8A8880", fontWeight: 700 }}>Games: <span style={{ color: "#F0EEEA" }}>{profile.iesportsMatchesPlayed || 0}</span></span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotRank || "Unranked"}</div>
+                    <div style={{ fontSize: "0.56rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Current Rank</div>
+                  </div>
+                  <div style={{ width: 1, background: "#2A2A30" }} />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotPeakRank || "—"}</div>
+                    <div style={{ fontSize: "0.56rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Peak Rank</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ NON-MATCH RANK EVENTS (seed, admin, refresh) ═══ */}
+          {rankHistory.filter(rh => rh.type !== "match").length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+              {rankHistory.filter(rh => rh.type !== "match").map((rh, i) => {
+                const isPositive = rh.delta > 0;
+                const deltaColor = isPositive ? "#4ade80" : rh.delta === 0 ? "#8A8880" : "#f87171";
+                const deltaSign = isPositive ? "+" : "";
+                const date = new Date(rh.timestamp);
+                const dateStr = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                return (
+                  <div key={`event-${i}`} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "10px 14px", borderRadius: 10,
+                    background: rh.type === "admin_override" ? "rgba(167,139,250,0.06)" : "rgba(60,203,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.04)",
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {rh.type === "seed" ? (
+                        <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Rating Seeded</div>
+                      ) : rh.type === "riot_refresh" ? (
+                        <>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Riot Rank Refresh</div>
+                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{rh.riotRankBefore} &rarr; {rh.riotRankAfter}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#a78bfa" }}>Admin Adjustment</div>
+                          {rh.adminNote && <div style={{ fontSize: "0.68rem", color: "#8A8880", marginTop: 2 }}>{rh.adminNote}</div>}
+                        </>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 800, color: deltaColor }}>{deltaSign}{rh.delta}</div>
+                        <div style={{ fontSize: "0.58rem", color: "#555550", fontWeight: 600 }}>{rh.ratingBefore} &rarr; {rh.ratingAfter}</div>
+                      </div>
+                      <div style={{ fontSize: "0.56rem", color: "#3a3a42", fontWeight: 600, minWidth: 60, textAlign: "right" }}>{dateStr}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* How IEsports Rank Works (always visible) */}
+          {profile.iesportsRank && (
+            <div className="pp-section" style={{ cursor: "pointer" }} onClick={e => {
+              const content = (e.currentTarget.querySelector('[data-explainer]') as HTMLElement);
+              if (content) content.style.display = content.style.display === "none" ? "block" : "none";
+              const arrow = (e.currentTarget.querySelector('[data-arrow]') as HTMLElement);
+              if (arrow) arrow.style.transform = content?.style.display === "none" ? "rotate(0deg)" : "rotate(180deg)";
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span className="pp-section-label" style={{ marginBottom: 0 }}>How is your IEsports Rank calculated?</span>
+                <span data-arrow style={{ fontSize: 10, color: "#3a3a42", transition: "transform 0.2s" }}>&#9660;</span>
+              </div>
+              <div data-explainer style={{ display: "none", marginTop: 14 }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, fontSize: "0.78rem", color: "#8A8880", lineHeight: 1.6 }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#F0EEEA", fontSize: "0.72rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Starting Rank</div>
+                    Your IEsports rank starts as the average of your <span style={{ color: "#3CCBFF", fontWeight: 700 }}>current Valorant rank</span> and your <span style={{ color: "#3CCBFF", fontWeight: 700 }}>peak rank</span> (the highest you've ever achieved). This ensures players can't sandbag by intentionally deranking.
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#F0EEEA", fontSize: "0.72rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Game Performance</div>
+                    Every game you play on IEsports adjusts your rank. Wins and losses are <span style={{ color: "#3CCBFF", fontWeight: 700 }}>equally weighted</span> — stomp a game 13-3 and you gain more than a close 13-11. Each game in a BO3 counts individually.
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#F0EEEA", fontSize: "0.72rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Underdog Bonus</div>
+                    Beat a team rated higher than yours? You gain significantly more points. The bigger the upset, the bigger the reward. Lose to a stronger team? The penalty is tiny.
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#F0EEEA", fontSize: "0.72rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Riot Rank Floor</div>
+                    Your IEsports rank can never drop below your Riot rank average. Each time you register for a tournament, your Riot rank is refreshed — if it went up, your IEsports rank gets bumped up too.
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#F0EEEA", fontSize: "0.72rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Admin Adjustments</div>
+                    Tournament admins can manually adjust ratings when needed (e.g., verified smurf, known skill level). Every adjustment is logged with a reason and visible in your rank history.
+                  </div>
+                  <div style={{ padding: "10px 14px", background: "rgba(60,203,255,0.05)", borderRadius: 8, border: "1px solid rgba(60,203,255,0.1)" }}>
+                    <div style={{ fontWeight: 800, color: "#3CCBFF", fontSize: "0.66rem", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rating Scale</div>
+                    <span style={{ color: "#e0e0da" }}>Same as Valorant ranks — Iron 1 (300 pts) through Radiant (2700 pts). Each rank tier = 100 points.</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -427,6 +550,12 @@ export default function PlayerProfile() {
                   <div className="pp-matches">
                     {matchHistory.map((mh) => {
                       const isExpanded = expandedMatch === `${mh.tournamentId}-${mh.matchDocId}`;
+                      // Find rank history entries for this match
+                      const matchRh = rankHistory.filter(rh => rh.type === "match" && rh.matchId === mh.matchDocId && rh.tournamentId === mh.tournamentId);
+                      const matchTotalDelta = matchRh.reduce((sum, rh) => sum + rh.delta, 0);
+                      const matchRatingBefore = matchRh.length > 0 ? matchRh[matchRh.length - 1].ratingBefore : null;
+                      const matchRatingAfter = matchRh.length > 0 ? matchRh[0].ratingAfter : null;
+
                       return (
                         <div key={`${mh.tournamentId}-${mh.matchDocId}`} className="pp-match-card">
                           <div className="pp-match-header" onClick={() => setExpandedMatch(isExpanded ? null : `${mh.tournamentId}-${mh.matchDocId}`)}>
@@ -439,12 +568,22 @@ export default function PlayerProfile() {
                               <span className="pp-match-score">{mh.team1Score} - {mh.team2Score}</span>
                               <span className="pp-match-team">{mh.team2Name}</span>
                             </div>
+                            {matchRh.length > 0 && (
+                              <div style={{ textAlign: "right", minWidth: 70, marginRight: 4 }}>
+                                <div style={{ fontSize: "0.82rem", fontWeight: 800, color: matchTotalDelta > 0 ? "#4ade80" : matchTotalDelta < 0 ? "#f87171" : "#8A8880" }}>
+                                  {matchTotalDelta > 0 ? "+" : ""}{matchTotalDelta}
+                                </div>
+                                <div style={{ fontSize: "0.52rem", color: "#555550", fontWeight: 600 }}>{matchRatingBefore} &rarr; {matchRatingAfter}</div>
+                              </div>
+                            )}
                             <span className={`pp-match-expand ${isExpanded ? "open" : ""}`}>▼</span>
                           </div>
                           {isExpanded && (
                             <div className="pp-match-detail">
                               {mh.games.map(g => {
                                 const won = g.winner === g.playerTeam;
+                                // Find rank history for this specific game
+                                const gameRh = matchRh.find(rh => (rh as any).gameNum === g.gameNum);
                                 return (
                                   <div key={g.gameNum} className={`pp-game-row ${won ? "won" : "lost"}`}>
                                     <div className="pp-game-map">
@@ -457,6 +596,11 @@ export default function PlayerProfile() {
                                       <span className="pp-game-kda">{g.kills}/{g.deaths}/{g.assists}</span>
                                       <span className="pp-game-acs">ACS {g.acs}</span>
                                       <span className={`pp-game-result ${won ? "win" : "loss"}`}>{won ? "WIN" : "LOSS"}</span>
+                                      {gameRh && (
+                                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: gameRh.delta > 0 ? "#4ade80" : "#f87171", minWidth: 36, textAlign: "right" }}>
+                                          {gameRh.delta > 0 ? "+" : ""}{gameRh.delta}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 );

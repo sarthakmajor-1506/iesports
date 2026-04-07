@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
         riotAvatar: data.riotAvatar || "",
         riotRank: data.riotRank || "",
         riotTier: data.riotTier || 0,
+        iesportsRating: data.iesportsRating || 0,
         skillLevel: data.skillLevel || 1,
         riotPuuid: "", // will be filled from user doc
       };
@@ -101,8 +102,12 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Snake draft shuffle (by riotTier — highest rank first) ───────────────
-    const sorted = [...players].sort((a, b) => b.riotTier - a.riotTier);
+    // ── Snake draft shuffle (by iesportsRating — highest first, fallback to riotTier) ──
+    const sorted = [...players].sort((a, b) => {
+      const aRating = (a as any).iesportsRating || a.riotTier * 100;
+      const bRating = (b as any).iesportsRating || b.riotTier * 100;
+      return bRating - aRating;
+    });
 
     const teams: {
       teamIndex: number;
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
 
     for (const player of sorted) {
       teams[idx].members.push(player);
-      teams[idx].totalSkill += player.riotTier;
+      teams[idx].totalSkill += (player.iesportsRating || player.riotTier * 100);
 
       if (forward) {
         idx++;
