@@ -4,13 +4,8 @@
 // Uses Firebase Phone Auth (OTP) then calls /api/auth/verify-phone to save to Firestore
 
 import { useState, useRef } from "react";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  ConfirmationResult,
-  getAuth,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import type { ConfirmationResult } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 
 interface PhoneVerifyModalProps {
@@ -37,14 +32,15 @@ export default function PhoneVerifyModal({ onClose, onVerified }: PhoneVerifyMod
     setLoading(true);
 
     try {
+      const { auth, mod } = await getFirebaseAuth();
       if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(
+        window.recaptchaVerifier = new mod.RecaptchaVerifier(
           auth,
           recaptchaRef.current!,
           { size: "invisible" }
         );
       }
-      const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
+      const result = await mod.signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
       setConfirmation(result);
       setStep("otp");
     } catch (err: any) {

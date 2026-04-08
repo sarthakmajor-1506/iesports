@@ -4,14 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { doc, updateDoc, getDoc, getDocFromServer, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  PhoneAuthProvider,
-  linkWithCredential,
-  ConfirmationResult,
-} from "firebase/auth";
+import { db, getFirebaseAuth } from "@/lib/firebase";
+import type { ConfirmationResult } from "firebase/auth";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 
 const COUNTRIES = [
@@ -60,7 +54,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [phoneDone, setPhoneDone] = useState(false);
   const phoneRef = useRef<HTMLInputElement>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearRecaptcha = () => {
@@ -88,10 +82,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     try {
       setPhoneLoading(true); setPhoneError("");
       clearRecaptcha();
-      recaptchaRef.current = new RecaptchaVerifier(auth, "reg-recaptcha", {
+      const { auth, mod } = await getFirebaseAuth();
+      recaptchaRef.current = new mod.RecaptchaVerifier(auth, "reg-recaptcha", {
         size: "invisible", callback: () => {}, "expired-callback": () => { clearRecaptcha(); },
       });
-      const result: ConfirmationResult = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
+      const result: ConfirmationResult = await mod.signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
       setVerificationId(result.verificationId);
       setPhoneStep("otp"); startTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 150);
@@ -107,8 +102,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     if (!user) { setPhoneError("Not logged in. Please refresh."); return; }
     try {
       setPhoneLoading(true); setPhoneError("");
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-      await linkWithCredential(user, credential);
+      const { mod } = await getFirebaseAuth();
+      const credential = mod.PhoneAuthProvider.credential(verificationId, code);
+      await mod.linkWithCredential(user, credential);
       await updateDoc(doc(db, "users", user.uid), { phone: `${countryCode}${phoneNum.replace(/\D/g, "")}` });
       setPhoneDone(true);
       setShowPhoneOtp(false);

@@ -6,16 +6,9 @@ import DiscordAccountsPrompt from "./DiscordAccountsPrompt";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, getFirebaseAuth } from "@/lib/firebase";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  PhoneAuthProvider,
-  linkWithCredential,
-  ConfirmationResult,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import type { ConfirmationResult } from "firebase/auth";
 import Image from "next/image";
 
 const games = [
@@ -65,7 +58,7 @@ export default function Navbar() {
 
   const phoneRef     = useRef<HTMLInputElement>(null);
   const otpRefs      = useRef<(HTMLInputElement | null)[]>([]);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaRef = useRef<any>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
 
@@ -141,10 +134,11 @@ export default function Navbar() {
     try {
       setPhoneLoading(true); setPhoneError("");
       clearRecaptcha();
-      recaptchaRef.current = new RecaptchaVerifier(auth, "navbar-recaptcha", {
+      const { auth, mod } = await getFirebaseAuth();
+      recaptchaRef.current = new mod.RecaptchaVerifier(auth, "navbar-recaptcha", {
         size: "invisible", callback: () => {}, "expired-callback": () => { clearRecaptcha(); },
       });
-      const result: ConfirmationResult = await signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
+      const result: ConfirmationResult = await mod.signInWithPhoneNumber(auth, `${countryCode}${digits}`, recaptchaRef.current);
       setVerificationId(result.verificationId);
       setPhoneStep("otp"); startTimer();
       setTimeout(() => otpRefs.current[0]?.focus({ preventScroll: true }), 150);
@@ -160,8 +154,9 @@ export default function Navbar() {
     if (!user) { setPhoneError("Not logged in. Please refresh."); return; }
     try {
       setPhoneLoading(true); setPhoneError("");
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-      await linkWithCredential(user, credential);
+      const { mod } = await getFirebaseAuth();
+      const credential = mod.PhoneAuthProvider.credential(verificationId, code);
+      await mod.linkWithCredential(user, credential);
       await updateDoc(doc(db, "users", user.uid), { phone: `${countryCode}${phone.replace(/\D/g, "")}` });
       closePhoneModal();
     } catch (e: any) {

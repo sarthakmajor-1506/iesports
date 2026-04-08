@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import type { User } from "firebase/auth";
+import { db, getFirebaseAuth } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Shared helper to sync user state from Firestore
-  const syncUserData = async (u: User) => {
+  const syncUserData = useCallback(async (u: User) => {
     const snap = await getDoc(doc(db, "users", u.uid));
     const data = snap.data();
     const hasSteam = !!data?.steamId;
@@ -134,35 +134,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRegisteredSoloTournaments(new Set(data?.registeredSoloTournaments || []));
 
     return { hasSteam };
-  };
+  }, []);
 
   // Public method to re-read user data (after linking accounts etc.)
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!user) return;
     await syncUserData(user);
-  };
+  }, [user, syncUserData]);
 
+  // Firebase Auth is loaded DYNAMICALLY here — not at module level.
+  // This keeps the 90KB auth/iframe.js out of the initial JS bundle,
+  // so the landing page paints before Firebase Auth downloads.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
+    let unsubscribe: (() => void) | undefined;
 
-      if (u) {
-        await syncUserData(u);
-      } else {
-        setSteamLinked(false);
-        setDotaProfile(null);
-        setRiotData(null);
-        setUserProfile(null);
-        setDiscordConnections([]);
-        setRegisteredTournaments(new Set());
-        setRegisteredValorantTournaments(new Set());
-        setRegisteredSoloTournaments(new Set());
-      }
+    getFirebaseAuth().then(({ auth, mod }) => {
+      unsubscribe = mod.onAuthStateChanged(auth, async (u) => {
+        setUser(u);
 
-      setLoading(false);
+        if (u) {
+          await syncUserData(u);
+        } else {
+          setSteamLinked(false);
+          setDotaProfile(null);
+          setRiotData(null);
+          setUserProfile(null);
+          setDiscordConnections([]);
+          setRegisteredTournaments(new Set());
+          setRegisteredValorantTournaments(new Set());
+          setRegisteredSoloTournaments(new Set());
+        }
+
+        setLoading(false);
+      });
     });
 
-    return () => unsubscribe();
+    return () => unsubscribe?.();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -178,17 +185,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, steamLinked, pathname, router]);
 
-  const logout = async () => {
-    // Clear discord prompt dismissal so it shows fresh on next login
+  const logout = useCallback(async () => {
     if (user) {
       try { sessionStorage.removeItem(`discord_prompt_dismissed_${user.uid}`); } catch {}
     }
-    await signOut(auth);
+    const { auth, mod } = await getFirebaseAuth();
+    await mod.signOut(auth);
     router.push("/");
-  };
+  }, [user, router]);
 
   return (
-    
     <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, registeredTournaments, registeredValorantTournaments, registeredSoloTournaments, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>

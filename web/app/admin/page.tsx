@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
-import { getAuth } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export default function AdminPanel() {
     getDoc(doc(db, "users", user.uid)).then(snap => {
       const role = snap.data()?.role;
       if (role === "cafe_admin" || role === "super_admin") {
-        getAuth().currentUser?.getIdToken().then(token => {
+        getFirebaseAuth().then(({ auth }) => auth.currentUser?.getIdToken()).then(token => {
           if (token) {
             setAdminKey(token);
             setAdminRole(role);

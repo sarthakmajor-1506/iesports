@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithCustomToken } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { Suspense } from "react";
 
 function DiscordSuccessInner() {
@@ -16,7 +15,7 @@ function DiscordSuccessInner() {
       router.replace("/?error=discord_failed");
       return;
     }
-    signInWithCustomToken(auth, token)
+    getFirebaseAuth().then(({ auth, mod }) => mod.signInWithCustomToken(auth, token))
       .then((cred) => {
         // Clear discord prompt dismissal so it shows fresh after login
         try { sessionStorage.removeItem(`discord_prompt_dismissed_${cred.user.uid}`); } catch {}

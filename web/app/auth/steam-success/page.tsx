@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithCustomToken } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { Suspense } from "react";
 
 function SteamSuccessInner() {
@@ -16,7 +15,7 @@ function SteamSuccessInner() {
       router.replace("/?error=steam_failed");
       return;
     }
-    signInWithCustomToken(auth, token)
+    getFirebaseAuth().then(({ auth, mod }) => mod.signInWithCustomToken(auth, token))
       .then(() => {
         let dest = "/valorant";
         try {
