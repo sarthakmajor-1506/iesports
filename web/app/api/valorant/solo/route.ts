@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { recalcTiers } from "@/lib/recalcTiers";
 import { seedRating, floorCheck, ratingToRank, ratingToTier } from "@/lib/elo";
+import { sendRegistrationDM } from "@/lib/discord";
 
 const HENRIK_BASE = "https://api.henrikdev.xyz/valorant";
 
@@ -196,6 +197,23 @@ export async function POST(req: NextRequest) {
 
     // ── Recalculate tiers for all players based on quantiles ──────────────
     await recalcTiers(tournamentId);
+
+    // ── Send registration DM (fire-and-forget — never blocks registration) ──
+    const discordId = userData.discordId || (uid.startsWith("discord_") ? uid.replace("discord_", "") : "");
+    if (discordId) {
+      sendRegistrationDM({
+        discordId,
+        playerName: userData.riotGameName || userData.fullName || "Player",
+        tournamentName: tData.name || "Tournament",
+        tournamentId,
+        startDate: tData.startDate || "",
+        format: tData.format || "shuffle",
+        prizePool: tData.prizePool || "TBD",
+        slotsBooked: (tData.slotsBooked || 0) + 1,
+        totalSlots: tData.totalSlots || 0,
+        iesportsRank: ratingToRank(iesportsRating),
+      }).catch(() => {}); // never fail the registration
+    }
 
     return NextResponse.json({
       success: true,

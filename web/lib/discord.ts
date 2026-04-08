@@ -138,6 +138,52 @@ export async function sendTournamentComplete(opts: {
   return sendChannelMessage(channelId, message);
 }
 
+/** Send a registration confirmation DM to a player. Fire-and-forget — never fails the registration. */
+export async function sendRegistrationDM(opts: {
+  discordId: string;
+  playerName: string;
+  tournamentName: string;
+  tournamentId: string;
+  startDate: string;
+  format: string;
+  prizePool: string;
+  slotsBooked: number;
+  totalSlots: number;
+  iesportsRank: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const formatLabel = opts.format === "shuffle" ? "Shuffle (teams auto-drafted)"
+      : opts.format === "auction" ? "Auction (captain picks)"
+      : "Standard (pre-formed teams)";
+
+    const startFormatted = (() => {
+      try {
+        const d = new Date(opts.startDate);
+        return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+      } catch { return opts.startDate; }
+    })();
+
+    const slotsLeft = opts.totalSlots - opts.slotsBooked;
+
+    const message = [
+      `# You're in. Let's go. \n`,
+      `Hey **${opts.playerName}** — you just locked your spot in **${opts.tournamentName}**.\n`,
+      `> Your rank: **${opts.iesportsRank}**`,
+      `> Format: **${formatLabel}**`,
+      `> Prize Pool: **₹${opts.prizePool}**`,
+      `> Starts: **${startFormatted}**`,
+      `> Slots remaining: **${slotsLeft}** / ${opts.totalSlots}\n`,
+      `Bring your A-game. This is your shot.\n`,
+      `📎 **Tournament page:** https://iesports.in/valorant/tournament/${opts.tournamentId}`,
+      `\n— IEsports`,
+    ].join("\n");
+
+    return await sendDM(opts.discordId, message);
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+}
+
 /** Split a message into chunks that fit Discord's character limit. */
 function splitMessage(content: string, maxLength: number): string[] {
   if (content.length <= maxLength) return [content];
