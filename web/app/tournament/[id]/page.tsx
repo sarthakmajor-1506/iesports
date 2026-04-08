@@ -486,15 +486,12 @@ function DotaTournamentDetailInner() {
   }, [id]);
 
   // Real-time updates for logged-in users via onSnapshot
+  // Real-time updates — only tournament doc + players (for registration status)
   useEffect(() => {
     if (!id || !user) return;
     const unsubs: (() => void)[] = [];
     unsubs.push(onSnapshot(doc(db, "tournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); }));
     unsubs.push(onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }));
-    unsubs.push(onSnapshot(query(collection(db, "tournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
-    unsubs.push(onSnapshot(collection(db, "tournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }));
-    unsubs.push(onSnapshot(collection(db, "tournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }));
-    unsubs.push(onSnapshot(collection(db, "tournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0)); setLeaderboard(list); }));
     return () => unsubs.forEach(u => u());
   }, [id, user]);
 

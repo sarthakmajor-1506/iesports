@@ -160,13 +160,20 @@ export default function PlayerProfile() {
 
         if (d.registeredValorantTournaments?.length > 0) {
           const history: MatchHistoryItem[] = [];
-          for (const tId of d.registeredValorantTournaments.slice(0, 10)) {
+          // Fetch all tournaments in parallel instead of sequential loop
+          const tournamentIds = d.registeredValorantTournaments.slice(0, 10);
+          const tournamentResults = await Promise.all(tournamentIds.map(async (tId: string) => {
             try {
-              const tDoc = await getDoc(doc(db, "valorantTournaments", tId));
-              const tName = tDoc.exists() ? tDoc.data().name : tId;
-              const matchesSnap = await getDocs(
-                query(collection(db, "valorantTournaments", tId, "matches"), orderBy("matchDay"))
-              );
+              const [tDoc, matchesSnap] = await Promise.all([
+                getDoc(doc(db, "valorantTournaments", tId)),
+                getDocs(query(collection(db, "valorantTournaments", tId, "matches"), orderBy("matchDay"))),
+              ]);
+              return { tId, tName: tDoc.exists() ? tDoc.data().name : tId, matches: matchesSnap };
+            } catch { return null; }
+          }));
+          for (const result of tournamentResults) {
+            if (!result) continue;
+            const { tId, tName, matches: matchesSnap } = result;
               for (const mDoc of matchesSnap.docs) {
                 const m = mDoc.data();
                 if (m.status !== "completed" && m.status !== "live") continue;
@@ -207,7 +214,6 @@ export default function PlayerProfile() {
                   });
                 }
               }
-            } catch (e) { /* skip failed tournament */ }
           }
           history.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
           setMatchHistory(history);

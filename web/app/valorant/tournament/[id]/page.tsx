@@ -530,16 +530,13 @@ function ValorantTournamentDetailInner() {
       .catch(() => setTLoading(false));
   }, [id]);
 
-  // Real-time updates for logged-in users via onSnapshot
+  // Real-time updates — only tournament doc + soloPlayers (for registration status + slot count)
+  // Other data (teams, matches, standings, leaderboard) loaded via API and refreshed on tab switch
   useEffect(() => {
     if (!id || !user) return;
     const unsubs: (() => void)[] = [];
     unsubs.push(onSnapshot(doc(db, "valorantTournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); }));
     unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "soloPlayers"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); setIsRegistered(list.some((p: any) => p.uid === user.uid)); }));
-    unsubs.push(onSnapshot(query(collection(db, "valorantTournaments", id, "teams"), orderBy("teamIndex")), (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })))));
-    unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "standings"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); }); setStandings(list); }));
-    unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "matches"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); }); setMatches(list); }));
-    unsubs.push(onSnapshot(collection(db, "valorantTournaments", id, "leaderboard"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a: any, b: any) => { const kdA = a.kd || 0; const kdB = b.kd || 0; if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA; const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); return acsB - acsA; }); setLeaderboard(list); }));
     return () => unsubs.forEach(u => u());
   }, [id, user]);
 
