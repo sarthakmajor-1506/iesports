@@ -4,6 +4,8 @@ import {
   Events,
   TextChannel,
   Collection,
+  Partials,
+  ChannelType,
 } from "discord.js";
 import * as dotenv from "dotenv";
 import * as cron from "node-cron";
@@ -34,7 +36,9 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
   ],
+  partials: [Partials.Channel],
 });
 
 const commands = new Collection<string, any>();
@@ -70,6 +74,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 registerWelcomeEvent(client);
+
+// ─── DM Reply Forwarding ────────────────────────────────────
+// When someone replies to a bot DM, forward it to a channel so admins can see it.
+client.on(Events.MessageCreate, async (message) => {
+  // Only handle DMs, ignore bot's own messages
+  if (message.channel.type !== ChannelType.DM) return;
+  if (message.author.bot) return;
+
+  const forwardChannelId = process.env.DM_FORWARD_CHANNEL_ID || process.env.Valorant_lobby || process.env.LOBBY_CONTROL_CHANNEL_ID;
+  if (!forwardChannelId) return;
+
+  try {
+    const channel = await client.channels.fetch(forwardChannelId) as TextChannel;
+    if (!channel) return;
+
+    const content = message.content.length > 1800
+      ? message.content.slice(0, 1800) + "..."
+      : message.content;
+
+    await channel.send(
+      `📩 **DM from <@${message.author.id}>** (${message.author.tag}):\n> ${content.split("\n").join("\n> ")}`
+    );
+  } catch (err: any) {
+    console.error("[DM Forward]", err.message);
+  }
+});
 
 // ─── Ready ───────────────────────────────────────────────────
 
