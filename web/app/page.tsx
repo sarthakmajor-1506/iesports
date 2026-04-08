@@ -39,13 +39,9 @@ const HERO_IMAGES = [
   ];
 
 const SteamIcon = ({ size = 18 }: { size?: number }) => (
-  <img
-    src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
-    alt="Steam"
-    width={size}
-    height={size}
-    style={{ display: "block" }}
-  />
+  <svg width={size} height={size} viewBox="0 0 256 259" fill="currentColor" style={{ display: "block" }}>
+    <path d="M127.779 0C60.226 0 5.24 48.958.381 112.308l68.676 28.396c5.916-4.058 13.06-6.44 20.765-6.44 1.378 0 2.733.078 4.066.22l31.038-44.966v-.63c0-26.552 21.596-48.148 48.148-48.148s48.148 21.596 48.148 48.148-21.596 48.148-48.148 48.148h-1.103l-44.253 31.58c.032 1.014.086 2.02.086 3.05 0 22.147-17.47 40.238-39.437 41.252L61.78 226.624C76.672 245.373 100.837 258.092 127.779 258.092c70.588 0 127.779-57.191 127.779-127.779S198.367 0 127.779 0zM80.422 196.488l-16.918-6.99c3.033 6.313 8.269 11.549 15.26 14.482 15.112 6.348 32.546-.929 38.901-16.047 3.076-7.313 3.098-15.355.072-22.691-3.019-7.328-8.672-12.99-15.97-16.059-7.226-3.012-14.89-2.935-21.672-.409l17.496 7.24c11.142 4.676 16.398 17.579 11.723 28.728-4.683 11.158-17.587 16.42-28.893 11.746zm133.418-57.326c0-17.71-14.406-32.117-32.117-32.117-17.71 0-32.117 14.406-32.117 32.117 0 17.71 14.406 32.117 32.117 32.117 17.71 0 32.117-14.406 32.117-32.117zm-56.19.048c0-13.378 10.86-24.238 24.238-24.238 13.371 0 24.238 10.86 24.238 24.238 0 13.378-10.867 24.238-24.238 24.238-13.378 0-24.238-10.86-24.238-24.238z"/>
+  </svg>
 );
 
 export default function Home() {
@@ -176,9 +172,10 @@ export default function Home() {
 
         /* Hero */
         .ie-hero { position:relative; overflow:hidden; width:100%; min-height:580px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:80px 20px 60px; }
-        .ie-hero-bg-img { position:absolute; inset:-8%; width:116%; height:116%; object-fit:cover; object-position:center 20%; z-index:0; pointer-events:none; transition:opacity 1.2s ease-in-out; }
-        .ie-hero-bg-img.active { opacity:1; animation:ie-hero-kb 12s ease-in-out infinite alternate; }
-        .ie-hero-bg-img.inactive { opacity:0; animation:none; }
+        .ie-hero-bg-wrap { position:absolute; inset:-8%; width:116%; height:116%; z-index:0; pointer-events:none; transition:opacity 1.2s ease-in-out; }
+        .ie-hero-bg-wrap.active { opacity:1; animation:ie-hero-kb 12s ease-in-out infinite alternate; }
+        .ie-hero-bg-wrap.inactive { opacity:0; animation:none; }
+        .ie-hero-bg-wrap img { object-fit:cover; object-position:center 20%; }
         @keyframes ie-hero-kb { 0% { transform:scale(1) translate(0,0); } 50% { transform:scale(1.06) translate(-1.5%,-1%); } 100% { transform:scale(1.03) translate(1%,-0.5%); } }
         .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:none; }
         .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.82) 0%,rgba(0,0,0,.58) 45%,rgba(0,0,0,.9) 100%); }
@@ -335,13 +332,21 @@ export default function Home() {
       {/* HERO — rotating background images (video kept hidden for future use) */}
       <section className="ie-hero" id="home">
         {HERO_IMAGES.map((src, i) => (
-          <img
-            key={src}
-            className={`ie-hero-bg-img ${i === heroImageIndex ? "active" : "inactive"}`}
-            src={src}
-            alt=""
+          <div
+            key={src + i}
+            className={`ie-hero-bg-wrap ${i === heroImageIndex ? "active" : "inactive"}`}
             aria-hidden="true"
-          />
+          >
+            <Image
+              src={src}
+              alt=""
+              fill
+              sizes="100vw"
+              priority={i === 0}
+              loading={i === 0 ? "eager" : "lazy"}
+              quality={75}
+            />
+          </div>
         ))}
         {/* Video element kept for future use, hidden via CSS display:none */}
         {/* <video className="ie-hero-video" src="/Dota2teaser.mp4" autoPlay muted loop playsInline preload="auto" poster="/dota2-poster.jpg" aria-hidden="true" /> */}
