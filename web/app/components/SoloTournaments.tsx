@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
-import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getThreeWeeks, formatWeekLabel, getTimeUntilDeadline } from "@/lib/soloTournaments";
 import { SoloTournament } from "@/lib/types";
@@ -32,11 +32,10 @@ const SCORING_PILLS = [
 ];
 
 export default function SoloTournaments() {
-  const { user } = useAuth();
+  const { registeredSoloTournaments: registeredIds } = useAuth();
   const router   = useRouter();
 
   const [weeks,         setWeeks]         = useState<WeekGroup[]>([]);
-  const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
   const [countdown,     setCountdown]     = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -52,11 +51,6 @@ export default function SoloTournaments() {
     return () => unsub();
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const check = async () => { const snap = await getDoc(doc(db, "users", user.uid)); setRegisteredIds(new Set(snap.data()?.registeredSoloTournaments || [])); };
-    check(); window.addEventListener("focus", check); return () => window.removeEventListener("focus", check);
-  }, [user]);
 
   useEffect(() => {
     const tick = () => { const updated: Record<string, string> = {}; weeks.forEach((w) => { if (w.free) updated[w.free.id] = getTimeUntilDeadline(w.free.registrationDeadline); }); setCountdown(updated); };

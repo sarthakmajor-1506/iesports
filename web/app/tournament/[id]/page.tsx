@@ -922,7 +922,7 @@ function DotaTournamentDetailInner() {
 
         {/* ═══ HERO ═══ */}
         <div className="dtd-hero">
-          <img className="dtd-hero-bg" src={tournament.bannerImage || "/dota2poster3.png"} alt="" aria-hidden="true" />
+          <img className="dtd-hero-bg" src={tournament.bannerImage || "/dota2poster3.jpg"} alt="" aria-hidden="true" />
           <div className="dtd-hero-overlay" />
           <div className="dtd-hero-content">
             <div className="dtd-hero-inner">

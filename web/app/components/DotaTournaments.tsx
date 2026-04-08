@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Tournament } from "@/lib/types";
 
 export default function DotaTournaments() {
-  const { user } = useAuth();
+  const { registeredTournaments: registeredIds, refreshUser } = useAuth();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [tLoading, setTLoading] = useState(true);
-  const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/tournaments/list?game=dota2")
@@ -25,16 +22,10 @@ export default function DotaTournaments() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    const checkRegistrations = async () => {
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const data = snap.data();
-      setRegisteredIds(new Set(data?.registeredTournaments || []));
-    };
-    checkRegistrations();
-    window.addEventListener("focus", checkRegistrations);
-    return () => window.removeEventListener("focus", checkRegistrations);
-  }, [user]);
+    const onFocus = () => { refreshUser(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshUser]);
 
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
 

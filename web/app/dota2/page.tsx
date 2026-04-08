@@ -1,10 +1,13 @@
 "use client";
 import Navbar from "../components/Navbar";
 import DotaTournaments from "../components/DotaTournaments";
-import SoloTournaments from "../components/SoloTournaments";
-import DailyMatches from "../components/DailyMatches";
+import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { Trophy, Swords, Gamepad2 } from "lucide-react";
+import Image from "next/image";
+
+const SoloTournaments = dynamic(() => import("../components/SoloTournaments"), { ssr: false });
+const DailyMatches = dynamic(() => import("../components/DailyMatches"), { ssr: false });
 
 type DotaTab = "tournaments" | "solo" | "daily";
 
@@ -193,15 +196,18 @@ export default function Dota2() {
           <Navbar />
 
           <div className="d2-hero">
-            <img
+            <Image
               className="d2-hero-img"
-              src="/dota2poster3.png"
+              src="/dota2poster3.jpg"
               alt="Dota 2"
+              width={1920}
+              height={1080}
+              priority
               draggable={false}
             />
             <div className="d2-hero-overlay" />
             <div className={`d2-hero-content${mounted ? " show" : ""}`}>
-              <img className="d2-hero-logo" src="/dota2logo.png" alt="Dota 2" />
+              <Image className="d2-hero-logo" src="/dota2logo.png" alt="Dota 2" width={56} height={56} />
               <div className="d2-hero-text">
                 <div className="d2-hero-title">Dota 2 <span>Tournaments</span></div>
                 <div className="d2-hero-sub">

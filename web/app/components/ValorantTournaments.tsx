@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ValorantTournament } from "@/lib/types";
 
 export default function ValorantTournaments() {
-  const { user } = useAuth();
+  const { registeredValorantTournaments: registeredIds, refreshUser } = useAuth();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<ValorantTournament[]>([]);
   const [tLoading, setTLoading] = useState(true);
-  const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/tournaments/list?game=valorant")
@@ -25,16 +22,10 @@ export default function ValorantTournaments() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    const checkRegistrations = async () => {
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const data = snap.data();
-      setRegisteredIds(new Set(data?.registeredValorantTournaments || []));
-    };
-    checkRegistrations();
-    window.addEventListener("focus", checkRegistrations);
-    return () => window.removeEventListener("focus", checkRegistrations);
-  }, [user]);
+    const onFocus = () => { refreshUser(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshUser]);
 
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
 

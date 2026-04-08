@@ -32,9 +32,9 @@ const HOW_IT_WORKS = [
 ];
 
 const HERO_IMAGES = [
-  "/dota2poster3.png",
+  "/dota2poster3.jpg",
   "/valorantimg3.jpg",
-  "/dota2poster3.png",
+  "/dota2poster3.jpg",
   "/valorant-agents.jpg",
   ];
 
@@ -73,7 +73,6 @@ export default function Home() {
       try {
         const res = await fetch("/api/featured-tournaments");
         const data = await res.json();
-        console.log("[Landing] Featured tournaments API response:", data);
 
         if (data.dota) {
           setFeaturedTournament(data.dota as Tournament);

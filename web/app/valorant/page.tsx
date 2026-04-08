@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Trophy, Swords, Clock } from "lucide-react";
+import Image from "next/image";
 
 type ValorantTab = "tournaments" | "solo";
 
@@ -176,10 +177,10 @@ export default function Valorant() {
           <Navbar />
 
           <div className="val-hero">
-            <img className="val-hero-img" src="/valorantimg3.jpg" alt="Valorant" draggable={false} />
+            <Image className="val-hero-img" src="/valorantimg3.jpg" alt="Valorant" width={1920} height={1080} priority draggable={false} />
             <div className="val-hero-overlay" />
             <div className={`val-hero-content${mounted ? " show" : ""}`}>
-              <img className="val-hero-logo" src="/valorantlogo.png" alt="Valorant" />
+              <Image className="val-hero-logo" src="/valorantlogo.png" alt="Valorant" width={56} height={56} />
               <div className="val-hero-text">
                 <div className="val-hero-title">Valorant <span>Tournaments</span></div>
                 <div className="val-hero-sub">Rank-verified competitive play for Indian Valorant players</div>

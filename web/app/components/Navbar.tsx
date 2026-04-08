@@ -5,7 +5,7 @@ import DiscordAccountsPrompt from "./DiscordAccountsPrompt";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import {
@@ -34,8 +34,6 @@ const COUNTRIES = [
   { flag: "🇦🇺", code: "+61"  },
 ];
 
-const CACHE_KEY = "ie_user_data";
-
 const DiscordIcon = ({ size = 16, color = "currentColor" }: { size?: number; color?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.114 18.1.132 18.114a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
@@ -45,15 +43,12 @@ const DiscordIcon = ({ size = 16, color = "currentColor" }: { size?: number; col
 type PhoneStep = "phone" | "otp";
 
 export default function Navbar() {
-  const { user, logout, riotData, steamLinked, discordConnections } = useAuth();
+  const { user, logout, riotData, steamLinked, discordConnections, userProfile, dotaProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [steamData, setSteamData] = useState<any>(() => {
-    if (typeof window === "undefined") return null;
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch { return null; }
-  });
+  const steamData = userProfile;
   const [dropdownOpen,   setDropdownOpen]   = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -73,28 +68,6 @@ export default function Navbar() {
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      localStorage.removeItem(CACHE_KEY);
-      setSteamData(null);
-      return;
-    }
-    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setSteamData(data);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({
-            steamId: data.steamId, steamName: data.steamName, steamAvatar: data.steamAvatar,
-            discordId: data.discordId, discordUsername: data.discordUsername, phone: data.phone,
-            dotaRankTier: data.dotaRankTier, riotGameName: data.riotGameName, riotTagLine: data.riotTagLine,
-            riotAvatar: data.riotAvatar, riotVerified: data.riotVerified,
-          }));
-        } catch (_) {}
-      }
-    });
-    return () => unsub();
-  }, [user]);
 
   useEffect(() => {
     const discord = searchParams.get("discord");
@@ -128,11 +101,11 @@ export default function Navbar() {
   const discordUsername = steamData?.discordUsername || "";
   const hasPhone        = !!steamData?.phone;
   const hasSteam        = !!steamData?.steamId;
-  const riotStatus      = riotData?.riotVerified || (steamData?.riotGameName ? "pending" : "unlinked");
+  const riotStatus      = riotData?.riotVerified || (riotData?.riotGameName ? "pending" : "unlinked");
 
   // Best available profile photo: Steam > Riot > Discord (fallback to initial)
-  const profilePhoto = steamData?.steamAvatar || riotData?.riotAvatar || steamData?.riotAvatar || null;
-  const profileName = steamData?.steamName || riotData?.riotGameName || steamData?.riotGameName || steamData?.discordUsername || "User";
+  const profilePhoto = steamData?.steamAvatar || riotData?.riotAvatar || null;
+  const profileName = steamData?.steamName || riotData?.riotGameName || steamData?.discordUsername || "User";
 
   const clearRecaptcha = () => {
     try { recaptchaRef.current?.clear(); } catch (_) {}
@@ -493,7 +466,7 @@ export default function Navbar() {
           )}
         </div>
 
-        {pathname?.startsWith("/dota") && steamData?.steamId && (!steamData?.dotaRankTier || steamData?.dotaRankTier === 0) && (
+        {pathname?.startsWith("/dota") && steamData?.steamId && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0) && (
           <div className="ie-private-warning">
             <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
             <p><strong>Your Dota 2 profile is private.</strong> Enable <code>Expose Public Match Data</code> in Dota 2 → Settings → Social. Play one match. Changes take up to 24 hours.</p>

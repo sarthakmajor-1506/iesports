@@ -29,6 +29,8 @@ type UserProfile = {
   discordId: string;
   discordUsername: string;
   steamId: string;
+  steamName: string;
+  steamAvatar: string;
 };
 
 type DiscordConnection = {
@@ -46,6 +48,9 @@ type AuthContextType = {
   riotData: RiotData | null;
   userProfile: UserProfile | null;
   discordConnections: DiscordConnection[];
+  registeredTournaments: Set<string>;
+  registeredValorantTournaments: Set<string>;
+  registeredSoloTournaments: Set<string>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -58,6 +63,9 @@ const AuthContext = createContext<AuthContextType>({
   riotData: null,
   userProfile: null,
   discordConnections: [],
+  registeredTournaments: new Set(),
+  registeredValorantTournaments: new Set(),
+  registeredSoloTournaments: new Set(),
   refreshUser: async () => {},
   logout: async () => {},
 });
@@ -79,6 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [riotData, setRiotData] = useState<RiotData | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [discordConnections, setDiscordConnections] = useState<DiscordConnection[]>([]);
+  const [registeredTournaments, setRegisteredTournaments] = useState<Set<string>>(new Set());
+  const [registeredValorantTournaments, setRegisteredValorantTournaments] = useState<Set<string>>(new Set());
+  const [registeredSoloTournaments, setRegisteredSoloTournaments] = useState<Set<string>>(new Set());
   const router = useRouter();
   const pathname = usePathname();
 
@@ -102,6 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       discordId: data?.discordId || "",
       discordUsername: data?.discordUsername || "",
       steamId: data?.steamId || "",
+      steamName: data?.steamName || "",
+      steamAvatar: data?.steamAvatar || "",
     });
 
     const hasRiot = !!data?.riotGameName;
@@ -116,8 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     setDiscordConnections(data?.discordConnections || []);
+    setRegisteredTournaments(new Set(data?.registeredTournaments || []));
+    setRegisteredValorantTournaments(new Set(data?.registeredValorantTournaments || []));
+    setRegisteredSoloTournaments(new Set(data?.registeredSoloTournaments || []));
 
-    return { hasSteam, pathname };
+    return { hasSteam };
   };
 
   // Public method to re-read user data (after linking accounts etc.)
@@ -131,29 +147,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
 
       if (u) {
-        const { hasSteam } = await syncUserData(u);
-        // If user already has Steam linked and is on connect-steam, redirect to game page
-        if (hasSteam && pathname === "/connect-steam") {
-          router.push("/valorant");
-        }
+        await syncUserData(u);
       } else {
         setSteamLinked(false);
         setDotaProfile(null);
         setRiotData(null);
         setUserProfile(null);
         setDiscordConnections([]);
-        // Only redirect from pages that strictly require authentication
-        if (requiresAuth(pathname)) {
-          try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
-          router.push("/");
-        }
+        setRegisteredTournaments(new Set());
+        setRegisteredValorantTournaments(new Set());
+        setRegisteredSoloTournaments(new Set());
       }
 
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [pathname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Redirect logic — runs when auth state or pathname changes, no Firestore reads
+  useEffect(() => {
+    if (loading) return;
+    if (user && steamLinked && pathname === "/connect-steam") {
+      router.push("/valorant");
+    }
+    if (!user && requiresAuth(pathname)) {
+      try { sessionStorage.setItem("redirectAfterLogin", pathname + window.location.search); } catch {}
+      router.push("/");
+    }
+  }, [user, loading, steamLinked, pathname, router]);
 
   const logout = async () => {
     // Clear discord prompt dismissal so it shows fresh on next login
@@ -166,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     
-    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, refreshUser, logout }}>
+    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, registeredTournaments, registeredValorantTournaments, registeredSoloTournaments, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );
