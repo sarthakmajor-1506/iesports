@@ -232,7 +232,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         )}
                         <div style={{ textAlign: "center", maxWidth: 56 }}>
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
-                          {p.riotRank && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.riotRank}</div>}
+                          {(p.iesportsRank || p.riotRank) && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.iesportsRank || p.riotRank}</div>}
                         </div>
                       </div>
                       </a>
@@ -308,7 +308,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         )}
                         <div style={{ textAlign: "center", maxWidth: 56 }}>
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
-                          {p.riotRank && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.riotRank}</div>}
+                          {(p.iesportsRank || p.riotRank) && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.iesportsRank || p.riotRank}</div>}
                         </div>
                       </div>
                       </a>
@@ -1418,7 +1418,8 @@ function ValorantTournamentDetailInner() {
                   };
                   const grouped: Record<string, any[]> = {};
                   players.forEach((p: any) => {
-                    const baseRank = (p.riotRank || "").split(" ")[0];
+                    const displayRank = p.iesportsRank || p.riotRank || "Unranked";
+                    const baseRank = displayRank.split(" ")[0];
                     const key = rankOrder.includes(baseRank) ? baseRank : "Unranked";
                     if (!grouped[key]) grouped[key] = [];
                     grouped[key].push(p);
@@ -1428,7 +1429,7 @@ function ValorantTournamentDetailInner() {
                     <div className="vtd-tier-columns">
                       {sortedRanks.map((rank) => {
                         const colors = rankColors[rank];
-                        const rankPlayers = grouped[rank].sort((a: any, b: any) => (b.riotTier || 0) - (a.riotTier || 0));
+                        const rankPlayers = grouped[rank].sort((a: any, b: any) => (b.iesportsTier || b.riotTier || 0) - (a.iesportsTier || a.riotTier || 0));
                         return (
                           <div key={rank} className="vtd-tier-col">
                             <div className="vtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
@@ -1441,7 +1442,7 @@ function ValorantTournamentDetailInner() {
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
                                     <span className="vtd-tier-player-name">{p.riotGameName}</span>
-                                    <span className="vtd-tier-player-rank">{p.riotRank || "Unranked"}</span>
+                                    <span className="vtd-tier-player-rank">{p.iesportsRank || p.riotRank || "Unranked"}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1495,7 +1496,7 @@ function ValorantTournamentDetailInner() {
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="vtd-team-box-member">
                               {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
-                              <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}{m.riotTier ? ` (${m.riotTier})` : ""}</div></div>
+                              <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.iesportsRank || m.riotRank || "Unranked"}</div></div>
                             </div>
                           </Link>
                         ))}
@@ -1714,7 +1715,8 @@ function ValorantTournamentDetailInner() {
                       const playerRankMap: Record<string, { riotRank: string; riotTier: number; baseRank: string }> = {};
                       players.forEach((p: any) => {
                         if (p.riotPuuid || p.puuid) {
-                          playerRankMap[p.riotPuuid || p.puuid] = { riotRank: p.riotRank || "", riotTier: p.riotTier || 0, baseRank: (p.riotRank || "").split(" ")[0] };
+                          const displayRank = p.iesportsRank || p.riotRank || "";
+                          playerRankMap[p.riotPuuid || p.puuid] = { riotRank: displayRank, riotTier: p.iesportsTier || p.riotTier || 0, baseRank: displayRank.split(" ")[0] };
                         }
                       });
                       // Compute median tier to determine "lower rank" threshold

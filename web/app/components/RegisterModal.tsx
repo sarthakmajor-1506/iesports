@@ -138,7 +138,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   };
 
   const isValorant = game === "valorant";
-  const isShuffle = isValorant && tournament?.format === "shuffle";
+  const isShuffle = tournament?.format === "shuffle";
   const accentColor = isValorant ? "#3CCBFF" : "#f97316";
 
   const isProfilePrivate = !isValorant && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
