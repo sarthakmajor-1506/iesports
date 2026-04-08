@@ -82,7 +82,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.channel.type !== ChannelType.DM) return;
   if (message.author.bot) return;
 
-  const forwardChannelId = process.env.DM_FORWARD_CHANNEL_ID || process.env.Valorant_lobby || process.env.LOBBY_CONTROL_CHANNEL_ID;
+  const forwardChannelId = process.env.DM_FORWARD_CHANNEL_ID || "1491455654370742324";
   if (!forwardChannelId) return;
 
   try {
