@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyAdmin } from "@/lib/verifyAdmin";
 
 /**
  * POST /api/admin/create-tournament
@@ -23,11 +24,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { adminKey, game, tournamentId, ...fields } = body;
 
-    // ── Validate ──────────────────────────────────────────────────────────────
-    if (!adminKey) {
-      return NextResponse.json({ error: "Missing admin key" }, { status: 400 });
-    }
-    if (adminKey !== process.env.ADMIN_SECRET) {
+    // ── Auth — super admin or cafe admin ────────────────────────────────────
+    let admin;
+    try {
+      admin = await verifyAdmin(body);
+    } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     if (!game || !GAME_COLLECTIONS[game]) {
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       rules: fields.rules || [],
       desc: fields.desc || "",
       createdAt: new Date().toISOString(),
+      ...(admin.role === "cafe_admin" ? { ownerId: admin.uid } : {}),
     };
 
     // ── Schedule object (timeline info for players) ───────────────────────────

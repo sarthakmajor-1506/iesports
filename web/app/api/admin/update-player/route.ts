@@ -1,3 +1,4 @@
+import { isNotAdmin } from "@/lib/checkAdmin";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 

@@ -43,6 +43,16 @@ export async function GET(req: NextRequest) {
 
         if (linkUid) {
           // ── Linking Steam to an existing user (e.g. Discord-login user) ──
+          // Check if this Steam ID is already linked to another account
+          const existingSteam = await adminDb.collection("users")
+            .where("steamId", "==", steamId)
+            .limit(1)
+            .get();
+          if (!existingSteam.empty && existingSteam.docs[0].id !== linkUid) {
+            const ownerName = existingSteam.docs[0].data().discordUsername || existingSteam.docs[0].data().riotGameName || "another user";
+            resolve(NextResponse.redirect(`${realm}/connect-steam?error=${encodeURIComponent(`This Steam account is already linked to ${ownerName}. Each Steam account can only be used once.`)}`));
+            return;
+          }
           firebaseUid = linkUid;
           await adminDb.collection("users").doc(firebaseUid).set({
             steamId,

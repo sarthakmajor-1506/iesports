@@ -50,9 +50,12 @@ export type Team = {
   createdAt: Date;
 };
 
+export type AdminRole = "super_admin" | "cafe_admin";
+
 export type UserProfile = {
   uid: string;
   phone: string;
+  role?: AdminRole;
   steamId?: string;
   steamName?: string;
   steamAvatar?: string;
@@ -313,6 +316,7 @@ export interface ValorantTournament {
   dummyDataSeeded?: boolean;
   championTeamId?: string;
   championTeamName?: string;
+  ownerId?: string;             // uid of cafe admin who owns this tournament
 }
 
 

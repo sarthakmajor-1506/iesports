@@ -209,7 +209,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                   {row.map((p: any, pi: number) => {
                     const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
                     return (
-                      <a key={pi} href={p.uid ? `/player/${p.uid}` : undefined} style={{ textDecoration: "none", color: "inherit", cursor: p.uid ? "pointer" : "default" }}>
+                      <a key={pi} href={p.uid ? `/player/${p.uid}?tab=valorant` : undefined} style={{ textDecoration: "none", color: "inherit", cursor: p.uid ? "pointer" : "default" }}>
                       <div className="vtd-fighter-card" style={{
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                         animation: `vtd-player-reveal 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
@@ -285,7 +285,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                   {row.map((p: any, pi: number) => {
                     const idx = ri === 0 ? pi : ri === 1 ? 2 + pi : 4;
                     return (
-                      <a key={pi} href={p.uid ? `/player/${p.uid}` : undefined} style={{ textDecoration: "none", color: "inherit", cursor: p.uid ? "pointer" : "default" }}>
+                      <a key={pi} href={p.uid ? `/player/${p.uid}?tab=valorant` : undefined} style={{ textDecoration: "none", color: "inherit", cursor: p.uid ? "pointer" : "default" }}>
                       <div className="vtd-fighter-card" style={{
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                         animation: `vtd-player-reveal-right 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
@@ -1237,7 +1237,7 @@ function ValorantTournamentDetailInner() {
               {championMembers.length > 0 && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                   {championMembers.map((p: any, i: number) => (
-                    <div key={i} onClick={() => { if (p.uid) router.push(`/player/${p.uid}`); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, padding: "4px 12px 4px 4px", cursor: p.uid ? "pointer" : "default" }}>
+                    <div key={i} onClick={() => { if (p.uid) router.push(`/player/${p.uid}?tab=valorant`); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 100, padding: "4px 12px 4px 4px", cursor: p.uid ? "pointer" : "default" }}>
                       {p.riotAvatar ? (
                         <img src={p.riotAvatar} alt="" style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid rgba(255,215,0,0.3)" }} />
                       ) : (
@@ -1439,7 +1439,7 @@ function ValorantTournamentDetailInner() {
                               <span className="vtd-tier-header-count">{rankPlayers.length}</span>
                             </div>
                             {rankPlayers.map((p: any, pi: number) => (
-                              <div key={p.uid} onClick={() => router.push(`/player/${p.uid}`)} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
+                              <div key={p.uid} onClick={() => router.push(`/player/${p.uid}?tab=valorant`)} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
                                 <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s` }}>
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
@@ -1495,7 +1495,7 @@ function ValorantTournamentDetailInner() {
                       </div>
                       <div className="vtd-team-box-members">
                         {(team.members || []).map((m: any, i: number) => (
-                          <Link key={m.uid || i} href={`/player/${m.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                          <Link key={m.uid || i} href={`/player/${m.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="vtd-team-box-member">
                               {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
                               <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.riotRank}{m.riotTier ? ` (${m.riotTier})` : ""}</div></div>
@@ -1765,7 +1765,7 @@ function ValorantTournamentDetailInner() {
                         return (
                         <tr key={p.id} style={rowBg}>
                           <td style={{ fontWeight: 800, color: rank === 1 ? "#f59e0b" : rank <= 3 ? "#3CCBFF" : "#555550" }}>{rank === 1 ? "\u{1F451}" : rank === 2 ? "\u{1F948}" : rank === 3 ? "\u{1F949}" : rank}</td>
-                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
+                          <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isUnderdog && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(74,222,128,0.15)", color: "#6fcf8a", border: "1px solid rgba(74,222,128,0.3)" }}>UNDERDOG</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
                           <td><span style={{ fontSize: "0.68rem", fontWeight: 700, color: rColor, padding: "2px 6px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></td>
                           <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
                           <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
@@ -1987,7 +1987,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
               <img src={mvpAgentIcon} alt={mvp.name || mvp.agent} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2.5px solid rgba(245,158,11,0.5)", boxShadow: "0 0 16px rgba(245,158,11,0.25), 0 4px 12px rgba(0,0,0,0.4)", display: "block", margin: "0 auto 6px" }} />
             ) : (
               <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, #f59e0b, #d97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: 900, color: "#fff", border: "2.5px solid rgba(245,158,11,0.5)", boxShadow: "0 0 16px rgba(245,158,11,0.25)", margin: "0 auto 6px" }}>{(mvp.name || "?")[0]}</div>
-            ); return mvpUid ? <a href={`/player/${mvpUid}`} style={{ textDecoration: "none" }}>{avatarEl}</a> : avatarEl; })()}
+            ); return mvpUid ? <a href={`/player/${mvpUid}?tab=valorant`} style={{ textDecoration: "none" }}>{avatarEl}</a> : avatarEl; })()}
             <div style={{ fontSize: "0.54rem", fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#f59e0b", marginBottom: 4 }}>GAME MVP</div>
             <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#F0EEEA", textShadow: "0 0 14px rgba(245,158,11,0.35)", marginBottom: 2, lineHeight: 1.2 }}>{mvp.name || "Unknown"}</div>
             <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#8A8880", marginBottom: 8 }}>{mvp.agent || ""}</div>
@@ -2020,7 +2020,7 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
                   <img src={secAgentIcon} alt={second.name || second.agent} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(192,192,192,0.35)", boxShadow: "0 0 8px rgba(192,192,192,0.15)", flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #9ca3af, #6b7280)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 900, color: "#fff", border: "2px solid rgba(192,192,192,0.35)", flexShrink: 0 }}>{(second.name || "?")[0]}</div>
-                ); return secUid ? <a href={`/player/${secUid}`} style={{ textDecoration: "none", flexShrink: 0 }}>{secEl}</a> : secEl; })()}
+                ); return secUid ? <a href={`/player/${secUid}?tab=valorant`} style={{ textDecoration: "none", flexShrink: 0 }}>{secEl}</a> : secEl; })()}
                 <div style={{ textAlign: "left" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 1 }}>
                     <span style={{ fontSize: "0.9rem", filter: "drop-shadow(0 0 4px rgba(192,192,192,0.4))" }}>🥈</span>

@@ -1,3 +1,4 @@
+import { isNotAdmin } from "@/lib/checkAdmin";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
     if (!tournamentId || !adminKey || !matchDocId) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
-    if (adminKey !== process.env.ADMIN_SECRET) {
+    if (await isNotAdmin(adminKey)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

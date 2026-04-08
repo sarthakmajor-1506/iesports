@@ -41,6 +41,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       steamName: d.steamName || null,
       steamId: d.steamId || null,
       steamAvatar: d.steamAvatar || null,
+      dotaRankTier: d.dotaRankTier || null,
+      dotaBracket: d.dotaBracket || null,
+      dotaMMR: d.dotaMMR || null,
       phone: d.phone ? "redacted" : null,   // never expose raw phone to public
       upiId: null,                           // never expose UPI publicly
       personalPhoto: d.personalPhoto || null,

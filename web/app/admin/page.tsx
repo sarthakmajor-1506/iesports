@@ -5,6 +5,8 @@ import Navbar from "@/app/components/Navbar";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { useAuth } from "@/app/context/AuthContext";
+import { getAuth } from "firebase/auth";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -13,7 +15,7 @@ interface TeamData { id: string; teamName: string; teamIndex: number; members: a
 interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
 interface DiscordConnection { type: string; name: string; id: string; verified: boolean; }
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
-interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; }
+interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
 
 type AdminTab = "tournament" | "players" | "create";
 
@@ -50,11 +52,37 @@ const toISTISOString = (val: string): string => {
 };
 
 export default function AdminPanel() {
+  const { user } = useAuth();
+
   // ─── Auth ───────────────────────────────────────────────────────────────────
   const [adminKey, setAdminKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [adminRole, setAdminRole] = useState<"super_admin" | "cafe_admin" | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
+  const isSuperAdmin = adminRole === "super_admin";
+  const isCafeAdmin = adminRole === "cafe_admin";
+
+  // Auto-detect cafe admin role from user doc
+  useEffect(() => {
+    if (!user) { setRoleChecked(true); return; }
+    getDoc(doc(db, "users", user.uid)).then(snap => {
+      const role = snap.data()?.role;
+      if (role === "cafe_admin" || role === "super_admin") {
+        getAuth().currentUser?.getIdToken().then(token => {
+          if (token) {
+            setAdminKey(token);
+            setAdminRole(role);
+            setAuthenticated(true);
+          }
+          setRoleChecked(true);
+        });
+      } else {
+        setRoleChecked(true);
+      }
+    }).catch(() => { setRoleChecked(true); });
+  }, [user]);
 
   const handleAdminAuth = async () => {
     if (!adminKey) return;
@@ -68,6 +96,7 @@ export default function AdminPanel() {
       });
       if (res.ok) {
         setAuthenticated(true);
+        setAdminRole("super_admin"); // secret key = super admin
       } else {
         setAuthError("Wrong password. Access denied.");
       }
@@ -345,53 +374,64 @@ export default function AdminPanel() {
   // ─── Fetch tournaments ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!authenticated) return;
+    const cafeUid = adminRole === "cafe_admin" && user ? user.uid : null;
+
+    const mapTournament = (d: any, prefix: string) => ({
+      id: d.id,
+      name: `${prefix} ${d.data?.().name || d.name || d.id}`,
+      status: d.data?.().status || d.status || "upcoming",
+      teamCount: d.data?.().teamCount || d.teamCount,
+      slotsBooked: d.data?.().slotsBooked || d.slotsBooked,
+      totalSlots: d.data?.().totalSlots || d.totalSlots,
+      matchesPerRound: d.data?.().matchesPerRound || d.matchesPerRound,
+      bracketBestOf: d.data?.().bracketBestOf || d.bracketBestOf,
+      grandFinalBestOf: d.data?.().grandFinalBestOf || d.grandFinalBestOf,
+      lbFinalBestOf: d.data?.().lbFinalBestOf || d.lbFinalBestOf,
+      bracketFormat: d.data?.().bracketFormat || d.bracketFormat,
+      bracketTeamCount: d.data?.().bracketTeamCount || d.bracketTeamCount,
+      groupStageRounds: d.data?.().groupStageRounds || d.groupStageRounds,
+    });
+
+    // Try onSnapshot first (works when Firebase user is authenticated)
+    let snapshotWorked = false;
     const unsub1 = onSnapshot(collection(db, "valorantTournaments"), (snap) => {
-      const valAll = snap.docs.map(d => ({
-        id: d.id,
-        name: `[VAL] ${d.data().name || d.id}`,
-        status: d.data().status || "upcoming",
-        teamCount: d.data().teamCount,
-        slotsBooked: d.data().slotsBooked,
-        totalSlots: d.data().totalSlots,
-        matchesPerRound: d.data().matchesPerRound,
-        bracketBestOf: d.data().bracketBestOf,
-        grandFinalBestOf: d.data().grandFinalBestOf,
-        lbFinalBestOf: d.data().lbFinalBestOf,
-        bracketFormat: d.data().bracketFormat,
-        bracketTeamCount: d.data().bracketTeamCount,
-        groupStageRounds: d.data().groupStageRounds,
-      }));
+      snapshotWorked = true;
+      const valAll = snap.docs
+        .filter(d => !cafeUid || d.data().ownerId === cafeUid)
+        .map(d => mapTournament(d, "[VAL]"));
       setTournaments(prev => {
         const dota = prev.filter(t => t.name.startsWith("[DOTA2]"));
-        const merged = [...valAll, ...dota].sort((a, b) => a.name.localeCompare(b.name));
-        return merged;
+        return [...valAll, ...dota].sort((a, b) => a.name.localeCompare(b.name));
       });
+    }, () => {
+      // onSnapshot failed (no Firebase auth) — fallback to API
+      if (!snapshotWorked) {
+        fetch("/api/admin/list-tournaments", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminKey }),
+        }).then(r => r.json()).then(data => {
+          if (data.tournaments) {
+            const mapped = data.tournaments.map((t: any) => ({
+              id: t.id, name: `[${t.game === "dota2" ? "DOTA2" : "VAL"}] ${t.name}`,
+              status: t.status, slotsBooked: t.slotsBooked, totalSlots: t.totalSlots,
+            }));
+            setTournaments(mapped);
+          }
+        }).catch(() => {});
+      }
     });
     const unsub2 = onSnapshot(collection(db, "tournaments"), (snap) => {
-      const dotaAll = snap.docs.map(d => ({
-        id: d.id,
-        name: `[DOTA2] ${d.data().name || d.id}`,
-        status: d.data().status || "upcoming",
-        teamCount: d.data().teamCount,
-        slotsBooked: d.data().slotsBooked,
-        totalSlots: d.data().totalSlots,
-        matchesPerRound: d.data().matchesPerRound,
-        bracketBestOf: d.data().bracketBestOf,
-        grandFinalBestOf: d.data().grandFinalBestOf,
-        lbFinalBestOf: d.data().lbFinalBestOf,
-        bracketFormat: d.data().bracketFormat,
-        bracketTeamCount: d.data().bracketTeamCount,
-        groupStageRounds: d.data().groupStageRounds,
-      }));
+      const dotaAll = snap.docs
+        .filter(d => !cafeUid || d.data().ownerId === cafeUid)
+        .map(d => mapTournament(d, "[DOTA2]"));
       setTournaments(prev => {
         const val = prev.filter(t => t.name.startsWith("[VAL]"));
-        const merged = [...val, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
-        return merged;
+        return [...val, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
       });
       setTournamentId(prev => prev || "");
-    });
+    }, () => { /* fallback handled above */ });
     return () => { unsub1(); unsub2(); };
-  }, [authenticated]);
+  }, [authenticated, adminRole]);
 
   // ─── Determine collection for selected tournament ────────────────────────────
   const getSelectedCollection = (): string => {
@@ -421,24 +461,45 @@ export default function AdminPanel() {
     return () => { unsub1(); unsub2(); };
   }, [tournamentId, authenticated]);
 
-  // ─── Fetch all players ──────────────────────────────────────────────────────
+  // ─── Fetch players ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authenticated || activeTab !== "players") return;
     let cancelled = false;
     const fetchPlayers = async () => {
       try {
-        const res = await fetch("/api/valorant/list-users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ adminKey }),
-        });
-        const data = await res.json();
-        if (!cancelled && data.users) setAllPlayers(data.users);
+        if (isCafeAdmin && tournaments.length > 0) {
+          // Cafe admin: fetch all users via API then filter to tournament registrants
+          const res = await fetch("/api/valorant/list-users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adminKey }),
+          });
+          const data = await res.json();
+          if (!cancelled && data.users) {
+            // Filter to only players registered in cafe admin's tournaments
+            const ownedTournamentIds = new Set(tournaments.map(t => t.id));
+            const filtered = data.users.filter((p: PlayerData) => {
+              const regVal = p.registeredValorantTournaments || [];
+              const regDota = p.registeredTournaments || [];
+              return [...regVal, ...regDota].some(tId => ownedTournamentIds.has(tId));
+            });
+            setAllPlayers(filtered);
+          }
+        } else if (!isCafeAdmin) {
+          // Super admin: fetch all users
+          const res = await fetch("/api/valorant/list-users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adminKey }),
+          });
+          const data = await res.json();
+          if (!cancelled && data.users) setAllPlayers(data.users);
+        }
       } catch (e) { console.error("Failed to fetch players:", e); }
     };
     fetchPlayers();
     return () => { cancelled = true; };
-  }, [authenticated, activeTab, adminKey]);
+  }, [authenticated, activeTab, adminKey, isCafeAdmin, tournaments]);
 
   // ─── Fetch all tournaments ──────────────────────────────────────────────────
   const fetchAllTournaments = useCallback(async () => {
@@ -609,6 +670,8 @@ export default function AdminPanel() {
   };
 
   const filteredTournaments = allTournaments.filter(t => {
+    // Cafe admin only sees their own tournaments
+    if (isCafeAdmin && user && t.ownerId !== user.uid) return false;
     if (createFilterGame === "all") return true;
     return t.game === createFilterGame;
   });
@@ -789,17 +852,23 @@ export default function AdminPanel() {
         <div className="admin-login">
           <div className="admin-login-box">
             <h1 style={{ fontSize: "1.4rem", fontWeight: 900, marginBottom: 8, color: "#f0f0f0" }}>Admin Panel</h1>
-            <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: 24 }}>Enter the admin key to access tournament management.</p>
-            <input type="password" placeholder="Admin Key" value={adminKey}
-              onChange={e => { setAdminKey(e.target.value); setAuthError(""); }}
-              onKeyDown={e => { if (e.key === "Enter" && adminKey) handleAdminAuth(); }}
-              style={{ width: "100%", padding: 12, border: `1.5px solid ${authError ? "#dc2626" : "#2a2a2e"}`, borderRadius: 10, fontSize: "0.95rem", marginBottom: 4, outline: "none", boxSizing: "border-box", background: "#1a1a1e", color: "#e0e0e0", transition: "border-color 0.2s" }}
-            />
-            {authError && <p style={{ fontSize: "0.8rem", color: "#f87171", marginBottom: 8, textAlign: "left" }}>{authError}</p>}
-            <button onClick={handleAdminAuth} disabled={authLoading}
-              style={{ width: "100%", padding: 12, background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: authLoading ? "default" : "pointer", opacity: authLoading ? 0.6 : 1, marginTop: 8 }}>
-              {authLoading ? "Verifying..." : "Authenticate →"}
-            </button>
+            {user && !roleChecked ? (
+              <p style={{ fontSize: "0.85rem", color: "#3CCBFF", marginBottom: 24 }}>Checking admin access...</p>
+            ) : (
+              <>
+                <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: 24 }}>Enter the admin key to access tournament management.</p>
+                <input type="password" placeholder="Admin Key" value={adminKey}
+                  onChange={e => { setAdminKey(e.target.value); setAuthError(""); }}
+                  onKeyDown={e => { if (e.key === "Enter" && adminKey) handleAdminAuth(); }}
+                  style={{ width: "100%", padding: 12, border: `1.5px solid ${authError ? "#dc2626" : "#2a2a2e"}`, borderRadius: 10, fontSize: "0.95rem", marginBottom: 4, outline: "none", boxSizing: "border-box", background: "#1a1a1e", color: "#e0e0e0", transition: "border-color 0.2s" }}
+                />
+                {authError && <p style={{ fontSize: "0.8rem", color: "#d07070", marginBottom: 8, textAlign: "left" }}>{authError}</p>}
+                <button onClick={handleAdminAuth} disabled={authLoading}
+                  style={{ width: "100%", padding: 12, background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.95rem", cursor: authLoading ? "default" : "pointer", opacity: authLoading ? 0.6 : 1, marginTop: 8 }}>
+                  {authLoading ? "Verifying..." : "Authenticate →"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </>
@@ -878,8 +947,18 @@ export default function AdminPanel() {
       <div className="adm-page">
         <Navbar />
         <div className="adm-content">
-          <h1 style={{ fontSize: "1.4rem", fontWeight: 900, marginBottom: 4, color: "#f0f0f0" }}>Tournament Admin</h1>
-          <p style={{ fontSize: "0.82rem", color: "#666", marginBottom: 20 }}>Manage your esports tournaments</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+            <h1 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#f0f0f0", margin: 0 }}>Tournament Admin</h1>
+            <span style={{
+              fontSize: "0.58rem", fontWeight: 800, padding: "3px 10px", borderRadius: 100, letterSpacing: "0.08em",
+              background: isSuperAdmin ? "rgba(60,203,255,0.12)" : "rgba(251,146,60,0.12)",
+              color: isSuperAdmin ? "#3CCBFF" : "#fb923c",
+              border: `1px solid ${isSuperAdmin ? "rgba(60,203,255,0.3)" : "rgba(251,146,60,0.3)"}`,
+            }}>{isSuperAdmin ? "SUPER ADMIN" : "CAFE ADMIN"}</span>
+          </div>
+          <p style={{ fontSize: "0.82rem", color: "#666", marginBottom: 20 }}>
+            {isCafeAdmin ? "Manage your tournaments" : "Manage all esports tournaments"}
+          </p>
 
           {/* ═══ TAB BAR ═══ */}
           <div className="adm-tab-bar">
@@ -1971,23 +2050,25 @@ export default function AdminPanel() {
                                 </div>
                               ))}
                             </div>
-                            {/* ── IEsports Rating Adjustment ── */}
+                            {/* ── IEsports Rating ── */}
                             <div style={{ marginTop: 14, padding: 12, background: "rgba(60,203,255,0.04)", border: "1px solid rgba(60,203,255,0.15)", borderRadius: 8 }}>
                               <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#3CCBFF", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>IEsports Rating</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isSuperAdmin ? 10 : 0 }}>
                                 <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#F0EEEA" }}>{(p as any).iesportsRating || "Not seeded"}</span>
                                 <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>{(p as any).iesportsRank || ""}</span>
                               </div>
-                              <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-                                <input type="number" placeholder="+/- points" value={ratingDelta} onChange={e => setRatingDelta(e.target.value)}
-                                  style={{ width: 100, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
-                                <input placeholder="Reason (visible to player)" value={ratingNote} onChange={e => setRatingNote(e.target.value)}
-                                  style={{ flex: 1, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
-                                <button onClick={() => adjustRating(p.uid)} disabled={ratingAdjusting || !ratingDelta}
-                                  style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: ratingDelta && parseInt(ratingDelta) > 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.15)", color: ratingDelta && parseInt(ratingDelta) > 0 ? "#4ade80" : "#f87171", fontSize: "0.72rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                                  {ratingAdjusting ? "..." : "Adjust"}
-                                </button>
-                              </div>
+                              {isSuperAdmin && (
+                                <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                                  <input type="number" placeholder="+/- points" value={ratingDelta} onChange={e => setRatingDelta(e.target.value)}
+                                    style={{ width: 100, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
+                                  <input placeholder="Reason (visible to player)" value={ratingNote} onChange={e => setRatingNote(e.target.value)}
+                                    style={{ flex: 1, padding: "6px 10px", background: "#111114", border: "1px solid #2a2a2e", borderRadius: 6, color: "#e0e0e0", fontSize: "0.76rem", fontFamily: "inherit", outline: "none" }} />
+                                  <button onClick={() => adjustRating(p.uid)} disabled={ratingAdjusting || !ratingDelta}
+                                    style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: ratingDelta && parseInt(ratingDelta) > 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.15)", color: ratingDelta && parseInt(ratingDelta) > 0 ? "#6fcf8a" : "#d07070", fontSize: "0.72rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                                    {ratingAdjusting ? "..." : "Adjust"}
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -2003,10 +2084,12 @@ export default function AdminPanel() {
                           </div>
                         ) : (
                           <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
-                            <button onClick={() => startEditPlayer(p)}
-                              style={{ padding: "6px 16px", borderRadius: 8, border: "1px solid #3B82F6", background: "rgba(59,130,246,0.1)", color: "#3B82F6", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                              Edit Profile
-                            </button>
+                            {isSuperAdmin && (
+                              <button onClick={() => startEditPlayer(p)}
+                                style={{ padding: "6px 16px", borderRadius: 8, border: "1px solid #3B82F6", background: "rgba(59,130,246,0.1)", color: "#3B82F6", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                Edit Profile
+                              </button>
+                            )}
                             <a href={`/player/${p.uid}`} target="_blank" rel="noopener noreferrer"
                               style={{ fontSize: "0.72rem", color: "#888", fontWeight: 600, textDecoration: "none" }}>
                               View Public Profile &rarr;

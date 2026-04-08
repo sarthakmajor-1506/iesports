@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar, { triggerPhoneModal } from "@/app/components/Navbar";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -40,6 +40,7 @@ interface UserProfile {
   discordUsername?: string; discordId?: string;
   discordConnections?: DiscordConnection[];
   steamName?: string; steamId?: string; steamAvatar?: string;
+  dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number;
   phone?: string; upiId?: string; displayName?: string; personalPhoto?: string;
 }
 
@@ -77,6 +78,7 @@ interface MatchHistoryItem {
 export default function PlayerProfile() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const uid = params.uid as string;
   const { user, steamLinked, riotData: authRiotData, discordConnections } = useAuth();
   const isOwnProfile = !!user && user.uid === uid;
@@ -86,7 +88,9 @@ export default function PlayerProfile() {
   const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
   const [rankHistory, setRankHistory] = useState<RankHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ProfileTab>(isOwnProfile ? "account" : "valorant");
+  // Default tab: from URL ?tab=, else own profile → account, else valorant
+  const urlTab = searchParams.get("tab") as ProfileTab | null;
+  const [activeTab, setActiveTab] = useState<ProfileTab>(urlTab || (isOwnProfile ? "account" : "valorant"));
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
   // UPI state
@@ -131,6 +135,7 @@ export default function PlayerProfile() {
           iesportsTier: d.iesportsTier, iesportsMatchesPlayed: d.iesportsMatchesPlayed,
           discordUsername: d.discordUsername, discordId: d.discordId, discordConnections: d.discordConnections,
           steamName: d.steamName, steamId: d.steamId, steamAvatar: d.steamAvatar,
+          dotaRankTier: d.dotaRankTier, dotaBracket: d.dotaBracket, dotaMMR: d.dotaMMR,
           phone: d.phone, upiId: undefined, // loaded separately for owner only
           displayName: d.displayName,
           personalPhoto: d.personalPhoto,
@@ -332,19 +337,46 @@ export default function PlayerProfile() {
             </button>
           </div>
 
-          {/* ═══ HEADER ═══ */}
+          {/* ═══ TAB BAR (master tabs) ═══ */}
+          <div className="pp-tab-bar" style={{ marginBottom: 20 }}>
+            <button className={`pp-tab ${activeTab === "valorant" ? "active" : ""}`} onClick={() => setActiveTab("valorant")}>Valorant</button>
+            <button className={`pp-tab ${activeTab === "dota" ? "active" : ""}`} onClick={() => setActiveTab("dota")}>Dota 2</button>
+            {isOwnProfile && (
+              <button className={`pp-tab pp-tab-private ${activeTab === "account" ? "active" : ""}`} onClick={() => setActiveTab("account")}>
+                My Account
+              </button>
+            )}
+          </div>
+
+          {/* ═══ HEADER — changes per tab ═══ */}
           <div className="pp-header">
             <div className="pp-header-left">
-              {profile.riotAvatar ? (
-                <img src={profile.riotAvatar} alt={displayName} className="pp-avatar" />
+              {activeTab === "valorant" ? (
+                profile.riotAvatar ? (
+                  <img src={profile.riotAvatar} alt={displayName} className="pp-avatar" />
+                ) : profile.discordId ? (
+                  <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)" }}>{(profile.discordUsername || displayName)[0]?.toUpperCase()}</div>
+                ) : (
+                  <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
+                )
+              ) : activeTab === "dota" ? (
+                profile.steamAvatar ? (
+                  <img src={profile.steamAvatar} alt={profile.steamName || displayName} className="pp-avatar" />
+                ) : (
+                  <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #1b2838 0%, #2a475e 100%)" }}>{(profile.steamName || displayName)[0]?.toUpperCase()}</div>
+                )
               ) : (
-                <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
+                profile.personalPhoto ? (
+                  <img src={profile.personalPhoto} alt={displayName} className="pp-avatar" />
+                ) : (
+                  <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
+                )
               )}
               <div className="pp-header-info">
                 <h1 className="pp-name">
-                  {displayName}{displayTag && <span className="pp-tag">#{displayTag}</span>}
+                  {activeTab === "valorant" ? (profile.riotGameName || profile.discordUsername || displayName) : activeTab === "dota" ? (profile.steamName || profile.discordUsername || displayName) : (profile.fullName || displayName)}
                 </h1>
-                {profile.iesportsRank ? (
+                {activeTab === "valorant" && profile.iesportsRank ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
                     <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#3CCBFF" }}>{profile.iesportsRank}</span>
                     <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#555550", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: 100, letterSpacing: "0.04em" }}>iE RANK</span>
@@ -352,38 +384,69 @@ export default function PlayerProfile() {
                       <span style={{ fontSize: "0.68rem", color: "#555550", fontWeight: 600 }}>Riot: {profile.riotRank}</span>
                     )}
                   </div>
-                ) : (
+                ) : activeTab === "valorant" ? (
                   <div className="pp-rank">{profile.riotRank || "Unranked"}</div>
+                ) : activeTab === "dota" ? (
+                  <div className="pp-rank">{profile.steamName ? (profile.steamId ? "Steam Linked" : "") : "Steam not connected"}</div>
+                ) : (
+                  <div style={{ fontSize: "0.68rem", color: "#555550", marginTop: 4, fontWeight: 700, letterSpacing: "0.06em" }}>YOUR PROFILE</div>
                 )}
-                {isOwnProfile && (
-                  <div style={{ fontSize: "0.62rem", color: "#555550", marginTop: 4, fontWeight: 700, letterSpacing: "0.06em" }}>
-                    YOUR PROFILE
+                {/* Discord-only notice for valorant tab */}
+                {activeTab === "valorant" && !profile.riotGameName && profile.discordId && (
+                  <div style={{ marginTop: 8, padding: "8px 14px", background: "rgba(129,140,248,0.06)", border: "1px solid rgba(129,140,248,0.15)", borderRadius: 8 }}>
+                    <div style={{ fontSize: "0.72rem", color: "#818cf8", fontWeight: 700 }}>Riot ID not connected</div>
+                    <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Riot ID to see your Valorant rank and register for tournaments.</div>
+                    {isOwnProfile && (
+                      <button onClick={() => window.open("/connect-riot", "_blank")} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Riot ID</button>
+                    )}
+                  </div>
+                )}
+                {activeTab === "dota" && !profile.steamId && profile.discordId && (
+                  <div style={{ marginTop: 8, padding: "8px 14px", background: "rgba(102,192,244,0.06)", border: "1px solid rgba(102,192,244,0.15)", borderRadius: 8 }}>
+                    <div style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>Steam not connected</div>
+                    <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Steam account to see your Dota 2 rank and register for tournaments.</div>
+                    {isOwnProfile && (
+                      <button onClick={() => window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank")} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(102,192,244,0.12)", color: "#66c0f4", border: "1px solid rgba(102,192,244,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Steam</button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ═══ STATS CARDS ═══ */}
-          {vStats ? (
+          {/* ═══ STATS CARDS — tab-aware ═══ */}
+          {activeTab === "valorant" && (
+            vStats ? (
+              <div className="pp-stats-row">
+                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value">{totalGames}</div><div className="pp-stat-label">Games Played</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value pp-stat-green">{gamesWon}</div><div className="pp-stat-label">Wins</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value pp-stat-red">{gamesLost}</div><div className="pp-stat-label">Losses</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: winRate >= 50 ? "#6fcf8a" : "#d07070" }}>{winRate}%</div><div className="pp-stat-label">Win Rate</div></div>
+              </div>
+            ) : (
+              <div className="pp-stats-row">
+                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value">0</div><div className="pp-stat-label">Official Games</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">ACS</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">K/D</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
+              </div>
+            )
+          )}
+          {activeTab === "dota" && (
             <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value">{totalGames}</div><div className="pp-stat-label">Games Played</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value pp-stat-green">{gamesWon}</div><div className="pp-stat-label">Wins</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value pp-stat-red">{gamesLost}</div><div className="pp-stat-label">Losses</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: winRate >= 50 ? "#4ade80" : "#f87171" }}>{winRate}%</div><div className="pp-stat-label">Win Rate</div></div>
-            </div>
-          ) : (
-            <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value">0</div><div className="pp-stat-label">Official Games</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">ACS</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">K/D</div></div>
+              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{profile.dotaBracket ? ({ herald_guardian: "Guardian", crusader_archon: "Archon", legend_ancient: "Ancient", divine_immortal: "Immortal" }[profile.dotaBracket] || profile.dotaBracket) : "Unranked"}</div><div className="pp-stat-label">Dota 2 Bracket</div></div>
+              <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
+              <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaRankTier || "—"}</div><div className="pp-stat-label">Rank Tier</div></div>
+              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Tournaments</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
             </div>
           )}
 
-          {/* ═══ IESPORTS RANK CARD (always visible) ═══ */}
+          {/* ═══ VALORANT TAB CONTENT ═══ */}
+          {activeTab === "valorant" && (<>
+          {/* ═══ IESPORTS RANK CARD ═══ */}
           {profile.iesportsRank && (
             <div className="pp-section" style={{ borderColor: "rgba(60,203,255,0.2)", background: "linear-gradient(135deg, rgba(60,203,255,0.04) 0%, #121215 100%)" }}>
               <span className="pp-section-label">IEsports Rank</span>
@@ -497,20 +560,7 @@ export default function PlayerProfile() {
             </div>
           )}
 
-          {/* ═══ TAB BAR ═══ */}
-          <div className="pp-tab-bar">
-            <button className={`pp-tab ${activeTab === "valorant" ? "active" : ""}`} onClick={() => setActiveTab("valorant")}>Valorant</button>
-            <button className={`pp-tab ${activeTab === "dota" ? "active" : ""}`} onClick={() => setActiveTab("dota")}>Dota 2</button>
-            {isOwnProfile && (
-              <button className={`pp-tab pp-tab-private ${activeTab === "account" ? "active" : ""}`} onClick={() => setActiveTab("account")}>
-                🔒 My Account
-              </button>
-            )}
-          </div>
-
-          {/* ═══ VALORANT TAB ═══ */}
-          {activeTab === "valorant" && (
-            <>
+          {/* Valorant stats + match history continue below */}
               {vStats ? (
                 <div className="pp-section">
                   <span className="pp-section-label">Performance Breakdown</span>
@@ -618,10 +668,44 @@ export default function PlayerProfile() {
 
           {/* ═══ DOTA TAB ═══ */}
           {activeTab === "dota" && (
-            <div className="pp-section">
-              <span className="pp-section-label">Dota 2 Stats</span>
-              <div className="pp-empty">Dota 2 tournament stats coming soon. This will show match history, win/loss record, and performance from official IEsports Dota 2 tournaments.</div>
-            </div>
+            <>
+              {profile.steamId ? (
+                <div className="pp-section">
+                  <span className="pp-section-label">Dota 2 Profile</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                      <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Steam Name</span>
+                      <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.steamName || "—"}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                      <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Bracket</span>
+                      <span style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>{profile.dotaBracket ? ({ herald_guardian: "Guardian", crusader_archon: "Archon", legend_ancient: "Ancient", divine_immortal: "Immortal" }[profile.dotaBracket] || profile.dotaBracket) : "Unranked"}</span>
+                    </div>
+                    {profile.dotaMMR && (
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                        <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>MMR</span>
+                        <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.dotaMMR}</span>
+                      </div>
+                    )}
+                    {profile.dotaRankTier && (
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
+                        <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Rank Tier</span>
+                        <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.dotaRankTier}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="pp-section">
+                  <span className="pp-section-label">Dota 2</span>
+                  <div className="pp-empty">Steam account not connected. Connect Steam to see Dota 2 rank and tournament stats.</div>
+                </div>
+              )}
+              <div className="pp-section">
+                <span className="pp-section-label">Dota 2 Match History</span>
+                <div className="pp-empty">Dota 2 tournament match history coming soon.</div>
+              </div>
+            </>
           )}
 
           {/* ═══ ACCOUNT TAB (private — own profile only) ═══ */}

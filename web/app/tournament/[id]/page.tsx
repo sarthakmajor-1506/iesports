@@ -1177,7 +1177,7 @@ function DotaTournamentDetailInner() {
                               <span className="dtd-tier-header-count">{bracketPlayers.length}</span>
                             </div>
                             {bracketPlayers.map((p: any) => (
-                              <Link key={p.uid || p.id} href={`/player/${p.uid || p.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                              <Link key={p.uid || p.id} href={`/player/${p.uid || p.id}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                                 <div className="dtd-tier-player">
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={p.steamName} /> : <div className="dtd-tier-player-avatar-init">{(p.steamName || "?")[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
@@ -1223,7 +1223,7 @@ function DotaTournamentDetailInner() {
                       </div>
                       <div className="dtd-team-box-members">
                         {(team.members || []).map((m: any, i: number) => (
-                          <Link key={m.uid || i} href={`/player/${m.uid}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                          <Link key={m.uid || i} href={`/player/${m.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="dtd-team-box-member">
                               {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
                               <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
@@ -1342,7 +1342,7 @@ function DotaTournamentDetailInner() {
                       <tbody>{leaderboard.map((p: any, i: number) => (
                         <tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}>
                           <td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3B82F6" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td>
-                          <td>{p.uid ? (<Link href={`/player/${p.uid}`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div></Link>) : (<div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div>)}</td>
+                          <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div></Link>) : (<div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div>)}</td>
                           <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
                           <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
                           <td>{p.totalAssists || 0}</td>
