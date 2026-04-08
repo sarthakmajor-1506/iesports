@@ -207,6 +207,7 @@ export async function POST(req: NextRequest) {
         tournamentName: tData.name || "Tournament",
         tournamentId,
         startDate: tData.startDate || "",
+        registrationDeadline: tData.registrationDeadline || "",
         format: tData.format || "shuffle",
         prizePool: tData.prizePool || "TBD",
         slotsBooked: (tData.slotsBooked || 0) + 1,

@@ -145,6 +145,7 @@ export async function sendRegistrationDM(opts: {
   tournamentName: string;
   tournamentId: string;
   startDate: string;
+  registrationDeadline?: string;
   format: string;
   prizePool: string;
   slotsBooked: number;
@@ -152,30 +153,40 @@ export async function sendRegistrationDM(opts: {
   iesportsRank: string;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
-    const formatLabel = opts.format === "shuffle" ? "Shuffle (teams auto-drafted)"
-      : opts.format === "auction" ? "Auction (captain picks)"
-      : "Standard (pre-formed teams)";
-
-    const startFormatted = (() => {
+    const formatDate = (iso: string) => {
       try {
-        const d = new Date(opts.startDate);
+        const d = new Date(iso);
         return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-      } catch { return opts.startDate; }
-    })();
+      } catch { return iso; }
+    };
 
-    const slotsLeft = opts.totalSlots - opts.slotsBooked;
+    const startFormatted = formatDate(opts.startDate);
+
+    const nextSteps = opts.format === "shuffle"
+      ? `Once registration closes, teams will be **shuffled** — balanced squads based on rank. You don't need to find a team. We handle it.`
+      : opts.format === "auction"
+      ? `Captains will **auction-draft** players after registration closes. Show up, get picked, and prove your worth.`
+      : `Make sure your team is ready before the tournament starts. Coordinate with your squad.`;
+
+    const deadlineStr = opts.registrationDeadline
+      ? `\n> Registration closes: **${formatDate(opts.registrationDeadline)}**`
+      : "";
 
     const message = [
-      `# You're in. Let's go. \n`,
-      `Hey **${opts.playerName}** — you just locked your spot in **${opts.tournamentName}**.\n`,
-      `> Your rank: **${opts.iesportsRank}**`,
-      `> Format: **${formatLabel}**`,
+      `# You're in. Game on.\n`,
+      `**${opts.playerName}**, you're officially registered for **${opts.tournamentName}**.\n`,
+      `> Rank: **${opts.iesportsRank}**`,
+      `> Format: **${opts.format === "shuffle" ? "Shuffle" : opts.format === "auction" ? "Auction" : "Standard"}**`,
       `> Prize Pool: **₹${opts.prizePool}**`,
-      `> Starts: **${startFormatted}**`,
-      `> Slots remaining: **${slotsLeft}** / ${opts.totalSlots}\n`,
-      `Bring your A-game. This is your shot.\n`,
-      `📎 **Tournament page:** https://iesports.in/valorant/tournament/${opts.tournamentId}`,
-      `\n— IEsports`,
+      `> Tournament starts: **${startFormatted}**${deadlineStr}\n`,
+      `**What happens next?**`,
+      `${nextSteps}\n`,
+      `**About the Leaderboard**`,
+      `Every match counts. Your kills, deaths, ACS — all tracked automatically. Top performers on the leaderboard win **bonus prizes** on top of the tournament prize pool. Play every round like it matters.\n`,
+      `Stay sharp. Stay online. When it's game time, we expect you to show up ready.\n`,
+      `📎 **Tournament details:** https://iesports.in/valorant/tournament/${opts.tournamentId}`,
+      `\nSee you on the leaderboard.`,
+      `**— IEsports**`,
     ].join("\n");
 
     return await sendDM(opts.discordId, message);
