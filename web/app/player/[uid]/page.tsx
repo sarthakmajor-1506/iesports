@@ -46,7 +46,7 @@ interface UserProfile {
 
 interface RankHistoryItem {
   timestamp: string;
-  type: "seed" | "match" | "riot_refresh" | "admin_override";
+  type: "seed" | "match" | "riot_refresh" | "admin_override" | "riot_id_change";
   ratingBefore: number;
   ratingAfter: number;
   delta: number;
@@ -492,7 +492,7 @@ export default function PlayerProfile() {
                   <div key={`event-${i}`} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "10px 14px", borderRadius: 10,
-                    background: rh.type === "admin_override" ? "rgba(167,139,250,0.06)" : "rgba(60,203,255,0.04)",
+                    background: (rh.type === "admin_override" || rh.type === "riot_id_change") ? "rgba(167,139,250,0.06)" : "rgba(60,203,255,0.04)",
                     border: "1px solid rgba(255,255,255,0.04)",
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -502,6 +502,11 @@ export default function PlayerProfile() {
                         <>
                           <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#3CCBFF" }}>Riot Rank Refresh</div>
                           <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{rh.riotRankBefore} &rarr; {rh.riotRankAfter}</div>
+                        </>
+                      ) : rh.type === "riot_id_change" ? (
+                        <>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#a78bfa" }}>Admin Adjustment — Riot ID Changed</div>
+                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{(rh as any).oldRiotId} &rarr; {(rh as any).newRiotId}</div>
                         </>
                       ) : (
                         <>
