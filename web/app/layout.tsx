@@ -39,6 +39,7 @@ export default function RootLayout({
 
           <Analytics />
         </Suspense>
+        <Analytics />
       </body>
     </html>
   );
