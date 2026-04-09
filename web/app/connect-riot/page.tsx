@@ -23,7 +23,7 @@ type RiotPlayer = {
 };
 
 export default function ConnectRiot() {
-  const { user, loading, riotData } = useAuth();
+  const { user, loading, riotData, refreshUser } = useAuth();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("search");
@@ -31,6 +31,9 @@ export default function ConnectRiot() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const [player, setPlayer] = useState<RiotPlayer | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState("");
 
   // Upload state
   const [uploading, setUploading] = useState(false);
@@ -45,11 +48,11 @@ export default function ConnectRiot() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (!loading && riotData) {
+    if (!loading && riotData && !replacing) {
       if (riotData.riotVerified === "pending") setStep("done");
       if (riotData.riotVerified === "verified") setStep("done");
     }
-  }, [loading, riotData]);
+  }, [loading, riotData, replacing]);
 
   const handleSearch = async () => {
     if (!riotId.includes("#")) {
@@ -89,6 +92,76 @@ export default function ConnectRiot() {
     setError("");
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRefresh = async () => {
+    if (!user) return;
+    setRefreshing(true);
+    setRefreshMsg("");
+    setError("");
+    try {
+      const res = await fetch("/api/riot/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Refresh failed");
+      await refreshUser();
+      setRefreshMsg(`Updated to ${data.gameName}#${data.tagLine} — ${data.rank}`);
+    } catch (e: any) {
+      setError(e.message || "Failed to refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleStartReplace = () => {
+    setReplacing(true);
+    setStep("search");
+    setPlayer(null);
+    setRiotId("");
+    setError("");
+    setRefreshMsg("");
+    setSelectedFile(null);
+    setPreviewUrl("");
+    setScreenshotExpanded(false);
+    setConsent(true);
+  };
+
+  const handleReplace = async () => {
+    if (!user || !player || !consent) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/riot/replace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid, riotId: `${player.gameName}#${player.tagLine}`, region: player.region }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Replace failed");
+
+      // Upload screenshot if selected
+      if (selectedFile) {
+        const timestamp = Date.now();
+        const storageRef = ref(storage, `riot-screenshots/${user.uid}/${timestamp}.jpg`);
+        await uploadBytes(storageRef, selectedFile);
+        const screenshotUrl = await getDownloadURL(storageRef);
+        await updateDoc(doc(db, "users", user.uid), {
+          riotScreenshotUrl: screenshotUrl,
+          riotVerificationNote: `Replaced Riot ID. UID: ${user.uid} | Phone: ${user.phoneNumber || "N/A"}`,
+        });
+      }
+
+      await refreshUser();
+      setReplacing(false);
+      setStep("done");
+    } catch (e: any) {
+      setError(e.message || "Failed to replace Riot ID");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -207,7 +280,7 @@ export default function ConnectRiot() {
         <div className="cr-container">
 
           {/* ALREADY LINKED */}
-          {alreadyLinked && (
+          {alreadyLinked && !replacing && (
             <div className="cr-card">
               <div className="cr-accent" />
               <div className="cr-success">
@@ -239,21 +312,35 @@ export default function ConnectRiot() {
                 <span className={`cr-status-badge ${riotData?.riotVerified}`}>
                   {riotData?.riotVerified === "verified" ? "✓ Verified" : "⏳ Pending Review"}
                 </span>
-                <button className="cr-btn-outline" onClick={() => router.push("/valorant")} style={{ marginTop: 20 }}>
-                  Browse Valorant Tournaments →
+                {refreshMsg && <p style={{ fontSize: 13, color: "#4ade80", marginTop: 12 }}>{refreshMsg}</p>}
+                {error && <p className="cr-error">{error}</p>}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+                  <button className="cr-btn" onClick={() => router.push("/valorant")} style={{ flex: 1, marginTop: 0 }}>
+                    Browse Tournaments →
+                  </button>
+                </div>
+                <button className="cr-btn-outline" onClick={handleRefresh} disabled={refreshing} style={{ marginTop: 8 }}>
+                  {refreshing ? "Refreshing..." : "Refresh Name & Rank"}
+                </button>
+                <button className="cr-btn-outline" onClick={handleStartReplace} style={{ marginTop: 8, color: "#ff4655", borderColor: "rgba(255,70,85,0.3)" }}>
+                  Change Riot ID
                 </button>
               </div>
             </div>
           )}
 
           {/* STEP 1: SEARCH */}
-          {!alreadyLinked && step === "search" && (
+          {(!alreadyLinked || replacing) && step === "search" && (
             <div className="cr-card">
               <div className="cr-accent" />
-              <span className="cr-label">Connect Riot ID</span>
-              <h1 className="cr-title">Link Your Valorant Account</h1>
+              <span className="cr-label">{replacing ? "Change Riot ID" : "Connect Riot ID"}</span>
+              <h1 className="cr-title">{replacing ? "Link a Different Account" : "Link Your Valorant Account"}</h1>
               <p className="cr-subtitle">
-                Enter your Riot ID to connect your Valorant account. We'll verify your rank and identity.
+                {replacing
+                  ? "Enter your new Riot ID. Your iE rating will carry over. The new ID will need re-verification."
+                  : "Enter your Riot ID to connect your Valorant account. We'll verify your rank and identity."
+                }
               </p>
               <input
                 className="cr-input"
@@ -268,14 +355,17 @@ export default function ConnectRiot() {
               <button className="cr-btn" onClick={handleSearch} disabled={searching || !riotId.trim()}>
                 {searching ? "Searching..." : "Search Player →"}
               </button>
-              <button className="cr-btn-outline" onClick={() => router.back()}>
-                ← Go Back
+              <button className="cr-btn-outline" onClick={() => {
+                if (replacing) { setReplacing(false); setStep("done"); setError(""); }
+                else router.back();
+              }}>
+                ← {replacing ? "Cancel" : "Go Back"}
               </button>
             </div>
           )}
 
           {/* STEP 2: CONFIRM + SCREENSHOT + CONSENT + SUBMIT (combined) */}
-          {!alreadyLinked && step === "confirm" && player && (
+          {(!alreadyLinked || replacing) && step === "confirm" && player && (
             <div className="cr-card">
               <div className="cr-accent" />
               <span className="cr-label">Is this you?</span>
@@ -361,17 +451,21 @@ export default function ConnectRiot() {
 
               {error && <p className="cr-error">{error}</p>}
 
-              <button className="cr-btn" onClick={handleSubmit} disabled={uploading || !consent}>
-                {uploading ? "Submitting..." : "Confirm & Submit →"}
+              <button className="cr-btn" onClick={replacing ? handleReplace : handleSubmit} disabled={uploading || !consent}>
+                {uploading ? "Submitting..." : replacing ? "Replace Riot ID →" : "Confirm & Submit →"}
               </button>
-              <button className="cr-btn-outline" onClick={() => { setStep("search"); setPlayer(null); setSelectedFile(null); setPreviewUrl(""); setScreenshotExpanded(false); setError(""); setConsent(true); }}>
-                Try a different ID
+              <button className="cr-btn-outline" onClick={() => {
+                if (replacing) { setReplacing(false); setStep("done"); }
+                else { setStep("search"); }
+                setPlayer(null); setSelectedFile(null); setPreviewUrl(""); setScreenshotExpanded(false); setError(""); setConsent(true);
+              }}>
+                {replacing ? "← Cancel" : "Try a different ID"}
               </button>
             </div>
           )}
 
           {/* DONE */}
-          {!alreadyLinked && step === "done" && (
+          {!alreadyLinked && !replacing && step === "done" && (
             <div className="cr-card">
               <div className="cr-accent" />
               <div className="cr-success">
