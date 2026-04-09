@@ -852,16 +852,25 @@ export default function PlayerProfile() {
                           : <div className="pp-acc-detail" style={{ color: "#f87171" }}>Not connected</div>}
                       </div>
                     </div>
-                    {profile.riotVerified === "verified" ? (
-                      <span className="pp-acc-badge pp-acc-linked">✓ Verified</span>
-                    ) : profile.riotVerified === "pending" ? (
-                      <span className="pp-acc-badge pp-acc-pending">⏳ Pending</span>
-                    ) : (
-                      <button className="pp-acc-link-btn" onClick={() => {
-                        if (hasDiscordAccount(discordConnections, "riot", !!authRiotData?.riotLinked)) { triggerDiscordPrompt(); }
-                        else { window.open("/connect-riot", "_blank"); }
-                      }}>Connect</button>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {profile.riotVerified === "verified" ? (
+                        <span className="pp-acc-badge pp-acc-linked">✓ Verified</span>
+                      ) : profile.riotVerified === "pending" ? (
+                        <span className="pp-acc-badge pp-acc-pending">⏳ Pending</span>
+                      ) : (
+                        <button className="pp-acc-link-btn" onClick={() => {
+                          if (hasDiscordAccount(discordConnections, "riot", !!authRiotData?.riotLinked)) { triggerDiscordPrompt(); }
+                          else { window.open("/connect-riot", "_blank"); }
+                        }}>Connect</button>
+                      )}
+                      {profile.riotGameName && (
+                        <button onClick={() => router.push("/connect-riot")} style={{
+                          padding: "4px 10px", borderRadius: 100, background: "rgba(255,70,85,0.08)",
+                          color: "#ff6b77", border: "1px solid rgba(255,70,85,0.25)", fontSize: "0.62rem",
+                          fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                        }}>Change</button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Phone */}
