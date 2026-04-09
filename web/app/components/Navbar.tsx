@@ -361,6 +361,11 @@ export default function Navbar() {
                       style={{ justifyContent: "center", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 100, padding: "10px 0" }}>
                       Profile
                     </button>
+                    <button className="ie-dd-btn"
+                      onClick={() => { router.push("/connect-riot"); setDropdownOpen(false); }}
+                      style={{ justifyContent: "center", background: "rgba(255,70,85,0.08)", border: "1px solid rgba(255,70,85,0.25)", borderRadius: 100, padding: "10px 0", color: "#ff6b77" }}>
+                      {riotData?.riotLinked ? "Manage Riot ID" : "Connect Riot ID"}
+                    </button>
                     <button className="ie-dd-btn logout"
                       onClick={async () => { await logout(); setDropdownOpen(false); }}
                       style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, padding: "10px 0" }}>
