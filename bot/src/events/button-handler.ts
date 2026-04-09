@@ -21,10 +21,30 @@ import {
 } from "../services/firebase";
 import { getDotaBot } from "../services/dota-gc";
 import { cleanupVoiceChannels, createVCsAndMovePlayers } from "../services/match-orchestrator";
+import { handleTossChoice, handleVetoMap } from "../services/map-veto";
 import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
 
 export async function handleButton(interaction: ButtonInteraction): Promise<void> {
+  // ── Valorant map veto buttons (multi-part customId) ──────────
+  if (interaction.customId.startsWith("toss_") || interaction.customId.startsWith("veto_")) {
+    const parts = interaction.customId.split(":");
+    const action = parts[0];
+    const tournamentId = parts[1];
+    const matchId = parts[2];
+    const data = parts[3];
+
+    if (action === "toss_choice") {
+      await handleTossChoice(interaction, tournamentId, matchId, data);
+    } else if (action === "veto_map") {
+      await handleVetoMap(interaction, tournamentId, matchId, parseInt(data));
+    } else {
+      await interaction.reply({ content: "Unknown veto action.", ephemeral: true });
+    }
+    return;
+  }
+
+  // ── Existing Dota lobby / queue buttons ──────────────────────
   const [action, id] = interaction.customId.split(":");
 
   switch (action) {

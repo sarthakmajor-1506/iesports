@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
     const {
       tournamentId, adminKey, matchId, action,
       gameNumber, lobbyName, lobbyPassword,
-      notifyDiscord, scheduledTime,
+      notifyDiscord, scheduledTime, bo: bodyBo,
     } = await req.json();
 
     if (!tournamentId || !adminKey || !matchId || !action) {
@@ -474,6 +474,133 @@ export async function POST(req: NextRequest) {
     } else if (action === "set-time") {
       await matchRef.update({ scheduledTime: scheduledTime || null });
       return NextResponse.json({ success: true, matchId, action: "set-time", scheduledTime });
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ACTION: TOSS + MAP VETO
+    // → Random coin toss → post result with choice buttons
+    // → Bot handles interactive veto from there (button-handler.ts)
+    // ═══════════════════════════════════════════════════════════════════════
+    } else if (action === "toss") {
+      const bo = bodyBo || matchData.bo || 3;
+
+      if (![1, 3, 5].includes(bo)) {
+        return NextResponse.json({ error: "bo must be 1, 3, or 5" }, { status: 400 });
+      }
+      if (!notifyChannelId) {
+        return NextResponse.json({ error: "No Discord channel configured" }, { status: 400 });
+      }
+      if (matchData.vetoState && matchData.vetoState.status !== "complete") {
+        return NextResponse.json({ error: "Toss/veto already in progress" }, { status: 400 });
+      }
+
+      // ── Look up team captains ──────────────────────────────────────
+      const team1TeamRef = tournamentRef.collection("teams").doc(matchData.team1Id);
+      const team2TeamRef = tournamentRef.collection("teams").doc(matchData.team2Id);
+      const [team1Doc, team2Doc] = await Promise.all([team1TeamRef.get(), team2TeamRef.get()]);
+
+      const team1CaptainUid = team1Doc.data()?.captainUid;
+      const team2CaptainUid = team2Doc.data()?.captainUid;
+
+      // Fallback: first member if no captainUid
+      const team1FallbackUid = team1CaptainUid || (team1Doc.data()?.members?.[0]?.uid ?? team1Doc.data()?.members?.[0]);
+      const team2FallbackUid = team2CaptainUid || (team2Doc.data()?.members?.[0]?.uid ?? team2Doc.data()?.members?.[0]);
+
+      if (!team1FallbackUid || !team2FallbackUid) {
+        return NextResponse.json({ error: "Cannot determine team captains" }, { status: 400 });
+      }
+
+      const [cap1User, cap2User] = await Promise.all([
+        adminDb.collection("users").doc(team1FallbackUid).get(),
+        adminDb.collection("users").doc(team2FallbackUid).get(),
+      ]);
+
+      const team1CaptainDiscordId = cap1User.data()?.discordId || "";
+      const team2CaptainDiscordId = cap2User.data()?.discordId || "";
+
+      if (!team1CaptainDiscordId || !team2CaptainDiscordId) {
+        return NextResponse.json({ error: "Both captains must have Discord linked" }, { status: 400 });
+      }
+
+      // ── Random toss ────────────────────────────────────────────────
+      const tossWinner: "team1" | "team2" = Math.random() < 0.5 ? "team1" : "team2";
+      const winnerName = tossWinner === "team1" ? matchData.team1Name : matchData.team2Name;
+      const winnerCaptainTag = tossWinner === "team1" ? team1CaptainDiscordId : team2CaptainDiscordId;
+
+      const VALORANT_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split"];
+
+      // ── Post toss message with buttons ─────────────────────────────
+      const tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
+        content: `<@${winnerCaptainTag}> your team won the toss! Pick your advantage below.`,
+        embeds: [{
+          title: "🎲 COIN TOSS",
+          description: [
+            `**${matchData.team1Name}** vs **${matchData.team2Name}**\n`,
+            `🏆 **${winnerName}** wins the toss!\n`,
+            `Choose your advantage:`,
+            `**🎯 Ban First** — Your team bans a map first`,
+            `**🗺️ Pick Side on Decider** — Other team bans first, you pick side on the final map`,
+          ].join("\n"),
+          color: 0xff4655,
+          footer: { text: `BO${bo} · Only ${winnerName} captain can choose` },
+        }],
+        components: [{
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 1,
+              label: "Ban First",
+              emoji: { name: "🎯" },
+              custom_id: `toss_choice:${tournamentId}:${matchId}:ban_first`,
+            },
+            {
+              type: 2,
+              style: 2,
+              label: "Pick Side on Decider",
+              emoji: { name: "🗺️" },
+              custom_id: `toss_choice:${tournamentId}:${matchId}:side_first`,
+            },
+          ],
+        }],
+      });
+
+      let messageId = "";
+      if (tossRes.ok) {
+        const data = await tossRes.json();
+        messageId = data.id;
+      }
+
+      // ── Store veto state on match doc ──────────────────────────────
+      const vetoState = {
+        status: "toss_choice",
+        bo,
+        tossWinner,
+        banFirst: null,
+        sidePickOnDecider: null,
+        currentStep: 0,
+        actions: [],
+        remainingMaps: [...VALORANT_MAPS],
+        team1Name: matchData.team1Name,
+        team2Name: matchData.team2Name,
+        team1CaptainDiscordId,
+        team2CaptainDiscordId,
+        channelId: notifyChannelId,
+        messageId,
+      };
+
+      await matchRef.update({ vetoState });
+
+      return NextResponse.json({
+        success: true,
+        matchId,
+        action: "toss",
+        tossWinner,
+        winnerName,
+        bo,
+        messageId,
+      });
+
     } else {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
