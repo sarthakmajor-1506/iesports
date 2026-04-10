@@ -16,7 +16,7 @@ interface Comment {
 interface CommentSectionProps {
   tournamentId: string;
   section: "standings" | "leaderboard";
-  game?: "valorant" | "dota2";
+  game?: "valorant" | "dota2" | "cs2";
   user: User | null;
   riotData?: any;
   userProfile?: any;

@@ -16,6 +16,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 const GAME_COLLECTIONS: Record<string, string> = {
   valorant: "valorantTournaments",
   dota2: "tournaments",
+  cs2: "cs2Tournaments",
 };
 
 export async function POST(req: NextRequest) {

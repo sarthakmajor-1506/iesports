@@ -13,12 +13,14 @@ import { adminDb } from "@/lib/firebaseAdmin";
 const GAME_COLLECTIONS: Record<string, string> = {
   valorant: "valorantTournaments",
   dota2: "tournaments",
+  cs2: "cs2Tournaments",
 };
 
 // Known subcollections per game (extend as needed)
 const SUBCOLLECTIONS: Record<string, string[]> = {
   valorant: ["teams", "matches", "standings", "leaderboard", "soloPlayers"],
   dota2: ["teams", "matches", "standings", "soloPlayers", "brackets"],
+  cs2: ["teams", "matches", "standings", "leaderboard", "soloPlayers"],
 };
 
 async function deleteSubcollection(docRef: FirebaseFirestore.DocumentReference, subName: string) {

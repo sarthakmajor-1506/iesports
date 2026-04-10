@@ -5,13 +5,13 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   const game = req.nextUrl.searchParams.get("game");
 
-  if (!id || !game || !["dota2", "valorant"].includes(game)) {
+  if (!id || !game || !["dota2", "valorant", "cs2"].includes(game)) {
     return NextResponse.json({ error: "Missing id or invalid game" }, { status: 400 });
   }
 
   try {
-    const col = game === "valorant" ? "valorantTournaments" : "tournaments";
-    const playersCol = game === "valorant" ? "soloPlayers" : "players";
+    const col = game === "valorant" ? "valorantTournaments" : game === "cs2" ? "cs2Tournaments" : "tournaments";
+    const playersCol = game === "valorant" || game === "cs2" ? "soloPlayers" : "players";
 
     const [tDoc, playersSnap, teamsSnap, standingsSnap, matchesSnap, lbSnap] = await Promise.all([
       adminDb.collection(col).doc(id).get(),

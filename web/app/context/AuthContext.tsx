@@ -50,6 +50,7 @@ type AuthContextType = {
   discordConnections: DiscordConnection[];
   registeredTournaments: Set<string>;
   registeredValorantTournaments: Set<string>;
+  registeredCS2Tournaments: Set<string>;
   registeredSoloTournaments: Set<string>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
@@ -65,6 +66,7 @@ const AuthContext = createContext<AuthContextType>({
   discordConnections: [],
   registeredTournaments: new Set(),
   registeredValorantTournaments: new Set(),
+  registeredCS2Tournaments: new Set(),
   registeredSoloTournaments: new Set(),
   refreshUser: async () => {},
   logout: async () => {},
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [discordConnections, setDiscordConnections] = useState<DiscordConnection[]>([]);
   const [registeredTournaments, setRegisteredTournaments] = useState<Set<string>>(new Set());
   const [registeredValorantTournaments, setRegisteredValorantTournaments] = useState<Set<string>>(new Set());
+  const [registeredCS2Tournaments, setRegisteredCS2Tournaments] = useState<Set<string>>(new Set());
   const [registeredSoloTournaments, setRegisteredSoloTournaments] = useState<Set<string>>(new Set());
   const router = useRouter();
   const pathname = usePathname();
@@ -131,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setDiscordConnections(data?.discordConnections || []);
     setRegisteredTournaments(new Set(data?.registeredTournaments || []));
     setRegisteredValorantTournaments(new Set(data?.registeredValorantTournaments || []));
+    setRegisteredCS2Tournaments(new Set(data?.registeredCS2Tournaments || []));
     setRegisteredSoloTournaments(new Set(data?.registeredSoloTournaments || []));
 
     return { hasSteam };
@@ -162,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setDiscordConnections([]);
           setRegisteredTournaments(new Set());
           setRegisteredValorantTournaments(new Set());
+          setRegisteredCS2Tournaments(new Set());
           setRegisteredSoloTournaments(new Set());
         }
 
@@ -195,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, registeredTournaments, registeredValorantTournaments, registeredSoloTournaments, refreshUser, logout }}>
+    <AuthContext.Provider value={{ user, loading, steamLinked, dotaProfile, riotData, userProfile, discordConnections, registeredTournaments, registeredValorantTournaments, registeredCS2Tournaments, registeredSoloTournaments, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

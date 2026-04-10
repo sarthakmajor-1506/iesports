@@ -21,7 +21,7 @@ type Props = {
   tournament: any;
   user: any;
   dotaProfile: any;
-  game?: "dota2" | "valorant";
+  game?: "dota2" | "valorant" | "cs2";
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -138,8 +138,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   };
 
   const isValorant = game === "valorant";
+  const isCS2 = game === "cs2";
   const isShuffle = tournament?.format === "shuffle";
-  const accentColor = isValorant ? "#3CCBFF" : "#f97316";
+  const accentColor = isCS2 ? "#f0a500" : isValorant ? "#3CCBFF" : "#f97316";
 
   const isProfilePrivate = !isValorant && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
 
@@ -337,7 +338,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const handleCreateTeam = async () => {
     setLoading(true); setError("");
     try {
-      const endpoint = isValorant ? "/api/valorant/teams/create" : "/api/teams/create";
+      const endpoint = isCS2 ? "/api/cs2/teams/create" : isValorant ? "/api/valorant/teams/create" : "/api/teams/create";
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -349,7 +350,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     if (joinCode.length !== 6) { setError("Enter a valid 6-digit code"); return; }
     setLoading(true); setError("");
     try {
-      const endpoint = isValorant ? "/api/valorant/teams/join" : "/api/teams/join";
+      const endpoint = isCS2 ? "/api/cs2/teams/join" : isValorant ? "/api/valorant/teams/join" : "/api/teams/join";
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: joinCode.toUpperCase(), uid: user.uid }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -360,7 +361,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const handleSolo = async () => {
     setLoading(true); setError(""); setWarning("");
     try {
-      const endpoint = isValorant ? "/api/valorant/solo" : "/api/teams/solo";
+      const endpoint = isCS2 ? "/api/cs2/solo" : isValorant ? "/api/valorant/solo" : "/api/teams/solo";
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -370,7 +371,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   };
 
   const handleWhatsApp = () => {
-    const gameName = isValorant ? "Valorant" : "Dota 2";
+    const gameName = isCS2 ? "CS2" : isValorant ? "Valorant" : "Dota 2";
     const msg = encodeURIComponent(`Join my ${gameName} team on Indian Esports!\nTournament: ${tournament.name}\n${teamCode ? `Team Code: ${teamCode}\n` : ""}Join here: ${window.location.origin}`);
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
@@ -484,7 +485,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 )}
                 <button onClick={saveFullName} disabled={fullNameSaving || fullName.trim().length < 2} style={{
                   width: "100%", padding: 14,
-                  background: fullNameSaving || fullName.trim().length < 2 ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                  background: fullNameSaving || fullName.trim().length < 2 ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                   cursor: fullNameSaving || fullName.trim().length < 2 ? "default" : "pointer",
                   opacity: fullName.trim().length < 2 ? 0.4 : 1,
@@ -507,7 +508,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     </div>
                     <button onClick={() => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); }} style={{
                       width: "100%", padding: 14,
-                      background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
                     }}>
                       {"Verify Phone Number \u2192"}
@@ -541,7 +542,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
                     <button onClick={sendOtp} disabled={phoneLoading} style={{
                       width: "100%", padding: 14,
-                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
@@ -578,7 +579,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8, textAlign: "center" as const }}>{phoneError}</p>}
                     <button onClick={() => verifyOtpStr(otp.join(""))} disabled={phoneLoading} style={{
                       width: "100%", padding: 14,
-                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
@@ -640,7 +641,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   <div>
                     <button onClick={currentReq.action} style={{
                       width: "100%", padding: 14,
-                      background: `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
                     }}>
@@ -683,7 +684,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 14 }}>All set!</h3>
                 <button onClick={() => { if (isShuffle) handleSolo(); else setStep("choose"); }} disabled={loading} style={{
                   width: "100%", padding: 14,
-                  background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isValorant ? "#2A9FCC" : "#ea580c"})`,
+                  background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#ea580c"})`,
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15,
                   cursor: loading ? "default" : "pointer",
                   boxShadow: `0 4px 20px ${accentColor}33`,

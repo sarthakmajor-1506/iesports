@@ -560,3 +560,64 @@ export interface RankHistoryEntry {
   // admin override details (type === "admin_override")
   adminNote?: string;
 }
+
+// ── CS2 tournament (Firestore: "cs2Tournaments/{id}") ──────────────
+export interface CS2Tournament {
+  id: string;
+  name: string;
+  game: "cs2";
+  format: "shuffle" | "standard";
+  status: "upcoming" | "active" | "ended";
+  bracketsComputed: boolean;
+  isTestTournament?: boolean;
+  registrationDeadline: string;
+  startDate: string;
+  endDate: string;
+  totalSlots: number;
+  slotsBooked: number;
+  entryFee: number;
+  prizePool: string;
+  rules: string[];
+  desc: string;
+  teamsGenerated?: boolean;
+  teamCount?: number;
+  swissRounds?: number;
+  currentMatchDay?: number;
+  schedule?: {
+    registrationOpens: string;
+    registrationCloses: string;
+    squadCreation: string;
+    groupStageStart: string;
+    groupStageEnd: string;
+    tourneyStageStart?: string;
+    tourneyStageEnd?: string;
+  };
+  description?: string;
+  bannerImage?: string;
+  groupStageRounds?: number;
+  matchesPerRound?: number;
+  bracketFormat?: "double_elimination" | "single_elimination";
+  bracketBestOf?: number;
+  grandFinalBestOf?: number;
+  eliminationBestOf?: number;
+  bracketTeamCount?: number;
+  totalTeams?: number;
+  playersPerTeam?: number;
+  upperBracketTeams?: number;
+  lowerBracketTeams?: number;
+  championTeamId?: string;
+  championTeamName?: string;
+  ownerId?: string;
+  lbFinalBestOf?: number;
+  bracketSize?: number;
+  shareImages?: {
+    tagline?: string;
+    highlightText?: string;
+    defaultBg?: string;
+    overviewBg?: string;
+    registerBg?: string;
+    teamsBg?: string;
+    scheduleBg?: string;
+    formatBg?: string;
+  };
+}

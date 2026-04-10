@@ -16,7 +16,7 @@ import { verifyAdmin } from "@/lib/verifyAdmin";
 const GAME_COLLECTIONS: Record<string, string> = {
   valorant: "valorantTournaments",
   dota2: "tournaments",
-  // Future: cs2: "cs2Tournaments", cod: "codTournaments"
+  cs2: "cs2Tournaments",
 };
 
 export async function POST(req: NextRequest) {
