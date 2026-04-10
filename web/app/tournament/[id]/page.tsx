@@ -453,6 +453,7 @@ function DotaTournamentDetailInner() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
+  const tabsWrapRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
@@ -969,7 +970,7 @@ function DotaTournamentDetailInner() {
                 )}
                 {regClosed && !isRegistered && isRegOpen && (
                   <button
-                    onClick={() => setActiveTab("leaderboard")}
+                    onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                     style={{ padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
                   >Leaderboard</button>
                 )}
@@ -1010,10 +1011,10 @@ function DotaTournamentDetailInner() {
           )}
 
           {/* ═══ TAB BAR ═══ */}
-          <div className="dtd-tabs-wrap">
+          <div className="dtd-tabs-wrap" ref={tabsWrapRef}>
             <div className="dtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }} title={t.label}>
+                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} title={t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
                   <span className="dtd-tab-label">{t.label}</span>
                   {t.key === "players" && players.length > 0 && <span className="dtd-tab-count">{players.length}</span>}
@@ -1181,12 +1182,13 @@ function DotaTournamentDetailInner() {
                               const stars = tier % 10;
                               const rankName = tier > 0 && medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : "";
                               const rankLabel = p.dotaMMR ? `${rankName ? rankName + " · " : ""}${p.dotaMMR} MMR` : rankName || colors.label;
+                              const isMe = user?.uid === (p.uid || p.id);
                               return (
                               <Link key={p.uid || p.id} href={`/player/${p.uid || p.id}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                                <div className="dtd-tier-player">
+                                <div className="dtd-tier-player" style={isMe ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 10 } : {}}>
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
-                                    <span className="dtd-tier-player-name">{displayName}</span>
+                                    <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <span className="dtd-tier-player-rank">{rankLabel}</span>
                                   </div>
                                 </div>
@@ -1228,14 +1230,16 @@ function DotaTournamentDetailInner() {
                         </div>
                       </div>
                       <div className="dtd-team-box-members">
-                        {(team.members || []).map((m: any, i: number) => (
+                        {(team.members || []).map((m: any, i: number) => {
+                          const isMeMember = user?.uid === m.uid;
+                          return (
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                            <div className="dtd-team-box-member">
+                            <div className="dtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
                               {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
-                              <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
+                              <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
                             </div>
                           </Link>
-                        ))}
+                        );})}
                       </div>
                       <div className="dtd-team-box-footer">
                         <span>{team.members?.length || 0} players</span>
@@ -1349,7 +1353,12 @@ function DotaTournamentDetailInner() {
                     herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
                   };
                   const playerBracketMap: Record<string, string> = {};
-                  players.forEach((p: any) => { if (p.uid && p.dotaBracket) playerBracketMap[p.uid] = p.dotaBracket; });
+                  const playerAvatarMap: Record<string, string> = {};
+                  players.forEach((p: any) => {
+                    if (p.uid && p.dotaBracket) playerBracketMap[p.uid] = p.dotaBracket;
+                    if (p.uid && p.steamAvatar) playerAvatarMap[p.uid] = p.steamAvatar;
+                  });
+                  const kdaScore = (p: any) => ((p.totalKills || 0) + 0.5 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
                   const grouped: Record<string, any[]> = {};
                   leaderboard.forEach((p: any) => {
                     const bracket = playerBracketMap[p.uid || p.id] || "herald_guardian";
@@ -1361,31 +1370,84 @@ function DotaTournamentDetailInner() {
                     const order = ["herald_guardian", "crusader_archon", "legend_ancient", "divine_immortal"];
                     return order.indexOf(b) - order.indexOf(a);
                   });
-                  // Per-bracket MVP: highest score in each bracket
+                  // Per-bracket MVP: highest KDA in each bracket
                   const bracketMvpMap: Record<string, string> = {};
+                  const bracketMvpData: { bracket: string; player: any }[] = [];
                   for (const bracket of sortedBrackets) {
-                    if (grouped[bracket].length > 0) bracketMvpMap[grouped[bracket][0].id] = bracket;
+                    const kdaSorted = [...grouped[bracket]].sort((a: any, b: any) => {
+                      const diff = kdaScore(b) - kdaScore(a);
+                      if (Math.abs(diff) > 0.01) return diff;
+                      return (b.totalKills || 0) - (a.totalKills || 0);
+                    });
+                    if (kdaSorted.length > 0) {
+                      bracketMvpMap[kdaSorted[0].id] = bracket;
+                      bracketMvpData.push({ bracket, player: kdaSorted[0] });
+                    }
                   }
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                      {/* ── MVP Banner ── */}
+                      <div style={{ padding: "16px 0" }}>
+                        <div style={{ textAlign: "center", marginBottom: 16 }}>
+                          <div style={{ fontSize: "1.4rem", marginBottom: 4 }}>{"\u{1F451}"}</div>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#8A8880" }}>Bracket MVPs</span>
+                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.5 &times; A) / D</div>
+                        </div>
+                        <div className="dtd-tier-columns" style={{ justifyContent: "center" }}>
+                          {bracketMvpData.map(({ bracket: bk, player: pl }) => {
+                            const bColors = bracketColors[bk] || bracketColors.herald_guardian;
+                            const avatar = playerAvatarMap[pl.uid] || "";
+                            const kda = kdaScore(pl);
+                            return (
+                              <div key={bk} className="dtd-tier-col" style={{ minWidth: 130, maxWidth: 180 }}>
+                                <div className="dtd-tier-header" style={{ background: bColors.bg, border: `1px solid ${bColors.border}`, color: bColors.text, justifyContent: "center" }}>
+                                  <span>{bColors.label}</span>
+                                </div>
+                                <div onClick={() => pl.uid && router.push(`/player/${pl.uid}?tab=dota`)} style={{ cursor: pl.uid ? "pointer" : "default", padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                  {avatar ? (
+                                    <img src={avatar} alt={pl.name || pl.steamName} style={{ width: 48, height: 48, borderRadius: "50%", border: `2px solid ${bColors.border}` }} />
+                                  ) : (
+                                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: bColors.bg, border: `2px solid ${bColors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: bColors.text }}>{((pl.name || pl.steamName || "?")[0]).toUpperCase()}</div>
+                                  )}
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{pl.name || pl.steamName}</div>
+                                  </div>
+                                  <div style={{ fontWeight: 800, fontSize: "0.9rem", color: bColors.text }}>{Math.round(kda * 100) / 100} KDA</div>
+                                  <div style={{ fontSize: "0.65rem", color: "#555550" }}>{pl.totalKills || 0}K / {pl.totalDeaths || 0}D / {pl.totalAssists || 0}A</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {sortedBrackets.map((bracket) => {
                         const colors = bracketColors[bracket] || bracketColors.herald_guardian;
                         const entries = grouped[bracket];
                         return (
                           <div key={bracket}>
-                            <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
                               <span>{colors.label}</span>
-                              <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>{entries.length} player{entries.length !== 1 ? "s" : ""}</span>
+                              <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: 8 }}>({entries.length})</span>
                             </div>
                             <div style={{ overflowX: "auto" }}>
                               <table className="dtd-standings-table">
-                                <thead><tr><th>#</th><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
+                                <thead><tr><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
                                 <tbody>{entries.map((p: any, i: number) => {
                                   const isMvp = bracketMvpMap[p.id] === bracket;
+                                  const isMeRow = user?.uid === p.uid;
+                                  let rowBg: React.CSSProperties = {};
+                                  if (isMeRow) rowBg = { background: "rgba(60,203,255,0.08)", boxShadow: "inset 2px 0 0 #3CCBFF" };
+                                  else if (isMvp) rowBg = { background: colors.bg };
+
+                                  const playerCell = (<>
+                                    <div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
+                                    <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: colors.text, padding: "1px 5px", borderRadius: 4, background: colors.bg, whiteSpace: "nowrap" }}>{colors.label}</span></div>
+                                  </>);
+
                                   return (
-                                  <tr key={p.id} style={isMvp ? { background: colors.bg } : {}}>
-                                    <td style={{ fontWeight: 800, color: isMvp ? colors.text : i < 3 ? colors.text : "#555550" }}>{isMvp ? "\u{1F451}" : i + 1}</td>
-                                    <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}</div></Link>) : (<div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}</div>)}</td>
+                                  <tr key={p.id} style={rowBg}>
+                                    <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}>{playerCell}</Link>) : playerCell}</td>
                                     <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
                                     <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
                                     <td>{p.totalAssists || 0}</td>
@@ -1399,6 +1461,9 @@ function DotaTournamentDetailInner() {
                           </div>
                         );
                       })}
+                      <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.5 &times; A) / D.
+                      </div>
                     </div>
                   );
                 })()}
