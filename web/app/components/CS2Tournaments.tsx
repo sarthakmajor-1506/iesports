@@ -193,7 +193,7 @@ export default function CS2Tournaments() {
                       )}
                       <div className="cs-card-accent" style={{ background: "#f0a500", position: "relative", zIndex: 1 }} />
                       <div className="cs-card-body" style={{ position: "relative", zIndex: 1 }}>
-                        <div className="cs-card-icon"><img src="/csgologo.png" alt="CS2" /></div>
+                        <div className="cs-card-icon"><img src="/cs2logo.png" alt="CS2" /></div>
                         <div className="cs-card-info">
                           <div className="cs-card-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>{t.name}{isActive && <span style={{ fontSize: "0.6rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(34,197,94,0.12)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)", whiteSpace: "nowrap", lineHeight: 1.4 }}>LIVE</span>}</div>
                           <div className="cs-card-meta">
@@ -273,7 +273,7 @@ export default function CS2Tournaments() {
                       )}
                       <div className="cs-card-accent" style={{ background: "#fbbf24", position: "relative", zIndex: 1 }} />
                       <div className="cs-card-body" style={{ position: "relative", zIndex: 1 }}>
-                        <div className="cs-card-icon"><img src="/csgologo.png" alt="CS2" /></div>
+                        <div className="cs-card-icon"><img src="/cs2logo.png" alt="CS2" /></div>
                         <div className="cs-card-info">
                           <div className="cs-card-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             {t.name}

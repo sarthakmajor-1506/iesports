@@ -140,7 +140,7 @@ export default function CS2() {
             <Image className="cs2-hero-img" src="/csimagehd.jpg" alt="CS2" width={1920} height={1080} priority draggable={false} />
             <div className="cs2-hero-overlay" />
             <div className={`cs2-hero-content${mounted ? " show" : ""}`}>
-              <Image className="cs2-hero-logo" src="/csgologo.png" alt="CS2" width={56} height={56} />
+              <Image className="cs2-hero-logo" src="/cs2logo.png" alt="CS2" width={56} height={56} />
               <div className="cs2-hero-text">
                 <div className="cs2-hero-title">CS2 <span>Tournaments</span></div>
                 <div className="cs2-hero-sub">Competitive Counter-Strike 2 for Indian players</div>
