@@ -142,7 +142,8 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const isShuffle = tournament?.format === "shuffle";
   const accentColor = isCS2 ? "#f0a500" : isValorant ? "#3CCBFF" : "#f97316";
 
-  const isProfilePrivate = !isValorant && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
+  const isDota = game === "dota2" || (!isValorant && !isCS2);
+  const isProfilePrivate = isDota && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
 
   // ── Re-check linked accounts when user returns from another tab ────────
   const [localDiscord, setLocalDiscord] = useState(false);
@@ -699,7 +700,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         )}
 
         {/* Dota: private profile warning */}
-        {!isValorant && isProfilePrivate && actualStep === "choose" && (
+        {isDota && isProfilePrivate && actualStep === "choose" && (
           <div style={{
             background: "#1a1200", border: "1px solid #854d0e",
             borderRadius: 10, padding: "12px 14px", marginBottom: 20,
@@ -896,7 +897,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               </div>
             )}
 
-            {!isValorant && isProfilePrivate && (
+            {isDota && isProfilePrivate && (
               <div style={{ marginTop: 16, background: "#1a1200", border: "1px solid #854d0e", borderRadius: 8, padding: "10px 14px", textAlign: "left" as const }}>
                 <p style={{ color: "#fbbf24", fontSize: 12, fontWeight: 700, marginBottom: 3 }}>⚠️ Action needed to claim prizes</p>
                 <p style={{ color: "#92400e", fontSize: 11, lineHeight: 1.6 }}>
