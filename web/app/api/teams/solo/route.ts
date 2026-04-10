@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No slots left in your bracket" }, { status: 400 });
     }
 
-    // Add to solo pool
+    // Add to solo pool (legacy global collection)
     await adminDb.collection("soloPool").add({
       tournamentId,
       uid,
@@ -48,9 +48,22 @@ export async function POST(req: NextRequest) {
       registeredAt: new Date(),
     });
 
-    console.log("About to write registeredTournaments for uid:", uid, "tournamentId:", tournamentId);
+    // Also write to tournament's players subcollection (read by tournament detail page)
+    await adminDb.collection("tournaments").doc(tournamentId)
+      .collection("players").doc(uid).set({
+        uid,
+        fullName: userData.fullName || "",
+        steamName: userData.steamName || "",
+        steamAvatar: userData.steamAvatar || "",
+        dotaBracket: bracket,
+        dotaRankTier: userData.dotaRankTier || 0,
+        dotaMMR: mmr || userData.dotaMMR || 0,
+        discordId: userData.discordId || "",
+        discordUsername: userData.discordUsername || "",
+        registeredAt: new Date().toISOString(),
+      });
+
     await adminDb.collection("users").doc(uid).update({ registeredTournaments: FieldValue.arrayUnion(tournamentId) });
-    console.log("Successfully wrote registeredTournaments");
 
     // Increment slotsBooked
     await adminDb.collection("tournaments").doc(tournamentId).update({
