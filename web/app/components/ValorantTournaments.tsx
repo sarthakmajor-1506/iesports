@@ -131,8 +131,35 @@ export default function ValorantTournaments() {
         .vt-empty-icon { font-size: 44px; margin-bottom: 12px; }
         .vt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
-        @media (max-width: 700px) { .vt-card-body { gap: 12px; padding: 13px 14px; } .vt-card-right { padding-right: 14px; gap: 10px; } .vt-card-icon { width: 38px; height: 38px; } .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } .vt-meta-item { display: none; } .vt-card-meta { gap: 6px; } .vt-card-meta .vt-meta-item:nth-child(-n+3) { display: flex; } }
-        @media (max-width: 500px) { .vt-wrap { padding: 16px 16px 44px; } .vt-card { flex-direction: column; } .vt-card-accent { width: 100%; height: 3px; } .vt-card-body { padding: 13px 14px; } .vt-card-name { white-space: normal; } .vt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .vt-slots { min-width: unset; width: 100%; } .vt-slots-text { text-align: left; } .vt-card-meta .vt-meta-item { display: flex; } .vt-reg-btn, .vt-reg-done, .vt-coming-soon, .vt-leaderboard-btn { min-width: unset; } }
+        @media (max-width: 700px) {
+          .vt-card-body { gap: 12px; padding: 14px 14px; }
+          .vt-card-right { padding-right: 14px; gap: 10px; }
+          .vt-card-icon { width: 38px; height: 38px; }
+          .vt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; }
+          .vt-meta-item { display: none; }
+          .vt-card-meta { gap: 6px; }
+          .vt-card-meta .vt-meta-item:nth-child(-n+3) { display: flex; }
+        }
+        @media (max-width: 500px) {
+          .vt-wrap { padding: 16px 14px 44px; }
+          .vt-stats { gap: 8px; justify-content: center; }
+          .vt-stat-pill { padding: 6px 14px; }
+          .vt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .vt-card { flex-direction: column; border-radius: 14px; margin-bottom: 14px; }
+          .vt-card-accent { width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
+          .vt-card-body { padding: 16px 16px 12px; gap: 12px; }
+          .vt-card-icon { width: 40px; height: 40px; border-radius: 10px; }
+          .vt-card-name { white-space: normal; font-size: 0.95rem; line-height: 1.3; }
+          .vt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+          .vt-card-meta .vt-meta-item { display: flex; }
+          .vt-meta-key { font-size: 0.56rem; }
+          .vt-meta-val { font-size: 0.76rem; }
+          .vt-card-right { padding: 0 16px 16px; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
+          .vt-slots { min-width: unset; width: 100%; }
+          .vt-slots-text { text-align: left; font-size: 0.74rem; }
+          .vt-slots-bar { height: 5px; border-radius: 3px; }
+          .vt-reg-btn, .vt-reg-done, .vt-coming-soon, .vt-leaderboard-btn { min-width: unset; width: 100%; padding: 10px 16px; font-size: 0.8rem; }
+        }
       `}</style>
 
       <div className="vt-wrap">

@@ -155,13 +155,16 @@ export default function Valorant() {
         .val-coming-soon-text { font-size: 0.85rem; display: block; margin-top: 8px; }
 
         @media (max-width: 700px) {
-          .val-hero { height: 260px; }
-          .val-hero-title { font-size: 1.7rem; }
-          .val-hero-content { padding: 0 16px 22px; }
-          .val-hero-logo { width: 42px; height: 42px; }
-          .val-banner { padding: 10px 16px 0; }
-          .val-tabs-wrap { padding: 18px 16px 0; }
-          .val-tab { padding: 9px 18px; font-size: 0.84rem; }
+          .val-hero { height: 240px; }
+          .val-hero-title { font-size: 1.6rem; }
+          .val-hero-content { padding: 0 16px 22px; gap: 14px; }
+          .val-hero-logo { width: 40px; height: 40px; border-radius: 12px; }
+          .val-hero-sub { font-size: 0.78rem; }
+          .val-banner { padding: 10px 14px 0; }
+          .val-banner-box { padding: 10px 14px; font-size: 0.78rem; border-radius: 10px; }
+          .val-tabs-wrap { padding: 18px 14px 0; }
+          .val-tabs { width: 100%; }
+          .val-tab { padding: 10px 0; font-size: 0.84rem; flex: 1; justify-content: center; }
         }
       `}</style>
 
