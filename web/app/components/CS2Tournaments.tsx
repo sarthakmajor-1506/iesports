@@ -12,20 +12,21 @@ export default function CS2Tournaments() {
 
   const registeredSet: Set<string> = registeredIds instanceof Set ? registeredIds : new Set(Array.isArray(registeredIds) ? registeredIds : []);
 
-  useEffect(() => {
+  const fetchTournaments = () => {
     fetch("/api/tournaments/list?game=cs2")
       .then(r => r.json())
-      .then(data => {
-        setTournaments(data.tournaments || []);
-        setTLoading(false);
-      })
+      .then(data => { setTournaments(data.tournaments || []); setTLoading(false); })
       .catch(() => setTLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchTournaments(); }, []);
 
   useEffect(() => {
-    const onFocus = () => { refreshUser(); };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    refreshUser();
+    const onVis = () => { if (document.visibilityState === "visible") { refreshUser(); fetchTournaments(); } };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", () => { refreshUser(); fetchTournaments(); });
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", refreshUser); };
   }, [refreshUser]);
 
   const totalSlotsRemaining = tournaments.reduce((acc: number, t: any) => acc + (t.totalSlots - t.slotsBooked), 0);
