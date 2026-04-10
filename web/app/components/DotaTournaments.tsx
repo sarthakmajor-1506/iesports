@@ -126,8 +126,36 @@ export default function DotaTournaments() {
         .dt-empty-icon { font-size: 44px; margin-bottom: 12px; }
         .dt-empty-text { font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
-        @media (max-width: 700px) { .dt-card-body { gap: 12px; padding: 13px 14px; } .dt-card-right { padding-right: 14px; gap: 10px; } .dt-card-icon { width: 38px; height: 38px; } .dt-card-icon img { width: 26px; height: 26px; } .dt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; } .dt-meta-item { display: none; } .dt-card-meta { gap: 6px; } .dt-card-meta .dt-meta-item:nth-child(-n+3) { display: flex; } }
-        @media (max-width: 500px) { .dt-wrap { padding: 16px 16px 44px; } .dt-card { flex-direction: column; } .dt-card-accent { width: 100%; height: 3px; } .dt-card-body { padding: 13px 14px; } .dt-card-name { white-space: normal; } .dt-card-right { padding: 0 14px 14px; justify-content: space-between; width: 100%; box-sizing: border-box; } .dt-slots { min-width: unset; width: 100%; } .dt-slots-text { text-align: left; } .dt-card-meta .dt-meta-item { display: flex; } .dt-reg-btn, .dt-reg-done, .dt-coming-soon, .dt-leaderboard-btn { min-width: unset; } }
+        @media (max-width: 700px) {
+          .dt-card-body { gap: 12px; padding: 14px 14px; }
+          .dt-card-right { padding-right: 14px; gap: 10px; }
+          .dt-card-icon { width: 38px; height: 38px; }
+          .dt-card-icon img { width: 26px; height: 26px; }
+          .dt-reg-btn { padding: 7px 14px; font-size: 0.72rem; min-width: 110px; }
+          .dt-meta-item { display: none; }
+          .dt-card-meta { gap: 6px; }
+          .dt-card-meta .dt-meta-item:nth-child(-n+3) { display: flex; }
+        }
+        @media (max-width: 500px) {
+          .dt-wrap { padding: 16px 14px 44px; }
+          .dt-stats { gap: 8px; justify-content: center; }
+          .dt-stat-pill { padding: 6px 14px; }
+          .dt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .dt-card { flex-direction: column; border-radius: 14px; margin-bottom: 14px; }
+          .dt-card-accent { width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
+          .dt-card-body { padding: 16px 16px 12px; gap: 12px; }
+          .dt-card-icon { width: 40px; height: 40px; }
+          .dt-card-name { white-space: normal; font-size: 0.95rem; line-height: 1.3; }
+          .dt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+          .dt-card-meta .dt-meta-item { display: flex; }
+          .dt-meta-key { font-size: 0.56rem; }
+          .dt-meta-val { font-size: 0.76rem; }
+          .dt-card-right { padding: 0 16px 16px; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
+          .dt-slots { min-width: unset; width: 100%; }
+          .dt-slots-text { text-align: left; font-size: 0.74rem; }
+          .dt-slots-bar { height: 5px; border-radius: 3px; }
+          .dt-reg-btn, .dt-reg-done, .dt-coming-soon, .dt-leaderboard-btn { min-width: unset; width: 100%; padding: 10px 16px; font-size: 0.8rem; }
+        }
       `}</style>
 
       <div className="dt-wrap">
