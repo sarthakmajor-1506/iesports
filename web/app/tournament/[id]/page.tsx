@@ -1175,7 +1175,12 @@ function DotaTournamentDetailInner() {
                             </div>
                             {bracketPlayers.map((p: any) => {
                               const displayName = p.fullName || p.steamName || "Player";
-                              const rankLabel = p.dotaMMR ? `${p.dotaMMR} MMR` : colors.label;
+                              const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+                              const tier = p.dotaRankTier || 0;
+                              const medal = Math.floor(tier / 10);
+                              const stars = tier % 10;
+                              const rankName = tier > 0 && medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : "";
+                              const rankLabel = p.dotaMMR ? `${rankName ? rankName + " · " : ""}${p.dotaMMR} MMR` : rankName || colors.label;
                               return (
                               <Link key={p.uid || p.id} href={`/player/${p.uid || p.id}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                                 <div className="dtd-tier-player">
