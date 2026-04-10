@@ -505,8 +505,7 @@ function CS2TournamentDetailInner() {
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
 
-  // Initial data load via API (works for everyone, including unauthenticated)
-  useEffect(() => {
+  const refetchData = () => {
     if (!id) return;
     fetch(`/api/tournaments/detail?id=${id}&game=cs2`)
       .then(r => r.json())
@@ -529,7 +528,10 @@ function CS2TournamentDetailInner() {
         setTLoading(false);
       })
       .catch(() => setTLoading(false));
-  }, [id]);
+  };
+
+  // Initial data load via API
+  useEffect(() => { refetchData(); }, [id]);
 
   // Re-fetch data when user logs in (to check registration status)
   useEffect(() => {
@@ -580,6 +582,8 @@ function CS2TournamentDetailInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      setIsRegistered(false);
+      refetchData();
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -1885,7 +1889,7 @@ function CS2TournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => setIsRegistered(true)} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
 
       {/* ═══ LOGIN PROMPT ═══ */}
       {showLoginPrompt && !user && (

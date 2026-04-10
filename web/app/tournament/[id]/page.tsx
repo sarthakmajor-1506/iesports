@@ -461,8 +461,7 @@ function DotaTournamentDetailInner() {
   const [matches, setMatches] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
-  // Initial data load via API (works for everyone, including unauthenticated)
-  useEffect(() => {
+  const refetchData = () => {
     if (!id) return;
     fetch(`/api/tournaments/detail?id=${id}&game=dota2`)
       .then(r => r.json())
@@ -485,7 +484,10 @@ function DotaTournamentDetailInner() {
         setTLoading(false);
       })
       .catch(() => setTLoading(false));
-  }, [id]);
+  };
+
+  // Initial data load via API
+  useEffect(() => { refetchData(); }, [id]);
 
   // Real-time updates for logged-in users via onSnapshot
   // Real-time updates — only tournament doc + players (for registration status)
@@ -597,6 +599,7 @@ function DotaTournamentDetailInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
+      refetchData();
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -1517,7 +1520,7 @@ function DotaTournamentDetailInner() {
           user={user}
           dotaProfile={dotaProfile}
           onClose={() => setShowRegister(false)}
-          onSuccess={() => setIsRegistered(true)}
+          onSuccess={() => { setIsRegistered(true); refetchData(); }}
         />
       )}
 

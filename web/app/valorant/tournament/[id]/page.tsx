@@ -505,8 +505,7 @@ function ValorantTournamentDetailInner() {
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
 
-  // Initial data load via API (works for everyone, including unauthenticated)
-  useEffect(() => {
+  const refetchData = () => {
     if (!id) return;
     fetch(`/api/tournaments/detail?id=${id}&game=valorant`)
       .then(r => r.json())
@@ -529,7 +528,10 @@ function ValorantTournamentDetailInner() {
         setTLoading(false);
       })
       .catch(() => setTLoading(false));
-  }, [id]);
+  };
+
+  // Initial data load via API (works for everyone, including unauthenticated)
+  useEffect(() => { refetchData(); }, [id]);
 
   // Real-time updates — only tournament doc + soloPlayers (for registration status + slot count)
   // Other data (teams, matches, standings, leaderboard) loaded via API and refreshed on tab switch
@@ -575,6 +577,8 @@ function ValorantTournamentDetailInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      setIsRegistered(false);
+      refetchData();
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -1880,7 +1884,7 @@ function ValorantTournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => setIsRegistered(true)} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
 
       {/* ═══ LOGIN PROMPT ═══ */}
       {showLoginPrompt && !user && (
