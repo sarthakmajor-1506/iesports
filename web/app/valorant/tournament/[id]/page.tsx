@@ -1832,7 +1832,7 @@ function ValorantTournamentDetailInner() {
 
                                 const playerCell = (<>
                                   <div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div>
-                                  <span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span>
+                                  <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></div>
                                 </>);
 
                                 return (
