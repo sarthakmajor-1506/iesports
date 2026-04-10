@@ -1763,7 +1763,7 @@ function ValorantTournamentDetailInner() {
                         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#8A8880" }}>Bracket MVPs</span>
                         <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.5 &times; A) / D</div>
                       </div>
-                      <div className="vtd-tier-columns">
+                      <div className="vtd-tier-columns" style={{ justifyContent: "center" }}>
                         {bracketMvpData.map(({ rankKey, player }) => {
                           const gColors = rankGroupColors[rankKey];
                           const pRank = getPlayerRank(player);
