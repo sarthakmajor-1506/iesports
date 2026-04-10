@@ -1256,10 +1256,10 @@ function ValorantTournamentDetailInner() {
           )}
 
           {/* ═══ TAB BAR ═══ */}
-          <div className="vtd-tabs-wrap" ref={tabsWrapRef}
+          <div className="vtd-tabs-wrap" ref={tabsWrapRef}>
             <div className="vtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }} title={t.label}>
+                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} title={t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
                   <span className="vtd-tab-label">{t.label}</span>
                   {t.key === "players" && <span className="vtd-tab-count">{players.length}</span>}
