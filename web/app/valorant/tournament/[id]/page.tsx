@@ -1782,7 +1782,6 @@ function ValorantTournamentDetailInner() {
                                 )}
                                 <div style={{ textAlign: "center" }}>
                                   <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{player.name}</div>
-                                  <div style={{ fontSize: "0.65rem", color: "#555550" }}>#{player.tag}</div>
                                 </div>
                                 <div style={{ fontWeight: 800, fontSize: "0.9rem", color: gColors.text }}>{Math.round(kda * 100) / 100} KDA</div>
                                 <div style={{ fontSize: "0.65rem", color: "#555550" }}>{player.totalKills || 0}K / {player.totalDeaths || 0}D / {player.totalAssists || 0}A</div>
