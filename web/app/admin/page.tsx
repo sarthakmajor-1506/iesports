@@ -1450,83 +1450,99 @@ export default function AdminPanel() {
                         {hasLobby && !isLive && !isCompleted && (
                           <div style={{ marginTop: 10 }}>
                             {!hasVeto && <div style={stepHint("#f59e0b")}>Consider completing toss & veto first (or skip if not needed)</div>}
-                            {/* VC Status (move-based check) */}
-                            {m.vcStatus && (
-                              <div style={{ padding: 12, background: "#0f0f11", borderRadius: 8, border: "1px solid #222", marginBottom: 10, marginTop: 6 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                                  <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#666", letterSpacing: "0.1em" }}>VC STATUS</span>
-                                  <button disabled={loading} style={{ fontSize: "0.58rem", padding: "3px 10px", background: "#1a1a1e", border: "1px solid #333", borderRadius: 6, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
-                                    onClick={() => apiCall("/api/valorant/match-update", { tournamentId, matchId: opsMatchId, action: "check-vc" })}>Refresh</button>
-                                </div>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                  {m.vcStatus.inVc.map((name, i) => (
-                                    <span key={`in-${i}`} style={{ fontSize: "0.68rem", padding: "2px 10px", borderRadius: 100, background: "#0a200f", border: "1px solid #16a34a44", color: "#4ade80" }}>{name}</span>
-                                  ))}
-                                  {m.vcStatus.notInVc.map((name, i) => (
-                                    <span key={`out-${i}`} style={{ fontSize: "0.68rem", padding: "2px 10px", borderRadius: 100, background: "#200a0a", border: "1px solid #dc262644", color: "#f87171" }}>{name}</span>
-                                  ))}
-                                </div>
-                                {m.vcStatus.notInVc.length > 0 && (
-                                  <div style={{ fontSize: "0.62rem", color: "#f59e0b", marginTop: 6 }}>
-                                    {m.vcStatus.notInVc.length} player(s) not in VC — ask them to join Discord voice
-                                  </div>
-                                )}
-                              </div>
-                            )}
                             <div style={{ display: "flex", gap: 8 }}>
                               <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
                                 tournamentId, matchId: opsMatchId, action: "start",
                               })}>Start Match</button>
-                              {!m.vcStatus && hasWaitingRoom && (
-                                <button disabled={loading} style={{ ...btnSecondary, fontSize: "0.72rem" }} onClick={() => apiCall("/api/valorant/match-update", {
-                                  tournamentId, matchId: opsMatchId, action: "check-vc",
-                                })}>Check VC Status</button>
-                              )}
+                              <button disabled={loading} style={{ ...btnSecondary, fontSize: "0.72rem" }} onClick={() => apiCall("/api/valorant/match-update", {
+                                tournamentId, matchId: opsMatchId, action: "check-vc",
+                              })}>Check VC Status</button>
                             </div>
                           </div>
                         )}
                         {(isLive || isCompleted) && <div style={stepHint("#4ade80")}>Match is {m.status}</div>}
 
-                        {/* ── Live VC Monitor (real-time from bot) ──────────────── */}
-                        {m.vcLiveStatus && (hasWaitingRoom || hasTeamVcs || isLive) && (() => {
-                          const vcMemberBadge = (member: VcMember) => {
-                            const muted = member.selfMute || member.serverMute;
-                            const deafened = member.selfDeaf || member.serverDeaf;
-                            const icon = deafened ? "🔇" : muted ? "🔸" : "🎤";
-                            const bg = deafened ? "#200a0a" : muted ? "#2a2008" : "#0a200f";
-                            const border = deafened ? "#dc262644" : muted ? "#f59e0b44" : "#16a34a44";
-                            const color = deafened ? "#f87171" : muted ? "#fbbf24" : "#4ade80";
+                        {/* ── Team VC Roster — always visible when lobby is set ─── */}
+                        {hasLobby && (() => {
+                          const team1 = teams.find(t => t.id === m.team1Id);
+                          const team2 = teams.find(t => t.id === m.team2Id);
+                          const live = m.vcLiveStatus;
+                          const liveConnected = new Set<string>();
+                          const liveMap = new Map<string, VcMember>();
+
+                          // Build lookup of all connected members by discordId
+                          if (live) {
+                            for (const arr of [live.waitingRoom || [], live.team1 || [], live.team2 || []]) {
+                              for (const vm of arr) { liveConnected.add(vm.discordId); liveMap.set(vm.discordId, vm); }
+                            }
+                          }
+
+                          const renderTeamRoster = (team: TeamData | undefined, teamLabel: string, vcMembers: VcMember[] | undefined, color: string) => {
+                            const members = team?.members || [];
                             return (
-                              <span key={member.discordId} style={{ fontSize: "0.68rem", padding: "3px 10px", borderRadius: 100, background: bg, border: `1px solid ${border}`, color, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                {icon} {member.name}
-                              </span>
+                              <div style={{ flex: 1, padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #1e1e22" }}>
+                                <div style={{ fontSize: "0.6rem", fontWeight: 800, color, letterSpacing: "0.08em", marginBottom: 8 }}>
+                                  {teamLabel.toUpperCase()} ({members.length})
+                                </div>
+                                {members.length === 0 && <div style={{ fontSize: "0.66rem", color: "#444" }}>No members loaded</div>}
+                                {members.map((member: any, i: number) => {
+                                  const discordId = member.uid?.replace("discord_", "") || "";
+                                  const name = member.riotGameName || member.uid || `Player ${i + 1}`;
+                                  const vcMember = liveMap.get(discordId);
+                                  const isConnected = liveConnected.has(discordId);
+
+                                  // Determine status
+                                  let icon = "⬜";
+                                  let statusColor = "#444";
+                                  let statusBg = "#141416";
+                                  let statusBorder = "#222";
+                                  let statusLabel = "unknown";
+
+                                  if (live) {
+                                    if (isConnected && vcMember) {
+                                      const deafened = vcMember.selfDeaf || vcMember.serverDeaf;
+                                      const muted = vcMember.selfMute || vcMember.serverMute;
+                                      if (deafened) { icon = "🔇"; statusColor = "#f87171"; statusBg = "#200a0a"; statusBorder = "#dc262644"; statusLabel = "deafened"; }
+                                      else if (muted) { icon = "🔸"; statusColor = "#fbbf24"; statusBg = "#2a2008"; statusBorder = "#f59e0b44"; statusLabel = "muted"; }
+                                      else { icon = "🎤"; statusColor = "#4ade80"; statusBg = "#0a200f"; statusBorder = "#16a34a44"; statusLabel = "mic on"; }
+                                    } else {
+                                      icon = "⭕"; statusColor = "#f87171"; statusBg = "#1a0808"; statusBorder = "#7f1d1d44"; statusLabel = "not in VC";
+                                    }
+                                  } else if (m.vcStatus) {
+                                    // Fallback to move-based check
+                                    if (m.vcStatus.inVc.includes(name)) { icon = "✅"; statusColor = "#4ade80"; statusBg = "#0a200f"; statusBorder = "#16a34a44"; statusLabel = "in VC"; }
+                                    else if (m.vcStatus.notInVc.includes(name)) { icon = "⭕"; statusColor = "#f87171"; statusBg = "#1a0808"; statusBorder = "#7f1d1d44"; statusLabel = "not in VC"; }
+                                  }
+
+                                  return (
+                                    <div key={member.uid || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", marginBottom: 3, background: statusBg, borderRadius: 8, border: `1px solid ${statusBorder}` }}>
+                                      <span style={{ fontSize: "0.72rem", color: "#ccc", fontWeight: 600 }}>{name}</span>
+                                      <span style={{ fontSize: "0.62rem", color: statusColor, display: "flex", alignItems: "center", gap: 4 }}>
+                                        {icon} {statusLabel}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             );
                           };
-                          const sections: { label: string; members: VcMember[]; color: string }[] = [];
-                          if (m.vcLiveStatus.waitingRoom?.length > 0) sections.push({ label: "Waiting Room", members: m.vcLiveStatus.waitingRoom, color: "#888" });
-                          if (m.vcLiveStatus.team1?.length > 0) sections.push({ label: m.team1Name, members: m.vcLiveStatus.team1, color: "#f87171" });
-                          if (m.vcLiveStatus.team2?.length > 0) sections.push({ label: m.team2Name, members: m.vcLiveStatus.team2, color: "#60a5fa" });
-                          if (sections.length === 0) return null;
+
                           return (
-                            <div style={{ padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #1e1e22", marginTop: 10 }}>
+                            <div style={{ marginTop: 10 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>LIVE VOICE CHANNELS</span>
-                                <span style={{ fontSize: "0.54rem", color: "#444" }}>
-                                  {m.vcLiveStatus.updatedAt ? new Date(m.vcLiveStatus.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : ""}
-                                </span>
-                              </div>
-                              {sections.map(sec => (
-                                <div key={sec.label} style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: "0.6rem", fontWeight: 800, color: sec.color, letterSpacing: "0.08em", marginBottom: 4 }}>
-                                    {sec.label.toUpperCase()} ({sec.members.length})
-                                  </div>
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                    {sec.members.map(vcMemberBadge)}
-                                  </div>
+                                <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>TEAM VC STATUS</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  {live?.updatedAt && <span style={{ fontSize: "0.54rem", color: "#444" }}>Live — {new Date(live.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}</span>}
+                                  <button disabled={loading} style={{ fontSize: "0.58rem", padding: "3px 10px", background: "#1a1a1e", border: "1px solid #333", borderRadius: 6, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
+                                    onClick={() => apiCall("/api/valorant/match-update", { tournamentId, matchId: opsMatchId, action: "check-vc" })}>Refresh</button>
                                 </div>
-                              ))}
-                              <div style={{ fontSize: "0.54rem", color: "#444", marginTop: 4 }}>
-                                🎤 mic on · 🔸 muted · 🔇 deafened — updates live from Discord
+                              </div>
+                              <div style={{ display: "flex", gap: 10 }}>
+                                {renderTeamRoster(team1, m.team1Name, live?.team1, "#f87171")}
+                                {renderTeamRoster(team2, m.team2Name, live?.team2, "#60a5fa")}
+                              </div>
+                              <div style={{ fontSize: "0.54rem", color: "#444", marginTop: 6, textAlign: "center" as const }}>
+                                🎤 mic on · 🔸 muted · 🔇 deafened · ⭕ not in VC — {live ? "updates live from Discord bot" : "click Refresh to check"}
                               </div>
                             </div>
                           );
