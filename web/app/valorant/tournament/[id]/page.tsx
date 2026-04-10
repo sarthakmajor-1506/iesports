@@ -499,6 +499,7 @@ function ValorantTournamentDetailInner() {
   const [logoError, setLogoError] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
+  const tabsWrapRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
@@ -1120,7 +1121,7 @@ function ValorantTournamentDetailInner() {
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button
-                        onClick={() => setActiveTab("brackets")}
+                        onClick={() => { setActiveTab("brackets"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(255,215,0,0.12)", color: "#ffd700",
                           border: "1px solid rgba(255,215,0,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1130,7 +1131,7 @@ function ValorantTournamentDetailInner() {
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,215,0,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
                       >View Brackets</button>
                       <button
-                        onClick={() => setActiveTab("matches")}
+                        onClick={() => { setActiveTab("matches"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
                           border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1140,7 +1141,7 @@ function ValorantTournamentDetailInner() {
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
                       >Match History</button>
                       <button
-                        onClick={() => setActiveTab("leaderboard")}
+                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(255,255,255,0.06)", color: "#8A8880",
                           border: "1px solid rgba(255,255,255,0.1)", borderRadius: 100, fontSize: "0.86rem",
@@ -1194,7 +1195,7 @@ function ValorantTournamentDetailInner() {
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
                       <button
-                        onClick={() => setActiveTab("leaderboard")}
+                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
                           border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1255,7 +1256,7 @@ function ValorantTournamentDetailInner() {
           )}
 
           {/* ═══ TAB BAR ═══ */}
-          <div className="vtd-tabs-wrap">
+          <div className="vtd-tabs-wrap" ref={tabsWrapRef}
             <div className="vtd-tabs">
               {TABS.map(t => (
                 <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); }} title={t.label}>
