@@ -12,7 +12,8 @@ import { getFirebaseAuth } from "@/lib/firebase";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
-interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; waitingRoomVcId?: string; team1VcId?: string; team2VcId?: string; vcStatus?: { inVc: string[]; notInVc: string[]; checkedAt: string }; vetoState?: { status: string; bo: number; tossWinner: string; actions: { team: string; action: string; map: string }[]; remainingMaps: string[]; sidePickOnDecider?: string; team1Name: string; team2Name: string }; }
+interface VcMember { discordId: string; name: string; selfMute: boolean; selfDeaf: boolean; serverMute: boolean; serverDeaf: boolean; }
+interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; waitingRoomVcId?: string; team1VcId?: string; team2VcId?: string; vcStatus?: { inVc: string[]; notInVc: string[]; checkedAt: string }; vcLiveStatus?: { team1: VcMember[]; team2: VcMember[]; waitingRoom: VcMember[]; updatedAt: string }; vetoState?: { status: string; bo: number; tossWinner: string; actions: { team: string; action: string; map: string }[]; remainingMaps: string[]; sidePickOnDecider?: string; team1Name: string; team2Name: string }; }
 interface DiscordConnection { type: string; name: string; id: string; verified: boolean; }
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
@@ -1357,11 +1358,34 @@ export default function AdminPanel() {
 
                       {/* ── Step 1: Set Lobby ──────────────────────────────────── */}
                       <div style={stepBox(true, hasLobby)}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <span style={stepDone(hasLobby)}>{hasLobby ? "✓" : "1"}</span>
-                          <span style={stepTitle}>Set Lobby & Notify Discord</span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={stepDone(hasLobby)}>{hasLobby ? "✓" : "1"}</span>
+                            <span style={stepTitle}>Set Lobby & Notify Discord</span>
+                          </div>
+                          {hasLobby && !isCompleted && (
+                            <button style={{ fontSize: "0.62rem", padding: "3px 12px", background: "transparent", border: "1px solid #444", borderRadius: 6, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
+                              onClick={() => { setLobbyName(m.lobbyName || ""); setLobbyPassword(m.lobbyPassword || ""); }}>Redo</button>
+                          )}
                         </div>
-                        {hasLobby && <div style={stepHint("#4ade80")}>Lobby set: {m.lobbyName}</div>}
+                        {hasLobby && lobbyName !== m.lobbyName && !isCompleted ? (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={stepHint("#f59e0b")}>Previous lobby: {m.lobbyName} — set new details below to re-send</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginTop: 8 }}>
+                              <input value={lobbyName} onChange={e => setLobbyName(e.target.value)} placeholder="Lobby Name" style={inputStyle} />
+                              <select value={selectedGameForLobby} onChange={e => setSelectedGameForLobby(e.target.value)} style={selectStyle}>
+                                {Array.from({ length: bo }, (_, i) => <option key={i + 1} value={String(i + 1)}>Game {i + 1}</option>)}
+                              </select>
+                            </div>
+                            <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
+                            <button disabled={loading || !lobbyName} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
+                              tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                              action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                            })}>Re-send Lobby & Notify</button>
+                          </div>
+                        ) : hasLobby ? (
+                          <div style={stepHint("#4ade80")}>Lobby set: {m.lobbyName}{m.lobbyPassword ? ` / ${m.lobbyPassword}` : ""}</div>
+                        ) : null}
                         {!hasLobby && !isCompleted && (
                           <div style={{ marginTop: 10 }}>
                             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
@@ -1426,7 +1450,7 @@ export default function AdminPanel() {
                         {hasLobby && !isLive && !isCompleted && (
                           <div style={{ marginTop: 10 }}>
                             {!hasVeto && <div style={stepHint("#f59e0b")}>Consider completing toss & veto first (or skip if not needed)</div>}
-                            {/* VC Status */}
+                            {/* VC Status (move-based check) */}
                             {m.vcStatus && (
                               <div style={{ padding: 12, background: "#0f0f11", borderRadius: 8, border: "1px solid #222", marginBottom: 10, marginTop: 6 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -1462,6 +1486,51 @@ export default function AdminPanel() {
                           </div>
                         )}
                         {(isLive || isCompleted) && <div style={stepHint("#4ade80")}>Match is {m.status}</div>}
+
+                        {/* ── Live VC Monitor (real-time from bot) ──────────────── */}
+                        {m.vcLiveStatus && (hasWaitingRoom || hasTeamVcs || isLive) && (() => {
+                          const vcMemberBadge = (member: VcMember) => {
+                            const muted = member.selfMute || member.serverMute;
+                            const deafened = member.selfDeaf || member.serverDeaf;
+                            const icon = deafened ? "🔇" : muted ? "🔸" : "🎤";
+                            const bg = deafened ? "#200a0a" : muted ? "#2a2008" : "#0a200f";
+                            const border = deafened ? "#dc262644" : muted ? "#f59e0b44" : "#16a34a44";
+                            const color = deafened ? "#f87171" : muted ? "#fbbf24" : "#4ade80";
+                            return (
+                              <span key={member.discordId} style={{ fontSize: "0.68rem", padding: "3px 10px", borderRadius: 100, background: bg, border: `1px solid ${border}`, color, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                {icon} {member.name}
+                              </span>
+                            );
+                          };
+                          const sections: { label: string; members: VcMember[]; color: string }[] = [];
+                          if (m.vcLiveStatus.waitingRoom?.length > 0) sections.push({ label: "Waiting Room", members: m.vcLiveStatus.waitingRoom, color: "#888" });
+                          if (m.vcLiveStatus.team1?.length > 0) sections.push({ label: m.team1Name, members: m.vcLiveStatus.team1, color: "#f87171" });
+                          if (m.vcLiveStatus.team2?.length > 0) sections.push({ label: m.team2Name, members: m.vcLiveStatus.team2, color: "#60a5fa" });
+                          if (sections.length === 0) return null;
+                          return (
+                            <div style={{ padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #1e1e22", marginTop: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>LIVE VOICE CHANNELS</span>
+                                <span style={{ fontSize: "0.54rem", color: "#444" }}>
+                                  {m.vcLiveStatus.updatedAt ? new Date(m.vcLiveStatus.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : ""}
+                                </span>
+                              </div>
+                              {sections.map(sec => (
+                                <div key={sec.label} style={{ marginBottom: 8 }}>
+                                  <div style={{ fontSize: "0.6rem", fontWeight: 800, color: sec.color, letterSpacing: "0.08em", marginBottom: 4 }}>
+                                    {sec.label.toUpperCase()} ({sec.members.length})
+                                  </div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                    {sec.members.map(vcMemberBadge)}
+                                  </div>
+                                </div>
+                              ))}
+                              <div style={{ fontSize: "0.54rem", color: "#444", marginTop: 4 }}>
+                                🎤 mic on · 🔸 muted · 🔇 deafened — updates live from Discord
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* ── Step 4: Fetch Match Results ────────────────────────── */}
