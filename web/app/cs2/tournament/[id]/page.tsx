@@ -1085,7 +1085,7 @@ function CS2TournamentDetailInner() {
 
         {/* ═══ HERO ═══ */}
         <div className="csd-hero">
-          <img className="csd-hero-bg" src={tournament.bannerImage || "/valorantimg3.jpg"} alt="" aria-hidden="true" />
+          <img className="csd-hero-bg" src={tournament.bannerImage || "/csimagehd.jpg"} alt="" aria-hidden="true" />
           <div className="csd-hero-overlay" />
           <div className="csd-hero-content">
             <div className="csd-hero-inner">
