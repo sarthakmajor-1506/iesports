@@ -1341,25 +1341,67 @@ function DotaTournamentDetailInner() {
                 </div>
                 {leaderboard.length === 0 ? (
                   <div className="dtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="dtd-empty-title">No stats yet</span><span className="dtd-empty-sub">Player stats will appear once match data is available.</span></div>
-                ) : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="dtd-standings-table">
-                      <thead><tr><th>#</th><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: "#3B82F6" }}>Score</th></tr></thead>
-                      <tbody>{leaderboard.map((p: any, i: number) => (
-                        <tr key={p.id} style={i === 0 ? { background: "rgba(245,158,11,0.08)" } : {}}>
-                          <td style={{ fontWeight: 800, color: i === 0 ? "#f59e0b" : i < 3 ? "#3B82F6" : "#555550" }}>{i === 0 ? "👑" : i + 1}</td>
-                          <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div></Link>) : (<div style={{ fontWeight: 700 }}>{p.name || p.steamName}</div>)}</td>
-                          <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
-                          <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
-                          <td>{p.totalAssists || 0}</td>
-                          <td>{p.avgGPM || 0}</td>
-                          <td>{p.avgXPM || 0}</td>
-                          <td style={{ fontWeight: 800, color: "#3B82F6" }}>{p.totalScore || 0}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                )}
+                ) : (() => {
+                  const bracketColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
+                    divine_immortal:  { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#f59e0b", label: "Divine – Immortal" },
+                    legend_ancient:   { bg: "rgba(168,85,247,0.10)", border: "rgba(168,85,247,0.30)", text: "#a855f7", label: "Legend – Ancient" },
+                    crusader_archon:  { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.30)", text: "#3b82f6", label: "Crusader – Archon" },
+                    herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
+                  };
+                  const playerBracketMap: Record<string, string> = {};
+                  players.forEach((p: any) => { if (p.uid && p.dotaBracket) playerBracketMap[p.uid] = p.dotaBracket; });
+                  const grouped: Record<string, any[]> = {};
+                  leaderboard.forEach((p: any) => {
+                    const bracket = playerBracketMap[p.uid || p.id] || "herald_guardian";
+                    if (!grouped[bracket]) grouped[bracket] = [];
+                    grouped[bracket].push(p);
+                  });
+                  Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0)));
+                  const sortedBrackets = Object.keys(grouped).sort((a, b) => {
+                    const order = ["herald_guardian", "crusader_archon", "legend_ancient", "divine_immortal"];
+                    return order.indexOf(b) - order.indexOf(a);
+                  });
+                  // Per-bracket MVP: highest score in each bracket
+                  const bracketMvpMap: Record<string, string> = {};
+                  for (const bracket of sortedBrackets) {
+                    if (grouped[bracket].length > 0) bracketMvpMap[grouped[bracket][0].id] = bracket;
+                  }
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                      {sortedBrackets.map((bracket) => {
+                        const colors = bracketColors[bracket] || bracketColors.herald_guardian;
+                        const entries = grouped[bracket];
+                        return (
+                          <div key={bracket}>
+                            <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span>{colors.label}</span>
+                              <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>{entries.length} player{entries.length !== 1 ? "s" : ""}</span>
+                            </div>
+                            <div style={{ overflowX: "auto" }}>
+                              <table className="dtd-standings-table">
+                                <thead><tr><th>#</th><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
+                                <tbody>{entries.map((p: any, i: number) => {
+                                  const isMvp = bracketMvpMap[p.id] === bracket;
+                                  return (
+                                  <tr key={p.id} style={isMvp ? { background: colors.bg } : {}}>
+                                    <td style={{ fontWeight: 800, color: isMvp ? colors.text : i < 3 ? colors.text : "#555550" }}>{isMvp ? "\u{1F451}" : i + 1}</td>
+                                    <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}</div></Link>) : (<div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}</div>)}</td>
+                                    <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
+                                    <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
+                                    <td>{p.totalAssists || 0}</td>
+                                    <td>{p.avgGPM || 0}</td>
+                                    <td>{p.avgXPM || 0}</td>
+                                    <td style={{ fontWeight: 800, color: colors.text }}>{p.totalScore || 0}</td>
+                                  </tr>);
+                                })}</tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
               <CommentSection tournamentId={id} section="leaderboard" game="dota2" user={user} userProfile={userProfile} />
             </div>
