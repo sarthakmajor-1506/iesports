@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       const tSnap = await tournamentRef.get();
       if (tSnap.exists) {
         const tData = tSnap.data()!;
-        const newBracketBooked = (tData.brackets[teamBracket]?.slotsBooked || 0) + 5;
+        const newBracketBooked = (tData.brackets?.[teamBracket]?.slotsBooked || 0) + 5;
         const newTotalBooked = (tData.slotsBooked || 0) + 5;
         const newTStatus = newTotalBooked >= tData.totalSlots ? "Full" : "Open";
         await tournamentRef.update({

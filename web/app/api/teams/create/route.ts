@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const tournamentDoc = await adminDb.collection("tournaments").doc(tournamentId).get();
     const tData = tournamentDoc.data();
     if (!tData) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
-    if (tData.brackets[bracket].slotsBooked >= tData.brackets[bracket].slotsTotal) {
+    if (tData.brackets?.[bracket]?.slotsBooked >= tData.brackets?.[bracket]?.slotsTotal) {
       return NextResponse.json({ error: `No slots left in your bracket` }, { status: 400 });
     }
 
