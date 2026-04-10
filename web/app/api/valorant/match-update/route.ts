@@ -312,6 +312,19 @@ export async function POST(req: NextRequest) {
 
           discordSent = await sendMessage(notifyChannelId, messagePayload);
 
+          // ── Auto-move players already in a VC to waiting room ──────────
+          if (waitingRoomVcId) {
+            const inVc: string[] = [];
+            const notInVc: string[] = [];
+            for (const p of [...team1Players, ...team2Players]) {
+              if (!p.discordId) { notInVc.push(p.name); continue; }
+              const moved = await moveToVoice(guildId, p.discordId, waitingRoomVcId);
+              if (moved) inVc.push(p.name);
+              else notInVc.push(p.name);
+            }
+            updateData.vcStatus = { inVc, notInVc, checkedAt: new Date().toISOString() };
+          }
+
         } catch (discordErr: any) {
           discordSkipReason = `Discord error: ${discordErr.message}`;
           console.error("[Discord] set-lobby error:", discordErr.message);
@@ -329,6 +342,7 @@ export async function POST(req: NextRequest) {
         discordNotified: discordSent,
         ...(discordSkipReason ? { discordSkipReason } : {}),
         waitingRoomVcId,
+        vcStatus: updateData.vcStatus || null,
       });
 
 
@@ -470,6 +484,38 @@ export async function POST(req: NextRequest) {
         action: "cleanup-vcs",
         deletedChannels: vcsToDelete.length,
       });
+
+    } else if (action === "check-vc") {
+      // ═══════════════════════════════════════════════════════════════════════
+      // ACTION: CHECK VC STATUS
+      // → Re-attempt to move all players to the active VC (waiting room or team VCs)
+      // → Returns who is in VC and who is not
+      // ═══════════════════════════════════════════════════════════════════════
+      const targetVcId = matchData.waitingRoomVcId || matchData.team1VcId;
+      if (!targetVcId || !guildId) {
+        return NextResponse.json({ error: "No active VC for this match" }, { status: 400 });
+      }
+
+      const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
+      const inVc: string[] = [];
+      const notInVc: string[] = [];
+
+      for (const p of [...team1Players, ...team2Players]) {
+        if (!p.discordId) { notInVc.push(p.name); continue; }
+        // If waiting room exists, try to move there; otherwise just check via team VCs
+        const vc = matchData.waitingRoomVcId || (
+          team1Players.some(t => t.uid === p.uid) ? matchData.team1VcId : matchData.team2VcId
+        );
+        if (!vc) { notInVc.push(p.name); continue; }
+        const moved = await moveToVoice(guildId, p.discordId, vc);
+        if (moved) inVc.push(p.name);
+        else notInVc.push(p.name);
+      }
+
+      const vcStatus = { inVc, notInVc, checkedAt: new Date().toISOString() };
+      await matchRef.update({ vcStatus });
+
+      return NextResponse.json({ success: true, matchId, action: "check-vc", vcStatus });
 
     } else if (action === "set-time") {
       await matchRef.update({ scheduledTime: scheduledTime || null });

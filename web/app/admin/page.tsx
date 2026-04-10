@@ -12,7 +12,7 @@ import { getFirebaseAuth } from "@/lib/firebase";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
-interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; }
+interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; waitingRoomVcId?: string; team1VcId?: string; team2VcId?: string; vcStatus?: { inVc: string[]; notInVc: string[]; checkedAt: string }; vetoState?: { status: string; bo: number; tossWinner: string; actions: { team: string; action: string; map: string }[]; remainingMaps: string[]; sidePickOnDecider?: string; team1Name: string; team2Name: string }; }
 interface DiscordConnection { type: string; name: string; id: string; verified: boolean; }
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
@@ -154,11 +154,14 @@ export default function AdminPanel() {
   const [startTime, setStartTime] = useState("18:00");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // ─── Lobby ──────────────────────────────────────────────────────────────────
+  // ─── Match Operations (unified) ─────────────────────────────────────────────
+  const [opsMatchId, setOpsMatchId] = useState("");
   const [selectedMatchForLobby, setSelectedMatchForLobby] = useState("");
   const [selectedGameForLobby, setSelectedGameForLobby] = useState("1");
   const [lobbyName, setLobbyName] = useState("");
   const [lobbyPassword, setLobbyPassword] = useState("");
+  const [showSetup, setShowSetup] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   // ─── Manual series result ───────────────────────────────────────────────────
   const [manualMatchId, setManualMatchId] = useState("");
@@ -1216,394 +1219,378 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              <div className="adm-grid">
-                {/* ═══ 1. SHUFFLE TEAMS ═══ */}
-                <div style={sectionStyle}>
-                  <span style={labelStyle}>1. Shuffle Teams</span>
-                  <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                    Deletes all existing teams first, then creates balanced teams via snake draft by skill level.
-                  </p>
-                  <input value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button disabled={loading} style={btnDanger} onClick={async () => {
-                      if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
-                      await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
-                    }}>Delete & Reshuffle</button>
-                  </div>
-                  {teams.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>CURRENT TEAMS</span>
-                      {teams.map(t => (
-                        <div key={t.id} style={{ fontSize: "0.72rem", padding: "4px 0", color: "#aaa" }}>
-                          {t.teamName} — {t.members?.length || 0} players (avg {t.avgSkillLevel})
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* ═══ TOURNAMENT SETUP (collapsible) ═══ */}
+              <div style={{ ...sectionStyle, border: showSetup ? "1.5px solid #3CCBFF33" : "1px solid #2a2a2e", cursor: "pointer" }}>
+                <div onClick={() => setShowSetup(!showSetup)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={labelStyle}>Tournament Setup</span>
+                  <span style={{ fontSize: "0.72rem", color: "#555", transform: showSetup ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>▼</span>
                 </div>
-
-                {/* ═══ 2. GENERATE ALL SWISS PAIRINGS ═══ */}
-                <div style={sectionStyle}>
-                  <span style={labelStyle}>2. Generate Swiss Pairings (All Rounds)</span>
-                  <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                    Creates all rounds at once. Round 1 = random. Rounds 2+ = "TBD" placeholders that auto-fill as results come in.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <div>
-                      <label style={smallLabel}>Total Rounds</label>
-                      <input value={totalRounds} onChange={e => setTotalRounds(e.target.value)} style={inputStyle} type="number" min="1" max="10" />
+                {showSetup && (
+                  <div className="adm-grid" style={{ marginTop: 12 }}>
+                    {/* Shuffle */}
+                    <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
+                      <span style={smallLabel}>Shuffle Teams</span>
+                      <input value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
+                      <button disabled={loading} style={btnDanger} onClick={async () => {
+                        if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
+                        await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
+                      }}>Delete & Reshuffle</button>
+                      {teams.length > 0 && <div style={{ marginTop: 8 }}>{teams.map(t => <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {t.avgSkillLevel})</div>)}</div>}
                     </div>
-                    <div>
-                      <label style={smallLabel}>Start Time (IST)</label>
-                      <input value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} type="time" />
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={smallLabel}>Start Date</label>
-                    <input value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} type="date" />
-                  </div>
-                  <button disabled={loading} style={btnStyle} onClick={async () => {
-                    if (!confirm(`Generate ${totalRounds} rounds of fixtures? This will delete existing matches.`)) return;
-                    await apiCall("/api/valorant/generate-all-pairings", { tournamentId, totalRounds: parseInt(totalRounds), startTime, startDate });
-                  }}>Generate All Fixtures</button>
-                </div>
-
-                {/* ═══ 3. SET LOBBY & NOTIFY ═══ */}
-                <div style={sectionStyle}>
-                  {(() => {
-                    const lobbyMatch = matches.find(m => m.id === selectedMatchForLobby);
-                    const lobbyBo = getMatchBo(lobbyMatch);
-                    return (<>
-                  <span style={labelStyle}>3. Set Lobby & Notify Discord</span>
-                  <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                    Select a match and game. Setting lobby sends a Discord notification pinging all players.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
-                    <div>
-                      <label style={smallLabel}>Match</label>
-                      <select value={selectedMatchForLobby} onChange={e => setSelectedMatchForLobby(e.target.value)} style={selectStyle}>
-                        <option value="">Select a match...</option>
-                        {pendingMatches.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={smallLabel}>Game (BO{lobbyBo})</label>
-                      <select value={selectedGameForLobby} onChange={e => setSelectedGameForLobby(e.target.value)} style={selectStyle}>
-                        {Array.from({ length: lobbyBo }, (_, i) => (
-                          <option key={i + 1} value={String(i + 1)}>Game {i + 1}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <input value={lobbyName} onChange={e => setLobbyName(e.target.value)} placeholder="Lobby Name" style={inputStyle} />
-                  <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button disabled={loading || !selectedMatchForLobby} style={btnStyle}
-                      onClick={() => apiCall("/api/valorant/match-update", {
-                        tournamentId, matchId: selectedMatchForLobby, gameNumber: parseInt(selectedGameForLobby),
-                        action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
-                      })}>Set Lobby & Notify</button>
-                    <button disabled={loading || !selectedMatchForLobby} style={btnSecondary}
-                      onClick={() => apiCall("/api/valorant/match-update", {
-                        tournamentId, matchId: selectedMatchForLobby, action: "start",
-                      })}>Start Match</button>
-                    <button disabled={loading || !selectedMatchForLobby} style={{ ...btnStyle, background: "#52525b", fontSize: "0.72rem", padding: "8px 14px" }}
-                      onClick={() => apiCall("/api/valorant/match-update", {
-                        tournamentId, matchId: selectedMatchForLobby, action: "cleanup-vcs",
-                      })}>🗑️ Cleanup VCs</button>
-                  </div>
-                  <div style={{ marginTop: 8, padding: "8px 12px", background: "#1a1a1e", borderRadius: 8, fontSize: "0.62rem", color: "#666", lineHeight: 1.6, border: "1px solid #2a2a2e" }}>
-                    <strong style={{ color: "#888" }}>Set Lobby</strong> → Creates waiting room VC + pings all players on Discord<br/>
-                    <strong style={{ color: "#888" }}>Start Match</strong> → Creates 2 team VCs, moves players, deletes waiting room<br/>
-                    <strong style={{ color: "#888" }}>Cleanup VCs</strong> → Deletes all VCs for this match
-                  </div>
-                    </>);
-                  })()}
-                </div>
-
-                {/* ═══ 4. MANUAL SERIES RESULT ═══ */}
-                <div style={sectionStyle}>
-                  {(() => {
-                    const selMatch = matches.find(m => m.id === manualMatchId);
-                    const bo = getMatchBo(selMatch);
-                    return (<>
-                      <span style={labelStyle}>4. Manual Series Result (fallback)</span>
-                      <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                        Directly set the BO{bo} score. Use when you don't have Valorant match UUIDs.
-                      </p>
-                      <select value={manualMatchId} onChange={e => setManualMatchId(e.target.value)} style={selectStyle}>
-                        <option value="">Select a match...</option>
-                        {matches.filter(m => m.status !== "completed").map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} (BO{getMatchBo(m)})
-                          </option>
-                        ))}
-                      </select>
-                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                        <input value={t1Score} onChange={e => setT1Score(e.target.value)} placeholder="T1" style={{ ...inputStyle, textAlign: "center" as const }} type="number" min="0" max={String(bo)} />
-                        <span style={{ display: "flex", alignItems: "center", color: "#555", fontWeight: 700 }}>vs</span>
-                        <input value={t2Score} onChange={e => setT2Score(e.target.value)} placeholder="T2" style={{ ...inputStyle, textAlign: "center" as const }} type="number" min="0" max={String(bo)} />
+                    {/* Swiss Pairings */}
+                    <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
+                      <span style={smallLabel}>Generate Swiss Pairings</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div><label style={smallLabel}>Rounds</label><input value={totalRounds} onChange={e => setTotalRounds(e.target.value)} style={inputStyle} type="number" min="1" max="10" /></div>
+                        <div><label style={smallLabel}>Start Time</label><input value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} type="time" /></div>
                       </div>
-                      <button disabled={loading || !manualMatchId} style={btnStyle}
-                        onClick={() => apiCall("/api/valorant/match-result", {
-                          tournamentId, matchId: manualMatchId, team1Score: parseInt(t1Score), team2Score: parseInt(t2Score), bestOf: bo,
-                        })}>Submit Series Result</button>
-                    </>);
-                  })()}
-                </div>
-
-                {/* ═══ 5. ADD/REMOVE PLAYER ═══ */}
-                <div style={sectionStyle}>
-                  <span style={labelStyle}>5. Add / Remove Player</span>
-                  <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                    Move players between teams or remove from a team entirely.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div>
-                      <label style={smallLabel}>Team</label>
-                      <select value={modTeamId} onChange={e => setModTeamId(e.target.value)} style={selectStyle}>
-                        <option value="">Select team...</option>
-                        {teams.map(t => (
-                          <option key={t.id} value={t.id}>{t.teamName} ({t.members?.length || 0}p)</option>
-                        ))}
-                      </select>
+                      <label style={smallLabel}>Start Date</label>
+                      <input value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} type="date" />
+                      <button disabled={loading} style={btnStyle} onClick={async () => {
+                        if (!confirm(`Generate ${totalRounds} rounds of fixtures?`)) return;
+                        await apiCall("/api/valorant/generate-all-pairings", { tournamentId, totalRounds: parseInt(totalRounds), startTime, startDate });
+                      }}>Generate All Fixtures</button>
                     </div>
-                    <div>
-                      <label style={smallLabel}>Player UID</label>
-                      <input value={modPlayerUid} onChange={e => setModPlayerUid(e.target.value)} placeholder="Player UID" style={inputStyle} />
+                    {/* Add/Remove Player */}
+                    <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
+                      <span style={smallLabel}>Add / Remove Player</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div><label style={smallLabel}>Team</label><select value={modTeamId} onChange={e => setModTeamId(e.target.value)} style={selectStyle}><option value="">Select...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.teamName} ({t.members?.length || 0}p)</option>)}</select></div>
+                        <div><label style={smallLabel}>Player UID</label><input value={modPlayerUid} onChange={e => setModPlayerUid(e.target.value)} placeholder="Player UID" style={inputStyle} /></div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                        <button disabled={loading || !modTeamId || !modPlayerUid} style={{ ...btnSuccess, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "add" })}>Add</button>
+                        <button disabled={loading || !modTeamId || !modPlayerUid} style={{ ...btnDanger, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "remove" })}>Remove</button>
+                      </div>
+                      <select value={modTargetTeamId} onChange={e => setModTargetTeamId(e.target.value)} style={selectStyle}><option value="">Move to team...</option>{teams.filter(t => t.id !== modTeamId).map(t => <option key={t.id} value={t.id}>{t.teamName}</option>)}</select>
+                      <button disabled={loading || !modTeamId || !modPlayerUid || !modTargetTeamId} style={{ ...btnWarning, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, targetTeamId: modTargetTeamId, action: "move" })}>Move Player</button>
                     </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                    <button disabled={loading || !modTeamId || !modPlayerUid} style={btnSuccess}
-                      onClick={() => apiCall("/api/valorant/modify-roster", {
-                        tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "add",
-                      })}>Add to Team</button>
-                    <button disabled={loading || !modTeamId || !modPlayerUid} style={btnDanger}
-                      onClick={() => apiCall("/api/valorant/modify-roster", {
-                        tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "remove",
-                      })}>Remove from Team</button>
-                  </div>
-                  <div style={{ borderTop: "1px solid #2a2a2e", paddingTop: 10, marginTop: 4 }}>
-                    <label style={smallLabel}>Move Player to Another Team</label>
-                    <select value={modTargetTeamId} onChange={e => setModTargetTeamId(e.target.value)} style={selectStyle}>
-                      <option value="">Select target team...</option>
-                      {teams.filter(t => t.id !== modTeamId).map(t => (
-                        <option key={t.id} value={t.id}>{t.teamName}</option>
-                      ))}
-                    </select>
-                    <button disabled={loading || !modTeamId || !modPlayerUid || !modTargetTeamId} style={btnWarning}
-                      onClick={() => apiCall("/api/valorant/modify-roster", {
-                        tournamentId, teamId: modTeamId, playerUid: modPlayerUid, targetTeamId: modTargetTeamId, action: "move",
-                      })}>Move Player</button>
-                  </div>
-                </div>
-
-                {/* ═══ 6. MANUAL GAME-LEVEL RESULT (dynamic BO) ═══ */}
-                <div style={sectionStyle}>
-                  {(() => {
-                    const selMatch = matches.find(m => m.id === manualGameMatchId);
-                    const bo = getMatchBo(selMatch);
-                    return (<>
-                      <span style={labelStyle}>6. Manual Game-Level Result (BO{bo})</span>
-                      <p style={{ fontSize: "0.68rem", color: "#666", marginBottom: 8 }}>
-                        Set individual game winners for walkovers, forfeits, or no-shows.
-                      </p>
-                      <select value={manualGameMatchId} onChange={e => {
-                        setManualGameMatchId(e.target.value);
-                        const m = matches.find(mm => mm.id === e.target.value);
-                        resizeManualGameArrays(getMatchBo(m));
-                      }} style={selectStyle}>
-                        <option value="">Select a match...</option>
-                        {matches.filter(m => m.status !== "completed").map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} (BO{getMatchBo(m)})
-                          </option>
-                        ))}
-                      </select>
-                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bo, 3)}, 1fr)`, gap: 8 }}>
-                        {manualGameWinners.slice(0, bo).map((val, i) => (
-                          <div key={i}>
-                            <label style={smallLabel}>Game {i + 1} Winner</label>
-                            <select value={val} onChange={e => {
-                              const arr = [...manualGameWinners];
-                              arr[i] = e.target.value;
-                              setManualGameWinners(arr);
-                            }} style={selectStyle}>
-                              <option value="none">Not played</option>
-                              <option value="team1">Team 1 wins</option>
-                              <option value="team2">Team 2 wins</option>
-                            </select>
-                          </div>
-                        ))}
+                    {/* Generate Brackets */}
+                    <div style={{ padding: 16, background: "#1a1508", borderRadius: 10, border: "1px solid #5c3a14" }}>
+                      <span style={{ ...smallLabel, color: "#f59e0b" }}>Generate Brackets (Post Group)</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div><label style={smallLabel}>Teams</label><select value={bracketTopTeams} onChange={e => setBracketTopTeams(e.target.value)} style={selectStyle}><option value="2">Top 2</option><option value="4">Top 4</option><option value="8">Top 8</option></select></div>
+                        <div><label style={smallLabel}>Date</label><input value={bracketStartDate} onChange={e => setBracketStartDate(e.target.value)} style={inputStyle} type="date" /></div>
                       </div>
-                      <input value={manualReason} onChange={e => setManualReason(e.target.value)} placeholder="Reason (e.g. Team 2 no-show)" style={inputStyle} />
-                      <button disabled={loading || !manualGameMatchId} style={btnWarning}
-                        onClick={() => {
-                          const gameWinners: Record<string, string | null> = {};
-                          for (let i = 0; i < bo; i++) {
-                            gameWinners[`game${i + 1}Winner`] = manualGameWinners[i] === "none" ? null : manualGameWinners[i];
-                          }
-                          apiCall("/api/valorant/manual-game-result", {
-                            tournamentId, matchDocId: manualGameMatchId, bestOf: bo,
-                            ...gameWinners,
-                            reason: manualReason,
-                          });
-                        }}>Set Game Results</button>
-                    </>);
-                  })()}
-                </div>
-
-                {/* ═══ 7. MATCH FETCH — DYNAMIC BO — FULL WIDTH ═══ */}
-                <div style={{ ...sectionStyle, gridColumn: "1 / -1" }}>
-                  {(() => {
-                    const selMatch = matches.find(m => m.id === fetchMatchDocId);
-                    const bo = getMatchBo(selMatch);
-                    const gameColors = ["#3CCBFF", "#60a5fa", "#4ade80", "#f59e0b", "#c084fc"];
-                    const gameBgs = ["#2a1215", "#0d1a2a", "#0d2a18", "#2a2008", "#1d0d2a"];
-                    const gameBorders = ["#5c1f28", "#1e3a5f", "#1e5f3a", "#5f4e1e", "#3a1e5f"];
-                    return (<>
-                      <span style={labelStyle}>7. BO{bo} Series — Fetch Match Stats (Henrik API)</span>
-                      <p style={{ fontSize: "0.72rem", color: "#777", marginBottom: 12, lineHeight: 1.5 }}>
-                        Enter Valorant match UUIDs. System fetches player stats, auto-detects winner, updates series + standings.
-                      </p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <div>
-                          <label style={smallLabel}>Match</label>
-                          <select value={fetchMatchDocId} onChange={e => {
-                            setFetchMatchDocId(e.target.value);
-                            const m = matches.find(mm => mm.id === e.target.value);
-                            resizeGameArrays(getMatchBo(m));
-                          }} style={selectStyle}>
-                            <option value="">Select a match...</option>
-                            {matches.filter(m => m.status !== "completed").map(m => (
-                              <option key={m.id} value={m.id}>
-                                {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} (BO{getMatchBo(m)})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={smallLabel}>Region</label>
-                          <select value={fetchRegion} onChange={e => setFetchRegion(e.target.value)} style={selectStyle}>
-                            <option value="ap">AP (India)</option>
-                            <option value="eu">EU</option>
-                            <option value="na">NA</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bo, 3)}, 1fr)`, gap: 12, marginTop: 4 }}>
-                        {gameMatchIds.slice(0, bo).map((val, i) => (
-                          <div key={i} style={{ padding: 12, background: gameBgs[i % gameBgs.length], borderRadius: 10, border: `1px solid ${gameBorders[i % gameBorders.length]}` }}>
-                            <label style={{ fontSize: "0.68rem", fontWeight: 800, color: gameColors[i % gameColors.length], display: "block", marginBottom: 6 }}>GAME {i + 1} (Map {i + 1})</label>
-                            <input value={val} onChange={e => {
-                              const arr = [...gameMatchIds];
-                              arr[i] = e.target.value;
-                              setGameMatchIds(arr);
-                            }} placeholder="Valorant Match UUID" style={inputStyle} />
-                            <label style={{ ...smallLabel, fontSize: "0.62rem" }}>Game {i + 1} Sub PUUIDs</label>
-                            <input value={gameExcludedPuuids[i] || ""} onChange={e => {
-                              const arr = [...gameExcludedPuuids];
-                              arr[i] = e.target.value;
-                              setGameExcludedPuuids(arr);
-                            }} placeholder="comma separated" style={{ ...inputStyle, fontSize: "0.76rem" }} />
-                            <button disabled={loading || !val || !fetchMatchDocId} style={{ ...(i === 0 ? btnStyle : btnSecondary), width: "100%", marginTop: 4 }}
-                              onClick={() => apiCall("/api/valorant/match-fetch", {
-                                tournamentId, matchDocId: fetchMatchDocId, valorantMatchId: val,
-                                gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
-                              })}>Fetch Game {i + 1}</button>
-                          </div>
-                        ))}
-                      </div>
-                    </>);
-                  })()}
-                </div>
-
-                {/* ═══ 7b. DELETE GAME DATA ═══ */}
-                <div style={{ ...sectionStyle, gridColumn: "1 / -1", border: "1.5px solid #7f1d1d", background: "#1a0808" }}>
-                  {(() => {
-                    const selMatch = matches.find(m => m.id === deleteGameMatchId);
-                    const bo = getMatchBo(selMatch);
-                    return (<>
-                      <span style={{ ...labelStyle, color: "#f87171" }}>7b. Delete Game Data (Rollback)</span>
-                      <p style={{ fontSize: "0.72rem", color: "#777", marginBottom: 12, lineHeight: 1.5 }}>
-                        Reverses leaderboard stats, standings (group stage), and clears game data from match. Use this to re-fetch correct data.
-                      </p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                        <div>
-                          <label style={smallLabel}>Match</label>
-                          <select value={deleteGameMatchId} onChange={e => setDeleteGameMatchId(e.target.value)} style={selectStyle}>
-                            <option value="">Select a match...</option>
-                            {matches.map(m => (
-                              <option key={m.id} value={m.id}>
-                                {m.isBracket ? `[B] ` : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} ({m.status})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={smallLabel}>Game Number</label>
-                          <select value={deleteGameNumber} onChange={e => setDeleteGameNumber(e.target.value)} style={selectStyle}>
-                            {Array.from({ length: bo }, (_, i) => (
-                              <option key={i + 1} value={String(i + 1)}>Game {i + 1}{selMatch?.games?.[`game${i + 1}`] || (selMatch as any)?.[`game${i + 1}`] ? " (has data)" : ""}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "flex-end" }}>
-                          <button disabled={loading || !deleteGameMatchId} style={{ ...btnStyle, background: "#dc2626", width: "100%" }}
-                            onClick={() => {
-                              if (!confirm(`Delete Game ${deleteGameNumber} data from ${selMatch?.team1Name} vs ${selMatch?.team2Name}? This will reverse all stats.`)) return;
-                              apiCall("/api/admin/delete-game-data", {
-                                tournamentId, matchDocId: deleteGameMatchId,
-                                gameNumber: parseInt(deleteGameNumber),
-                              });
-                            }}>Delete Game {deleteGameNumber} Data</button>
-                        </div>
-                      </div>
-                    </>);
-                  })()}
-                </div>
-
-                {/* ═══ 8. GENERATE BRACKETS — FULL WIDTH ═══ */}
-                <div style={{ ...sectionStyle, gridColumn: "1 / -1", border: "1.5px solid #5c3a14", background: "#1a1508" }}>
-                  <span style={{ ...labelStyle, color: "#f59e0b" }}>8. Generate Elimination Brackets (Post Group Stage)</span>
-                  <p style={{ fontSize: "0.72rem", color: "#777", marginBottom: 12, lineHeight: 1.5 }}>
-                    After all group stage rounds are complete, generate a single-elimination bracket from the top teams.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    <div>
-                      <label style={smallLabel}>Teams to Advance</label>
-                      <select value={bracketTopTeams} onChange={e => setBracketTopTeams(e.target.value)} style={selectStyle}>
-                        <option value="2">Top 2 (Final only)</option>
-                        <option value="4">Top 4 (Semis + Final)</option>
-                        <option value="8">Top 8 (Quarters + Semis + Final)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={smallLabel}>Bracket Start Date</label>
-                      <input value={bracketStartDate} onChange={e => setBracketStartDate(e.target.value)} style={inputStyle} type="date" />
-                    </div>
-                    <div>
-                      <label style={smallLabel}>Start Time (IST)</label>
+                      <label style={smallLabel}>Start Time</label>
                       <input value={bracketStartTime} onChange={e => setBracketStartTime(e.target.value)} style={inputStyle} type="time" />
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: "pointer", fontSize: "0.72rem", color: standingsNotComplete ? "#f59e0b" : "#777" }}>
+                        <input type="checkbox" checked={standingsNotComplete} onChange={e => setStandingsNotComplete(e.target.checked)} style={{ accentColor: "#f59e0b" }} />
+                        Standings not complete (all TBD)
+                      </label>
+                      <button disabled={loading} style={{ ...btnWarning, marginTop: 8 }} onClick={async () => {
+                        if (!confirm(`Generate brackets for top ${bracketTopTeams} teams?`)) return;
+                        await apiCall("/api/valorant/generate-brackets", { tournamentId, topTeams: parseInt(bracketTopTeams), startTime: bracketStartTime, startDate: bracketStartDate, standingsNotComplete });
+                      }}>Generate Brackets</button>
                     </div>
                   </div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: "0.78rem", color: standingsNotComplete ? "#f59e0b" : "#999" }}>
-                    <input type="checkbox" checked={standingsNotComplete} onChange={e => setStandingsNotComplete(e.target.checked)} style={{ accentColor: "#f59e0b", width: 16, height: 16, cursor: "pointer" }} />
-                    <span style={{ fontWeight: 700 }}>Standings not complete</span>
-                    <span style={{ fontWeight: 400, color: "#666" }}> — fills all team slots with TBD</span>
-                  </label>
-                  <button disabled={loading} style={{ ...btnWarning, marginTop: 8 }}
-                    onClick={async () => {
-                      if (!confirm(`Generate elimination bracket for top ${bracketTopTeams} teams${standingsNotComplete ? " (all TBD)" : ""}?`)) return;
-                      await apiCall("/api/valorant/generate-brackets", {
-                        tournamentId, topTeams: parseInt(bracketTopTeams), startTime: bracketStartTime, startDate: bracketStartDate, standingsNotComplete,
-                      });
-                    }}>Generate Brackets</button>
+                )}
+              </div>
+
+              {/* ═══════════════════════════════════════════════════════════════════ */}
+              {/* MATCH OPERATIONS — GUIDED FLOW                                     */}
+              {/* ═══════════════════════════════════════════════════════════════════ */}
+              <div style={{ ...sectionStyle, border: "1.5px solid #3CCBFF44", padding: "24px 28px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <span style={{ ...labelStyle, marginBottom: 0, fontSize: "0.72rem", color: "#3CCBFF" }}>Match Operations</span>
                 </div>
+
+                {/* ── Match Selector ─────────────────────────────────────────── */}
+                <select value={opsMatchId} onChange={e => {
+                  const id = e.target.value;
+                  setOpsMatchId(id);
+                  setSelectedMatchForLobby(id);
+                  setFetchMatchDocId(id);
+                  setManualMatchId(id);
+                  setManualGameMatchId(id);
+                  setDeleteGameMatchId(id);
+                  const m = matches.find(mm => mm.id === id);
+                  resizeGameArrays(getMatchBo(m));
+                  resizeManualGameArrays(getMatchBo(m));
+                }} style={{ ...selectStyle, fontSize: "0.92rem", padding: 12, border: "1.5px solid #3CCBFF44", marginBottom: 16 }}>
+                  <option value="">Select a match to manage...</option>
+                  {matches.filter(m => m.status !== "completed").map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.isBracket ? "[B] " : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} (BO{getMatchBo(m)}) — {m.status}
+                    </option>
+                  ))}
+                  {matches.filter(m => m.status === "completed").length > 0 && <option disabled>── Completed ──</option>}
+                  {matches.filter(m => m.status === "completed").map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.isBracket ? "[B] " : ""}R{m.matchDay}-M{m.matchIndex}: {m.team1Name} vs {m.team2Name} — {m.team1Score}-{m.team2Score}
+                    </option>
+                  ))}
+                </select>
+
+                {(() => {
+                  const m = matches.find(mm => mm.id === opsMatchId);
+                  if (!m) return <div style={{ textAlign: "center", padding: 40, color: "#444", fontSize: "0.82rem" }}>Select a match above to see the step-by-step flow</div>;
+                  const bo = getMatchBo(m);
+                  const hasLobby = !!m.lobbyName;
+                  const hasVeto = m.vetoState?.status === "complete";
+                  const isLive = m.status === "live";
+                  const isCompleted = m.status === "completed";
+                  const hasWaitingRoom = !!m.waitingRoomVcId;
+                  const hasTeamVcs = !!m.team1VcId || !!m.team2VcId;
+                  const vetoStatus = m.vetoState?.status;
+                  const gameColors = ["#3CCBFF", "#60a5fa", "#4ade80", "#f59e0b", "#c084fc"];
+                  const gameBgs = ["#2a1215", "#0d1a2a", "#0d2a18", "#2a2008", "#1d0d2a"];
+                  const gameBorders = ["#5c1f28", "#1e3a5f", "#1e5f3a", "#5f4e1e", "#3a1e5f"];
+
+                  const stepDone = (done: boolean) => ({ display: "inline-block", width: 18, height: 18, borderRadius: "50%", background: done ? "#16a34a" : "#2a2a2e", color: done ? "#fff" : "#555", fontSize: "0.62rem", textAlign: "center" as const, lineHeight: "18px", fontWeight: 800, marginRight: 10, flexShrink: 0 });
+                  const stepBox = (active: boolean, done: boolean) => ({ padding: "16px 20px", background: done ? "#0a1a0f" : active ? "#141418" : "#0e0e10", borderRadius: 12, border: `1.5px solid ${done ? "#16a34a44" : active ? "#3CCBFF33" : "#1e1e22"}`, marginBottom: 10, opacity: active || done ? 1 : 0.5 });
+                  const stepTitle = { fontSize: "0.78rem", fontWeight: 700, color: "#e0e0e0" };
+                  const stepHint = (color: string) => ({ fontSize: "0.66rem", color, marginTop: 4, lineHeight: 1.5 });
+
+                  return (
+                    <>
+                      {/* Match header */}
+                      <div style={{ padding: "12px 16px", background: "#1a1a1e", borderRadius: 10, border: "1px solid #2a2a2e", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#fff" }}>{m.team1Name} vs {m.team2Name}</div>
+                          <div style={{ fontSize: "0.68rem", color: "#666", marginTop: 2 }}>BO{bo} {m.isBracket ? `— ${m.bracketLabel || "Bracket"}` : `— Round ${m.matchDay}`} {m.scheduledTime ? `— ${new Date(m.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })} IST` : ""}</div>
+                        </div>
+                        <div style={{ padding: "4px 14px", borderRadius: 100, fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" as const, background: isCompleted ? "#0a200f" : isLive ? "#1a200a" : "#1a1508", color: isCompleted ? "#4ade80" : isLive ? "#eab308" : "#888", border: `1px solid ${isCompleted ? "#16a34a44" : isLive ? "#eab30844" : "#333"}` }}>
+                          {m.status}
+                        </div>
+                      </div>
+
+                      {/* ── Step 1: Set Lobby ──────────────────────────────────── */}
+                      <div style={stepBox(true, hasLobby)}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={stepDone(hasLobby)}>{hasLobby ? "✓" : "1"}</span>
+                          <span style={stepTitle}>Set Lobby & Notify Discord</span>
+                        </div>
+                        {hasLobby && <div style={stepHint("#4ade80")}>Lobby set: {m.lobbyName}</div>}
+                        {!hasLobby && !isCompleted && (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
+                              <input value={lobbyName} onChange={e => setLobbyName(e.target.value)} placeholder="Lobby Name" style={inputStyle} />
+                              <select value={selectedGameForLobby} onChange={e => setSelectedGameForLobby(e.target.value)} style={selectStyle}>
+                                {Array.from({ length: bo }, (_, i) => <option key={i + 1} value={String(i + 1)}>Game {i + 1}</option>)}
+                              </select>
+                            </div>
+                            <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
+                            <button disabled={loading || !lobbyName} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
+                              tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                              action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                            })}>Set Lobby & Notify</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Step 2: Toss & Map Veto ────────────────────────────── */}
+                      <div style={stepBox(hasLobby, hasVeto)}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={stepDone(hasVeto)}>{hasVeto ? "✓" : "2"}</span>
+                          <span style={stepTitle}>Coin Toss & Map Veto</span>
+                        </div>
+                        {!hasLobby && !hasVeto && <div style={stepHint("#f59e0b")}>Set lobby first before starting the toss</div>}
+                        {hasLobby && !hasVeto && !isCompleted && (
+                          <div style={{ marginTop: 10 }}>
+                            {vetoStatus === "toss_choice" && <div style={stepHint("#f59e0b")}>Toss posted — waiting for captain to choose in Discord</div>}
+                            {vetoStatus === "veto" && <div style={stepHint("#f59e0b")}>Map veto in progress — captains are picking in Discord</div>}
+                            {!vetoStatus && (
+                              <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
+                                tournamentId, matchId: opsMatchId, action: "toss", bo,
+                              })}>Start Toss (BO{bo})</button>
+                            )}
+                          </div>
+                        )}
+                        {hasVeto && m.vetoState && (
+                          <div style={{ marginTop: 8 }}>
+                            {m.vetoState.actions.filter((a: any) => a.action === "pick").map((a: any, i: number) => (
+                              <div key={i} style={{ fontSize: "0.72rem", color: "#aaa", padding: "2px 0" }}>
+                                Game {i + 1}: <strong style={{ color: "#e0e0e0" }}>{a.map}</strong> <span style={{ color: "#666" }}>({a.team === "team1" ? m.vetoState!.team1Name : m.vetoState!.team2Name} pick)</span>
+                              </div>
+                            ))}
+                            {m.vetoState.remainingMaps?.length === 1 && (
+                              <div style={{ fontSize: "0.72rem", color: "#aaa", padding: "2px 0" }}>
+                                Game {m.vetoState.actions.filter((a: any) => a.action === "pick").length + 1}: <strong style={{ color: "#e0e0e0" }}>{m.vetoState.remainingMaps[0]}</strong> <span style={{ color: "#666" }}>(decider)</span>
+                              </div>
+                            )}
+                            <div style={{ fontSize: "0.62rem", color: "#555", marginTop: 4 }}>
+                              Bans: {m.vetoState.actions.filter((a: any) => a.action === "ban").map((a: any) => a.map).join(", ")}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Step 3: Start Match + VC Status ────────────────────── */}
+                      <div style={stepBox(hasLobby, isLive || isCompleted)}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={stepDone(isLive || isCompleted)}>{isLive || isCompleted ? "✓" : "3"}</span>
+                          <span style={stepTitle}>Start Match</span>
+                        </div>
+                        {!hasLobby && <div style={stepHint("#f59e0b")}>Set lobby first</div>}
+                        {hasLobby && !isLive && !isCompleted && (
+                          <div style={{ marginTop: 10 }}>
+                            {!hasVeto && <div style={stepHint("#f59e0b")}>Consider completing toss & veto first (or skip if not needed)</div>}
+                            {/* VC Status */}
+                            {m.vcStatus && (
+                              <div style={{ padding: 12, background: "#0f0f11", borderRadius: 8, border: "1px solid #222", marginBottom: 10, marginTop: 6 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                  <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#666", letterSpacing: "0.1em" }}>VC STATUS</span>
+                                  <button disabled={loading} style={{ fontSize: "0.58rem", padding: "3px 10px", background: "#1a1a1e", border: "1px solid #333", borderRadius: 6, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
+                                    onClick={() => apiCall("/api/valorant/match-update", { tournamentId, matchId: opsMatchId, action: "check-vc" })}>Refresh</button>
+                                </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                  {m.vcStatus.inVc.map((name, i) => (
+                                    <span key={`in-${i}`} style={{ fontSize: "0.68rem", padding: "2px 10px", borderRadius: 100, background: "#0a200f", border: "1px solid #16a34a44", color: "#4ade80" }}>{name}</span>
+                                  ))}
+                                  {m.vcStatus.notInVc.map((name, i) => (
+                                    <span key={`out-${i}`} style={{ fontSize: "0.68rem", padding: "2px 10px", borderRadius: 100, background: "#200a0a", border: "1px solid #dc262644", color: "#f87171" }}>{name}</span>
+                                  ))}
+                                </div>
+                                {m.vcStatus.notInVc.length > 0 && (
+                                  <div style={{ fontSize: "0.62rem", color: "#f59e0b", marginTop: 6 }}>
+                                    {m.vcStatus.notInVc.length} player(s) not in VC — ask them to join Discord voice
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
+                                tournamentId, matchId: opsMatchId, action: "start",
+                              })}>Start Match</button>
+                              {!m.vcStatus && hasWaitingRoom && (
+                                <button disabled={loading} style={{ ...btnSecondary, fontSize: "0.72rem" }} onClick={() => apiCall("/api/valorant/match-update", {
+                                  tournamentId, matchId: opsMatchId, action: "check-vc",
+                                })}>Check VC Status</button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(isLive || isCompleted) && <div style={stepHint("#4ade80")}>Match is {m.status}</div>}
+                      </div>
+
+                      {/* ── Step 4: Fetch Match Results ────────────────────────── */}
+                      <div style={stepBox(isLive, isCompleted)}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={stepDone(isCompleted)}>{isCompleted ? "✓" : "4"}</span>
+                          <span style={stepTitle}>Fetch Match Results (Henrik API)</span>
+                        </div>
+                        {!isLive && !isCompleted && <div style={stepHint("#f59e0b")}>Start match first to fetch results</div>}
+                        {(isLive || isCompleted) && (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                              <label style={{ ...smallLabel, marginBottom: 0 }}>Region:</label>
+                              <select value={fetchRegion} onChange={e => setFetchRegion(e.target.value)} style={{ ...selectStyle, width: 120, marginBottom: 0 }}>
+                                <option value="ap">AP (India)</option>
+                                <option value="eu">EU</option>
+                                <option value="na">NA</option>
+                              </select>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bo, 3)}, 1fr)`, gap: 10 }}>
+                              {gameMatchIds.slice(0, bo).map((val, i) => {
+                                const gameData = m.games?.[`game${i + 1}`] || (m as any)?.[`game${i + 1}`];
+                                const fetched = !!gameData?.mapName;
+                                const vetoMap = hasVeto && m.vetoState ? (
+                                  m.vetoState.actions.filter((a: any) => a.action === "pick")[i]?.map || m.vetoState.remainingMaps?.[0]
+                                ) : null;
+                                return (
+                                  <div key={i} style={{ padding: 12, background: fetched ? "#0a200f" : gameBgs[i % gameBgs.length], borderRadius: 10, border: `1px solid ${fetched ? "#16a34a44" : gameBorders[i % gameBorders.length]}` }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                      <span style={{ fontSize: "0.68rem", fontWeight: 800, color: fetched ? "#4ade80" : gameColors[i % gameColors.length] }}>GAME {i + 1}{vetoMap ? ` — ${vetoMap}` : ""}</span>
+                                      {fetched && <span style={{ fontSize: "0.58rem", color: "#4ade80" }}>Fetched</span>}
+                                    </div>
+                                    {fetched && gameData && (
+                                      <div style={{ fontSize: "0.68rem", color: "#888", marginBottom: 6 }}>{gameData.mapName} — {gameData.team1RoundsWon || 0}-{gameData.team2RoundsWon || 0}</div>
+                                    )}
+                                    <input value={val} onChange={e => { const arr = [...gameMatchIds]; arr[i] = e.target.value; setGameMatchIds(arr); }} placeholder="Valorant Match UUID" style={inputStyle} />
+                                    <input value={gameExcludedPuuids[i] || ""} onChange={e => { const arr = [...gameExcludedPuuids]; arr[i] = e.target.value; setGameExcludedPuuids(arr); }} placeholder="Sub PUUIDs (comma sep)" style={{ ...inputStyle, fontSize: "0.72rem" }} />
+                                    <button disabled={loading || !val} style={{ ...(fetched ? btnSuccess : btnStyle), width: "100%", fontSize: "0.72rem" }}
+                                      onClick={() => apiCall("/api/valorant/match-fetch", {
+                                        tournamentId, matchDocId: opsMatchId, valorantMatchId: val,
+                                        gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
+                                      })}>{fetched ? "Re-fetch" : "Fetch"} Game {i + 1}</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Step 5: Cleanup ─────────────────────────────────────── */}
+                      <div style={stepBox(isLive || isCompleted, false)}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={stepDone(!hasWaitingRoom && !hasTeamVcs && (isLive || isCompleted))}>{!hasWaitingRoom && !hasTeamVcs && (isLive || isCompleted) ? "✓" : "5"}</span>
+                            <span style={stepTitle}>Cleanup VCs</span>
+                          </div>
+                          <button disabled={loading || (!hasWaitingRoom && !hasTeamVcs)} style={{ ...btnStyle, background: "#52525b", fontSize: "0.68rem", padding: "6px 14px" }}
+                            onClick={() => apiCall("/api/valorant/match-update", { tournamentId, matchId: opsMatchId, action: "cleanup-vcs" })}>Cleanup VCs</button>
+                        </div>
+                        {(hasWaitingRoom || hasTeamVcs) && <div style={stepHint("#888")}>Active VCs exist for this match</div>}
+                        {!hasWaitingRoom && !hasTeamVcs && <div style={stepHint("#555")}>No active VCs</div>}
+                      </div>
+
+                      {/* ── Fallback Actions (collapsible) ─────────────────────── */}
+                      <div style={{ marginTop: 8 }}>
+                        <div onClick={() => setShowFallback(!showFallback)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "8px 0" }}>
+                          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#555", letterSpacing: "0.1em" }}>FALLBACK ACTIONS</span>
+                          <span style={{ fontSize: "0.62rem", color: "#444", transform: showFallback ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>▼</span>
+                        </div>
+                        {showFallback && (
+                          <div className="adm-grid" style={{ gap: 10 }}>
+                            {/* Manual Series Result */}
+                            <div style={{ padding: 14, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
+                              <span style={smallLabel}>Manual Series Result (BO{bo})</span>
+                              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                <input value={t1Score} onChange={e => setT1Score(e.target.value)} placeholder="T1" style={{ ...inputStyle, textAlign: "center" as const }} type="number" min="0" max={String(bo)} />
+                                <span style={{ display: "flex", alignItems: "center", color: "#555", fontWeight: 700 }}>vs</span>
+                                <input value={t2Score} onChange={e => setT2Score(e.target.value)} placeholder="T2" style={{ ...inputStyle, textAlign: "center" as const }} type="number" min="0" max={String(bo)} />
+                              </div>
+                              <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-result", {
+                                tournamentId, matchId: opsMatchId, team1Score: parseInt(t1Score), team2Score: parseInt(t2Score), bestOf: bo,
+                              })}>Submit Series Result</button>
+                            </div>
+                            {/* Manual Game Result */}
+                            <div style={{ padding: 14, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
+                              <span style={smallLabel}>Manual Game-Level Result</span>
+                              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bo, 3)}, 1fr)`, gap: 6 }}>
+                                {manualGameWinners.slice(0, bo).map((val, i) => (
+                                  <div key={i}>
+                                    <label style={{ ...smallLabel, fontSize: "0.58rem" }}>Game {i + 1}</label>
+                                    <select value={val} onChange={e => { const arr = [...manualGameWinners]; arr[i] = e.target.value; setManualGameWinners(arr); }} style={selectStyle}>
+                                      <option value="none">—</option><option value="team1">T1 wins</option><option value="team2">T2 wins</option>
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                              <input value={manualReason} onChange={e => setManualReason(e.target.value)} placeholder="Reason (e.g. no-show)" style={inputStyle} />
+                              <button disabled={loading} style={btnWarning} onClick={() => {
+                                const gw: Record<string, string | null> = {};
+                                for (let i = 0; i < bo; i++) gw[`game${i + 1}Winner`] = manualGameWinners[i] === "none" ? null : manualGameWinners[i];
+                                apiCall("/api/valorant/manual-game-result", { tournamentId, matchDocId: opsMatchId, bestOf: bo, ...gw, reason: manualReason });
+                              }}>Set Game Results</button>
+                            </div>
+                            {/* Delete Game Data */}
+                            <div style={{ padding: 14, background: "#1a0808", borderRadius: 10, border: "1px solid #7f1d1d44", gridColumn: "1 / -1" }}>
+                              <span style={{ ...smallLabel, color: "#f87171" }}>Delete Game Data (Rollback)</span>
+                              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ ...smallLabel, fontSize: "0.58rem" }}>Game</label>
+                                  <select value={deleteGameNumber} onChange={e => setDeleteGameNumber(e.target.value)} style={selectStyle}>
+                                    {Array.from({ length: bo }, (_, i) => {
+                                      const gd = m.games?.[`game${i + 1}`] || (m as any)?.[`game${i + 1}`];
+                                      return <option key={i + 1} value={String(i + 1)}>Game {i + 1}{gd ? " (has data)" : ""}</option>;
+                                    })}
+                                  </select>
+                                </div>
+                                <button disabled={loading} style={{ ...btnDanger, fontSize: "0.72rem" }} onClick={() => {
+                                  if (!confirm(`Delete Game ${deleteGameNumber} data? This reverses all stats.`)) return;
+                                  apiCall("/api/admin/delete-game-data", { tournamentId, matchDocId: opsMatchId, gameNumber: parseInt(deleteGameNumber) });
+                                }}>Delete Game {deleteGameNumber}</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* ═══ FIXTURES OVERVIEW ═══ */}
