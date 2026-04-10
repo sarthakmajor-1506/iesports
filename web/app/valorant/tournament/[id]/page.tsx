@@ -1771,7 +1771,7 @@ function ValorantTournamentDetailInner() {
                           const kda = kdaScore(player);
                           return (
                             <div key={rankKey} className="vtd-tier-col" style={{ minWidth: 130, maxWidth: 180 }}>
-                              <div className="vtd-tier-header" style={{ background: gColors.bg, border: `1px solid ${gColors.border}`, color: gColors.text }}>
+                              <div className="vtd-tier-header" style={{ background: gColors.bg, border: `1px solid ${gColors.border}`, color: gColors.text, justifyContent: "center" }}>
                                 <span>{rankKey}</span>
                               </div>
                               <div onClick={() => player.uid && router.push(`/player/${player.uid}?tab=valorant`)} style={{ cursor: player.uid ? "pointer" : "default", padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
