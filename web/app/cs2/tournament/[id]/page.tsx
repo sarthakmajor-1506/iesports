@@ -531,14 +531,19 @@ function CS2TournamentDetailInner() {
       .catch(() => setTLoading(false));
   }, [id]);
 
-  // Real-time updates — only tournament doc + soloPlayers (for registration status + slot count)
-  // Other data (teams, matches, standings, leaderboard) loaded via API and refreshed on tab switch
+  // Re-fetch data when user logs in (to check registration status)
   useEffect(() => {
     if (!id || !user) return;
-    const unsubs: (() => void)[] = [];
-    unsubs.push(onSnapshot(doc(db, "cs2Tournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); }));
-    unsubs.push(onSnapshot(collection(db, "cs2Tournaments", id, "soloPlayers"), (snap) => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); setPlayers(list); setIsRegistered(list.some((p: any) => p.uid === user.uid)); }));
-    return () => unsubs.forEach(u => u());
+    fetch(`/api/tournaments/detail?id=${id}&game=cs2`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.tournament) setTournament(data.tournament);
+        if (data.players) {
+          setPlayers(data.players);
+          setIsRegistered(data.players.some((p: any) => p.uid === user.uid));
+        }
+      })
+      .catch(() => {});
   }, [id, user]);
 
   useEffect(() => {
