@@ -1437,17 +1437,19 @@ function ValorantTournamentDetailInner() {
                               <span>{rank}</span>
                               <span className="vtd-tier-header-count">{rankPlayers.length}</span>
                             </div>
-                            {rankPlayers.map((p: any, pi: number) => (
+                            {rankPlayers.map((p: any, pi: number) => {
+                              const isMe = user?.uid === p.uid;
+                              return (
                               <div key={p.uid} onClick={() => router.push(`/player/${p.uid}?tab=valorant`)} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
-                                <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s` }}>
+                                <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s`, ...(isMe ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 10 } : {}) }}>
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
-                                    <span className="vtd-tier-player-name">{p.riotGameName}</span>
+                                    <span className="vtd-tier-player-name">{p.riotGameName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <span className="vtd-tier-player-rank">{p.iesportsRank || p.riotRank || "Unranked"}</span>
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                            );})}
                           </div>
                         );
                       })}
@@ -1493,14 +1495,16 @@ function ValorantTournamentDetailInner() {
                         </div>
                       </div>
                       <div className="vtd-team-box-members">
-                        {(team.members || []).map((m: any, i: number) => (
+                        {(team.members || []).map((m: any, i: number) => {
+                          const isMeMember = user?.uid === m.uid;
+                          return (
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                            <div className="vtd-team-box-member">
+                            <div className="vtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
                               {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
-                              <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}</div><div className="vtd-team-box-member-rank">{m.iesportsRank || m.riotRank || "Unranked"}</div></div>
+                              <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div><div className="vtd-team-box-member-rank">{m.iesportsRank || m.riotRank || "Unranked"}</div></div>
                             </div>
                           </Link>
-                        ))}
+                        );})}
                       </div>
                       <div className="vtd-team-box-footer">
                         <span>{team.members?.length || 0} players</span>
@@ -1828,11 +1832,13 @@ function ValorantTournamentDetailInner() {
                                 const rColor = rankColors[pRank?.baseRank || ""] || "#555550";
                                 const pKda = kdaScore(p);
 
+                                const isMeRow = user?.uid === p.uid;
                                 let rowBg: React.CSSProperties = {};
-                                if (isMvp) rowBg = { background: gColors.bg };
+                                if (isMeRow) rowBg = { background: "rgba(60,203,255,0.08)", boxShadow: "inset 2px 0 0 #3CCBFF" };
+                                else if (isMvp) rowBg = { background: gColors.bg };
 
                                 const playerCell = (<>
-                                  <div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div>
+                                  <div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
                                   <span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span>
                                 </>);
 
