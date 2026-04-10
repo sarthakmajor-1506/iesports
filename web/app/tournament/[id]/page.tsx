@@ -1159,8 +1159,8 @@ function DotaTournamentDetailInner() {
                     grouped[bracket].push(p);
                   });
                   const sortedBrackets = Object.keys(grouped).sort((a, b) => {
-                    const order = ["divine_immortal", "legend_ancient", "crusader_archon", "herald_guardian"];
-                    return order.indexOf(a) - order.indexOf(b);
+                    const order = ["herald_guardian", "crusader_archon", "legend_ancient", "divine_immortal"];
+                    return order.indexOf(b) - order.indexOf(a);
                   });
                   return (
                     <div className="dtd-tier-columns">
@@ -1173,17 +1173,21 @@ function DotaTournamentDetailInner() {
                               <span>{colors.label}</span>
                               <span className="dtd-tier-header-count">{bracketPlayers.length}</span>
                             </div>
-                            {bracketPlayers.map((p: any) => (
+                            {bracketPlayers.map((p: any) => {
+                              const displayName = p.fullName || p.steamName || "Player";
+                              const rankLabel = p.dotaMMR ? `${p.dotaMMR} MMR` : colors.label;
+                              return (
                               <Link key={p.uid || p.id} href={`/player/${p.uid || p.id}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                                 <div className="dtd-tier-player">
-                                  {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={p.steamName} /> : <div className="dtd-tier-player-avatar-init">{(p.steamName || "?")[0].toUpperCase()}</div>}
+                                  {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
-                                    <span className="dtd-tier-player-name">{p.steamName || "Player"}</span>
-                                    <span className="dtd-tier-player-rank">{p.dotaMMR ? `${p.dotaMMR} MMR` : "Unranked"}</span>
+                                    <span className="dtd-tier-player-name">{displayName}</span>
+                                    <span className="dtd-tier-player-rank">{rankLabel}</span>
                                   </div>
                                 </div>
                               </Link>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       })}
