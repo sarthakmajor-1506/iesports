@@ -228,7 +228,7 @@ export default function ValorantTournaments() {
                         {isRegistered ? (
                           <div className="vt-reg-done">✓ Registered</div>
                         ) : regState === "closed" ? (
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
                             <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, padding: "2px 10px", whiteSpace: "nowrap" }}>Registration Closed</span>
                             {t.schedule?.groupStageStart && new Date() < new Date(t.schedule.groupStageStart) && (
                               <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)" }}>Group stage starts on {formatDate(t.schedule.groupStageStart)}</span>
@@ -309,7 +309,7 @@ export default function ValorantTournaments() {
                         </div>
                       </div>
                       <div className="vt-card-right" style={{ position: "relative", zIndex: 1 }}>
-                        <button className="vt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=matches`); }} style={{ minWidth: 100 }}>View Results</button>
+                        <button className="vt-leaderboard-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}?tab=matches`); }}>View Results</button>
                       </div>
                     </div>
                   );
