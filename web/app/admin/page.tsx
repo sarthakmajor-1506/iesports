@@ -409,8 +409,8 @@ export default function AdminPanel() {
         .filter(d => !cafeUid || d.data().ownerId === cafeUid)
         .map(d => mapTournament(d, "[VAL]"));
       setTournaments(prev => {
-        const dota = prev.filter(t => t.name.startsWith("[DOTA2]"));
-        return [...valAll, ...dota].sort((a, b) => a.name.localeCompare(b.name));
+        const rest = prev.filter(t => !t.name.startsWith("[VAL]"));
+        return [...valAll, ...rest].sort((a, b) => a.name.localeCompare(b.name));
       });
     }, () => {
       // onSnapshot failed (no Firebase auth) — fallback to API
@@ -420,8 +420,9 @@ export default function AdminPanel() {
           body: JSON.stringify({ adminKey }),
         }).then(r => r.json()).then(data => {
           if (data.tournaments) {
+            const gameLabel: Record<string, string> = { dota2: "DOTA2", valorant: "VAL", cs2: "CS2" };
             const mapped = data.tournaments.map((t: any) => ({
-              id: t.id, name: `[${t.game === "dota2" ? "DOTA2" : "VAL"}] ${t.name}`,
+              id: t.id, name: `[${gameLabel[t.game] || t.game}] ${t.name}`,
               status: t.status, slotsBooked: t.slotsBooked, totalSlots: t.totalSlots,
             }));
             setTournaments(mapped);
@@ -434,18 +435,28 @@ export default function AdminPanel() {
         .filter(d => !cafeUid || d.data().ownerId === cafeUid)
         .map(d => mapTournament(d, "[DOTA2]"));
       setTournaments(prev => {
-        const val = prev.filter(t => t.name.startsWith("[VAL]"));
-        return [...val, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
+        const rest = prev.filter(t => !t.name.startsWith("[DOTA2]"));
+        return [...rest, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
       });
       setTournamentId(prev => prev || "");
     }, () => { /* fallback handled above */ });
-    return () => { unsub1(); unsub2(); };
+    const unsub3 = onSnapshot(collection(db, "cs2Tournaments"), (snap) => {
+      const cs2All = snap.docs
+        .filter(d => !cafeUid || d.data().ownerId === cafeUid)
+        .map(d => mapTournament(d, "[CS2]"));
+      setTournaments(prev => {
+        const rest = prev.filter(t => !t.name.startsWith("[CS2]"));
+        return [...rest, ...cs2All].sort((a, b) => a.name.localeCompare(b.name));
+      });
+    }, () => { /* fallback handled above */ });
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, [authenticated, adminRole]);
 
   // ─── Determine collection for selected tournament ────────────────────────────
   const getSelectedCollection = (): string => {
     const t = tournaments.find(t => t.id === tournamentId);
     if (t?.name.startsWith("[DOTA2]")) return "tournaments";
+    if (t?.name.startsWith("[CS2]")) return "cs2Tournaments";
     return "valorantTournaments";
   };
 
