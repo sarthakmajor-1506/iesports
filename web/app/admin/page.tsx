@@ -24,6 +24,7 @@ type AdminTab = "tournament" | "players" | "create";
 const GAME_OPTIONS = [
   { value: "valorant", label: "Valorant" },
   { value: "dota2", label: "Dota 2" },
+  { value: "cs2", label: "CS2" },
 ];
 
 const FORMAT_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -37,6 +38,10 @@ const FORMAT_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: "shuffle", label: "Shuffle" },
     { value: "auction", label: "Auction" },
     { value: "solo", label: "Solo" },
+  ],
+  cs2: [
+    { value: "standard", label: "Standard" },
+    { value: "shuffle", label: "Shuffle" },
   ],
 };
 
