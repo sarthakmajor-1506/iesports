@@ -448,7 +448,24 @@ export default function AdminPanel() {
         const rest = prev.filter(t => !t.name.startsWith("[CS2]"));
         return [...rest, ...cs2All].sort((a, b) => a.name.localeCompare(b.name));
       });
-    }, () => { /* fallback handled above */ });
+    }, () => {
+      // onSnapshot failed for cs2Tournaments (no Firestore rules) — fallback to API
+      fetch("/api/admin/list-tournaments", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, game: "cs2" }),
+      }).then(r => r.json()).then(data => {
+        if (data.tournaments) {
+          const mapped = data.tournaments.map((t: any) => ({
+            id: t.id, name: `[CS2] ${t.name}`,
+            status: t.status, slotsBooked: t.slotsBooked, totalSlots: t.totalSlots,
+          }));
+          setTournaments(prev => {
+            const rest = prev.filter(t => !t.name.startsWith("[CS2]"));
+            return [...rest, ...mapped].sort((a, b) => a.name.localeCompare(b.name));
+          });
+        }
+      }).catch(() => {});
+    });
     return () => { unsub1(); unsub2(); unsub3(); };
   }, [authenticated, adminRole]);
 
