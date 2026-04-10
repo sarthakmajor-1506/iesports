@@ -568,7 +568,7 @@ function CS2TournamentDetailInner() {
     if (!confirm("Are you sure you want to unregister from this tournament?")) return;
     setUnregLoading(true);
     try {
-      const res = await fetch("/api/valorant/unregister", {
+      const res = await fetch("/api/cs2/unregister", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tournamentId: id, uid: user.uid }),

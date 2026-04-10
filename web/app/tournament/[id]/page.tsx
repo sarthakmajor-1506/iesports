@@ -440,6 +440,7 @@ function DotaTournamentDetailInner() {
   const [toastMsg, setToastMsg] = useState("Link copied!");
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
       try { localStorage.removeItem("pendingRegistration"); } catch {}
@@ -582,6 +583,26 @@ function DotaTournamentDetailInner() {
     return true;
   })();
   const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
+
+  const handleUnregister = async () => {
+    if (!user || !id) return;
+    if (!confirm("Are you sure you want to unregister from this tournament?")) return;
+    setUnregLoading(true);
+    try {
+      const res = await fetch("/api/dota/unregister", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setIsRegistered(false);
+    } catch (e: any) {
+      alert(e.message || "Failed to unregister");
+    } finally {
+      setUnregLoading(false);
+    }
+  };
   const teamMembers: Record<string, any[]> = {};
   const teamLogoMap: Record<string, string> = {};
   teams.forEach((t: any) => { teamMembers[t.id] = (t.members || []).slice(0, 5); if (t.teamLogo) teamLogoMap[t.id] = t.teamLogo; });
@@ -961,7 +982,21 @@ function DotaTournamentDetailInner() {
                   </>
                 )}
                 {isRegistered && (
-                  <div style={{ padding: "12px 28px", background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 100, fontSize: "0.9rem", fontWeight: 700 }}>✓ Registered</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ padding: "12px 28px", background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 100, fontSize: "0.9rem", fontWeight: 700 }}>✓ Registered</div>
+                    {tournament.status === "upcoming" && !tournament.bracketsComputed && (
+                      <button
+                        onClick={handleUnregister}
+                        disabled={unregLoading}
+                        style={{
+                          padding: "10px 20px", background: "rgba(239,68,68,0.08)", color: "#ef4444",
+                          border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, fontSize: "0.78rem",
+                          fontWeight: 700, cursor: unregLoading ? "default" : "pointer", fontFamily: "inherit",
+                          transition: "all 0.15s", opacity: unregLoading ? 0.6 : 1,
+                        }}
+                      >{unregLoading ? "Withdrawing..." : "Withdraw"}</button>
+                    )}
+                  </div>
                 )}
                 {!isRegOpen && !isRegistered && (
                   <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
