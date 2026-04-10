@@ -1799,9 +1799,9 @@ function ValorantTournamentDetailInner() {
                       const entries = grouped[rankKey];
                       return (
                         <div key={rankKey}>
-                          <div style={{ background: gColors.bg, border: `1px solid ${gColors.border}`, color: gColors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ background: gColors.bg, border: `1px solid ${gColors.border}`, color: gColors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
                             <span>{rankKey}</span>
-                            <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>{entries.length} player{entries.length !== 1 ? "s" : ""}</span>
+                            <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: 8 }}>({entries.length})</span>
                           </div>
                           <div style={{ overflowX: "auto" }}>
                             <table className="vtd-standings-table">
@@ -1832,7 +1832,7 @@ function ValorantTournamentDetailInner() {
 
                                 const playerCell = (<>
                                   <div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div>
-                                  <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></div>
+                                  <span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span>
                                 </>);
 
                                 return (
