@@ -1807,9 +1807,7 @@ function ValorantTournamentDetailInner() {
                           <div style={{ overflowX: "auto" }}>
                             <table className="vtd-standings-table">
                               <thead><tr>
-                                <th>#</th>
                                 <th>Player</th>
-                                <th>Rank</th>
                                 <th>Team</th>
                                 <th>Agent(s)</th>
                                 <th style={thStyle("maps")} onClick={() => setLbSort("maps")}>Maps{sortArrow("maps")}</th>
@@ -1833,11 +1831,15 @@ function ValorantTournamentDetailInner() {
                                 let rowBg: React.CSSProperties = {};
                                 if (isMvp) rowBg = { background: gColors.bg };
 
+                                const playerCell = (<>
+                                  <div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div>
+                                  <div style={{ fontSize: "0.65rem", color: "#555550" }}>#{p.tag}</div>
+                                  <span style={{ fontSize: "0.62rem", fontWeight: 700, color: rColor, padding: "1px 5px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span>
+                                </>);
+
                                 return (
                                 <tr key={p.id} style={rowBg}>
-                                  <td style={{ fontWeight: 800, color: isMvp ? gColors.text : i < 3 ? gColors.text : "#555550" }}>{isMvp ? "\u{1F451}" : i + 1}</td>
-                                  <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit" }}><div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></Link>) : (<><div style={{ fontWeight: 700 }}>{p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: `${gColors.border}`, color: gColors.text, border: `1px solid ${gColors.border}` }}>MVP</span>}</div><div style={{ fontSize: "0.68rem", color: "#555550" }}>#{p.tag}</div></>)}</td>
-                                  <td><span style={{ fontSize: "0.68rem", fontWeight: 700, color: rColor, padding: "2px 6px", borderRadius: 4, background: `${rColor}15`, whiteSpace: "nowrap" }}>{pRank?.riotRank || "—"}</span></td>
+                                  <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit" }}>{playerCell}</Link>) : playerCell}</td>
                                   <td style={{ fontSize: "0.72rem", color: "#8A8880", maxWidth: 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamNameMap[p.teamId] || "—"}</td>
                                   <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{(p.agents || []).join(", ")}</td>
                                   <td>{p.matchesPlayed || 0}</td>
