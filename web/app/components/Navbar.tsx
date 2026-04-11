@@ -229,13 +229,18 @@ export default function Navbar() {
         .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
         @media (max-width: 900px) {
-          .ie-nav-tabs { display: none; }
+          .ie-nav-tabs { display: flex; gap: 2px; }
+          .ie-nav-tab span { display: none !important; }
+          .ie-nav-tab { padding: 6px 10px !important; }
+          .ie-nav-tab img { width: 22px !important; height: 22px !important; }
+          .ie-nav-tab.active img { width: 26px !important; height: 26px !important; }
+          .ie-nav-tab.active { padding: 6px 12px !important; }
           .ie-signin-btn { display: none !important; }
           .ie-mobile-signin-cta { display: flex !important; }
-          .ie-nav-logo .ie-logo-img { width: 32px !important; height: 32px !important; }
-          .ie-nav-logo-name { font-size: 1.05rem !important; }
+          .ie-nav-logo .ie-logo-img { width: 28px !important; height: 28px !important; }
+          .ie-nav-logo-name { display: none !important; }
           .ie-nav-logo-sub { display: none !important; }
-          .ie-nav-row { padding: 0 16px !important; height: 54px !important; }
+          .ie-nav-row { padding: 0 10px !important; height: 50px !important; gap: 8px !important; }
           .ie-profile-name-text { display: none !important; }
           .ie-profile-chevron { display: none !important; }
           .ie-profile-btn { padding: 2px !important; border-radius: 50% !important; }
