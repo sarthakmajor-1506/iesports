@@ -440,16 +440,8 @@ export default function AdminPanel() {
       });
       setTournamentId(prev => prev || "");
     }, () => { /* fallback handled above */ });
-    const unsub3 = onSnapshot(collection(db, "cs2Tournaments"), (snap) => {
-      const cs2All = snap.docs
-        .filter(d => !cafeUid || d.data().ownerId === cafeUid)
-        .map(d => mapTournament(d, "[CS2]"));
-      setTournaments(prev => {
-        const rest = prev.filter(t => !t.name.startsWith("[CS2]"));
-        return [...rest, ...cs2All].sort((a, b) => a.name.localeCompare(b.name));
-      });
-    }, () => {
-      // onSnapshot failed for cs2Tournaments (no Firestore rules) — fallback to API
+    // CS2: always use API (no Firestore security rules for cs2Tournaments)
+    const fetchCS2 = () => {
       fetch("/api/admin/list-tournaments", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminKey, game: "cs2" }),
@@ -465,9 +457,10 @@ export default function AdminPanel() {
           });
         }
       }).catch(() => {});
-    });
-    return () => { unsub1(); unsub2(); unsub3(); };
-  }, [authenticated, adminRole]);
+    };
+    if (adminKey) fetchCS2();
+    return () => { unsub1(); unsub2(); };
+  }, [authenticated, adminRole, adminKey]);
 
   // ─── Determine collection for selected tournament ────────────────────────────
   const getSelectedCollection = (): string => {
