@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 type Report = {
   id: string;
@@ -29,6 +29,8 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const playerReports = reports.filter(r => r.targetUid === playerUid);
   const highCount = playerReports.filter(r => r.type === "rank_too_high").length;
@@ -62,7 +64,8 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
     <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }} onClick={e => e.stopPropagation()}>
       {/* Badge button */}
       <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
+        ref={btnRef}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); const left = Math.min(r.left, window.innerWidth - 290); setPopoverPos({ top: r.bottom + 6, left: Math.max(8, left) }); } setOpen(!open); }}
         style={{
           background: totalCount > 0 ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)",
           border: `1px solid ${totalCount > 0 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.1)"}`,
@@ -83,13 +86,15 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
       </button>
 
       {/* Popover */}
-      {open && (
+      {open && (<>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 999 }} />
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 50,
+            position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 1000,
             background: "#141414", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
             padding: 14, width: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+            maxHeight: "70vh", overflowY: "auto",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -166,7 +171,7 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
             <div style={{ fontSize: "0.62rem", color: "#555550", textAlign: "center" }}>Sign in to report</div>
           )}
         </div>
-      )}
+      </>)}
     </div>
   );
 }
