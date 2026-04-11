@@ -235,6 +235,7 @@ export default function Navbar() {
           .ie-nav-tab img { width: 22px !important; height: 22px !important; }
           .ie-nav-tab.active img { width: 26px !important; height: 26px !important; }
           .ie-nav-tab.active { padding: 6px 12px !important; }
+          .ie-nav-tab-inactive { display: none !important; }
           .ie-signin-btn { display: none !important; }
           .ie-mobile-signin-cta { display: flex !important; }
           .ie-nav-logo .ie-logo-img { width: 28px !important; height: 28px !important; }
@@ -309,7 +310,7 @@ export default function Navbar() {
             {games.map((g) => {
               const isActive = activeGame?.id === g.id;
               return (
-                <button key={g.id} className={`ie-nav-tab${isActive ? " active" : ""}`} onClick={() => router.push(g.path)}
+                <button key={g.id} className={`ie-nav-tab${isActive ? " active" : ""}${!g.active ? " ie-nav-tab-inactive" : ""}`} onClick={() => router.push(g.path)}
                   style={isActive ? {
                     background: `${g.color}14`,
                     border: `1.5px solid ${g.color}40`,
