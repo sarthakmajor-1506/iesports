@@ -12,7 +12,7 @@ import type { ConfirmationResult } from "firebase/auth";
 import Image from "next/image";
 
 const games = [
-  { id: "dota2",    name: "DOTA 2",            path: "/dota2",    color: "#C23616", glow: "rgba(194,54,22,0.2)",   icon: "/dota2logo.png",    active: true  },
+  { id: "dota2",    name: "DOTA 2",            path: "/dota2",    color: "#A12B1F", glow: "rgba(161,43,31,0.2)",   icon: "/dota2logo.png",    active: true  },
   { id: "valorant", name: "VALORANT",        path: "/valorant", color: "#3CCBFF", glow: "rgba(60,203,255,0.2)",  icon: "/valorantlogo.png", active: true },
   { id: "cs2",      name: "COUNTER-STRIKE 2", path: "/cs2",      color: "#f0a500", glow: "rgba(240,165,0,0.2)",  icon: "/cs2logo.png",     active: true },
   { id: "cod",      name: "COD",              path: "/cod",      color: "#22c55e", glow: "rgba(34,197,94,0.2)",  icon: "/codlogo.jpeg",     active: false },

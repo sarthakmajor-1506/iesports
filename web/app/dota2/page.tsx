@@ -37,18 +37,18 @@ export default function Dota2() {
         }
         .d2-bg-grid {
           position: absolute; inset: 0;
-          background-image: linear-gradient(rgba(194,54,22,0.04) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(194,54,22,0.04) 1px, transparent 1px);
+          background-image: linear-gradient(rgba(161,43,31,0.04) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(161,43,31,0.04) 1px, transparent 1px);
           background-size: 64px 64px;
         }
         .d2-bg-glow1 {
           position: absolute; width: 700px; height: 700px; top: -200px; right: -100px;
-          background: radial-gradient(circle, rgba(194,54,22,0.12) 0%, rgba(194,54,22,0.03) 45%, transparent 70%);
+          background: radial-gradient(circle, rgba(161,43,31,0.12) 0%, rgba(161,43,31,0.03) 45%, transparent 70%);
           animation: d2-glow-drift1 20s ease-in-out infinite;
         }
         .d2-bg-glow2 {
           position: absolute; width: 550px; height: 550px; bottom: 20%; left: -150px;
-          background: radial-gradient(circle, rgba(194,54,22,0.09) 0%, rgba(194,54,22,0.02) 45%, transparent 70%);
+          background: radial-gradient(circle, rgba(161,43,31,0.09) 0%, rgba(161,43,31,0.02) 45%, transparent 70%);
           animation: d2-glow-drift2 26s ease-in-out infinite;
         }
         @keyframes d2-glow-drift1 {
@@ -126,7 +126,7 @@ export default function Dota2() {
           letter-spacing: -0.03em;
           line-height: 1.1;
         }
-        .d2-hero-title span { color: #C23616; }
+        .d2-hero-title span { color: #A12B1F; }
         .d2-hero-sub {
           font-size: 0.86rem;
           color: rgba(255,255,255,0.55);
@@ -168,11 +168,11 @@ export default function Dota2() {
         }
         .d2-tab:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
         .d2-tab.active {
-          background: #C23616;
+          background: #A12B1F;
           color: #fff;
-          box-shadow: 0 0 20px rgba(194,54,22,0.35);
+          box-shadow: 0 0 20px rgba(161,43,31,0.35);
         }
-        .d2-tab.active:hover { background: #8B1A0E; }
+        .d2-tab.active:hover { background: #7A1F15; }
 
         @media (max-width: 700px) {
           .d2-hero { height: 260px; }

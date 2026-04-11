@@ -140,7 +140,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const isValorant = game === "valorant";
   const isCS2 = game === "cs2";
   const isShuffle = tournament?.format === "shuffle";
-  const accentColor = isCS2 ? "#f0a500" : isValorant ? "#3CCBFF" : "#C23616";
+  const accentColor = isCS2 ? "#f0a500" : isValorant ? "#3CCBFF" : "#A12B1F";
 
   const isDota = game === "dota2" || (!isValorant && !isCS2);
   const isProfilePrivate = isDota && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
@@ -486,7 +486,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 )}
                 <button onClick={saveFullName} disabled={fullNameSaving || fullName.trim().length < 2} style={{
                   width: "100%", padding: 14,
-                  background: fullNameSaving || fullName.trim().length < 2 ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                  background: fullNameSaving || fullName.trim().length < 2 ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                   cursor: fullNameSaving || fullName.trim().length < 2 ? "default" : "pointer",
                   opacity: fullName.trim().length < 2 ? 0.4 : 1,
@@ -509,7 +509,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     </div>
                     <button onClick={() => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); }} style={{
                       width: "100%", padding: 14,
-                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
                     }}>
                       {"Verify Phone Number \u2192"}
@@ -543,7 +543,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{phoneError}</p>}
                     <button onClick={sendOtp} disabled={phoneLoading} style={{
                       width: "100%", padding: 14,
-                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
@@ -580,7 +580,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     {phoneError && <p style={{ fontSize: 12, color: "#f87171", marginBottom: 8, textAlign: "center" as const }}>{phoneError}</p>}
                     <button onClick={() => verifyOtpStr(otp.join(""))} disabled={phoneLoading} style={{
                       width: "100%", padding: 14,
-                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                      background: phoneLoading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: phoneLoading ? "default" : "pointer", fontFamily: "inherit",
                     }}>
@@ -642,7 +642,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   <div>
                     <button onClick={currentReq.action} style={{
                       width: "100%", padding: 14,
-                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
                       cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
                     }}>
@@ -685,7 +685,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 14 }}>All set!</h3>
                 <button onClick={() => { if (isShuffle) handleSolo(); else setStep("choose"); }} disabled={loading} style={{
                   width: "100%", padding: 14,
-                  background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#8B1A0E"})`,
+                  background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15,
                   cursor: loading ? "default" : "pointer",
                   boxShadow: `0 4px 20px ${accentColor}33`,
@@ -822,7 +822,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               }}>← Back</button>
               <button onClick={handleCreateTeam} disabled={loading} style={{
                 flex: 2, padding: 12,
-                background: loading ? "#b45309" : `linear-gradient(135deg, ${accentColor}, #8B1A0E)`,
+                background: loading ? "#b45309" : `linear-gradient(135deg, ${accentColor}, #7A1F15)`,
                 border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 14, cursor: loading ? "default" : "pointer",
               }}>{loading ? "Creating..." : "Create Team →"}</button>
             </div>
