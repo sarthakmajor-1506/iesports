@@ -81,7 +81,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         cursor: "pointer",
         ...(isBracket ? { borderColor: "rgba(245,158,11,0.2)" } : {}),
         ...(isLive ? { borderColor: "rgba(34,197,94,0.25)" } : {}),
-        ...(isExpanded ? { borderColor: isBracket ? "rgba(245,158,11,0.5)" : "rgba(59,130,246,0.25)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
+        ...(isExpanded ? { borderColor: isBracket ? "rgba(245,158,11,0.5)" : "rgba(194,54,22,0.25)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 } : {}),
       }} onClick={() => setExpandedMatch(isExpanded ? null : m.id)}>
         <div className="dtd-mc-index">
           <span className="dtd-mc-index-num" style={isBracket ? { color: bracketAccent, fontSize: "0.55rem" } : {}}>
@@ -125,7 +125,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <>
               {scheduledTime ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: isBracket ? bracketAccent : "#3B82F6" }}>{scheduledTime}</div>
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: isBracket ? bracketAccent : "#C23616" }}>{scheduledTime}</div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "rgba(255,255,255,0.35)" }}>{scheduledDay}</div>
                 </div>
               ) : (
@@ -148,7 +148,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="dtd-mc-avatars">{t2Members.map((p: any, i: number) => p.steamAvatar ? <img key={i} src={p.steamAvatar} alt="" /> : <div key={i} className="dtd-mc-av-init">{(p.steamName || "?")[0]}</div>)}</div>
           </div>
         </div>
-        <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#3B82F6") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
+        <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#C23616") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
       </div>
 
       {isExpanded && (() => {
@@ -158,9 +158,9 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         <div className="dtd-mc-expanded" style={{ background: "linear-gradient(180deg, #0A0A10 0%, #14141A 30%, #14141A 70%, #0A0A10 100%)", border: "1px solid #2A2A30", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10, padding: "22px 14px 18px", overflow: "hidden", position: "relative" }}>
           {/* Background diagonal streaks */}
           <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(59,130,246,0.07), transparent)", transform: "translate(-50%, -50%) rotate(30deg)" }} />
-            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(59,130,246,0.05), transparent)", transform: "translate(-50%, -50%) rotate(-30deg)" }} />
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 10%, rgba(59,130,246,0.15) 50%, transparent 90%)" }} />
+            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(194,54,22,0.07), transparent)", transform: "translate(-50%, -50%) rotate(30deg)" }} />
+            <div style={{ position: "absolute", top: "50%", left: "50%", width: 1.5, height: "160%", background: "linear-gradient(180deg, transparent, rgba(194,54,22,0.05), transparent)", transform: "translate(-50%, -50%) rotate(-30deg)" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 10%, rgba(194,54,22,0.15) 50%, transparent 90%)" }} />
           </div>
           {/* Floating 2-2-1 Player Lineup */}
           <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
@@ -178,17 +178,17 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         {p.steamAvatar ? (
                           <img src={p.steamAvatar} alt="" style={{
                             width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
-                            border: "2px solid rgba(59,130,246,0.3)",
-                            boxShadow: "0 0 10px rgba(59,130,246,0.15), 0 3px 10px rgba(0,0,0,0.35)",
+                            border: "2px solid rgba(194,54,22,0.3)",
+                            boxShadow: "0 0 10px rgba(194,54,22,0.15), 0 3px 10px rgba(0,0,0,0.35)",
                           }} />
                         ) : (
                           <div style={{
                             width: 46, height: 46, borderRadius: "50%",
-                            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                            background: "linear-gradient(135deg, #C23616, #8B1A0E)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: "0.95rem", fontWeight: 800, color: "#fff",
-                            border: "2px solid rgba(59,130,246,0.3)",
-                            boxShadow: "0 0 10px rgba(59,130,246,0.15)",
+                            border: "2px solid rgba(194,54,22,0.3)",
+                            boxShadow: "0 0 10px rgba(194,54,22,0.15)",
                           }}>{(p.steamName || "?")[0]}</div>
                         )}
                         <div style={{ textAlign: "center", maxWidth: 56 }}>
@@ -205,24 +205,24 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="dtd-mc-vs-col" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "dtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px" }}>
               {/* Team 1 Logo + Name */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 10, animation: "dtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(59,130,246,0.3)", background: "linear-gradient(135deg, #3b82f622, #2563eb22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#3b82f6" }}>{(m.team1Name || "?")[0]}</span>}
+                <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(194,54,22,0.3)", background: "linear-gradient(135deg, #C2361622, #8B1A0E22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#C23616" }}>{(m.team1Name || "?")[0]}</span>}
                 </div>
                 <div style={{
-                  fontSize: "0.78rem", fontWeight: 900, color: "#3b82f6", textAlign: "center",
+                  fontSize: "0.78rem", fontWeight: 900, color: "#C23616", textAlign: "center",
                   textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
-                  textShadow: "0 0 12px rgba(59,130,246,0.4), 0 0 24px rgba(59,130,246,0.15)",
+                  textShadow: "0 0 12px rgba(194,54,22,0.4), 0 0 24px rgba(194,54,22,0.15)",
                   wordBreak: "break-word" as any,
                 }}>{m.team1Name}</div>
               </div>
               {/* VS Badge */}
               <div className="dtd-mc-vs" style={{
                 width: 48, height: 48, borderRadius: "50%",
-                background: "linear-gradient(135deg, #3b82f6, #6366f1, #1d4ed8)",
+                background: "linear-gradient(135deg, #C23616, #e25b3e, #8B1A0E)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "0.95rem", fontWeight: 900, color: "#fff", letterSpacing: "0.05em",
                 animation: "dtd-glow-pulse 2.5s ease-in-out infinite",
-                boxShadow: "0 0 28px rgba(59,130,246,0.3), inset 0 0 10px rgba(255,255,255,0.1)",
+                boxShadow: "0 0 28px rgba(194,54,22,0.3), inset 0 0 10px rgba(255,255,255,0.1)",
               }}>VS</div>
               {isComplete && <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#4ade80", textShadow: "0 0 8px rgba(74,222,128,0.4)", marginTop: 4 }}>{m.team1Score} - {m.team2Score}</div>}
               {/* Team 2 Logo + Name */}
@@ -298,7 +298,7 @@ async function captureTabImage(el: HTMLElement) {
   const prevBg = el.style.background;
   el.style.filter = "contrast(1.3) brightness(1.25) saturate(1.2)";
   el.style.padding = "24px";
-  el.style.border = "3px solid rgba(59,130,246,0.35)";
+  el.style.border = "3px solid rgba(194,54,22,0.35)";
   el.style.background = "#080c14";
   const html2canvas = (await import("html2canvas")).default;
   const canvas = await html2canvas(el, { backgroundColor: "#050810", scale: 2, useCORS: true, logging: false });
@@ -331,7 +331,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
       {open && (
         <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 200, background: "rgba(10,14,24,0.97)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 8, minWidth: 188, boxShadow: "0 12px 40px rgba(0,0,0,0.6)", overflow: "hidden" }}>
           <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.15)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(194,54,22,0.15)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/tournament/${id}?tab=${tabKey}`);
@@ -340,7 +340,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
             <Copy size={14} /> Copy Link
           </button>
           <button style={{ width: "100%", padding: "10px 14px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", fontFamily: "inherit", background: "transparent", border: "none", textAlign: "left" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.15)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(194,54,22,0.15)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             onClick={async () => {
               if (!tabContentRef.current) return;
@@ -414,7 +414,7 @@ function TimelineItem({ label, date, status, badge }: { label: string; date: str
       <div>
         <div className="dtd-tl-label">
           {label}
-          {badge && <span className="dtd-tl-badge" style={{ background: status === "active" ? "rgba(59,130,246,0.15)" : "rgba(245,158,11,0.12)", color: status === "active" ? "#60A5FA" : "#fbbf24" }}>{badge}</span>}
+          {badge && <span className="dtd-tl-badge" style={{ background: status === "active" ? "rgba(194,54,22,0.15)" : "rgba(245,158,11,0.12)", color: status === "active" ? "#E25B3E" : "#fbbf24" }}>{badge}</span>}
         </div>
         <div className="dtd-tl-date">{formatDateTime(date)}</div>
       </div>
@@ -536,14 +536,14 @@ function DotaTournamentDetailInner() {
       <style>{`
         @keyframes dtd-sk-pulse { 0%,100% { background-position: -200% 0; } 50% { background-position: 200% 0; } }
         @keyframes dtspin { to { transform: rotate(360deg); } }
-        .dtd-sk { background: linear-gradient(90deg, rgba(59,130,246,0.04) 0%, rgba(59,130,246,0.12) 40%, rgba(59,130,246,0.04) 80%); background-size: 200% 100%; animation: dtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
+        .dtd-sk { background: linear-gradient(90deg, rgba(194,54,22,0.04) 0%, rgba(194,54,22,0.12) 40%, rgba(194,54,22,0.04) 80%); background-size: 200% 100%; animation: dtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
         .dtd-sk-dark { background: linear-gradient(90deg, #0d151e 0%, #162030 40%, #0d151e 80%); background-size: 200% 100%; animation: dtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
       `}</style>
-      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(59,130,246,0.12)" }} />
-      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(59,130,246,0.14) 0%, #0a0e18 60%)", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(194,54,22,0.12)" }} />
+      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(194,54,22,0.14) 0%, #0a0e18 60%)", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(194,54,22,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(194,54,22,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div style={{ position: "absolute", bottom: 40, left: 32, right: 32 }}>
-          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(59,130,246,0.3)", marginBottom: 16 }} />
+          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(194,54,22,0.3)", marginBottom: 16 }} />
           <div className="dtd-sk" style={{ width: "62%", height: 46, marginBottom: 12, borderRadius: 12 }} />
           <div className="dtd-sk" style={{ width: "40%", height: 18, marginBottom: 20, borderRadius: 6 }} />
           <div style={{ display: "flex", gap: 10 }}>
@@ -571,7 +571,7 @@ function DotaTournamentDetailInner() {
     <div style={{ minHeight: "100vh", background: "#0a0e18", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, fontFamily: "system-ui, sans-serif" }}>
       <span style={{ fontSize: 40 }}>🎮</span>
       <p style={{ color: "#8A8880", fontSize: "1rem", fontWeight: 600 }}>Tournament not found.</p>
-      <button onClick={() => router.push("/dota2")} style={{ background: "#3B82F6", color: "#fff", border: "none", borderRadius: 100, padding: "10px 24px", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}>
+      <button onClick={() => router.push("/dota2")} style={{ background: "#C23616", color: "#fff", border: "none", borderRadius: 100, padding: "10px 24px", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}>
         ← Back to Tournaments
       </button>
     </div>
@@ -627,11 +627,11 @@ function DotaTournamentDetailInner() {
 
         /* ── Animated background ── */
         .dtd-bg { position: fixed; inset: 0; z-index: 0; background: #0a0e18; overflow: hidden; pointer-events: none; }
-        .dtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(59,130,246,0.10) 60deg, transparent 120deg, rgba(59,130,246,0.07) 200deg, transparent 260deg, rgba(10,14,24,0.8) 360deg); animation: dtd-bg-rot 28s linear infinite; }
-        .dtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: dtd-bg-drift1 22s ease-in-out infinite; }
-        .dtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, rgba(59,130,246,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: dtd-bg-drift2 28s ease-in-out infinite; }
-        .dtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(96,165,250,0.08) 0%, transparent 70%); bottom: 30%; left: 60%; animation: dtd-bg-drift3 34s ease-in-out infinite; }
-        .dtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px); background-size: 60px 60px; animation: dtd-grid-shimmer 8s ease-in-out infinite; }
+        .dtd-bg-gradient { position: absolute; inset: -60%; background: conic-gradient(from 0deg at 35% 45%, transparent 0deg, rgba(194,54,22,0.10) 60deg, transparent 120deg, rgba(194,54,22,0.07) 200deg, transparent 260deg, rgba(10,14,24,0.8) 360deg); animation: dtd-bg-rot 28s linear infinite; }
+        .dtd-bg-glow1 { position: absolute; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, rgba(194,54,22,0.14) 0%, rgba(194,54,22,0.04) 40%, transparent 70%); top: -200px; left: -150px; animation: dtd-bg-drift1 22s ease-in-out infinite; }
+        .dtd-bg-glow2 { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(194,54,22,0.10) 0%, rgba(194,54,22,0.03) 40%, transparent 70%); bottom: 0%; right: 0%; animation: dtd-bg-drift2 28s ease-in-out infinite; }
+        .dtd-bg-glow3 { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(226,91,62,0.08) 0%, transparent 70%); bottom: 30%; left: 60%; animation: dtd-bg-drift3 34s ease-in-out infinite; }
+        .dtd-bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(194,54,22,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(194,54,22,0.06) 1px, transparent 1px); background-size: 60px 60px; animation: dtd-grid-shimmer 8s ease-in-out infinite; }
         @keyframes dtd-bg-rot { to { transform: rotate(360deg); } }
         @keyframes dtd-bg-drift1 { 0% { transform: translate(0,0) scale(1); opacity: 0.7; } 25% { transform: translate(80px,-60px) scale(1.15); opacity: 1; } 50% { transform: translate(120px,40px) scale(0.95); opacity: 0.8; } 75% { transform: translate(-40px,70px) scale(1.08); opacity: 0.9; } 100% { transform: translate(0,0) scale(1); opacity: 0.7; } }
         @keyframes dtd-bg-drift2 { 0% { transform: translate(0,0) scale(1); opacity: 0.6; } 33% { transform: translate(-100px,-80px) scale(1.12); opacity: 1; } 66% { transform: translate(-60px,60px) scale(0.92); opacity: 0.75; } 100% { transform: translate(0,0) scale(1); opacity: 0.6; } }
@@ -644,27 +644,27 @@ function DotaTournamentDetailInner() {
         .dtd-hero { position: relative; min-height: 460px; overflow: hidden; display: flex; align-items: flex-end; }
         .dtd-hero-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; object-position: center 20%; z-index: 0; filter: brightness(0.35) saturate(1.2); animation: dtd-hero-kb 16s ease-in-out infinite alternate; will-change: transform; }
         @keyframes dtd-hero-kb { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.04) translate(-1%, -0.8%); } 100% { transform: scale(1.02) translate(0.8%, -0.4%); } }
-        .dtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(59,130,246,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,14,24,0.3) 0%, rgba(10,14,24,0.7) 60%, rgba(10,14,24,1) 100%); }
+        .dtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(194,54,22,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,14,24,0.3) 0%, rgba(10,14,24,0.7) 60%, rgba(10,14,24,1) 100%); }
         .dtd-hero-content { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .dtd-hero-inner { flex: 1; }
-        .dtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #3B82F6; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .dtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #3B82F6; }
+        .dtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #C23616; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .dtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #C23616; }
         .dtd-hero-title { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900; color: #E6E6E6; line-height: 1.05; animation: dtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) both; letter-spacing: -0.03em; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
         .dtd-hero-desc { font-size: 1rem; color: rgba(230,230,230,0.65); margin-top: 10px; max-width: 560px; line-height: 1.6; animation: dtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.08s both; }
         .dtd-hero-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; animation: dtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.16s both; flex-wrap: wrap; }
-        .dtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); color: #3B82F6; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
-        .dtd-hero-share-btn:hover { background: rgba(59,130,246,0.25); border-color: rgba(59,130,246,0.5); transform: scale(1.05); }
+        .dtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(194,54,22,0.12); border: 1px solid rgba(194,54,22,0.3); color: #C23616; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
+        .dtd-hero-share-btn:hover { background: rgba(194,54,22,0.25); border-color: rgba(194,54,22,0.5); transform: scale(1.05); }
         @keyframes dtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         .dtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
 
         /* ── Tab bar ── */
-        .dtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(59,130,246,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        .dtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(194,54,22,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
         .dtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .dtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
         .dtd-tab-label { display: inline; }
-        .dtd-tab:hover { background: rgba(59,130,246,0.08); color: rgba(255,255,255,0.75); border-color: rgba(59,130,246,0.2); }
-        .dtd-tab.active { background: #3B82F6; color: #fff; border-color: #3B82F6; box-shadow: 0 0 20px rgba(59,130,246,0.35), 0 4px 16px rgba(59,130,246,0.25); }
+        .dtd-tab:hover { background: rgba(194,54,22,0.08); color: rgba(255,255,255,0.75); border-color: rgba(194,54,22,0.2); }
+        .dtd-tab.active { background: #C23616; color: #fff; border-color: #C23616; box-shadow: 0 0 20px rgba(194,54,22,0.35), 0 4px 16px rgba(194,54,22,0.25); }
         .dtd-tab-count { font-size: 0.68rem; font-weight: 700; opacity: 0.75; background: rgba(0,0,0,0.2); padding: 1px 7px; border-radius: 100px; }
 
         .dtd-tab-pane { animation: dtd-fade-up 0.35s ease-out both; }
@@ -673,7 +673,7 @@ function DotaTournamentDetailInner() {
         /* ── Cards ── */
         .dtd-card { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 28px 32px; margin-bottom: 18px; backdrop-filter: blur(12px); transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .dtd-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-        .dtd-card-label { display: block; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #3B82F6; margin-bottom: 18px; }
+        .dtd-card-label { display: block; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #C23616; margin-bottom: 18px; }
 
         /* ── Overview ── */
         .dtd-overview-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
@@ -685,12 +685,12 @@ function DotaTournamentDetailInner() {
         .dtd-stat-tile-icon { display: flex; justify-content: center; margin-bottom: 10px; opacity: 0.7; }
         .dtd-stat-tile-val { font-size: 1.4rem; font-weight: 900; color: #E6E6E6; line-height: 1.1; }
         .dtd-stat-tile-lbl { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #555550; margin-top: 5px; }
-        .dtd-stat-tile.blue { border-color: rgba(59,130,246,0.2); background: rgba(59,130,246,0.06); }
-        .dtd-stat-tile.blue .dtd-stat-tile-val { color: #3B82F6; }
+        .dtd-stat-tile.blue { border-color: rgba(194,54,22,0.2); background: rgba(194,54,22,0.06); }
+        .dtd-stat-tile.blue .dtd-stat-tile-val { color: #C23616; }
         .dtd-stat-tile.gold .dtd-stat-tile-val { color: #fbbf24; }
         .dtd-stat-tile.gold { border-color: rgba(251,191,36,0.2); background: rgba(251,191,36,0.05); }
-        .dtd-stat-tile.light-blue .dtd-stat-tile-val { color: #60a5fa; }
-        .dtd-stat-tile.light-blue { border-color: rgba(59,130,246,0.2); background: rgba(59,130,246,0.05); }
+        .dtd-stat-tile.light-blue .dtd-stat-tile-val { color: #E25B3E; }
+        .dtd-stat-tile.light-blue { border-color: rgba(194,54,22,0.2); background: rgba(194,54,22,0.05); }
         .dtd-desc { font-size: 1rem; color: #8A8880; line-height: 1.8; margin: 0; }
 
         /* ── Timeline ── */
@@ -700,21 +700,21 @@ function DotaTournamentDetailInner() {
         .dtd-tl-item:first-child { padding-top: 0; }
         .dtd-tl-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
         .dtd-tl-dot.past { background: #22c55e; }
-        .dtd-tl-dot.active { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
+        .dtd-tl-dot.active { background: #C23616; box-shadow: 0 0 0 4px rgba(194,54,22,0.2); }
         .dtd-tl-dot.future { background: #2A2A30; }
-        .dtd-tl-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #3B82F6; }
+        .dtd-tl-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #C23616; }
         .dtd-tl-date { font-size: 0.82rem; color: #8A8880; margin-top: 3px; }
         .dtd-tl-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; margin-left: 8px; }
 
         /* ── Rules ── */
         .dtd-rule { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: flex-start; }
         .dtd-rule:last-child { border-bottom: none; }
-        .dtd-rule-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; border-radius: 50%; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.4); font-size: 0.65rem; font-weight: 900; color: #3B82F6; margin-top: 1px; }
+        .dtd-rule-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; border-radius: 50%; background: rgba(194,54,22,0.15); border: 1px solid rgba(194,54,22,0.4); font-size: 0.65rem; font-weight: 900; color: #C23616; margin-top: 1px; }
         .dtd-rule-text { font-size: 0.88rem; color: #8A8880; line-height: 1.6; }
         .dtd-rules-scroll { max-height: 400px; overflow-y: auto; padding-right: 4px; }
         .dtd-rules-scroll::-webkit-scrollbar { width: 4px; }
         .dtd-rules-scroll::-webkit-scrollbar-track { background: transparent; }
-        .dtd-rules-scroll::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.35); border-radius: 4px; }
+        .dtd-rules-scroll::-webkit-scrollbar-thumb { background: rgba(194,54,22,0.35); border-radius: 4px; }
 
         /* ── Empty states ── */
         .dtd-empty { text-align: center; padding: 70px 20px; }
@@ -730,9 +730,9 @@ function DotaTournamentDetailInner() {
         .dtd-tier-header { padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; }
         .dtd-tier-header-count { font-size: 0.72rem; font-weight: 600; opacity: 0.7; }
         .dtd-tier-player { background: rgba(18,18,21,0.7); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; animation: dtd-fadeSlideIn 0.35s ease both; }
-        .dtd-tier-player:hover { transform: translateY(-2px) scale(1.01); border-color: rgba(59,130,246,0.35); box-shadow: 0 0 0 1px rgba(59,130,246,0.15), 0 8px 24px rgba(0,0,0,0.4); background: rgba(25,25,30,0.9); }
+        .dtd-tier-player:hover { transform: translateY(-2px) scale(1.01); border-color: rgba(194,54,22,0.35); box-shadow: 0 0 0 1px rgba(194,54,22,0.15), 0 8px 24px rgba(0,0,0,0.4); background: rgba(25,25,30,0.9); }
         .dtd-tier-player-avatar { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.1); }
-        .dtd-tier-player-avatar-init { width: 38px; height: 38px; border-radius: 10px; background: rgba(59,130,246,0.1); border: 1.5px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #3B82F6; flex-shrink: 0; }
+        .dtd-tier-player-avatar-init { width: 38px; height: 38px; border-radius: 10px; background: rgba(194,54,22,0.1); border: 1.5px solid rgba(194,54,22,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #C23616; flex-shrink: 0; }
         .dtd-tier-player-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .dtd-tier-player-name { font-size: 0.85rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; }
@@ -740,16 +740,16 @@ function DotaTournamentDetailInner() {
         /* ── Teams grid ── */
         .dtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
         .dtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; }
-        .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(59,130,246,0.2); }
-        .dtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #3B82F6; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); padding: 3px 10px; border-radius: 100px; }
+        .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(194,54,22,0.2); }
+        .dtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #C23616; background: rgba(194,54,22,0.1); border: 1px solid rgba(194,54,22,0.25); padding: 3px 10px; border-radius: 100px; }
         .dtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-        .dtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
+        .dtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #C23616 0%, #8B1A0E 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
         .dtd-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .dtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
         .dtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
         .dtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
         .dtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; }
-        .dtd-team-box-member:hover { background: rgba(59,130,246,0.06); transform: translateX(2px); }
+        .dtd-team-box-member:hover { background: rgba(194,54,22,0.06); transform: translateX(2px); }
         .dtd-team-box-member-avatar { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
         .dtd-team-box-member-init { width: 34px; height: 34px; border-radius: 8px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555550; flex-shrink: 0; }
         .dtd-team-box-member-name { font-size: 0.86rem; font-weight: 600; color: #e0e0da; }
@@ -762,7 +762,7 @@ function DotaTournamentDetailInner() {
         .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
         .dtd-standings-table tr:last-child td { border-bottom: none; }
         .dtd-standings-table tbody tr { transition: background 0.15s; }
-        .dtd-standings-table tbody tr:hover { background: rgba(59,130,246,0.04); }
+        .dtd-standings-table tbody tr:hover { background: rgba(194,54,22,0.04); }
 
         /* ── Match headers ── */
         .dtd-section-header { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid; }
@@ -770,21 +770,21 @@ function DotaTournamentDetailInner() {
         .dtd-section-header.bracket { color: #f59e0b; border-color: rgba(245,158,11,0.3); }
         .dtd-match-day-header { font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; margin: 22px 0 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px; }
         .dtd-match-day-header:first-child { margin-top: 0; }
-        .dtd-match-day-header .day-num { color: #3B82F6; }
+        .dtd-match-day-header .day-num { color: #C23616; }
         .dtd-match-day-header.bracket-round .day-num { color: #f59e0b; }
 
         /* ── Match cards ── */
         .dtd-mc { display: flex; align-items: center; background: rgba(18,18,21,0.75); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; margin-bottom: 8px; overflow: hidden; transition: all 0.2s ease; min-height: 68px; backdrop-filter: blur(6px); }
-        .dtd-mc:hover { border-color: rgba(59,130,246,0.25); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .dtd-mc:hover { border-color: rgba(194,54,22,0.25); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .dtd-mc-index { width: 44px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 0; border-right: 1px solid rgba(255,255,255,0.05); }
         .dtd-mc-index-num { font-size: 0.68rem; font-weight: 800; color: #555550; }
-        .dtd-mc-index-fmt { font-size: 0.54rem; font-weight: 800; color: #3B82F6; background: rgba(59,130,246,0.1); padding: 2px 5px; border-radius: 4px; }
+        .dtd-mc-index-fmt { font-size: 0.54rem; font-weight: 800; color: #C23616; background: rgba(194,54,22,0.1); padding: 2px 5px; border-radius: 4px; }
         .dtd-mc-team { flex: 1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-width: 0; }
         .dtd-mc-team.right { flex-direction: row-reverse; text-align: right; }
-        .dtd-mc-team-logo { width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex-shrink: 0; overflow: hidden; }
+        .dtd-mc-team-logo { width: 38px; height: 38px; border-radius: 9px; background: linear-gradient(135deg, #C23616 0%, #8B1A0E 100%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex-shrink: 0; overflow: hidden; }
         .dtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .dtd-mc-team-info { flex: 1; min-width: 0; }
-        .dtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #3B82F6; text-transform: uppercase; }
+        .dtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #C23616; text-transform: uppercase; }
         .dtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dtd-mc-avatars { display: flex; gap: 0; margin-top: 4px; }
         .dtd-mc-avatars img, .dtd-mc-avatars .dtd-mc-av-init { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(18,18,21,0.9); margin-left: -4px; object-fit: cover; }
@@ -803,7 +803,7 @@ function DotaTournamentDetailInner() {
 
         /* ── Tab share button ── */
         .dtd-tab-share { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 100px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 700; transition: all 0.15s; }
-        .dtd-tab-share:hover { background: rgba(59,130,246,0.12); color: #3B82F6; border-color: rgba(59,130,246,0.3); }
+        .dtd-tab-share:hover { background: rgba(194,54,22,0.12); color: #C23616; border-color: rgba(194,54,22,0.3); }
         .dtd-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #fff; padding: 10px 22px; border-radius: 100px; font-size: 0.85rem; font-weight: 700; z-index: 2000; animation: dtd-toast-in 0.3s ease-out, dtd-toast-out 0.3s ease-in 1.7s both; pointer-events: none; display: flex; align-items: center; gap: 7px; }
         @keyframes dtd-toast-in { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         @keyframes dtd-toast-out { from { opacity: 1; } to { opacity: 0; } }
@@ -813,10 +813,10 @@ function DotaTournamentDetailInner() {
         @keyframes dtd-player-reveal { from { opacity: 0; transform: translateY(24px) scale(0.7) rotate(-2deg); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); filter: blur(0); } }
         @keyframes dtd-player-reveal-right { from { opacity: 0; transform: translateY(24px) scale(0.7) rotate(2deg); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); filter: blur(0); } }
         @keyframes dtd-vs-pop { 0% { opacity: 0; transform: scale(0.2) rotate(-180deg); filter: blur(8px); } 50% { opacity: 1; transform: scale(1.25) rotate(10deg); filter: blur(0); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
-        @keyframes dtd-glow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(59,130,246,0.4), 0 0 40px rgba(59,130,246,0.15); } 50% { box-shadow: 0 0 24px rgba(59,130,246,0.7), 0 0 60px rgba(59,130,246,0.25); } }
+        @keyframes dtd-glow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(194,54,22,0.4), 0 0 40px rgba(194,54,22,0.15); } 50% { box-shadow: 0 0 24px rgba(194,54,22,0.7), 0 0 60px rgba(194,54,22,0.25); } }
         @keyframes dtd-streak-left { 0% { opacity: 0; transform: translateX(60px); } 100% { opacity: 1; transform: translateX(0); } }
         @keyframes dtd-streak-right { 0% { opacity: 0; transform: translateX(-60px); } 100% { opacity: 1; transform: translateX(0); } }
-        @keyframes dtd-border-glow { 0%,100% { border-color: rgba(59,130,246,0.2); } 50% { border-color: rgba(59,130,246,0.5); } }
+        @keyframes dtd-border-glow { 0%,100% { border-color: rgba(194,54,22,0.2); } 50% { border-color: rgba(194,54,22,0.5); } }
         @keyframes dtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
         .dtd-fighter-card { position: relative; transition: transform 0.2s; }
         .dtd-fighter-card:hover { transform: translateY(-2px) scale(1.06); z-index: 2; }
@@ -828,23 +828,23 @@ function DotaTournamentDetailInner() {
         .dtd-share-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .dtd-share-modal-title { font-size: 1.1rem; font-weight: 900; color: #E6E6E6; display: flex; align-items: center; gap: 10px; }
         .dtd-share-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 100px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8A8880; }
-        .dtd-share-close:hover { background: rgba(59,130,246,0.12); color: #3B82F6; }
+        .dtd-share-close:hover { background: rgba(194,54,22,0.12); color: #C23616; }
         .vtd-share-carousel { position: relative; width: 100%; }
         .vtd-share-carousel-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
         .vtd-share-carousel-btn { width: 36px; height: 36px; border-radius: 100px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #8A8880; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
-        .vtd-share-carousel-btn:hover { background: rgba(59,130,246,0.12); color: #3B82F6; }
+        .vtd-share-carousel-btn:hover { background: rgba(194,54,22,0.12); color: #C23616; }
         .vtd-share-carousel-btn:disabled { opacity: 0.3; cursor: default; }
         .vtd-share-carousel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .vtd-share-carousel-label { font-size: 0.78rem; font-weight: 800; color: #E6E6E6; }
         .vtd-share-carousel-dots { display: flex; gap: 5px; }
         .vtd-share-carousel-dot { width: 6px; height: 6px; border-radius: 100px; background: rgba(255,255,255,0.15); transition: all 0.2s; }
-        .vtd-share-carousel-dot.active { background: #3B82F6; width: 16px; }
+        .vtd-share-carousel-dot.active { background: #C23616; width: 16px; }
         .vtd-share-carousel-actions { display: flex; gap: 8px; margin-top: 12px; }
         .vtd-share-img-btn { padding: 10px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; flex: 1; }
-        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #3B82F6, #2563EB); color: #fff; }
-        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(59,130,246,0.35); }
+        .vtd-share-img-btn.dl { background: linear-gradient(135deg, #C23616, #8B1A0E); color: #fff; }
+        .vtd-share-img-btn.dl:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(194,54,22,0.35); }
         .vtd-share-img-btn.cp { background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.1); }
-        .vtd-share-img-btn.cp:hover { background: rgba(59,130,246,0.10); color: #3B82F6; }
+        .vtd-share-img-btn.cp:hover { background: rgba(194,54,22,0.10); color: #C23616; }
 
         /* ── Responsive ── */
         @media (max-width: 1100px) { .dtd-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
@@ -959,7 +959,7 @@ function DotaTournamentDetailInner() {
               <div className="dtd-hero-actions">
                 {canRegister && (
                   <button
-                    style={{ padding: "12px 32px", background: "linear-gradient(135deg, #3B82F6, #2563EB)", color: "#fff", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(59,130,246,0.35)" }}
+                    style={{ padding: "12px 32px", background: "linear-gradient(135deg, #C23616, #8B1A0E)", color: "#fff", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(194,54,22,0.35)" }}
                     onClick={() => {
                       if (!user) { setShowLoginPrompt(true); return; }
                       if (!steamLinked) { navigateWithAppPriority(`/api/auth/steam?uid=${user.uid}`); return; }
@@ -1009,7 +1009,7 @@ function DotaTournamentDetailInner() {
                 {regClosed && !isRegistered && isRegOpen && (
                   <button
                     onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
-                    style={{ padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
+                    style={{ padding: "10px 24px", background: "rgba(226,91,62,0.12)", color: "#E25B3E", border: "1px solid rgba(226,91,62,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
                   >Leaderboard</button>
                 )}
                 <button className="dtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
@@ -1025,7 +1025,7 @@ function DotaTournamentDetailInner() {
           {/* ═══ CHAMPION BANNER ═══ */}
           {championTeamName && (
             <div style={{
-              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(59,130,246,0.06) 50%, rgba(255,215,0,0.08) 100%)",
+              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(194,54,22,0.06) 50%, rgba(255,215,0,0.08) 100%)",
               border: "1px solid rgba(255,215,0,0.25)", borderRadius: 14, padding: "20px 24px", marginBottom: 20, textAlign: "center", position: "relative", overflow: "hidden",
             }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 0%, rgba(255,215,0,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
@@ -1072,7 +1072,7 @@ function DotaTournamentDetailInner() {
             <div className="dtd-tab-pane" ref={tabContentRef}>
               <div className="dtd-stat-tiles">
                 <div className="dtd-stat-tile blue" style={{ animationDelay: "0s" }}>
-                  <div className="dtd-stat-tile-icon"><Zap size={24} color="#3B82F6" /></div>
+                  <div className="dtd-stat-tile-icon"><Zap size={24} color="#C23616" /></div>
                   <div className="dtd-stat-tile-val">{tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>
                   <div className="dtd-stat-tile-lbl">Format</div>
                 </div>
@@ -1089,7 +1089,7 @@ function DotaTournamentDetailInner() {
                   </div>
                 )}
                 <div className="dtd-stat-tile light-blue" style={{ animationDelay: "0.15s" }}>
-                  <div className="dtd-stat-tile-icon"><Calendar size={24} color="#60a5fa" /></div>
+                  <div className="dtd-stat-tile-icon"><Calendar size={24} color="#E25B3E" /></div>
                   <div className="dtd-stat-tile-val">{formatDate(tournament.startDate)}</div>
                   <div className="dtd-stat-tile-lbl">Start Date</div>
                 </div>
@@ -1142,11 +1142,11 @@ function DotaTournamentDetailInner() {
                     <span className="dtd-card-label"><GitBranch size={12} style={{ display: "inline", marginRight: 6 }} />Tournament Flow</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       {[
-                        { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#3b82f6" },
+                        { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#C23616" },
                         { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
                         { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
                         { label: "→", sub: `LB Final BO${tournament.lbFinalBestOf || tournament.bracketBestOf || 2}`, color: "#555550", isArrow: true },
-                        { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#3B82F6" },
+                        { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#C23616" },
                       ].map((s, i) => s.isArrow ? (
                         <div key={i} style={{ color: "#555550", fontSize: "1.2rem", flexShrink: 0 }}>{s.label}</div>
                       ) : (
@@ -1188,7 +1188,7 @@ function DotaTournamentDetailInner() {
                   const bracketColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
                     divine_immortal:  { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#f59e0b", label: "Divine – Immortal" },
                     legend_ancient:   { bg: "rgba(168,85,247,0.10)", border: "rgba(168,85,247,0.30)", text: "#a855f7", label: "Legend – Ancient" },
-                    crusader_archon:  { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.30)", text: "#3b82f6", label: "Crusader – Archon" },
+                    crusader_archon:  { bg: "rgba(194,54,22,0.10)", border: "rgba(194,54,22,0.30)", text: "#C23616", label: "Crusader – Archon" },
                     herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
                   };
                   const grouped: Record<string, any[]> = {};
@@ -1303,8 +1303,8 @@ function DotaTournamentDetailInner() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="dtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#3B82F6" }}>Pts</th><th>BH</th></tr></thead>
-                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#3B82F6" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#3B82F6" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#C23616" }}>Pts</th><th>BH</th></tr></thead>
+                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#C23616" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#C23616" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
                     </table>
                   </div>
                 )}
@@ -1349,9 +1349,9 @@ function DotaTournamentDetailInner() {
                   <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#E6E6E6" }}>Elimination Play-offs</h3>
                   <span style={{
                     fontSize: "0.6rem", fontWeight: 900, letterSpacing: "0.1em", padding: "3px 10px", borderRadius: 100,
-                    background: tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.12)" : "rgba(59,130,246,0.12)",
-                    border: `1px solid ${tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.35)"}`,
-                    color: tournament.bracketFormat === "single_elimination" ? "#f59e0b" : "#3B82F6",
+                    background: tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.12)" : "rgba(194,54,22,0.12)",
+                    border: `1px solid ${tournament.bracketFormat === "single_elimination" ? "rgba(245,158,11,0.35)" : "rgba(194,54,22,0.35)"}`,
+                    color: tournament.bracketFormat === "single_elimination" ? "#f59e0b" : "#C23616",
                   }}>
                     {tournament.bracketFormat === "single_elimination" ? "SINGLE ELIMINATION" : "DOUBLE ELIMINATION"}
                   </span>
@@ -1387,7 +1387,7 @@ function DotaTournamentDetailInner() {
                   const bracketColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
                     divine_immortal:  { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#f59e0b", label: "Divine – Immortal" },
                     legend_ancient:   { bg: "rgba(168,85,247,0.10)", border: "rgba(168,85,247,0.30)", text: "#a855f7", label: "Legend – Ancient" },
-                    crusader_archon:  { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.30)", text: "#3b82f6", label: "Crusader – Archon" },
+                    crusader_archon:  { bg: "rgba(194,54,22,0.10)", border: "rgba(194,54,22,0.30)", text: "#C23616", label: "Crusader – Archon" },
                     herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
                   };
                   const playerBracketMap: Record<string, string> = {};
