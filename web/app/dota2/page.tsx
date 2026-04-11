@@ -180,7 +180,8 @@ export default function Dota2() {
           .d2-hero-content { padding: 0 16px 22px; }
           .d2-hero-logo { width: 42px; height: 42px; }
           .d2-tabs-wrap { padding: 18px 16px 0; }
-          .d2-tab { padding: 9px 18px; font-size: 0.84rem; }
+          .d2-tabs { width: 100%; }
+          .d2-tab { padding: 9px 0; font-size: 0.82rem; flex: 1; justify-content: center; gap: 6px; white-space: nowrap; }
         }
       `}</style>
 

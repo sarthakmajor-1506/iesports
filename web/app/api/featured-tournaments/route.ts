@@ -3,16 +3,17 @@ import { adminDb } from "@/lib/firebaseAdmin";
 
 export async function GET() {
   try {
-    // ── Dota 2: fetch from "tournaments" collection ──
-    const dotaSnap = await adminDb.collection("tournaments").get();
+    // ── Dota 2 + Valorant: fetch in parallel ──
+    const now = new Date();
+    const [dotaSnap, valSnap] = await Promise.all([
+      adminDb.collection("tournaments").get(),
+      adminDb.collection("valorantTournaments").get(),
+    ]);
     const dotaAll = dotaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const dotaFeatured = dotaAll
       .filter((t: any) => t.status === "upcoming" || t.status === "active" || t.status === "ongoing")
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-    // ── Valorant: fetch from "valorantTournaments" collection ──
-    const now = new Date();
-    const valSnap = await adminDb.collection("valorantTournaments").get();
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const valIsEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
     const valFeatured = valAll
@@ -54,20 +55,20 @@ export async function GET() {
       return tournament;
     };
 
-    // ── Fetch champion team members for completed tournaments ──
+    // ── Fetch champion team members for completed tournaments (batched reads) ──
     const enrichWithChampionMembers = async (tournament: any, game: "valorant" | "dota") => {
-      // First detect champion if not already set
       tournament = await detectChampion(tournament, game);
       if (!tournament?.championTeamId) return tournament;
       try {
         const col = game === "valorant" ? "valorantTournaments" : "tournaments";
-        // Teams are stored as subcollection under the tournament doc
         const teamDoc = await adminDb.collection(col).doc(tournament.id).collection("teams").doc(tournament.championTeamId).get();
         if (teamDoc.exists) {
           const teamData = teamDoc.data();
           const members = teamData?.members || [];
           const memberNames: { name: string; tag?: string; avatar?: string; uid?: string }[] = [];
-          for (const m of members.slice(0, 5)) {
+          const uidMembers: { index: number; uid: string }[] = [];
+          for (let i = 0; i < Math.min(members.length, 5); i++) {
+            const m = members[i];
             if (typeof m === "object" && m !== null) {
               memberNames.push({
                 name: m.riotGameName || m.steamName || m.displayName || "Unknown",
@@ -76,15 +77,23 @@ export async function GET() {
                 uid: m.uid || undefined,
               });
             } else if (typeof m === "string") {
-              const userDoc = await adminDb.collection("users").doc(m).get();
-              if (userDoc.exists) {
-                const u = userDoc.data();
-                memberNames.push({
+              memberNames.push({ name: "Unknown", uid: m });
+              uidMembers.push({ index: memberNames.length - 1, uid: m });
+            }
+          }
+          // Batch read all UID-only members in one call instead of N individual reads
+          if (uidMembers.length > 0) {
+            const refs = uidMembers.map(um => adminDb.collection("users").doc(um.uid));
+            const userDocs = await adminDb.getAll(...refs);
+            for (let i = 0; i < userDocs.length; i++) {
+              if (userDocs[i].exists) {
+                const u = userDocs[i].data();
+                memberNames[uidMembers[i].index] = {
                   name: u?.riotGameName || u?.steamName || u?.displayName || "Unknown",
                   tag: u?.riotTagLine || undefined,
                   avatar: u?.riotAvatar || u?.steamAvatar || undefined,
-                  uid: m,
-                });
+                  uid: uidMembers[i].uid,
+                };
               }
             }
           }

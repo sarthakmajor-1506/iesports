@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/Navbar";
@@ -12,6 +10,7 @@ import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
+import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -540,23 +539,18 @@ function CS2TournamentDetailInner() {
       .catch(() => setTLoading(false));
   };
 
-  // Initial data load via API
-  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
+  // Initial data load via API + 30s polling (replaces duplicate fetch + onSnapshot)
+  useEffect(() => {
+    refetchData(); fetchRankReports();
+    const interval = setInterval(refetchData, 30_000);
+    return () => clearInterval(interval);
+  }, [id]);
 
-  // Re-fetch data when user logs in (to check registration status)
+  // Re-check registration status when user logs in
   useEffect(() => {
     if (!id || !user) return;
-    fetch(`/api/tournaments/detail?id=${id}&game=cs2`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.tournament) setTournament(data.tournament);
-        if (data.players) {
-          setPlayers(data.players);
-          setIsRegistered(data.players.some((p: any) => p.uid === user.uid));
-        }
-      })
-      .catch(() => {});
-  }, [id, user]);
+    setIsRegistered(players.some((p: any) => p.uid === user.uid));
+  }, [user]);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -651,56 +645,7 @@ function CS2TournamentDetailInner() {
     } catch (e) { console.error("Download failed", e); }
   };
 
-  if (tLoading) return (
-    <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
-      <style>{`
-        @keyframes csd-sk-pulse { 0%,100% { background-position: -200% 0; } 50% { background-position: 200% 0; } }
-        @keyframes vtspin { to { transform: rotate(360deg); } }
-        .csd-sk { background: linear-gradient(90deg, rgba(240,165,0,0.04) 0%, rgba(240,165,0,0.12) 40%, rgba(240,165,0,0.04) 80%); background-size: 200% 100%; animation: csd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
-        .csd-sk-dark { background: linear-gradient(90deg, #0d151e 0%, #162030 40%, #0d151e 80%); background-size: 200% 100%; animation: csd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
-      `}</style>
-      {/* Navbar placeholder */}
-      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(240,165,0,0.12)" }} />
-      {/* Hero skeleton */}
-      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(240,165,0,0.14) 0%, #0A0F2A 60%)", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(240,165,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(240,165,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-        <div style={{ position: "absolute", bottom: 40, left: 32, right: 32 }}>
-          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(240,165,0,0.3)", marginBottom: 16 }} />
-          <div className="csd-sk" style={{ width: "62%", height: 46, marginBottom: 12, borderRadius: 12 }} />
-          <div className="csd-sk" style={{ width: "40%", height: 18, marginBottom: 20, borderRadius: 6 }} />
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="csd-sk" style={{ width: 140, height: 44, borderRadius: 100 }} />
-            <div className="csd-sk" style={{ width: 44, height: 44, borderRadius: "50%" }} />
-          </div>
-        </div>
-      </div>
-      {/* Content skeleton */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 30px" }}>
-        {/* Tab bar */}
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 6, margin: "20px 0 24px", display: "flex", gap: 6 }}>
-          {[120, 100, 90, 110, 100, 105, 120].map((w, i) => (
-            <div key={i} className="csd-sk-dark" style={{ width: w, height: 46, borderRadius: 12, flexShrink: 0 }} />
-          ))}
-        </div>
-        {/* Stat tiles */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
-            <div key={i} className="csd-sk-dark" style={{ height: 100, borderRadius: 16 }} />
-          ))}
-        </div>
-        {/* Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
-          <div>
-            <div className="csd-sk-dark" style={{ height: 160, borderRadius: 18, marginBottom: 16 }} />
-            <div className="csd-sk-dark" style={{ height: 120, borderRadius: 18 }} />
-          </div>
-          <div>
-            <div className="csd-sk-dark" style={{ height: 280, borderRadius: 18 }} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  if (tLoading) return <TournamentDetailLoader game="cs2" />;
 
   if (!tournament) return (
     <div style={{ minHeight: "100vh", background: "#0f1923", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1469,7 +1414,7 @@ function CS2TournamentDetailInner() {
                                     <span className="csd-tier-player-name">{p.steamName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(240,165,0,0.15)", color: "#f0a500", border: "1px solid rgba(240,165,0,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="csd-tier-player-rank">{p.cs2Rank || "Unranked"}</span>
-                                      <RankReportBadge playerUid={p.uid} playerName={p.steamName} tournamentId={id} game="cs2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                      <RankReportBadge playerUid={p.uid} playerName={p.steamName} tournamentId={id} game="cs2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
                                     </div>
                                   </div>
                                 </div>

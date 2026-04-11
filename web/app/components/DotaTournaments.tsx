@@ -1,31 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import useSWR from "swr";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Tournament } from "@/lib/types";
+import { TournamentListLoader } from "./TournamentLoader";
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+const DEDUP_MS = 30_000;
 
 export default function DotaTournaments() {
   const { registeredTournaments: registeredIds, refreshUser } = useAuth();
   const router = useRouter();
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [tLoading, setTLoading] = useState(true);
+  const lastRefreshRef = useRef(0);
 
-  const fetchTournaments = () => {
-    fetch("/api/tournaments/list?game=dota2")
-      .then(r => r.json())
-      .then(data => { setTournaments(data.tournaments || []); setTLoading(false); })
-      .catch(() => setTLoading(false));
-  };
+  const { data, isLoading } = useSWR("/api/tournaments/list?game=dota2", fetcher, {
+    revalidateOnFocus: true,
+    dedupingInterval: DEDUP_MS,
+  });
 
-  useEffect(() => { fetchTournaments(); }, []);
+  const tournaments: Tournament[] = data?.tournaments || [];
 
+  // Debounced refreshUser on focus/visibility (30s dedup)
   useEffect(() => {
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current > DEDUP_MS) {
+        lastRefreshRef.current = now;
+        refreshUser();
+      }
+    };
     refreshUser();
-    const onVis = () => { if (document.visibilityState === "visible") { refreshUser(); fetchTournaments(); } };
+    lastRefreshRef.current = Date.now();
+    const onVis = () => { if (document.visibilityState === "visible") onFocus(); };
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", () => { refreshUser(); fetchTournaments(); });
-    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", refreshUser); };
+    window.addEventListener("focus", onFocus);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onFocus); };
   }, [refreshUser]);
 
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
@@ -42,22 +53,7 @@ export default function DotaTournaments() {
     return "open";
   };
 
-  if (tLoading) return (
-    <>
-      <style>{`
-        @keyframes dt-sk-pulse { 0%,100%{background-position:-200% 0} 50%{background-position:200% 0} }
-        .dt-sk { background: linear-gradient(90deg,rgba(161,43,31,0.04) 0%,rgba(161,43,31,0.1) 40%,rgba(161,43,31,0.04) 80%); background-size:200% 100%; animation: dt-sk-pulse 1.8s ease-in-out infinite; border-radius:16px; }
-      `}</style>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 30px 48px" }}>
-        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-          {[120, 100, 140].map((w, i) => <div key={i} className="dt-sk" style={{ width: w, height: 38, borderRadius: 100 }} />)}
-        </div>
-        {[1, 2, 3].map(i => (
-          <div key={i} className="dt-sk" style={{ height: 88, marginBottom: 10 }} />
-        ))}
-      </div>
-    </>
-  );
+  if (isLoading) return <TournamentListLoader game="dota" />;
 
   return (
     <>

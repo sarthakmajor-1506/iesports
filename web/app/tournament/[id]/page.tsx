@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { doc, onSnapshot, collection, query, orderBy, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
@@ -11,6 +11,7 @@ import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
+import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import Link from "next/link";
 import {
@@ -496,27 +497,26 @@ function DotaTournamentDetailInner() {
       .catch(() => setTLoading(false));
   };
 
-  // Initial data load via API
-  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
-
-  // Real-time updates for logged-in users via onSnapshot
-  // Real-time updates — only tournament doc + players (for registration status)
+  // Initial data load via API + 30s polling (replaces onSnapshot real-time listeners)
   useEffect(() => {
-    if (!id || !user) return;
-    const unsubs: (() => void)[] = [];
-    unsubs.push(onSnapshot(doc(db, "tournaments", id), (snap) => { if (snap.exists()) setTournament({ id: snap.id, ...snap.data() }); }));
-    unsubs.push(onSnapshot(collection(db, "tournaments", id, "players"), (snap) => { setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }));
-    return () => unsubs.forEach(u => u());
-  }, [id, user]);
+    refetchData(); fetchRankReports();
+    const interval = setInterval(refetchData, 30_000);
+    return () => clearInterval(interval);
+  }, [id]);
 
-  // Registration check for logged-in users
+  // Registration check for logged-in users (debounced on focus)
+  const lastRegCheckRef = useRef(0);
   useEffect(() => {
     if (!user || !id) return;
     const checkReg = async () => {
+      const now = Date.now();
+      if (now - lastRegCheckRef.current < 30_000) return;
+      lastRegCheckRef.current = now;
       const snap = await getDoc(doc(db, "users", user.uid));
       const data = snap.data();
       setIsRegistered((data?.registeredTournaments || []).includes(id));
     };
+    lastRegCheckRef.current = 0; // reset on user/id change
     checkReg();
     window.addEventListener("focus", checkReg);
     return () => window.removeEventListener("focus", checkReg);
@@ -541,41 +541,7 @@ function DotaTournamentDetailInner() {
   };
   useEffect(() => { if (!tournament) return; const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline)); tick(); const i = setInterval(tick, 60000); return () => clearInterval(i); }, [tournament]);
 
-  if (tLoading) return (
-    <div style={{ minHeight: "100vh", background: "#0a0e18", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
-      <style>{`
-        @keyframes dtd-sk-pulse { 0%,100% { background-position: -200% 0; } 50% { background-position: 200% 0; } }
-        @keyframes dtspin { to { transform: rotate(360deg); } }
-        .dtd-sk { background: linear-gradient(90deg, rgba(161,43,31,0.04) 0%, rgba(161,43,31,0.12) 40%, rgba(161,43,31,0.04) 80%); background-size: 200% 100%; animation: dtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
-        .dtd-sk-dark { background: linear-gradient(90deg, #0d151e 0%, #162030 40%, #0d151e 80%); background-size: 200% 100%; animation: dtd-sk-pulse 2s ease-in-out infinite; border-radius: 10px; }
-      `}</style>
-      <div style={{ height: 62, background: "rgba(10,10,12,0.97)", borderBottom: "1px solid rgba(161,43,31,0.12)" }} />
-      <div style={{ height: 460, background: "linear-gradient(160deg, rgba(161,43,31,0.14) 0%, #0a0e18 60%)", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(161,43,31,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(161,43,31,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-        <div style={{ position: "absolute", bottom: 40, left: 32, right: 32 }}>
-          <div style={{ width: 90, height: 10, borderRadius: 100, background: "rgba(161,43,31,0.3)", marginBottom: 16 }} />
-          <div className="dtd-sk" style={{ width: "62%", height: 46, marginBottom: 12, borderRadius: 12 }} />
-          <div className="dtd-sk" style={{ width: "40%", height: 18, marginBottom: 20, borderRadius: 6 }} />
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="dtd-sk" style={{ width: 140, height: 44, borderRadius: 100 }} />
-            <div className="dtd-sk" style={{ width: 44, height: 44, borderRadius: "50%" }} />
-          </div>
-        </div>
-      </div>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 30px" }}>
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 6, margin: "20px 0 24px", display: "flex", gap: 6 }}>
-          {[120, 100, 90, 110, 100, 105, 120].map((w, i) => (
-            <div key={i} className="dtd-sk-dark" style={{ width: w, height: 46, borderRadius: 12, flexShrink: 0 }} />
-          ))}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
-            <div key={i} className="dtd-sk-dark" style={{ height: 100, borderRadius: 16 }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  if (tLoading) return <TournamentDetailLoader game="dota" />;
 
   if (!tournament) return (
     <div style={{ minHeight: "100vh", background: "#0a0e18", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, fontFamily: "system-ui, sans-serif" }}>
@@ -975,7 +941,6 @@ function DotaTournamentDetailInner() {
                     style={{ padding: "12px 32px", background: "linear-gradient(135deg, #A12B1F, #7A1F15)", color: "#fff", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(161,43,31,0.35)" }}
                     onClick={() => {
                       if (!user) { setShowLoginPrompt(true); return; }
-                      if (!steamLinked) { navigateWithAppPriority(`/api/auth/steam?uid=${user.uid}`); return; }
                       setShowRegister(true);
                     }}
                   >Register Now →</button>
@@ -1226,7 +1191,7 @@ function DotaTournamentDetailInner() {
                               <span className="dtd-tier-header-count">{bracketPlayers.length}</span>
                             </div>
                             {bracketPlayers.map((p: any) => {
-                              const displayName = p.fullName || p.steamName || "Player";
+                              const displayName = p.steamName || p.fullName || "Player";
                               const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
                               const tier = p.dotaRankTier || 0;
                               const medal = Math.floor(tier / 10);
@@ -1242,7 +1207,7 @@ function DotaTournamentDetailInner() {
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="dtd-tier-player-rank">{rankLabel}</span>
-                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
                                     </div>
                                   </div>
                                 </div>
@@ -1459,12 +1424,12 @@ function DotaTournamentDetailInner() {
                                 </div>
                                 <div onClick={() => pl.uid && router.push(`/player/${pl.uid}?tab=dota`)} style={{ cursor: pl.uid ? "pointer" : "default", padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                                   {avatar ? (
-                                    <img src={avatar} alt={pl.name || pl.steamName} style={{ width: 48, height: 48, borderRadius: "50%", border: `2px solid ${bColors.border}` }} />
+                                    <img src={avatar} alt={pl.steamName || pl.name} style={{ width: 48, height: 48, borderRadius: "50%", border: `2px solid ${bColors.border}` }} />
                                   ) : (
-                                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: bColors.bg, border: `2px solid ${bColors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: bColors.text }}>{((pl.name || pl.steamName || "?")[0]).toUpperCase()}</div>
+                                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: bColors.bg, border: `2px solid ${bColors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: bColors.text }}>{((pl.steamName || pl.name || "?")[0]).toUpperCase()}</div>
                                   )}
                                   <div style={{ textAlign: "center" }}>
-                                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{pl.name || pl.steamName}</div>
+                                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{pl.steamName || pl.name}</div>
                                   </div>
                                   <div style={{ fontWeight: 800, fontSize: "0.9rem", color: bColors.text }}>{Math.round(kda * 100) / 100} KDA</div>
                                   <div style={{ fontSize: "0.65rem", color: "#555550" }}>{pl.totalKills || 0}K / {pl.totalDeaths || 0}D / {pl.totalAssists || 0}A</div>
@@ -1495,7 +1460,7 @@ function DotaTournamentDetailInner() {
                                   else if (isMvp) rowBg = { background: colors.bg };
 
                                   const playerCell = (<>
-                                    <div style={{ fontWeight: 700 }}>{p.name || p.steamName}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
+                                    <div style={{ fontWeight: 700 }}>{p.steamName || p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
                                     <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: colors.text, padding: "1px 5px", borderRadius: 4, background: colors.bg, whiteSpace: "nowrap" }}>{colors.label}</span></div>
                                   </>);
 

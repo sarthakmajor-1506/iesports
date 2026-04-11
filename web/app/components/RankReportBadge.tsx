@@ -23,9 +23,10 @@ type Props = {
   reports: Report[];
   onReportSubmitted: () => void;
   accentColor?: string;
+  nameMap?: Record<string, string>;
 };
 
-export default function RankReportBadge({ playerUid, playerName, tournamentId, game, user, userName, reports, onReportSubmitted }: Props) {
+export default function RankReportBadge({ playerUid, playerName, tournamentId, game, user, userName, reports, onReportSubmitted, nameMap }: Props) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState("");
@@ -122,7 +123,7 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
                       color: r.type === "rank_too_high" ? "#ef4444" : "#22c55e",
                       border: `1px solid ${r.type === "rank_too_high" ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}`,
                     }}>{r.type === "rank_too_high" ? "↑ Too High" : "↓ Too Low"}</span>
-                    <span style={{ color: "#8A8880", fontWeight: 600 }}>{r.reporterName}</span>
+                    <span style={{ color: "#8A8880", fontWeight: 600 }}>{nameMap?.[r.reporterUid] || r.reporterName}</span>
                   </div>
                   {user && r.reporterUid === user.uid && (
                     <button onClick={() => deleteReport(r.id)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "0.6rem", padding: "2px 4px" }} title="Delete your report">✕</button>

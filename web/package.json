@@ -23,7 +23,8 @@
     "openid": "^2.0.14",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "remotion": "^4.0.443"
+    "remotion": "^4.0.443",
+    "swr": "^2.4.1"
   },
   "browserslist": [
     "last 2 Chrome versions",

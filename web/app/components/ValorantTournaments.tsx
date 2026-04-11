@@ -1,31 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import useSWR from "swr";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { ValorantTournament } from "@/lib/types";
+import { TournamentListLoader } from "./TournamentLoader";
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+const DEDUP_MS = 30_000;
 
 export default function ValorantTournaments() {
   const { registeredValorantTournaments: registeredIds, refreshUser } = useAuth();
   const router = useRouter();
-  const [tournaments, setTournaments] = useState<ValorantTournament[]>([]);
-  const [tLoading, setTLoading] = useState(true);
+  const lastRefreshRef = useRef(0);
 
-  const fetchTournaments = () => {
-    fetch("/api/tournaments/list?game=valorant")
-      .then(r => r.json())
-      .then(data => { setTournaments(data.tournaments || []); setTLoading(false); })
-      .catch(() => setTLoading(false));
-  };
+  const { data, isLoading } = useSWR("/api/tournaments/list?game=valorant", fetcher, {
+    revalidateOnFocus: true,
+    dedupingInterval: DEDUP_MS,
+  });
 
-  useEffect(() => { fetchTournaments(); }, []);
+  const tournaments: ValorantTournament[] = data?.tournaments || [];
 
   useEffect(() => {
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current > DEDUP_MS) {
+        lastRefreshRef.current = now;
+        refreshUser();
+      }
+    };
     refreshUser();
-    const onVis = () => { if (document.visibilityState === "visible") { refreshUser(); fetchTournaments(); } };
+    lastRefreshRef.current = Date.now();
+    const onVis = () => { if (document.visibilityState === "visible") onFocus(); };
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", () => { refreshUser(); fetchTournaments(); });
-    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", refreshUser); };
+    window.addEventListener("focus", onFocus);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onFocus); };
   }, [refreshUser]);
 
   const totalSlotsRemaining = tournaments.reduce((acc, t) => acc + (t.totalSlots - t.slotsBooked), 0);
@@ -45,22 +55,7 @@ export default function ValorantTournaments() {
     return "open";
   };
 
-  if (tLoading) return (
-    <>
-      <style>{`
-        @keyframes vt-sk-pulse { 0%,100%{background-position:-200% 0} 50%{background-position:200% 0} }
-        .vt-sk { background: linear-gradient(90deg,rgba(60,203,255,0.04) 0%,rgba(60,203,255,0.1) 40%,rgba(60,203,255,0.04) 80%); background-size:200% 100%; animation: vt-sk-pulse 1.8s ease-in-out infinite; border-radius:16px; }
-      `}</style>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 30px 48px" }}>
-        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-          {[120, 100, 140].map((w, i) => <div key={i} className="vt-sk" style={{ width: w, height: 38, borderRadius: 100 }} />)}
-        </div>
-        {[1, 2, 3].map(i => (
-          <div key={i} className="vt-sk" style={{ height: 88, marginBottom: 10 }} />
-        ))}
-      </div>
-    </>
-  );
+  if (isLoading) return <TournamentListLoader game="valorant" />;
 
   return (
     <>

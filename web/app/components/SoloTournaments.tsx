@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getThreeWeeks, formatWeekLabel, getTimeUntilDeadline } from "@/lib/soloTournaments";
 import { SoloTournament } from "@/lib/types";
@@ -38,18 +38,22 @@ export default function SoloTournaments() {
   const [weeks,         setWeeks]         = useState<WeekGroup[]>([]);
   const [countdown,     setCountdown]     = useState<Record<string, string>>({});
 
-  useEffect(() => {
+  const fetchSoloTournaments = useCallback(async () => {
     const { last, current, next } = getThreeWeeks();
     const weekTags: Record<string, "last" | "current" | "next"> = { [last]: "last", [current]: "current", [next]: "next" };
     const q = query(collection(db, "soloTournaments"), where("game", "==", "dota2"), where("type", "==", "free"));
-    const unsub = onSnapshot(q, (snap) => {
-      const all: Record<string, SoloTournament> = {};
-      snap.docs.forEach((d) => { all[d.id] = { id: d.id, ...d.data() } as SoloTournament; });
-      const grouped: WeekGroup[] = [last, current, next].map((weekId) => ({ label: formatWeekLabel(weekId), weekTag: weekTags[weekId], free: all[`${weekId}-free`] || null }));
-      setWeeks(grouped);
-    });
-    return () => unsub();
+    const snap = await getDocs(q);
+    const all: Record<string, SoloTournament> = {};
+    snap.docs.forEach((d) => { all[d.id] = { id: d.id, ...d.data() } as SoloTournament; });
+    const grouped: WeekGroup[] = [last, current, next].map((weekId) => ({ label: formatWeekLabel(weekId), weekTag: weekTags[weekId], free: all[`${weekId}-free`] || null }));
+    setWeeks(grouped);
   }, []);
+
+  useEffect(() => {
+    fetchSoloTournaments();
+    const interval = setInterval(fetchSoloTournaments, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchSoloTournaments]);
 
 
   useEffect(() => {

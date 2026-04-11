@@ -3,7 +3,7 @@
 import { useAuth } from "../../context/AuthContext";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
-import { doc, onSnapshot, collection } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Navbar from "../../components/Navbar";
 import { SoloTournament, SoloPlayer } from "@/lib/types";
@@ -453,27 +453,27 @@ function SoloPageInner() {
     if (!loading && user && !steamLinked) router.push("/connect-steam");
   }, [user, loading, steamLinked]);
 
-  useEffect(() => {
+  const fetchSoloData = async () => {
     if (!id) return;
-    const unsub = onSnapshot(doc(db, "soloTournaments", id), snap => {
-      if (snap.exists()) setTournament({ id: snap.id, ...snap.data() } as SoloTournament);
-      setTLoading(false);
-    });
-    return () => unsub();
-  }, [id]);
+    const [tSnap, pSnap] = await Promise.all([
+      getDoc(doc(db, "soloTournaments", id)),
+      getDocs(collection(db, "soloTournaments", id, "players")),
+    ]);
+    if (tSnap.exists()) setTournament({ id: tSnap.id, ...tSnap.data() } as SoloTournament);
+    const all = pSnap.docs.map(d => d.data() as SoloPlayer).sort((a, b) => b.cachedScore - a.cachedScore);
+    setPlayers(all);
+    if (user) {
+      const mine = all.find(p => p.uid === user.uid);
+      setMyScore(mine || null);
+      setIsRegistered(!!mine);
+    }
+    setTLoading(false);
+  };
 
   useEffect(() => {
-    if (!id) return;
-    const unsub = onSnapshot(collection(db, "soloTournaments", id, "players"), snap => {
-      const all = snap.docs.map(d => d.data() as SoloPlayer).sort((a,b) => b.cachedScore - a.cachedScore);
-      setPlayers(all);
-      if (user) {
-        const mine = all.find(p => p.uid === user.uid);
-        setMyScore(mine || null);
-        setIsRegistered(!!mine);
-      }
-    });
-    return () => unsub();
+    fetchSoloData();
+    const interval = setInterval(fetchSoloData, 30_000);
+    return () => clearInterval(interval);
   }, [id, user]);
 
   useEffect(() => {
