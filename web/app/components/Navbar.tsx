@@ -192,7 +192,9 @@ export default function Navbar() {
       {user && <DiscordAccountsPrompt />}
       <style>{`
         * { box-sizing: border-box; }
-        .ie-navbar { position: sticky; top: 0; z-index: 100; background: rgba(10,10,12,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #2A2A30; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+        .ie-navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,12,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #2A2A30; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+        .ie-navbar-spacer { height: 68px; }
+        @media (max-width: 900px) { .ie-navbar-spacer { height: 56px; } }
         .ie-nav-accent { height: 3px; transition: background 0.3s; }
         .ie-nav-row { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 62px; gap: 12px; }
         .ie-nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
@@ -474,6 +476,7 @@ export default function Navbar() {
           </div>
         )}
       </nav>
+      <div className="ie-navbar-spacer" />
 
       <div id="navbar-recaptcha" />
 
