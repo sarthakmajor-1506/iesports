@@ -1242,7 +1242,7 @@ function DotaTournamentDetailInner() {
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="dtd-tier-player-rank">{rankLabel}</span>
-                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.fullName || userProfile?.steamName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
                                     </div>
                                   </div>
                                 </div>

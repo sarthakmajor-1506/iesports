@@ -1481,7 +1481,7 @@ function ValorantTournamentDetailInner() {
                                     <span className="vtd-tier-player-name">{p.riotGameName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="vtd-tier-player-rank">{p.iesportsRank || p.riotRank || "Unranked"}</span>
-                                      <RankReportBadge playerUid={p.uid} playerName={p.riotGameName} tournamentId={id} game="valorant" user={user} userName={userProfile?.fullName || riotData?.riotGameName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                      <RankReportBadge playerUid={p.uid} playerName={p.riotGameName} tournamentId={id} game="valorant" user={user} userName={riotData?.riotGameName || userProfile?.discordUsername || userProfile?.steamName || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
                                     </div>
                                   </div>
                                 </div>

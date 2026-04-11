@@ -1469,7 +1469,7 @@ function CS2TournamentDetailInner() {
                                     <span className="csd-tier-player-name">{p.steamName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(240,165,0,0.15)", color: "#f0a500", border: "1px solid rgba(240,165,0,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="csd-tier-player-rank">{p.cs2Rank || "Unranked"}</span>
-                                      <RankReportBadge playerUid={p.uid} playerName={p.steamName} tournamentId={id} game="cs2" user={user} userName={userProfile?.fullName || userProfile?.steamName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                      <RankReportBadge playerUid={p.uid} playerName={p.steamName} tournamentId={id} game="cs2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
                                     </div>
                                   </div>
                                 </div>
