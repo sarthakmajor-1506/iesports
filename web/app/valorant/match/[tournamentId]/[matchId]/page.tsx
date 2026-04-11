@@ -26,7 +26,7 @@ export default function MatchDetail() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
-    if (!tournamentId || !matchId) return;
+    if (!tournamentId || !matchId || authLoading || !user) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -39,7 +39,7 @@ export default function MatchDetail() {
         if (mDoc.exists()) {
           const mData = { id: mDoc.id, ...mDoc.data() } as SwissMatch;
           setMatch(mData);
-        
+
           const teamsMap: Record<string, any> = {};
           for (const teamId of [mData.team1Id, mData.team2Id]) {
             if (teamId && teamId !== "TBD") {
@@ -56,9 +56,13 @@ export default function MatchDetail() {
       }
     };
     load();
-  }, [tournamentId, matchId]);
+  }, [tournamentId, matchId, authLoading, user]);
 
-  if (!authLoading && !user) return (
+  if (authLoading) return (
+    <><style>{styles}</style><div className="md-page"><Navbar /><div className="md-content"><div className="md-loading">Loading...</div></div></div></>
+  );
+
+  if (!user) return (
     <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "var(--font-geist-sans),system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
       <Navbar />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", textAlign: "center" }}>
