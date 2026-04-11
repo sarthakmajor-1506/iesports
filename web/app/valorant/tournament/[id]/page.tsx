@@ -1183,17 +1183,35 @@ function ValorantTournamentDetailInner() {
                       setShowRegister(true);
                     }}>Register Now →</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                      <>
-                        <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
-                        <button
-                          onClick={() => {
-                            if (!user) { setShowLoginPrompt(true); return; }
-                            toggleWaitlist();
-                          }}
-                          disabled={waitlistLoading}
-                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                        >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
-                      </>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
+                          <button
+                            onClick={() => {
+                              if (!user) { setShowLoginPrompt(true); return; }
+                              toggleWaitlist();
+                            }}
+                            disabled={waitlistLoading}
+                            style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                          >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
+                        </div>
+                        {waitlistData.length > 0 && (
+                          <button onClick={() => setWaitlistOpen(!waitlistOpen)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fbbf24" }}>{waitlistData.length} on waitlist</span>
+                            <span style={{ fontSize: "0.6rem", color: "#8A8880" }}>{waitlistOpen ? "▲" : "▼"}</span>
+                          </button>
+                        )}
+                        {waitlistOpen && waitlistData.length > 0 && (
+                          <div style={{ padding: "8px 14px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.15)", borderRadius: 10, width: "100%", maxWidth: 300 }}>
+                            {waitlistData.map((w: any, i: number) => (
+                              <div key={w.uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", borderBottom: i < waitlistData.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#E6E6E6" }}>{w.displayName || "Player"}</span>
+                                <span style={{ fontSize: "0.58rem", color: "#555550" }}>#{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                     {isRegistered && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1306,36 +1324,6 @@ function ValorantTournamentDetailInner() {
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
             )}
           </div>
-
-          {/* ═══ WAITLIST ═══ */}
-          {waitlistData.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <button
-                onClick={() => setWaitlistOpen(!waitlistOpen)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8, width: "100%",
-                  padding: "10px 16px", background: "rgba(251,191,36,0.06)",
-                  border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12,
-                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                }}
-              >
-                <Clock size={14} strokeWidth={2} style={{ color: "#fbbf24" }} />
-                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fbbf24" }}>Waitlist</span>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.15)", padding: "2px 8px", borderRadius: 100 }}>{waitlistData.length}</span>
-                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#8A8880" }}>{waitlistOpen ? "Hide" : "Show"}</span>
-              </button>
-              {waitlistOpen && (
-                <div style={{ marginTop: 8, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10 }}>
-                  {waitlistData.map((w: any, i: number) => (
-                    <div key={w.uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: i < waitlistData.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#E6E6E6" }}>{w.displayName || "Player"}</span>
-                      <span style={{ fontSize: "0.62rem", color: "#555550" }}>#{i + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === "overview" && (
