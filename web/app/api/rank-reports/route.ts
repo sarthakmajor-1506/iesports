@@ -66,3 +66,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+
+// DELETE: remove own report
+export async function DELETE(req: NextRequest) {
+  try {
+    const { tournamentId, game, reportId, uid } = await req.json();
+    if (!tournamentId || !game || !reportId || !uid) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+    const col = GAME_COLLECTIONS[game];
+    if (!col) return NextResponse.json({ error: "Invalid game" }, { status: 400 });
+
+    const reportRef = adminDb.collection(col).doc(tournamentId).collection("rankReports").doc(reportId);
+    const reportDoc = await reportRef.get();
+    if (!reportDoc.exists) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
+    if (reportDoc.data()?.reporterUid !== uid) {
+      return NextResponse.json({ error: "You can only delete your own reports" }, { status: 403 });
+    }
+
+    await reportRef.delete();
+    return NextResponse.json({ success: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}

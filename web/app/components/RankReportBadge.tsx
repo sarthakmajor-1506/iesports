@@ -64,6 +64,22 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
     }
   };
 
+  const deleteReport = async (reportId: string) => {
+    if (!user) return;
+    try {
+      const res = await fetch("/api/rank-reports", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId, game, reportId, uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      onReportSubmitted();
+    } catch (e: any) {
+      setError(e.message || "Failed to delete");
+    }
+  };
+
   const handleOpen = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -98,14 +114,19 @@ export default function RankReportBadge({ playerUid, playerName, tournamentId, g
           <div style={{ maxHeight: 160, overflowY: "auto", marginBottom: 10 }}>
             {playerReports.map(r => (
               <div key={r.id} style={{ padding: "6px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 8, marginBottom: 4, fontSize: "0.68rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{
-                    fontWeight: 800, fontSize: "0.6rem", padding: "1px 6px", borderRadius: 100,
-                    background: r.type === "rank_too_high" ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)",
-                    color: r.type === "rank_too_high" ? "#ef4444" : "#22c55e",
-                    border: `1px solid ${r.type === "rank_too_high" ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}`,
-                  }}>{r.type === "rank_too_high" ? "↑ Too High" : "↓ Too Low"}</span>
-                  <span style={{ color: "#8A8880", fontWeight: 600 }}>{r.reporterName}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{
+                      fontWeight: 800, fontSize: "0.6rem", padding: "1px 6px", borderRadius: 100,
+                      background: r.type === "rank_too_high" ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)",
+                      color: r.type === "rank_too_high" ? "#ef4444" : "#22c55e",
+                      border: `1px solid ${r.type === "rank_too_high" ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}`,
+                    }}>{r.type === "rank_too_high" ? "↑ Too High" : "↓ Too Low"}</span>
+                    <span style={{ color: "#8A8880", fontWeight: 600 }}>{r.reporterName}</span>
+                  </div>
+                  {user && r.reporterUid === user.uid && (
+                    <button onClick={() => deleteReport(r.id)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "0.6rem", padding: "2px 4px" }} title="Delete your report">✕</button>
+                  )}
                 </div>
                 {r.comment && <div style={{ color: "#777", marginTop: 3 }}>{r.comment}</div>}
               </div>
