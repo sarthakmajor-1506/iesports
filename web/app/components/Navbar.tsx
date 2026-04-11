@@ -383,7 +383,7 @@ export default function Navbar() {
             <>
               <button
                 className="ie-signin-btn"
-                onClick={() => window.open("/api/auth/discord-login", "_blank")}
+                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   background: "rgba(88,101,242,0.15)", color: "#818cf8",
@@ -403,7 +403,7 @@ export default function Navbar() {
             {!user && (
               <button
                 className="ie-mobile-signin-cta"
-                onClick={() => window.open("/api/auth/discord-login", "_blank")}
+                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
                 style={{
                   alignItems: "center", gap: 6,
                   background: "#5865F2", color: "#fff",
@@ -461,7 +461,7 @@ export default function Navbar() {
           </>
           ) : (
           <>
-            <button className="ie-mobile-action-btn" onClick={() => window.open("/api/auth/discord-login", "_blank")}
+            <button className="ie-mobile-action-btn" onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
               style={{ background: "#5865F2", borderColor: "#5865F2", color: "#fff" }}>
               <DiscordIcon size={20} color="#fff" /> Sign in with Discord
             </button>
