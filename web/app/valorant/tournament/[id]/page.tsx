@@ -490,6 +490,8 @@ function ValorantTournamentDetailInner() {
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistData, setWaitlistData] = useState<any[]>([]);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(() => searchParams.get("match") || null);
   const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "acs" | "maps">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
@@ -512,6 +514,14 @@ function ValorantTournamentDetailInner() {
     fetch(`/api/rank-reports?tournamentId=${id}&game=valorant`)
       .then(r => r.json())
       .then(data => { if (data.reports) setRankReports(data.reports); })
+      .catch(() => {});
+  };
+
+  const fetchWaitlist = () => {
+    if (!id) return;
+    fetch(`/api/waitlist/list?tournamentId=${id}&game=valorant`)
+      .then(r => r.json())
+      .then(data => { if (data.waitlist) setWaitlistData(data.waitlist); })
       .catch(() => {});
   };
 
@@ -541,7 +551,7 @@ function ValorantTournamentDetailInner() {
   };
 
   // Initial data load via API (works for everyone, including unauthenticated)
-  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
+  useEffect(() => { refetchData(); fetchRankReports(); fetchWaitlist(); }, [id]);
 
   // Real-time updates — only tournament doc + soloPlayers (for registration status + slot count)
   // Other data (teams, matches, standings, leaderboard) loaded via API and refreshed on tab switch
@@ -1296,6 +1306,36 @@ function ValorantTournamentDetailInner() {
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
             )}
           </div>
+
+          {/* ═══ WAITLIST ═══ */}
+          {waitlistData.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <button
+                onClick={() => setWaitlistOpen(!waitlistOpen)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "10px 16px", background: "rgba(251,191,36,0.06)",
+                  border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12,
+                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                }}
+              >
+                <Clock size={14} strokeWidth={2} style={{ color: "#fbbf24" }} />
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fbbf24" }}>Waitlist</span>
+                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.15)", padding: "2px 8px", borderRadius: 100 }}>{waitlistData.length}</span>
+                <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#8A8880" }}>{waitlistOpen ? "Hide" : "Show"}</span>
+              </button>
+              {waitlistOpen && (
+                <div style={{ marginTop: 8, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10 }}>
+                  {waitlistData.map((w: any, i: number) => (
+                    <div key={w.uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: i < waitlistData.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#E6E6E6" }}>{w.displayName || "Player"}</span>
+                      <span style={{ fontSize: "0.62rem", color: "#555550" }}>#{i + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === "overview" && (
