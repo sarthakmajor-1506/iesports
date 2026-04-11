@@ -356,7 +356,7 @@ export default function Home() {
           <div className="ie-hero-logo">
             <Image src="/ielogo.png" alt="Indian Esports" width={144} height={144} priority style={{ borderRadius: 22, filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))" }} />
           </div>
-          <div className="ie-hero-badge"><span className="ie-pulse" /> Now Live – May Championship 2026</div>
+          <div className="ie-hero-badge"><span className="ie-pulse" /> Now Live – Valorant Ascension Tournament</div>
           <h1>Compete on<br /><span className="accent">Indian Esports</span></h1>
           <p className="ie-hero-sub">Play what you love. Compete in your rank bracket in totally free community events. Win with skills.</p>
           <div className="ie-hero-cta">
