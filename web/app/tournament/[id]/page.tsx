@@ -9,6 +9,7 @@ import { Navbar } from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
+import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import Link from "next/link";
@@ -460,6 +461,15 @@ function DotaTournamentDetailInner() {
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [rankReports, setRankReports] = useState<any[]>([]);
+
+  const fetchRankReports = () => {
+    if (!id) return;
+    fetch(`/api/rank-reports?tournamentId=${id}&game=dota2`)
+      .then(r => r.json())
+      .then(data => { if (data.reports) setRankReports(data.reports); })
+      .catch(() => {});
+  };
 
   const refetchData = () => {
     if (!id) return;
@@ -487,7 +497,7 @@ function DotaTournamentDetailInner() {
   };
 
   // Initial data load via API
-  useEffect(() => { refetchData(); }, [id]);
+  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
 
   // Real-time updates for logged-in users via onSnapshot
   // Real-time updates — only tournament doc + players (for registration status)
@@ -1227,7 +1237,10 @@ function DotaTournamentDetailInner() {
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
-                                    <span className="dtd-tier-player-rank">{rankLabel}</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span className="dtd-tier-player-rank">{rankLabel}</span>
+                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.fullName || userProfile?.steamName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                    </div>
                                   </div>
                                 </div>
                               </Link>

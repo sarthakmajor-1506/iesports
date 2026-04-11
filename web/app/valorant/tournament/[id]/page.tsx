@@ -10,6 +10,7 @@ import Navbar from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
+import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import Link from "next/link";
 import {
@@ -504,6 +505,15 @@ function ValorantTournamentDetailInner() {
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
+  const [rankReports, setRankReports] = useState<any[]>([]);
+
+  const fetchRankReports = () => {
+    if (!id) return;
+    fetch(`/api/rank-reports?tournamentId=${id}&game=valorant`)
+      .then(r => r.json())
+      .then(data => { if (data.reports) setRankReports(data.reports); })
+      .catch(() => {});
+  };
 
   const refetchData = () => {
     if (!id) return;
@@ -531,7 +541,7 @@ function ValorantTournamentDetailInner() {
   };
 
   // Initial data load via API (works for everyone, including unauthenticated)
-  useEffect(() => { refetchData(); }, [id]);
+  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
 
   // Real-time updates — only tournament doc + soloPlayers (for registration status + slot count)
   // Other data (teams, matches, standings, leaderboard) loaded via API and refreshed on tab switch
@@ -1449,7 +1459,10 @@ function ValorantTournamentDetailInner() {
                                   {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
                                   <div className="vtd-tier-player-info">
                                     <span className="vtd-tier-player-name">{p.riotGameName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
-                                    <span className="vtd-tier-player-rank">{p.iesportsRank || p.riotRank || "Unranked"}</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span className="vtd-tier-player-rank">{p.iesportsRank || p.riotRank || "Unranked"}</span>
+                                      <RankReportBadge playerUid={p.uid} playerName={p.riotGameName} tournamentId={id} game="valorant" user={user} userName={userProfile?.fullName || riotData?.riotGameName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                    </div>
                                   </div>
                                 </div>
                               </div>

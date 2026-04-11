@@ -10,6 +10,7 @@ import Navbar from "@/app/components/Navbar";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
+import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import Link from "next/link";
 import {
@@ -504,6 +505,15 @@ function CS2TournamentDetailInner() {
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
+  const [rankReports, setRankReports] = useState<any[]>([]);
+
+  const fetchRankReports = () => {
+    if (!id) return;
+    fetch(`/api/rank-reports?tournamentId=${id}&game=cs2`)
+      .then(r => r.json())
+      .then(data => { if (data.reports) setRankReports(data.reports); })
+      .catch(() => {});
+  };
 
   const refetchData = () => {
     if (!id) return;
@@ -531,7 +541,7 @@ function CS2TournamentDetailInner() {
   };
 
   // Initial data load via API
-  useEffect(() => { refetchData(); }, [id]);
+  useEffect(() => { refetchData(); fetchRankReports(); }, [id]);
 
   // Re-fetch data when user logs in (to check registration status)
   useEffect(() => {
@@ -1454,7 +1464,10 @@ function CS2TournamentDetailInner() {
                                   {p.steamAvatar ? <img className="csd-tier-player-avatar" src={p.steamAvatar} alt={p.steamName} /> : <div className="csd-tier-player-avatar-init">{(p.steamName || "?")[0].toUpperCase()}</div>}
                                   <div className="csd-tier-player-info">
                                     <span className="csd-tier-player-name">{p.steamName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(240,165,0,0.15)", color: "#f0a500", border: "1px solid rgba(240,165,0,0.3)" }}>YOU</span>}</span>
-                                    <span className="csd-tier-player-rank">{p.cs2Rank || p.cs2Rank || "Unranked"}</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span className="csd-tier-player-rank">{p.cs2Rank || "Unranked"}</span>
+                                      <RankReportBadge playerUid={p.uid} playerName={p.steamName} tournamentId={id} game="cs2" user={user} userName={userProfile?.fullName || userProfile?.steamName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} />
+                                    </div>
                                   </div>
                                 </div>
                               </div>
