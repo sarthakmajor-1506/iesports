@@ -4,9 +4,6 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
-import { useAuth } from "@/app/context/AuthContext";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
 import type { SwissMatch } from "@/lib/types";
 
@@ -14,7 +11,6 @@ export default function MatchDetail() {
   const params = useParams();
   const tournamentId = params.tournamentId as string;
   const matchId = params.matchId as string;
-  const { user, loading: authLoading } = useAuth();
 
   const [match, setMatch] = useState<any>(null);
   const [tournament, setTournament] = useState<any>(null);
@@ -26,58 +22,25 @@ export default function MatchDetail() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
-    if (!tournamentId || !matchId || authLoading || !user) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [tDoc, mDoc] = await Promise.all([
-          getDoc(doc(db, "valorantTournaments", tournamentId)),
-          getDoc(doc(db, "valorantTournaments", tournamentId, "matches", matchId)),
-        ]);
-
-        if (tDoc.exists()) setTournament({ id: tDoc.id, ...tDoc.data() });
-        if (mDoc.exists()) {
-          const mData = { id: mDoc.id, ...mDoc.data() } as SwissMatch;
-          setMatch(mData);
-
+    if (!tournamentId || !matchId) return;
+    setLoading(true);
+    fetch(`/api/tournaments/detail?id=${tournamentId}&game=valorant`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.tournament) setTournament(data.tournament);
+        if (data.matches) {
+          const m = data.matches.find((m: any) => m.id === matchId);
+          if (m) setMatch(m);
+        }
+        if (data.teams) {
           const teamsMap: Record<string, any> = {};
-          for (const teamId of [mData.team1Id, mData.team2Id]) {
-            if (teamId && teamId !== "TBD") {
-              const tDoc = await getDoc(doc(db, "valorantTournaments", tournamentId, "teams", teamId));
-              if (tDoc.exists()) teamsMap[teamId] = { id: tDoc.id, ...tDoc.data() };
-            }
-          }
+          for (const t of data.teams) teamsMap[t.id] = t;
           setTeams(teamsMap);
         }
-      } catch (e) {
-        console.error("Failed to load match:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [tournamentId, matchId, authLoading, user]);
-
-  if (authLoading) return (
-    <><style>{styles}</style><div className="md-page"><Navbar /><div className="md-content"><div className="md-loading">Loading...</div></div></div></>
-  );
-
-  if (!user) return (
-    <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "var(--font-geist-sans),system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
-      <Navbar />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", textAlign: "center" }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⚔️</div>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 8 }}>Sign in to view match details</h2>
-        <p style={{ fontSize: "0.88rem", color: "#8A8880", marginBottom: 28, maxWidth: 400, lineHeight: 1.6 }}>Create an account or sign in to see match scorecards, player stats and game results.</p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <button onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.open("/api/auth/discord-login", "_blank"); }}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(88,101,242,0.15)", color: "#818cf8", border: "1px solid rgba(88,101,242,0.35)", borderRadius: 100, padding: "12px 28px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            Sign in with Discord
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+      })
+      .catch(e => console.error("Failed to load match:", e))
+      .finally(() => setLoading(false));
+  }, [tournamentId, matchId]);
 
   if (loading) {
     return (
