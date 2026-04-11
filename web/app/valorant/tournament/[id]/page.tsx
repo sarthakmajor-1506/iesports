@@ -1197,20 +1197,9 @@ function ValorantTournamentDetailInner() {
                           >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
                         </div>
                         {waitlistData.length > 0 && (
-                          <button onClick={() => setWaitlistOpen(!waitlistOpen)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                          <button onClick={() => setWaitlistOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fbbf24" }}>{waitlistData.length} on waitlist</span>
-                            <span style={{ fontSize: "0.6rem", color: "#8A8880" }}>{waitlistOpen ? "▲" : "▼"}</span>
                           </button>
-                        )}
-                        {waitlistOpen && waitlistData.length > 0 && (
-                          <div style={{ padding: "8px 14px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.15)", borderRadius: 10, width: "100%", maxWidth: 300 }}>
-                            {waitlistData.map((w: any, i: number) => (
-                              <div key={w.uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", borderBottom: i < waitlistData.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#E6E6E6" }}>{w.displayName || "Player"}</span>
-                                <span style={{ fontSize: "0.58rem", color: "#555550" }}>#{i + 1}</span>
-                              </div>
-                            ))}
-                          </div>
                         )}
                       </div>
                     )}
@@ -1927,6 +1916,27 @@ function ValorantTournamentDetailInner() {
       </div>
 
       {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
+
+      {/* ═══ WAITLIST POPUP ═══ */}
+      {waitlistOpen && waitlistData.length > 0 && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setWaitlistOpen(false)}>
+          <div style={{ background: "#111", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 16, padding: 24, width: "100%", maxWidth: 340, maxHeight: "70vh", position: "relative" }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setWaitlistOpen(false)} style={{ position: "absolute", top: 14, right: 14, background: "transparent", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{ fontSize: "1rem", fontWeight: 800, color: "#fbbf24" }}>Waitlist</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.15)", padding: "2px 10px", borderRadius: 100, border: "1px solid rgba(251,191,36,0.3)" }}>{waitlistData.length}</span>
+            </div>
+            <div style={{ overflowY: "auto", maxHeight: "50vh" }}>
+              {waitlistData.map((w: any, i: number) => (
+                <div key={w.uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: i < waitlistData.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#E6E6E6" }}>{w.displayName || "Player"}</span>
+                  <span style={{ fontSize: "0.68rem", color: "#555550", fontWeight: 700 }}>#{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ LOGIN PROMPT ═══ */}
       {showLoginPrompt && !user && (
