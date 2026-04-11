@@ -788,6 +788,8 @@ function CS2TournamentDetailInner() {
         /* ── Tab bar ── */
         .csd-tabs-wrap { position: sticky; top: 68px; z-index: 20; margin-bottom: 24px; background: rgba(13,13,13,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(240,165,0,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
         @media (max-width: 900px) { .csd-tabs-wrap { top: 56px; } }
+        .csd-tab-pane { scroll-margin-top: 140px; }
+        @media (max-width: 900px) { .csd-tab-pane { scroll-margin-top: 120px; } }
         .csd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .csd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
         .csd-tab-label { display: inline; }
@@ -1141,7 +1143,7 @@ function CS2TournamentDetailInner() {
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button
-                        onClick={() => { setActiveTab("brackets"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                        onClick={() => { setActiveTab("brackets"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(255,215,0,0.12)", color: "#ffd700",
                           border: "1px solid rgba(255,215,0,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1151,7 +1153,7 @@ function CS2TournamentDetailInner() {
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,215,0,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
                       >View Brackets</button>
                       <button
-                        onClick={() => { setActiveTab("matches"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                        onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
                           border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1161,7 +1163,7 @@ function CS2TournamentDetailInner() {
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
                       >Match History</button>
                       <button
-                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(255,255,255,0.06)", color: "#8A8880",
                           border: "1px solid rgba(255,255,255,0.1)", borderRadius: 100, fontSize: "0.86rem",
@@ -1215,7 +1217,7 @@ function CS2TournamentDetailInner() {
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
                       <button
-                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
                           border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
@@ -1279,7 +1281,7 @@ function CS2TournamentDetailInner() {
           <div className="csd-tabs-wrap" ref={tabsWrapRef}>
             <div className="csd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`csd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} title={t.label}>
+                <button key={t.key} className={`csd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }} title={t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
                   <span className="csd-tab-label">{t.label}</span>
                   {t.key === "players" && <span className="csd-tab-count">{players.length}</span>}

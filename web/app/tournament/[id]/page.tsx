@@ -671,6 +671,8 @@ function DotaTournamentDetailInner() {
         /* ── Tab bar ── */
         .dtd-tabs-wrap { position: sticky; top: 68px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(161,43,31,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
         @media (max-width: 900px) { .dtd-tabs-wrap { top: 56px; } }
+        .dtd-tab-pane { scroll-margin-top: 140px; }
+        @media (max-width: 900px) { .dtd-tab-pane { scroll-margin-top: 120px; } }
         .dtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .dtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
         .dtd-tab-label { display: inline; }
@@ -1019,7 +1021,7 @@ function DotaTournamentDetailInner() {
                 )}
                 {regClosed && !isRegistered && isRegOpen && (
                   <button
-                    onClick={() => { setActiveTab("leaderboard"); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                    onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                     style={{ padding: "10px 24px", background: "rgba(190,58,37,0.12)", color: "#BE3A25", border: "1px solid rgba(190,58,37,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
                   >Leaderboard</button>
                 )}
@@ -1063,7 +1065,7 @@ function DotaTournamentDetailInner() {
           <div className="dtd-tabs-wrap" ref={tabsWrapRef}>
             <div className="dtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => tabsWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} title={t.label}>
+                <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }} title={t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
                   <span className="dtd-tab-label">{t.label}</span>
                   {t.key === "players" && players.length > 0 && <span className="dtd-tab-count">{players.length}</span>}
