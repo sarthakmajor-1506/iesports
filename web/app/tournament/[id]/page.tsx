@@ -669,7 +669,8 @@ function DotaTournamentDetailInner() {
         .dtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
 
         /* ── Tab bar ── */
-        .dtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(161,43,31,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        .dtd-tabs-wrap { position: sticky; top: 68px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(161,43,31,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        @media (max-width: 900px) { .dtd-tabs-wrap { top: 56px; } }
         .dtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .dtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
         .dtd-tab-label { display: inline; }
@@ -830,7 +831,7 @@ function DotaTournamentDetailInner() {
         @keyframes dtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
         .dtd-fighter-card { position: relative; transition: transform 0.2s; }
         .dtd-fighter-card:hover { transform: translateY(-2px) scale(1.06); z-index: 2; }
-        .dtd-page { overflow-x: hidden; }
+        .dtd-page { overflow-x: clip; }
 
         /* ── Share modal ── */
         .dtd-share-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }

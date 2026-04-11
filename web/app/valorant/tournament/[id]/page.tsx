@@ -791,7 +791,8 @@ function ValorantTournamentDetailInner() {
         @keyframes vtd-slide-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ── Tab bar ── */
-        .vtd-tabs-wrap { position: sticky; top: 62px; z-index: 20; margin-bottom: 24px; background: rgba(10,15,42,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(60,203,255,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        .vtd-tabs-wrap { position: sticky; top: 68px; z-index: 20; margin-bottom: 24px; background: rgba(10,15,42,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(60,203,255,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
+        @media (max-width: 900px) { .vtd-tabs-wrap { top: 56px; } }
         .vtd-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 6px; border: 1px solid rgba(255,255,255,0.06); }
         .vtd-tab { flex: 1; min-height: 48px; padding: 0 8px; border-radius: 12px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.45); transition: all 0.2s ease; }
         .vtd-tab-label { display: inline; }
@@ -1001,7 +1002,7 @@ function ValorantTournamentDetailInner() {
         @keyframes vtd-team-name-in { from { opacity: 0; transform: scale(0.6); filter: blur(6px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
         .vtd-fighter-card { position: relative; transition: transform 0.2s; }
         .vtd-fighter-card:hover { transform: translateY(-2px) scale(1.06); z-index: 2; }
-        .vtd-page { overflow-x: hidden; }
+        .vtd-page { overflow-x: clip; }
 
         /* ── Responsive ── */
         @media (max-width: 1100px) { .vtd-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
