@@ -141,21 +141,30 @@ export default function DotaTournaments() {
           .dt-wrap { padding: 16px 14px 44px; }
           .dt-stats { gap: 8px; justify-content: center; }
           .dt-stat-pill { padding: 6px 14px; }
-          .dt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-          .dt-card { flex-direction: column; border-radius: 14px; margin-bottom: 14px; }
+          .dt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+          .dt-card { flex-direction: column; border-radius: 14px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
           .dt-card-accent { width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
-          .dt-card-body { padding: 16px 16px 12px; gap: 12px; }
-          .dt-card-icon { width: 40px; height: 40px; }
-          .dt-card-name { white-space: normal; font-size: 0.95rem; line-height: 1.3; }
-          .dt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+          .dt-card-body { padding: 16px 16px 14px; gap: 12px; align-items: flex-start; }
+          .dt-card-icon { width: 36px; height: 36px; margin-top: 2px; }
+          .dt-card-name { white-space: normal; font-size: 0.92rem; line-height: 1.3; }
+
+          .dt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
           .dt-card-meta .dt-meta-item { display: flex; }
-          .dt-meta-key { font-size: 0.56rem; }
-          .dt-meta-val { font-size: 0.76rem; }
+          .dt-meta-key { font-size: 0.55rem; margin-bottom: 2px; }
+          .dt-meta-val { font-size: 0.78rem; }
+
           .dt-card-right { padding: 0 16px 16px; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
-          .dt-slots { min-width: unset; width: 100%; }
-          .dt-slots-text { text-align: left; font-size: 0.74rem; }
-          .dt-slots-bar { height: 5px; border-radius: 3px; }
-          .dt-reg-btn, .dt-reg-done, .dt-coming-soon, .dt-leaderboard-btn { min-width: unset; width: 100%; padding: 10px 16px; font-size: 0.8rem; }
+
+          .dt-slots { min-width: unset; width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }
+          .dt-slots-text { text-align: left; font-size: 0.76rem; margin-bottom: 6px; }
+          .dt-slots-bar { height: 6px; border-radius: 4px; }
+          .dt-slots-fill { border-radius: 4px; }
+
+          .dt-reg-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; font-weight: 800; }
+          .dt-reg-done { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .dt-leaderboard-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .dt-coming-soon { min-width: unset; width: 100%; padding: 12px 16px; border-radius: 12px; }
         }
       `}</style>
 

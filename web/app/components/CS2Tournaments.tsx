@@ -146,21 +146,30 @@ export default function CS2Tournaments() {
           .cs-wrap { padding: 16px 14px 44px; }
           .cs-stats { gap: 8px; justify-content: center; }
           .cs-stat-pill { padding: 6px 14px; }
-          .cs-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-          .cs-card { flex-direction: column; border-radius: 14px; margin-bottom: 14px; }
+          .cs-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+          .cs-card { flex-direction: column; border-radius: 14px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
           .cs-card-accent { width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
-          .cs-card-body { padding: 16px 16px 12px; gap: 12px; }
-          .cs-card-icon { width: 40px; height: 40px; border-radius: 10px; }
-          .cs-card-name { white-space: normal; font-size: 0.95rem; line-height: 1.3; }
-          .cs-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+          .cs-card-body { padding: 16px 16px 14px; gap: 12px; align-items: flex-start; }
+          .cs-card-icon { width: 36px; height: 36px; border-radius: 10px; margin-top: 2px; }
+          .cs-card-name { white-space: normal; font-size: 0.92rem; line-height: 1.3; }
+
+          .cs-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
           .cs-card-meta .cs-meta-item { display: flex; }
-          .cs-meta-key { font-size: 0.56rem; }
-          .cs-meta-val { font-size: 0.76rem; }
+          .cs-meta-key { font-size: 0.55rem; margin-bottom: 2px; }
+          .cs-meta-val { font-size: 0.78rem; }
+
           .cs-card-right { padding: 0 16px 16px; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
-          .cs-slots { min-width: unset; width: 100%; }
-          .cs-slots-text { text-align: left; font-size: 0.74rem; }
-          .cs-slots-bar { height: 5px; border-radius: 3px; }
-          .cs-reg-btn, .cs-reg-done, .cs-coming-soon, .cs-leaderboard-btn { min-width: unset; width: 100%; padding: 10px 16px; font-size: 0.8rem; }
+
+          .cs-slots { min-width: unset; width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }
+          .cs-slots-text { text-align: left; font-size: 0.76rem; margin-bottom: 6px; }
+          .cs-slots-bar { height: 6px; border-radius: 4px; }
+          .cs-slots-fill { border-radius: 4px; }
+
+          .cs-reg-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; font-weight: 800; }
+          .cs-reg-done { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .cs-leaderboard-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .cs-coming-soon { min-width: unset; width: 100%; padding: 12px 16px; border-radius: 12px; }
         }
       `}</style>
 

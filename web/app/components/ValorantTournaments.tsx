@@ -145,21 +145,30 @@ export default function ValorantTournaments() {
           .vt-wrap { padding: 16px 14px 44px; }
           .vt-stats { gap: 8px; justify-content: center; }
           .vt-stat-pill { padding: 6px 14px; }
-          .vt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-          .vt-card { flex-direction: column; border-radius: 14px; margin-bottom: 14px; }
+          .vt-section-label { font-size: 0.62rem; margin-bottom: 14px; margin-top: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+          .vt-card { flex-direction: column; border-radius: 14px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
           .vt-card-accent { width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
-          .vt-card-body { padding: 16px 16px 12px; gap: 12px; }
-          .vt-card-icon { width: 40px; height: 40px; border-radius: 10px; }
-          .vt-card-name { white-space: normal; font-size: 0.95rem; line-height: 1.3; }
-          .vt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+          .vt-card-body { padding: 16px 16px 14px; gap: 12px; align-items: flex-start; }
+          .vt-card-icon { width: 36px; height: 36px; border-radius: 10px; margin-top: 2px; }
+          .vt-card-name { white-space: normal; font-size: 0.92rem; line-height: 1.3; }
+
+          .vt-card-meta { gap: 0; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
           .vt-card-meta .vt-meta-item { display: flex; }
-          .vt-meta-key { font-size: 0.56rem; }
-          .vt-meta-val { font-size: 0.76rem; }
+          .vt-meta-key { font-size: 0.55rem; margin-bottom: 2px; }
+          .vt-meta-val { font-size: 0.78rem; }
+
           .vt-card-right { padding: 0 16px 16px; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
-          .vt-slots { min-width: unset; width: 100%; }
-          .vt-slots-text { text-align: left; font-size: 0.74rem; }
-          .vt-slots-bar { height: 5px; border-radius: 3px; }
-          .vt-reg-btn, .vt-reg-done, .vt-coming-soon, .vt-leaderboard-btn { min-width: unset; width: 100%; padding: 10px 16px; font-size: 0.8rem; }
+
+          .vt-slots { min-width: unset; width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }
+          .vt-slots-text { text-align: left; font-size: 0.76rem; margin-bottom: 6px; }
+          .vt-slots-bar { height: 6px; border-radius: 4px; }
+          .vt-slots-fill { border-radius: 4px; }
+
+          .vt-reg-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; font-weight: 800; }
+          .vt-reg-done { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .vt-leaderboard-btn { min-width: unset; width: 100%; padding: 12px 16px; font-size: 0.84rem; border-radius: 12px; }
+          .vt-coming-soon { min-width: unset; width: 100%; padding: 12px 16px; border-radius: 12px; }
         }
       `}</style>
 
