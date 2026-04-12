@@ -1302,7 +1302,7 @@ export default function AdminPanel() {
                           if (videoTeams.length > 0) setShuffleVideoTeams(videoTeams);
                         }, 3000);
                       }}>Delete & Reshuffle</button>
-                      {teams.length > 0 && !shuffleVideoTeams && <div style={{ marginTop: 8 }}>{teams.map(t => <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {t.avgSkillLevel})</div>)}</div>}
+                      {teams.length > 0 && !shuffleVideoTeams && <div style={{ marginTop: 8 }}>{teams.map(t => { const avg = t.avgSkillLevel < 100 ? Math.round(t.avgSkillLevel * 100) : Math.round(t.avgSkillLevel); return <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {avg})</div>; })}</div>}
                       {teams.length > 0 && !shuffleVideoTeams && (
                         <button style={{ ...btnStyle, marginTop: 8, fontSize: "0.72rem" }} onClick={() => {
                           const videoTeams: ShuffleTeam[] = teams.map(t => ({
