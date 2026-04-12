@@ -134,6 +134,7 @@ export default function AdminPanel() {
   const [playerSearch, setPlayerSearch] = useState("");
   const [riotFilter, setRiotFilter] = useState<"all" | "pending" | "verified" | "rejected">("all");
   const [tournamentFilter, setTournamentFilter] = useState<string>("all");
+  const [showCompleted, setShowCompleted] = useState(false);
   const [playerSort, setPlayerSort] = useState<"newest" | "oldest" | "name" | "status">("newest");
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
@@ -558,6 +559,8 @@ export default function AdminPanel() {
   }, [authenticated, activeTab, fetchAllTournaments]);
 
   // ─── Derived ────────────────────────────────────────────────────────────────
+  const selectedTournament = tournaments.find(t => t.id === tournamentId);
+  const isTournamentEnded = selectedTournament?.status === "ended" || selectedTournament?.status === "completed";
   const pendingMatches = matches.filter(m => m.status === "pending" || m.status === "live");
   const groupMatches = matches.filter(m => !m.isBracket);
   const bracketMatches = matches.filter(m => m.isBracket);
@@ -1012,15 +1015,27 @@ export default function AdminPanel() {
           {activeTab === "tournament" && (
             <>
               <div style={sectionStyle}>
-                <span style={labelStyle}>Select Tournament</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={labelStyle}>Select Tournament</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.65rem", color: "#555", cursor: "pointer" }}>
+                    <input type="checkbox" checked={showCompleted} onChange={e => setShowCompleted(e.target.checked)} style={{ accentColor: "#3CCBFF" }} />
+                    Show completed
+                  </label>
+                </div>
                 <select value={tournamentId} onChange={e => setTournamentId(e.target.value)} style={selectStyle}>
                   {tournaments.length === 0 && <option value="">Loading tournaments...</option>}
-                  {tournaments.map(t => (
+                  {tournaments.filter(t => showCompleted || (t.status !== "ended" && t.status !== "completed")).map(t => (
                     <option key={t.id} value={t.id}>
                       {t.name} ({t.status}) — {t.slotsBooked ?? 0}/{t.totalSlots ?? "∞"} players
                     </option>
                   ))}
                 </select>
+                {isTournamentEnded && tournamentId && (
+                  <div style={{ marginTop: 8, padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "1rem" }}>🔒</span>
+                    <span style={{ fontSize: "0.72rem", color: "#f87171", fontWeight: 700 }}>This tournament has ended. Destructive actions are disabled to protect historical data.</span>
+                  </div>
+                )}
                 {tournamentId && (
                   <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: "0.72rem", color: "#aaa", background: "#1a1a1e", padding: "4px 12px", borderRadius: 100, border: "1px solid #2a2a2e" }}>
@@ -1266,7 +1281,8 @@ export default function AdminPanel() {
                     <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
                       <span style={smallLabel}>Shuffle Teams</span>
                       <input value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
-                      <button disabled={loading} style={btnDanger} onClick={async () => {
+                      <button disabled={loading || isTournamentEnded} style={{ ...btnDanger, ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={async () => {
+                        if (isTournamentEnded) return;
                         if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
                         setShuffleVideoTeams(null);
                         await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
@@ -1334,7 +1350,8 @@ export default function AdminPanel() {
                       </div>
                       <label style={smallLabel}>Start Date</label>
                       <input value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} type="date" />
-                      <button disabled={loading} style={btnStyle} onClick={async () => {
+                      <button disabled={loading || isTournamentEnded} style={{ ...btnStyle, ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={async () => {
+                        if (isTournamentEnded) return;
                         if (!confirm(`Generate ${totalRounds} rounds of fixtures?`)) return;
                         await apiCall("/api/valorant/generate-all-pairings", { tournamentId, totalRounds: parseInt(totalRounds), startTime, startDate });
                       }}>Generate All Fixtures</button>
@@ -1347,11 +1364,11 @@ export default function AdminPanel() {
                         <div><label style={smallLabel}>Player UID</label><input value={modPlayerUid} onChange={e => setModPlayerUid(e.target.value)} placeholder="Player UID" style={inputStyle} /></div>
                       </div>
                       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                        <button disabled={loading || !modTeamId || !modPlayerUid} style={{ ...btnSuccess, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "add" })}>Add</button>
-                        <button disabled={loading || !modTeamId || !modPlayerUid} style={{ ...btnDanger, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "remove" })}>Remove</button>
+                        <button disabled={loading || isTournamentEnded || !modTeamId || !modPlayerUid} style={{ ...btnSuccess, fontSize: "0.72rem", padding: "8px 14px", ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={() => { if (isTournamentEnded) return; apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "add" }); }}>Add</button>
+                        <button disabled={loading || isTournamentEnded || !modTeamId || !modPlayerUid} style={{ ...btnDanger, fontSize: "0.72rem", padding: "8px 14px", ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={() => { if (isTournamentEnded) return; apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, action: "remove" }); }}>Remove</button>
                       </div>
                       <select value={modTargetTeamId} onChange={e => setModTargetTeamId(e.target.value)} style={selectStyle}><option value="">Move to team...</option>{teams.filter(t => t.id !== modTeamId).map(t => <option key={t.id} value={t.id}>{t.teamName}</option>)}</select>
-                      <button disabled={loading || !modTeamId || !modPlayerUid || !modTargetTeamId} style={{ ...btnWarning, fontSize: "0.72rem", padding: "8px 14px" }} onClick={() => apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, targetTeamId: modTargetTeamId, action: "move" })}>Move Player</button>
+                      <button disabled={loading || isTournamentEnded || !modTeamId || !modPlayerUid || !modTargetTeamId} style={{ ...btnWarning, fontSize: "0.72rem", padding: "8px 14px", ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={() => { if (isTournamentEnded) return; apiCall("/api/valorant/modify-roster", { tournamentId, teamId: modTeamId, playerUid: modPlayerUid, targetTeamId: modTargetTeamId, action: "move" }); }}>Move Player</button>
                     </div>
                     {/* Generate Brackets */}
                     <div style={{ padding: 16, background: "#1a1508", borderRadius: 10, border: "1px solid #5c3a14" }}>
@@ -1366,7 +1383,8 @@ export default function AdminPanel() {
                         <input type="checkbox" checked={standingsNotComplete} onChange={e => setStandingsNotComplete(e.target.checked)} style={{ accentColor: "#f59e0b" }} />
                         Standings not complete (all TBD)
                       </label>
-                      <button disabled={loading} style={{ ...btnWarning, marginTop: 8 }} onClick={async () => {
+                      <button disabled={loading || isTournamentEnded} style={{ ...btnWarning, marginTop: 8, ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={async () => {
+                        if (isTournamentEnded) return;
                         if (!confirm(`Generate brackets for top ${bracketTopTeams} teams?`)) return;
                         await apiCall("/api/valorant/generate-brackets", { tournamentId, topTeams: parseInt(bracketTopTeams), startTime: bracketStartTime, startDate: bracketStartDate, standingsNotComplete });
                       }}>Generate Brackets</button>
