@@ -64,11 +64,18 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         player.seekTo(f);
         // Wait for 2 animation frames to ensure render
         await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-        const canvas = await html2canvas(el, {
-          width: el.clientWidth, height: el.clientHeight,
-          scale: captureScale, backgroundColor: "#0A0F2A", logging: false, useCORS: true,
-        });
-        bitmaps.push(await createImageBitmap(canvas));
+        try {
+          const canvas = await html2canvas(el, {
+            width: el.clientWidth, height: el.clientHeight,
+            scale: captureScale, backgroundColor: "#0A0F2A", logging: false,
+            useCORS: true, allowTaint: true,
+          });
+          bitmaps.push(await createImageBitmap(canvas));
+        } catch (captureErr) {
+          console.warn("Frame capture failed at", k, captureErr);
+          // Reuse last good frame
+          if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
+        }
         setProgress(Math.round(((k + 1) / captureCount) * 45));
         setStatus(`Capturing frame ${k + 1}/${captureCount}`);
 
@@ -78,16 +85,28 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         }
       }
 
+      if (bitmaps.length === 0) throw new Error("No frames captured. Check browser console for CORS errors.");
+
       setStatus("Encoding video...");
       setProgress(46);
 
+      // Use actual captured size (may differ from ENCODE_W/H)
+      const encW = ENCODE_W;
+      const encH = ENCODE_H;
+
       const target = new ArrayBufferTarget();
-      const muxer = new Muxer({ target, video: { codec: "avc", width: ENCODE_W, height: ENCODE_H }, fastStart: "in-memory" });
+      const muxer = new Muxer({ target, video: { codec: "avc", width: encW, height: encH }, fastStart: "in-memory" });
       const encoder = new VideoEncoder({
         output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
         error: (e) => console.error("VideoEncoder error:", e),
       });
-      encoder.configure({ codec: "avc1.640028", width: ENCODE_W, height: ENCODE_H, bitrate: 5_000_000, framerate: FPS });
+
+      // Try H.264 High, fallback to Baseline
+      try {
+        encoder.configure({ codec: "avc1.640028", width: encW, height: encH, bitrate: 5_000_000, framerate: FPS });
+      } catch {
+        encoder.configure({ codec: "avc1.42001e", width: encW, height: encH, bitrate: 3_000_000, framerate: FPS });
+      }
 
       const offscreen = new OffscreenCanvas(ENCODE_W, ENCODE_H);
       const ctx = offscreen.getContext("2d")!;
@@ -124,8 +143,9 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       setProgress(100);
       setStatus("Done!");
     } catch (e: any) {
-      console.error("MP4 export error:", e);
-      alert("MP4 export failed: " + (e.message || "Unknown error") + "\n\nTip: Use screen recording as an alternative (OBS or built-in screen recorder).");
+      console.error("MP4 export error:", e, e?.stack);
+      const msg = e?.message || e?.name || (typeof e === "string" ? e : "Unknown error");
+      alert("MP4 export failed: " + msg + "\n\nCheck browser console (F12) for details.\nTip: Use screen recording as an alternative (OBS or built-in screen recorder).");
     } finally {
       setRecording(false);
       setTimeout(() => setStatus(""), 3000);
