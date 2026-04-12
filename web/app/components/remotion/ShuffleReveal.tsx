@@ -273,8 +273,8 @@ function PreviousTeamsSidebar({ theme, revealedTeams, currentTeamIndex }: { them
   const visible = revealedTeams.slice(startIdx);
 
   return (
-    <div style={{ position: "absolute", left: 20, top: 80, bottom: 80, width: 200, display: "flex", flexDirection: "column", gap: 8, justifyContent: "flex-start", zIndex: 10, overflow: "hidden" }}>
-      <div style={{ fontSize: 9, fontWeight: 800, color: `rgba(${theme.rgb}, 0.4)`, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
+    <div style={{ position: "absolute", left: 20, top: 80, bottom: 40, width: 340, display: "flex", flexDirection: "column", gap: 10, justifyContent: "flex-start", zIndex: 10, overflow: "hidden" }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
         Teams Revealed
       </div>
       {visible.map((team, vi) => {
@@ -282,18 +282,18 @@ function PreviousTeamsSidebar({ theme, revealedTeams, currentTeamIndex }: { them
         const isLatest = actualIdx === revealedTeams.length - 1;
         return (
           <div key={actualIdx} style={{
-            background: isLatest ? `rgba(${theme.rgb}, 0.08)` : "rgba(255,255,255,0.02)",
-            border: `1px solid ${isLatest ? `rgba(${theme.rgb}, 0.25)` : "rgba(255,255,255,0.06)"}`,
-            borderRadius: 10, padding: "8px 10px",
-            transition: "all 0.3s",
+            background: isLatest ? `rgba(${theme.rgb}, 0.08)` : "rgba(255,255,255,0.03)",
+            border: `1px solid ${isLatest ? `rgba(${theme.rgb}, 0.25)` : "rgba(255,255,255,0.08)"}`,
+            borderRadius: 12, padding: "10px 14px",
           }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: theme.accent, letterSpacing: 2, textTransform: "uppercase" }}>Team {actualIdx + 1}</div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.teamName}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: theme.accent, letterSpacing: 2, textTransform: "uppercase" }}>Team {actualIdx + 1}</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "#fff", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.teamName}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {team.members.slice(0, 5).map((p, j) => (
-                <div key={j} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: "rgba(255,255,255,0.55)" }}>
-                  {p.avatar ? <Img src={p.avatar} style={{ width: 14, height: 14, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 14, height: 14, borderRadius: "50%", background: `rgba(${theme.rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 800, color: theme.accent }}>{(p.name || "?")[0].toUpperCase()}</div>}
-                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name}</span>
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                  {p.avatar ? <Img src={p.avatar} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 20, height: 20, borderRadius: "50%", background: `rgba(${theme.rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: theme.accent }}>{(p.name || "?")[0].toUpperCase()}</div>}
+                  <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name}</span>
+                  {p.rank && <span style={{ fontSize: 10, color: `rgba(${theme.rgb}, 0.6)`, fontWeight: 700 }}>{p.rank}</span>}
                 </div>
               ))}
             </div>
