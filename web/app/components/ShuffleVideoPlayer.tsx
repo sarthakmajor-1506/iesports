@@ -12,21 +12,31 @@ interface Props {
 }
 
 const FPS = 30;
-const ENCODE_W = 1920;
-const ENCODE_H = 1080;
+const ENCODE_W = 1280;
+const ENCODE_H = 720;
 
 export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }: Props) {
   const playerRef = useRef<PlayerRef>(null);
   const [recording, setRecording] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("");
 
   const membersPerTeam = teams.length > 0 ? teams[0].members.length : 5;
   const totalFrames = getShuffleDuration(teamCount, membersPerTeam);
+  const durationSec = Math.round(totalFrames / FPS);
 
   const downloadMp4 = useCallback(async () => {
     if (recording) return;
+
+    // Check browser support
+    if (typeof VideoEncoder === "undefined") {
+      alert("Your browser doesn't support video encoding. Please use Chrome 94+ or use screen recording.");
+      return;
+    }
+
     setRecording(true);
     setProgress(0);
+    setStatus("Preparing...");
 
     try {
       const player = playerRef.current;
@@ -38,32 +48,46 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
       const el = container as HTMLElement;
 
-      // Capture every 3rd frame
-      const STEP = 3;
+      // Capture every 6th frame for performance (interpolated during encode)
+      const STEP = 6;
       const captureCount = Math.ceil(totalFrames / STEP);
       const captureScale = ENCODE_W / el.clientWidth;
+
+      setStatus(`Capturing ${captureCount} keyframes...`);
+
+      // Capture in batches to avoid memory pressure
+      const BATCH = 50;
       const bitmaps: ImageBitmap[] = [];
 
       for (let k = 0; k < captureCount; k++) {
         const f = Math.min(k * STEP, totalFrames - 1);
         player.seekTo(f);
+        // Wait for 2 animation frames to ensure render
         await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
         const canvas = await html2canvas(el, {
           width: el.clientWidth, height: el.clientHeight,
           scale: captureScale, backgroundColor: "#0A0F2A", logging: false, useCORS: true,
         });
         bitmaps.push(await createImageBitmap(canvas));
-        setProgress(Math.round(((k + 1) / captureCount) * 50));
+        setProgress(Math.round(((k + 1) / captureCount) * 45));
+        setStatus(`Capturing frame ${k + 1}/${captureCount}`);
+
+        // Yield to UI every batch
+        if (k % BATCH === 0 && k > 0) {
+          await new Promise(r => setTimeout(r, 10));
+        }
       }
 
-      // Encode
+      setStatus("Encoding video...");
+      setProgress(46);
+
       const target = new ArrayBufferTarget();
       const muxer = new Muxer({ target, video: { codec: "avc", width: ENCODE_W, height: ENCODE_H }, fastStart: "in-memory" });
       const encoder = new VideoEncoder({
         output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
         error: (e) => console.error("VideoEncoder error:", e),
       });
-      encoder.configure({ codec: "avc1.640028", width: ENCODE_W, height: ENCODE_H, bitrate: 10_000_000, framerate: FPS });
+      encoder.configure({ codec: "avc1.640028", width: ENCODE_W, height: ENCODE_H, bitrate: 5_000_000, framerate: FPS });
 
       const offscreen = new OffscreenCanvas(ENCODE_W, ENCODE_H);
       const ctx = offscreen.getContext("2d")!;
@@ -73,11 +97,17 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         ctx.clearRect(0, 0, ENCODE_W, ENCODE_H);
         ctx.drawImage(bitmaps[bIdx], 0, 0, ENCODE_W, ENCODE_H);
         const vf = new VideoFrame(offscreen, { timestamp: (i / FPS) * 1_000_000, duration: (1 / FPS) * 1_000_000 });
-        encoder.encode(vf, { keyFrame: i % 60 === 0 });
+        encoder.encode(vf, { keyFrame: i % 90 === 0 });
         vf.close();
-        if (i % 10 === 0) setProgress(50 + Math.round((i / totalFrames) * 48));
+        if (i % 30 === 0) {
+          setProgress(46 + Math.round((i / totalFrames) * 50));
+          setStatus(`Encoding ${Math.round((i / totalFrames) * 100)}%`);
+          // Yield to UI periodically
+          await new Promise(r => setTimeout(r, 0));
+        }
       }
 
+      setStatus("Finalizing...");
       await encoder.flush();
       muxer.finalize();
       bitmaps.forEach(b => b.close());
@@ -87,14 +117,18 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       const a = document.createElement("a");
       a.href = url;
       a.download = `${tournamentName.replace(/\s+/g, "_")}_shuffle.mp4`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
       setProgress(100);
+      setStatus("Done!");
     } catch (e: any) {
       console.error("MP4 export error:", e);
-      alert("MP4 export failed: " + (e.message || "Unknown error. Try screen recording instead."));
+      alert("MP4 export failed: " + (e.message || "Unknown error") + "\n\nTip: Use screen recording as an alternative (OBS or built-in screen recorder).");
     } finally {
       setRecording(false);
+      setTimeout(() => setStatus(""), 3000);
       playerRef.current?.play();
     }
   }, [recording, totalFrames, tournamentName]);
@@ -116,8 +150,8 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         />
       </div>
 
-      {/* Download button */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+      {/* Download + info */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
         <button
           disabled={recording}
           onClick={downloadMp4}
@@ -131,13 +165,16 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
           {recording ? `Exporting... ${progress}%` : "Download MP4"}
         </button>
         {recording && (
-          <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${progress}%`, background: "#3CCBFF", borderRadius: 2, transition: "width 0.3s" }} />
+          <div style={{ flex: 1, minWidth: 100, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${progress}%`, background: "#3CCBFF", borderRadius: 2, transition: "width 0.3s" }} />
+            </div>
+            {status && <div style={{ fontSize: "0.6rem", color: "#555" }}>{status}</div>}
           </div>
         )}
         {!recording && (
           <span style={{ fontSize: "0.62rem", color: "#555" }}>
-            {teamCount} teams · {Math.round(totalFrames / FPS)}s · 1920×1080
+            {teamCount} teams · {durationSec}s · 1280×720 · {status || "Use Chrome for best results"}
           </span>
         )}
       </div>
