@@ -168,69 +168,100 @@ function TeamDraftScene({ frame, theme, team, teamIndex, fps, revealedTeams }: {
   const cardOpacity = fade(frame, 0, 12);
   const cardScale = frame >= 0 ? spring({ frame, fps, config: { damping: 14, stiffness: 60 } }) : 0;
 
-  // Card positions
-  const cardX = 1140;
+  // Layout positions (1920x1080)
+  const cardX = 1160;
   const cardY = 120;
-  const cardW = 560;
+  const cardW = 540;
+  const cardHeaderH = 70;   // team header + divider
+  const slotH = 52;         // height per player slot
+  const slotPadTop = cardY + cardHeaderH + 28; // top of first slot
 
-  // Spotlight center position
-  const spotCenterX = 480;
-  const spotCenterY = 420;
+  // Spotlight: true center of screen
+  const spotCenterX = 960;
+  const spotCenterY = 460;
 
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <GridBg rgb={theme.rgb} />
-      <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", background: `radial-gradient(circle, rgba(${theme.rgb},0.08), transparent 70%)`, top: "50%", left: "40%", transform: "translate(-50%, -50%)" }} />
+
+      {/* Ambient glow behind spotlight */}
+      {!inHoldPhase && (
+        <div style={{ position: "absolute", width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, rgba(${theme.rgb},0.12), transparent 70%)`, top: spotCenterY, left: spotCenterX, transform: "translate(-50%, -50%)" }} />
+      )}
 
       {/* ── LEFT: Previous teams sidebar ── */}
       <PreviousTeamsSidebar theme={theme} revealedTeams={revealedTeams} currentTeamIndex={teamIndex} />
 
-      {/* ── CENTER: Player spotlight (only during draft, not hold) ── */}
+      {/* ── CENTER: Player spotlight → flies into team card slot ── */}
       {!inHoldPhase && (() => {
         const player = members[currentPlayerIdx];
         const enterScale = spring({ frame: Math.max(0, playerLocalFrame), fps, config: { damping: 12, stiffness: 100 } });
 
-        // Fly animation: scale down + move right towards card
-        const flyProgress = inFly ? interpolate(playerLocalFrame, [spotlightEnd, PLAYER_DRAFT_FRAMES], [0, 1], { extrapolateRight: "clamp" }) : 0;
-        const flyX = interpolate(flyProgress, [0, 1], [0, cardX - spotCenterX + 60]);
-        const flyY = interpolate(flyProgress, [0, 1], [0, cardY + 100 + currentPlayerIdx * 52 - spotCenterY]);
-        const flyScale = interpolate(flyProgress, [0, 1], [1, 0.35]);
-        const spotOpacity = interpolate(flyProgress, [0, 0.7, 1], [1, 0.8, 0]);
+        // Target: exact position of this player's slot in the team card
+        const targetX = cardX + 48;  // left edge of avatar in slot
+        const targetY = slotPadTop + currentPlayerIdx * (slotH + 8) + slotH / 2;
+
+        // Fly: use spring for organic feel
+        const flyRaw = inFly ? interpolate(playerLocalFrame, [spotlightEnd, PLAYER_DRAFT_FRAMES], [0, 1], { extrapolateRight: "clamp" }) : 0;
+        // Ease-out curve for smooth deceleration
+        const flyProgress = 1 - Math.pow(1 - flyRaw, 3);
+
+        const flyX = flyProgress * (targetX - spotCenterX);
+        const flyY = flyProgress * (targetY - spotCenterY);
+        const flyScale = interpolate(flyProgress, [0, 1], [1, 0.22]);
+        const spotOpacity = interpolate(flyProgress, [0, 0.8, 1], [1, 0.6, 0]);
+
+        // Glow trail during fly
+        const trailOpacity = inFly ? interpolate(flyProgress, [0, 0.3, 1], [0, 0.5, 0]) : 0;
 
         return (
-          <div style={{
-            position: "absolute", left: spotCenterX, top: spotCenterY,
-            transform: `translate(-50%, -50%) scale(${enterScale * flyScale}) translateX(${flyX}px) translateY(${flyY}px)`,
-            opacity: spotOpacity,
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
-          }}>
-            {/* Player number */}
-            <div style={{ fontSize: 13, fontWeight: 700, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 4, textTransform: "uppercase" }}>
-              Player {currentPlayerIdx + 1} of {members.length}
-            </div>
-
-            {/* Large avatar */}
-            {player.avatar ? (
-              <Img src={player.avatar} style={{ width: 120, height: 120, borderRadius: "50%", objectFit: "cover", border: `4px solid ${theme.accent}`, boxShadow: `0 0 40px rgba(${theme.rgb}, 0.4)` }} />
-            ) : (
-              <div style={{ width: 120, height: 120, borderRadius: "50%", border: `4px solid ${theme.accent}`, background: `rgba(${theme.rgb}, 0.15)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, fontWeight: 900, color: theme.accent, boxShadow: `0 0 40px rgba(${theme.rgb}, 0.4)` }}>
-                {(player.name || "?")[0].toUpperCase()}
-              </div>
+          <>
+            {/* Glow trail */}
+            {trailOpacity > 0 && (
+              <div style={{
+                position: "absolute",
+                left: spotCenterX + flyX * 0.5, top: spotCenterY + flyY * 0.5,
+                width: 80, height: 80, borderRadius: "50%",
+                background: `radial-gradient(circle, rgba(${theme.rgb}, ${trailOpacity * 0.3}), transparent)`,
+                transform: "translate(-50%, -50%)",
+                filter: "blur(20px)",
+              }} />
             )}
 
-            {/* Name */}
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff", letterSpacing: 1 }}>{player.name}</div>
-              {player.tag && <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>#{player.tag}</div>}
-            </div>
-
-            {/* Rank */}
-            {player.rank && (
-              <div style={{ fontSize: 16, fontWeight: 800, color: theme.accent, padding: "6px 20px", borderRadius: 100, background: `rgba(${theme.rgb}, 0.12)`, border: `2px solid rgba(${theme.rgb}, 0.3)` }}>
-                {player.rank}
+            <div style={{
+              position: "absolute", left: spotCenterX + flyX, top: spotCenterY + flyY,
+              transform: `translate(-50%, -50%) scale(${enterScale * flyScale})`,
+              opacity: spotOpacity,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 14,
+            }}>
+              {/* Player number */}
+              <div style={{ fontSize: 13, fontWeight: 700, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 4, textTransform: "uppercase", opacity: 1 - flyProgress }}>
+                Player {currentPlayerIdx + 1} of {members.length}
               </div>
-            )}
-          </div>
+
+              {/* Hero avatar — 4x size with dramatic shadow */}
+              {player.avatar ? (
+                <Img src={player.avatar} style={{ width: 260, height: 260, borderRadius: "50%", objectFit: "cover", border: `5px solid ${theme.accent}`, boxShadow: `0 0 ${80 - flyProgress * 70}px rgba(${theme.rgb}, ${0.6 - flyProgress * 0.5}), 0 20px 60px rgba(0,0,0,0.6)` }} />
+              ) : (
+                <div style={{ width: 260, height: 260, borderRadius: "50%", border: `5px solid ${theme.accent}`, background: `linear-gradient(135deg, rgba(${theme.rgb}, 0.2), rgba(${theme.rgb}, 0.05))`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 100, fontWeight: 900, color: theme.accent, boxShadow: `0 0 ${80 - flyProgress * 70}px rgba(${theme.rgb}, ${0.6 - flyProgress * 0.5}), 0 20px 60px rgba(0,0,0,0.6)` }}>
+                  {(player.name || "?")[0].toUpperCase()}
+                </div>
+              )}
+
+              {/* Name + tag (fades out during fly) */}
+              <div style={{ textAlign: "center", opacity: 1 - flyProgress * 1.5 }}>
+                <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", letterSpacing: 1, textShadow: "0 4px 20px rgba(0,0,0,0.5)" }}>{player.name}</div>
+                {player.tag && <div style={{ fontSize: 18, fontWeight: 500, color: "rgba(255,255,255,0.35)", marginTop: 4 }}>#{player.tag}</div>}
+              </div>
+
+              {/* Rank (fades out during fly) */}
+              {player.rank && (
+                <div style={{ fontSize: 20, fontWeight: 800, color: theme.accent, padding: "8px 28px", borderRadius: 100, background: `rgba(${theme.rgb}, 0.12)`, border: `2px solid rgba(${theme.rgb}, 0.3)`, boxShadow: `0 0 20px rgba(${theme.rgb}, 0.2)`, opacity: 1 - flyProgress * 1.5 }}>
+                  {player.rank}
+                </div>
+              )}
+            </div>
+          </>
         );
       })()}
 
