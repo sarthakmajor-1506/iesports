@@ -109,8 +109,11 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Rating function ──
-    const rating = (p: typeof players[0]) => p.iesportsRating || p.riotTier * 100 || 0;
+    // ── Rating function — always use exact iesportsRating, riotTier*100 only as last resort ──
+    const rating = (p: typeof players[0]) => {
+      if (p.iesportsRating && p.iesportsRating > 0) return p.iesportsRating;
+      return p.riotTier * 100 || 0;
+    };
 
     // ── Step 1: Sort players by rating (highest first) ──
     const sorted = [...players].sort((a, b) => rating(b) - rating(a));
