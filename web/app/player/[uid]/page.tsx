@@ -90,7 +90,8 @@ export default function PlayerProfile() {
   const [loading, setLoading] = useState(true);
   // Default tab: from URL ?tab=, else own profile → account, else valorant
   const urlTab = searchParams.get("tab") as ProfileTab | null;
-  const [activeTab, setActiveTab] = useState<ProfileTab>(urlTab || (isOwnProfile ? "account" : "valorant"));
+  const [activeTab, setActiveTab] = useState<ProfileTab>(urlTab || "valorant");
+  const [tabInitialized, setTabInitialized] = useState(!!urlTab);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
   // UPI state
@@ -113,6 +114,14 @@ export default function PlayerProfile() {
   // Personal photo state
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoSaved, setPhotoSaved] = useState(false);
+
+  // Set default tab to "account" for own profile once auth loads
+  useEffect(() => {
+    if (!tabInitialized && user && user.uid === uid) {
+      setActiveTab("account");
+      setTabInitialized(true);
+    }
+  }, [user, uid, tabInitialized]);
 
   useEffect(() => {
     if (!uid) return;
@@ -440,15 +449,23 @@ export default function PlayerProfile() {
               </div>
             )
           )}
-          {activeTab === "dota" && (
+          {activeTab === "dota" && (() => {
+            const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+            const tier = profile.dotaRankTier || 0;
+            const medal = Math.floor(tier / 10);
+            const stars = tier % 10;
+            const exactRank = tier > 0 && medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : "Unranked";
+            const bracketLabel = profile.dotaBracket ? ({ herald_guardian: "Herald – Guardian", crusader_archon: "Crusader – Archon", legend_ancient: "Legend – Ancient", divine_immortal: "Divine – Immortal" } as Record<string,string>)[profile.dotaBracket] || profile.dotaBracket : "—";
+            return (
             <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{profile.dotaBracket ? ({ herald_guardian: "Guardian", crusader_archon: "Archon", legend_ancient: "Ancient", divine_immortal: "Immortal" }[profile.dotaBracket] || profile.dotaBracket) : "Unranked"}</div><div className="pp-stat-label">Dota 2 Bracket</div></div>
+              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{exactRank}</div><div className="pp-stat-label">Dota 2 Rank</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaRankTier || "—"}</div><div className="pp-stat-label">Rank Tier</div></div>
+              <div className="pp-stat-card"><div className="pp-stat-value">{bracketLabel}</div><div className="pp-stat-label">Bracket</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Tournaments</div></div>
               <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ═══ VALORANT TAB CONTENT ═══ */}
           {activeTab === "valorant" && (<>
@@ -683,14 +700,21 @@ export default function PlayerProfile() {
               {profile.steamId ? (
                 <div className="pp-section">
                   <span className="pp-section-label">Dota 2 Profile</span>
+                  {(() => {
+                    const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+                    const tier = profile.dotaRankTier || 0;
+                    const medal = Math.floor(tier / 10);
+                    const stars = tier % 10;
+                    const exactRank = tier > 0 && medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : null;
+                    return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
                       <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Steam Name</span>
                       <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.steamName || "—"}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
-                      <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Bracket</span>
-                      <span style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>{profile.dotaBracket ? ({ herald_guardian: "Guardian", crusader_archon: "Archon", legend_ancient: "Ancient", divine_immortal: "Immortal" }[profile.dotaBracket] || profile.dotaBracket) : "Unranked"}</span>
+                      <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Rank</span>
+                      <span style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>{exactRank || "Unranked"}</span>
                     </div>
                     {profile.dotaMMR && (
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
@@ -698,13 +722,9 @@ export default function PlayerProfile() {
                         <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.dotaMMR}</span>
                       </div>
                     )}
-                    {profile.dotaRankTier && (
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #1e1e22" }}>
-                        <span style={{ fontSize: "0.72rem", color: "#8A8880" }}>Rank Tier</span>
-                        <span style={{ fontSize: "0.72rem", color: "#F0EEEA", fontWeight: 700 }}>{profile.dotaRankTier}</span>
-                      </div>
-                    )}
                   </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="pp-section">
