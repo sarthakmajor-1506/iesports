@@ -27,11 +27,33 @@ export async function GET(req: NextRequest) {
     }
 
     const tournament = { id: tDoc.id, ...tDoc.data() };
-    const players = playersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let players: any[] = playersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const standings = standingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const leaderboard = lbSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // For Dota, refresh rank data from user docs so tournament shows current rank
+    if (game === "dota2" && players.length > 0) {
+      const uids = players.map((p: any) => p.uid || p.id).filter(Boolean);
+      if (uids.length > 0) {
+        const userRefs = uids.map((uid: string) => adminDb.collection("users").doc(uid));
+        const userDocs = await adminDb.getAll(...userRefs);
+        const rankMap: Record<string, { dotaRankTier: number; dotaMMR: number }> = {};
+        userDocs.forEach(ud => {
+          if (ud.exists) {
+            const d = ud.data();
+            if (d?.dotaRankTier) rankMap[ud.id] = { dotaRankTier: d.dotaRankTier, dotaMMR: d.dotaMMR || 0 };
+          }
+        });
+        players = players.map((p: any) => {
+          const uid = p.uid || p.id;
+          const fresh = rankMap[uid];
+          if (fresh) return { ...p, dotaRankTier: fresh.dotaRankTier, dotaMMR: fresh.dotaMMR };
+          return p;
+        });
+      }
+    }
 
     return NextResponse.json({ tournament, players, teams, standings, matches, leaderboard });
   } catch (e: any) {
