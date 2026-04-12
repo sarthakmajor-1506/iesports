@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import Navbar from "@/app/components/Navbar";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, getDocs, getDoc, doc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { getShuffleDuration } from "@/app/components/remotion/ShuffleReveal";
+import type { ShuffleTeam } from "@/app/components/remotion/ShuffleReveal";
+
+const ShuffleVideoPlayer = dynamic(() => import("@/app/components/ShuffleVideoPlayer"), { ssr: false });
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -154,6 +159,9 @@ export default function AdminPanel() {
   const [editValues, setEditValues] = useState<Record<string, any>>({});
   const [savingPlayer, setSavingPlayer] = useState<string | null>(null);
   const [playerSortBy, setPlayerSortBy] = useState<"rank" | "name" | "skill">("rank");
+
+  // ─── Shuffle Video ──────────────────────────────────────────────────────────
+  const [shuffleVideoTeams, setShuffleVideoTeams] = useState<ShuffleTeam[] | null>(null);
 
   // ─── Swiss Pairings ─────────────────────────────────────────────────────────
   const [totalRounds, setTotalRounds] = useState("5");
@@ -1260,10 +1268,63 @@ export default function AdminPanel() {
                       <input value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
                       <button disabled={loading} style={btnDanger} onClick={async () => {
                         if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
+                        setShuffleVideoTeams(null);
                         await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
+                        // Wait a moment for Firestore listener to update teams, then build video data
+                        setTimeout(() => {
+                          const videoTeams: ShuffleTeam[] = teams.map(t => ({
+                            teamName: t.teamName,
+                            members: (t.members || []).map((m: any) => ({
+                              name: m.riotGameName || m.steamName || "Player",
+                              tag: m.riotTagLine || undefined,
+                              avatar: m.riotAvatar || m.steamAvatar || undefined,
+                              rank: m.iesportsRank || m.riotRank || undefined,
+                              tier: m.iesportsTier || m.riotTier || undefined,
+                            })),
+                            avgSkill: t.avgSkillLevel,
+                          }));
+                          if (videoTeams.length > 0) setShuffleVideoTeams(videoTeams);
+                        }, 3000);
                       }}>Delete & Reshuffle</button>
-                      {teams.length > 0 && <div style={{ marginTop: 8 }}>{teams.map(t => <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {t.avgSkillLevel})</div>)}</div>}
+                      {teams.length > 0 && !shuffleVideoTeams && <div style={{ marginTop: 8 }}>{teams.map(t => <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {t.avgSkillLevel})</div>)}</div>}
+                      {teams.length > 0 && !shuffleVideoTeams && (
+                        <button style={{ ...btnStyle, marginTop: 8, fontSize: "0.72rem" }} onClick={() => {
+                          const videoTeams: ShuffleTeam[] = teams.map(t => ({
+                            teamName: t.teamName,
+                            members: (t.members || []).map((m: any) => ({
+                              name: m.riotGameName || m.steamName || "Player",
+                              tag: m.riotTagLine || undefined,
+                              avatar: m.riotAvatar || m.steamAvatar || undefined,
+                              rank: m.iesportsRank || m.riotRank || undefined,
+                              tier: m.iesportsTier || m.riotTier || undefined,
+                            })),
+                            avgSkill: t.avgSkillLevel,
+                          }));
+                          setShuffleVideoTeams(videoTeams);
+                        }}>Generate Shuffle Video</button>
+                      )}
                     </div>
+
+                    {/* Shuffle Video Player */}
+                    {shuffleVideoTeams && shuffleVideoTeams.length > 0 && (
+                      <div style={{ padding: 16, background: "#0a0a0f", borderRadius: 10, border: "1px solid #3CCBFF33", gridColumn: "1 / -1" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                          <span style={{ ...smallLabel, color: "#3CCBFF" }}>Shuffle Reveal Video</span>
+                          <button style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14 }} onClick={() => setShuffleVideoTeams(null)}>✕</button>
+                        </div>
+                        <ShuffleVideoPlayer
+                          tournamentName={tournaments.find(t => t.id === tournamentId)?.name || "Tournament"}
+                          teams={shuffleVideoTeams}
+                          teamCount={shuffleVideoTeams.length}
+                        />
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <div style={{ fontSize: "0.65rem", color: "#555" }}>
+                            {shuffleVideoTeams.length} teams · {Math.round(getShuffleDuration(shuffleVideoTeams.length) / 30)}s · Use screen recording to capture
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Swiss Pairings */}
                     <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
                       <span style={smallLabel}>Generate Swiss Pairings</span>
