@@ -109,12 +109,11 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Snake draft shuffle (by iesportsRating — highest first, fallback to riotTier) ──
-    const sorted = [...players].sort((a, b) => {
-      const aRating = (a as any).iesportsRating || a.riotTier * 100;
-      const bRating = (b as any).iesportsRating || b.riotTier * 100;
-      return bRating - aRating;
-    });
+    // ── Rating function ──
+    const rating = (p: typeof players[0]) => p.iesportsRating || p.riotTier * 100 || 0;
+
+    // ── Step 1: Sort players by rating (highest first) ──
+    const sorted = [...players].sort((a, b) => rating(b) - rating(a));
 
     const teams: {
       teamIndex: number;
@@ -128,20 +127,64 @@ export async function POST(req: NextRequest) {
       totalSkill: 0,
     }));
 
-    let forward = true;
-    let idx = 0;
-
+    // ── Step 2: Greedy assignment — place each player on the weakest team ──
     for (const player of sorted) {
-      teams[idx].members.push(player);
-      teams[idx].totalSkill += (player.iesportsRating || player.riotTier * 100);
-
-      if (forward) {
-        idx++;
-        if (idx >= numTeams) { idx = numTeams - 1; forward = false; }
-      } else {
-        idx--;
-        if (idx < 0) { idx = 0; forward = true; }
+      // Find team with lowest total skill (break ties by fewer members)
+      let minIdx = 0;
+      for (let t = 1; t < numTeams; t++) {
+        if (teams[t].totalSkill < teams[minIdx].totalSkill ||
+            (teams[t].totalSkill === teams[minIdx].totalSkill && teams[t].members.length < teams[minIdx].members.length)) {
+          minIdx = t;
+        }
       }
+      teams[minIdx].members.push(player);
+      teams[minIdx].totalSkill += rating(player);
+    }
+
+    // ── Step 3: Swap optimization — reduce max-min spread ──
+    const getSpread = () => {
+      const avgs = teams.map(t => t.members.length > 0 ? t.totalSkill / t.members.length : 0);
+      return Math.max(...avgs) - Math.min(...avgs);
+    };
+
+    for (let pass = 0; pass < 20; pass++) {
+      let improved = false;
+      for (let i = 0; i < numTeams; i++) {
+        for (let j = i + 1; j < numTeams; j++) {
+          for (let pi = 0; pi < teams[i].members.length; pi++) {
+            for (let pj = 0; pj < teams[j].members.length; pj++) {
+              const rI = rating(teams[i].members[pi]);
+              const rJ = rating(teams[j].members[pj]);
+              if (rI === rJ) continue;
+
+              // Simulate swap
+              const newTotalI = teams[i].totalSkill - rI + rJ;
+              const newTotalJ = teams[j].totalSkill - rJ + rI;
+              const newAvgI = newTotalI / teams[i].members.length;
+              const newAvgJ = newTotalJ / teams[j].members.length;
+
+              const oldAvgs = teams.map(t => t.members.length > 0 ? t.totalSkill / t.members.length : 0);
+              const newAvgs = [...oldAvgs];
+              newAvgs[i] = newAvgI;
+              newAvgs[j] = newAvgJ;
+
+              const oldSpread = Math.max(...oldAvgs) - Math.min(...oldAvgs);
+              const newSpread = Math.max(...newAvgs) - Math.min(...newAvgs);
+
+              if (newSpread < oldSpread - 1) {
+                // Swap
+                const tmp = teams[i].members[pi];
+                teams[i].members[pi] = teams[j].members[pj];
+                teams[j].members[pj] = tmp;
+                teams[i].totalSkill = newTotalI;
+                teams[j].totalSkill = newTotalJ;
+                improved = true;
+              }
+            }
+          }
+        }
+      }
+      if (!improved) break;
     }
 
     // ── Write teams to Firestore ────────────────────────────────────────────
@@ -181,12 +224,19 @@ export async function POST(req: NextRequest) {
 
     await batch.commit();
 
+    // ── Balance stats ──
+    const avgs = teamSummaries.map(t => t.avgSkill);
+    const spread = Math.round((Math.max(...avgs) - Math.min(...avgs)) * 100) / 100;
+    const mean = avgs.reduce((a, b) => a + b, 0) / avgs.length;
+    const stdDev = Math.round(Math.sqrt(avgs.reduce((s, v) => s + (v - mean) ** 2, 0) / avgs.length) * 100) / 100;
+
     return NextResponse.json({
       success: true,
       totalPlayers: players.length,
       teamCount: numTeams,
       teams: teamSummaries,
       deletedExisting: !!deleteExisting,
+      balance: { spread, stdDev, mean: Math.round(mean * 100) / 100 },
     });
   } catch (e: any) {
     console.error("Shuffle teams error:", e);
