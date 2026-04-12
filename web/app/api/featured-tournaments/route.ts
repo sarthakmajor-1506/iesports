@@ -3,11 +3,12 @@ import { adminDb } from "@/lib/firebaseAdmin";
 
 export async function GET() {
   try {
-    // ── Dota 2 + Valorant: fetch in parallel ──
+    // ── Dota 2 + Valorant + CS2: fetch in parallel ──
     const now = new Date();
-    const [dotaSnap, valSnap] = await Promise.all([
+    const [dotaSnap, valSnap, cs2Snap] = await Promise.all([
       adminDb.collection("tournaments").get(),
       adminDb.collection("valorantTournaments").get(),
+      adminDb.collection("cs2Tournaments").get(),
     ]);
     const dotaAll = dotaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const dotaFeatured = dotaAll
@@ -27,6 +28,20 @@ export async function GET() {
         .filter((t: any) => !t.isTestTournament && valIsEnded(t))
         .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
       if (valEnded.length > 0) valResult = valEnded[0];
+    }
+
+    // ── CS2: featured ──
+    const cs2All = cs2Snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const cs2IsEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
+    const cs2Featured = cs2All
+      .filter((t: any) => !t.isTestTournament && !cs2IsEnded(t))
+      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    let cs2Result = cs2Featured.length > 0 ? cs2Featured[0] : null;
+    if (!cs2Result) {
+      const cs2Ended = cs2All
+        .filter((t: any) => !t.isTestTournament && cs2IsEnded(t))
+        .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      if (cs2Ended.length > 0) cs2Result = cs2Ended[0];
     }
 
     // ── Completed tournaments for "Recent Results" section ──
@@ -109,6 +124,7 @@ export async function GET() {
     return NextResponse.json({
       dota: dotaFeatured.length > 0 ? dotaFeatured[0] : null,
       valorant: valResult,
+      cs2: cs2Result,
       completedValorant: completedVal,
       completedDota: completedDota2,
     });
