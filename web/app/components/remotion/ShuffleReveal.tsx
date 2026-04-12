@@ -164,17 +164,48 @@ function TeamDraftScene({ frame, theme, team, teamIndex, fps, revealedTeams }: {
   const inSpotlight = playerLocalFrame < spotlightEnd && !inHoldPhase;
   const inFly = playerLocalFrame >= spotlightEnd && !inHoldPhase;
 
-  // Team card (right side) — always visible, fades in at start
+  // Team card — always visible, fades in at start
   const cardOpacity = fade(frame, 0, 12);
-  const cardScale = frame >= 0 ? spring({ frame, fps, config: { damping: 14, stiffness: 60 } }) : 0;
+  const cardEnterScale = frame >= 0 ? spring({ frame, fps, config: { damping: 14, stiffness: 60 } }) : 0;
 
   // Layout positions (1920x1080)
-  const cardX = 1160;
-  const cardY = 120;
+  const rightX = 1160;
+  const rightY = 120;
   const cardW = 540;
-  const cardHeaderH = 70;   // team header + divider
-  const slotH = 52;         // height per player slot
-  const slotPadTop = cardY + cardHeaderH + 28; // top of first slot
+  const cardHeaderH = 70;
+  const slotH = 52;
+  const slotPadTop = rightY + cardHeaderH + 28;
+
+  // Hold phase animation: right → center (expand) → left (shrink to sidebar)
+  const holdFrame = frame - totalDraftFrames;
+  const expandPhase = inHoldPhase ? interpolate(holdFrame, [0, 15], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const holdPhase = inHoldPhase ? interpolate(holdFrame, [15, 55], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const shrinkPhase = inHoldPhase ? interpolate(holdFrame, [55, TEAM_HOLD_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+  const shrinkEased = 1 - Math.pow(1 - shrinkPhase, 3);
+
+  // Card position: right → center → left
+  const centerX = 660;
+  const centerY = 140;
+  const expandedScale = 1.15;
+
+  let cardX = rightX;
+  let cardY = rightY;
+  let cardScale = Math.min(cardEnterScale, 1);
+
+  if (inHoldPhase) {
+    if (shrinkPhase > 0) {
+      // Shrinking to left sidebar
+      cardX = interpolate(shrinkEased, [0, 1], [centerX, -600]);
+      cardY = interpolate(shrinkEased, [0, 1], [centerY, 200]);
+      cardScale = interpolate(shrinkEased, [0, 1], [expandedScale, 0.3]);
+    } else {
+      // Expanding to center
+      const expandEased = 1 - Math.pow(1 - expandPhase, 2);
+      cardX = interpolate(expandEased, [0, 1], [rightX, centerX]);
+      cardY = interpolate(expandEased, [0, 1], [rightY, centerY]);
+      cardScale = interpolate(expandEased, [0, 1], [1, expandedScale]);
+    }
+  }
 
   // Spotlight: true center of screen
   const spotCenterX = 960;
@@ -197,8 +228,8 @@ function TeamDraftScene({ frame, theme, team, teamIndex, fps, revealedTeams }: {
         const player = members[currentPlayerIdx];
         const enterScale = spring({ frame: Math.max(0, playerLocalFrame), fps, config: { damping: 12, stiffness: 100 } });
 
-        // Target: exact position of this player's slot in the team card
-        const targetX = cardX + 48;  // left edge of avatar in slot
+        // Target: exact position of this player's slot in the team card (right side during draft)
+        const targetX = rightX + 48;
         const targetY = slotPadTop + currentPlayerIdx * (slotH + 8) + slotH / 2;
 
         // Fly: use spring for organic feel
@@ -265,13 +296,14 @@ function TeamDraftScene({ frame, theme, team, teamIndex, fps, revealedTeams }: {
         );
       })()}
 
-      {/* ── RIGHT: Team card (builds progressively) ── */}
+      {/* ── Team card (right during draft, center during hold, shrinks to left) ── */}
       <div style={{
         position: "absolute", left: cardX, top: cardY, width: cardW,
-        opacity: cardOpacity, transform: `scale(${Math.min(cardScale, 1)})`,
-        background: theme.bgCard, border: `1px solid rgba(${theme.rgb}, 0.15)`,
+        opacity: cardOpacity * (shrinkPhase > 0.9 ? fadeOut(frame, totalDraftFrames + TEAM_HOLD_FRAMES - 4, 4) : 1),
+        transform: `scale(${cardScale})`, transformOrigin: "top left",
+        background: theme.bgCard, border: `1px solid rgba(${theme.rgb}, ${inHoldPhase && shrinkPhase === 0 ? 0.3 : 0.15})`,
         borderRadius: 20, padding: "28px 32px",
-        boxShadow: `0 16px 60px rgba(0,0,0,0.5), 0 0 30px rgba(${theme.rgb}, 0.06)`,
+        boxShadow: inHoldPhase && shrinkPhase === 0 ? `0 20px 80px rgba(0,0,0,0.6), 0 0 60px rgba(${theme.rgb}, 0.15)` : `0 16px 60px rgba(0,0,0,0.5), 0 0 30px rgba(${theme.rgb}, 0.06)`,
       }}>
         {/* Team number watermark */}
         <div style={{ position: "absolute", top: -14, right: 20, fontSize: 120, fontWeight: 900, color: `rgba(${theme.rgb}, 0.05)`, lineHeight: 1 }}>
@@ -355,8 +387,8 @@ function PreviousTeamsSidebar({ theme, revealedTeams, currentTeamIndex }: { them
   const visible = revealedTeams.slice(startIdx);
 
   return (
-    <div style={{ position: "absolute", left: 24, top: 80, bottom: 40, width: 460, display: "flex", flexDirection: "column", gap: 12, justifyContent: "flex-start", zIndex: 10, overflow: "hidden" }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 4, textTransform: "uppercase", marginBottom: 6 }}>
+    <div style={{ position: "absolute", left: 24, top: 80, bottom: 30, width: 520, display: "flex", flexDirection: "column", gap: 12, justifyContent: "flex-start", zIndex: 10, overflow: "hidden" }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 4, textTransform: "uppercase", marginBottom: 6 }}>
         Teams Revealed ({revealedTeams.length})
       </div>
       {visible.map((team, vi) => {
@@ -366,16 +398,16 @@ function PreviousTeamsSidebar({ theme, revealedTeams, currentTeamIndex }: { them
           <div key={actualIdx} style={{
             background: isLatest ? `rgba(${theme.rgb}, 0.08)` : "rgba(255,255,255,0.03)",
             border: `1px solid ${isLatest ? `rgba(${theme.rgb}, 0.25)` : "rgba(255,255,255,0.08)"}`,
-            borderRadius: 14, padding: "14px 18px",
+            borderRadius: 14, padding: "14px 20px",
           }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: theme.accent, letterSpacing: 3, textTransform: "uppercase" }}>Team {actualIdx + 1}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.teamName}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, letterSpacing: 3, textTransform: "uppercase" }}>Team {actualIdx + 1}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.teamName}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {team.members.slice(0, 5).map((p, j) => (
-                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, color: "rgba(255,255,255,0.75)" }}>
-                  {p.avatar ? <Img src={p.avatar} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 26, height: 26, borderRadius: "50%", background: `rgba(${theme.rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: theme.accent }}>{(p.name || "?")[0].toUpperCase()}</div>}
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 18, color: "rgba(255,255,255,0.75)" }}>
+                  {p.avatar ? <Img src={p.avatar} style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", background: `rgba(${theme.rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: theme.accent }}>{(p.name || "?")[0].toUpperCase()}</div>}
                   <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name}</span>
-                  {p.rank && <span style={{ fontSize: 12, color: `rgba(${theme.rgb}, 0.6)`, fontWeight: 700 }}>{p.rank}</span>}
+                  {p.rank && <span style={{ fontSize: 13, color: `rgba(${theme.rgb}, 0.6)`, fontWeight: 700 }}>{p.rank}</span>}
                 </div>
               ))}
             </div>
