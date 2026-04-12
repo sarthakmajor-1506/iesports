@@ -81,14 +81,20 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Batch-fetch user docs to get riotPuuid
-    const userDocs = await Promise.all(
-      rawPlayers.map(p => adminDb.collection("users").doc(p.uid).get())
-    );
-    const players = rawPlayers.map((p, i) => ({
-      ...p,
-      riotPuuid: userDocs[i].data()?.riotPuuid || "",
-    }));
+    // Batch-fetch user docs to get riotPuuid + current rank data
+    const userRefs = rawPlayers.map(p => adminDb.collection("users").doc(p.uid));
+    const userDocs = await adminDb.getAll(...userRefs);
+    const players = rawPlayers.map((p, i) => {
+      const ud = userDocs[i].data();
+      if (!ud) return { ...p };
+      return {
+        ...p,
+        riotPuuid: ud.riotPuuid || "",
+        iesportsRating: ud.iesportsRating || p.iesportsRating || 0,
+        riotRank: ud.iesportsRank || ud.riotRank || p.riotRank || "",
+        riotTier: ud.iesportsTier || ud.riotTier || p.riotTier || 0,
+      };
+    });
 
 
     if (players.length === 0) {
