@@ -382,23 +382,26 @@ function TeamDraftScene({ frame, theme, team, teamIndex, fps, revealedTeams }: {
 
 function PreviousTeamsSidebar({ theme, revealedTeams, currentTeamIndex }: { theme: Theme; revealedTeams: ShuffleTeam[]; currentTeamIndex: number }) {
   if (revealedTeams.length === 0) return null;
-  const maxVisible = 5;
+  // Show only the 3 most recent teams, anchored to bottom so latest is always visible
+  const maxVisible = 3;
   const startIdx = Math.max(0, revealedTeams.length - maxVisible);
   const visible = revealedTeams.slice(startIdx);
 
   return (
-    <div style={{ position: "absolute", left: 24, top: 80, bottom: 30, width: 520, display: "flex", flexDirection: "column", gap: 12, justifyContent: "flex-start", zIndex: 10, overflow: "hidden" }}>
+    <div style={{ position: "absolute", left: 24, top: 80, bottom: 30, width: 520, display: "flex", flexDirection: "column", gap: 12, justifyContent: "flex-end", zIndex: 10, overflow: "hidden" }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 4, textTransform: "uppercase", marginBottom: 6 }}>
         Teams Revealed ({revealedTeams.length})
       </div>
       {visible.map((team, vi) => {
         const actualIdx = startIdx + vi;
         const isLatest = actualIdx === revealedTeams.length - 1;
+        // Older teams fade out slightly
+        const ageOpacity = isLatest ? 1 : vi === visible.length - 2 ? 0.7 : 0.45;
         return (
           <div key={actualIdx} style={{
             background: isLatest ? `rgba(${theme.rgb}, 0.08)` : "rgba(255,255,255,0.03)",
-            border: `1px solid ${isLatest ? `rgba(${theme.rgb}, 0.25)` : "rgba(255,255,255,0.08)"}`,
-            borderRadius: 14, padding: "14px 20px",
+            border: `1px solid ${isLatest ? `rgba(${theme.rgb}, 0.25)` : "rgba(255,255,255,0.06)"}`,
+            borderRadius: 14, padding: "14px 20px", opacity: ageOpacity,
           }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, letterSpacing: 3, textTransform: "uppercase" }}>Team {actualIdx + 1}</div>
             <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.teamName}</div>
