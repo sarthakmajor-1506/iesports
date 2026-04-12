@@ -1169,9 +1169,15 @@ function DotaTournamentDetailInner() {
                     crusader_archon:  { bg: "rgba(161,43,31,0.10)", border: "rgba(161,43,31,0.30)", text: "#A12B1F", label: "Crusader – Archon" },
                     herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
                   };
+                  const computeBracket = (rankTier: number) => {
+                    if (!rankTier || rankTier <= 25) return "herald_guardian";
+                    if (rankTier <= 45) return "crusader_archon";
+                    if (rankTier <= 65) return "legend_ancient";
+                    return "divine_immortal";
+                  };
                   const grouped: Record<string, any[]> = {};
                   players.forEach((p: any) => {
-                    const bracket = p.dotaBracket || "herald_guardian";
+                    const bracket = p.dotaRankTier ? computeBracket(p.dotaRankTier) : (p.dotaBracket || "herald_guardian");
                     if (!grouped[bracket]) grouped[bracket] = [];
                     grouped[bracket].push(p);
                   });
@@ -1371,10 +1377,16 @@ function DotaTournamentDetailInner() {
                     crusader_archon:  { bg: "rgba(161,43,31,0.10)", border: "rgba(161,43,31,0.30)", text: "#A12B1F", label: "Crusader – Archon" },
                     herald_guardian:  { bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.30)", text: "#6b7280", label: "Herald – Guardian" },
                   };
+                  const computeBracketLb = (rankTier: number) => {
+                    if (!rankTier || rankTier <= 25) return "herald_guardian";
+                    if (rankTier <= 45) return "crusader_archon";
+                    if (rankTier <= 65) return "legend_ancient";
+                    return "divine_immortal";
+                  };
                   const playerBracketMap: Record<string, string> = {};
                   const playerAvatarMap: Record<string, string> = {};
                   players.forEach((p: any) => {
-                    if (p.uid && p.dotaBracket) playerBracketMap[p.uid] = p.dotaBracket;
+                    if (p.uid) playerBracketMap[p.uid] = p.dotaRankTier ? computeBracketLb(p.dotaRankTier) : (p.dotaBracket || "herald_guardian");
                     if (p.uid && p.steamAvatar) playerAvatarMap[p.uid] = p.steamAvatar;
                   });
                   const kdaScore = (p: any) => ((p.totalKills || 0) + 0.5 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
