@@ -48,8 +48,8 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
       const el = container as HTMLElement;
 
-      // Capture every 6th frame for performance (interpolated during encode)
-      const STEP = 6;
+      // Capture every 2nd frame for smooth motion (15 unique fps)
+      const STEP = 2;
       const captureCount = Math.ceil(totalFrames / STEP);
       const captureScale = ENCODE_W / el.clientWidth;
 
