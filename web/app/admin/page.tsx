@@ -190,7 +190,16 @@ export default function AdminPanel() {
       }
     }));
 
-    // Try to fetch the previous tournament's leaderboard
+    // Build a lookup of current members by uid so we can enrich MVP entries
+    // (which come from the leaderboard and may lack fresh avatar/rank data)
+    // with the player's up-to-date profile for this tournament.
+    const currentMembersByUid: Record<string, any> = {};
+    teams.forEach(t => (t.members || []).forEach((m: any) => {
+      if (m.uid) currentMembersByUid[m.uid] = m;
+    }));
+
+    // Try to fetch the previous tournament's REAL leaderboard (actual match
+    // performance, sorted by ACS) and filter to players still in this league.
     const prevId = PREVIOUS_TOURNAMENT_MAP[tournamentId];
     let mvpUidSet: Set<string> = new Set();
     let mvps: import("@/app/components/remotion/ShuffleReveal").ShufflePlayer[] | undefined;
@@ -199,21 +208,38 @@ export default function AdminPanel() {
         const res = await fetch(`/api/tournaments/detail?id=${encodeURIComponent(prevId)}&game=valorant`);
         if (res.ok) {
           const prev = await res.json();
-          const prevPlayers: any[] = prev.players || [];
-          const ranked = prevPlayers
-            .filter(p => p.uid && currentUidSet.has(p.uid))
-            .sort((a, b) => (b.iesportsRating || b.iesportsTier || b.riotTier || 0) - (a.iesportsRating || a.iesportsTier || a.riotTier || 0))
+          const prevLeaderboard: any[] = prev.leaderboard || [];
+          // Sort by ACS (canonical Valorant MVP metric), fall back to score.
+          // Keep only entries whose uid is in the current registered roster.
+          const ranked = prevLeaderboard
+            .filter(lb => lb.uid && currentUidSet.has(lb.uid))
+            .sort((a, b) => {
+              const aAcs = a.acs ?? 0;
+              const bAcs = b.acs ?? 0;
+              if (bAcs !== aAcs) return bAcs - aAcs;
+              return (b.totalScore ?? 0) - (a.totalScore ?? 0);
+            })
             .slice(0, 5);
-          mvpUidSet = new Set(ranked.map(p => p.uid));
-          mvps = ranked.map(p => ({
-            uid: p.uid,
-            name: p.riotGameName || p.steamName || "Player",
-            tag: p.riotTagLine || undefined,
-            avatar: p.riotAvatar || undefined,
-            rank: p.iesportsRank || p.riotRank || undefined,
-            tier: p.iesportsTier || p.riotTier || undefined,
-            isMvp: true,
-          }));
+
+          if (ranked.length > 0) {
+            mvpUidSet = new Set(ranked.map(p => p.uid));
+            mvps = ranked.map(lb => {
+              const cur = currentMembersByUid[lb.uid] || {};
+              return {
+                uid: lb.uid,
+                // Prefer the CURRENT tournament's riot display so avatars stay fresh
+                name: cur.riotGameName || lb.name || "Player",
+                tag: cur.riotTagLine || lb.tag || undefined,
+                avatar: cur.riotAvatar || undefined,
+                rank: cur.iesportsRank || cur.riotRank || undefined,
+                tier: cur.iesportsTier || cur.riotTier || undefined,
+                isMvp: true,
+              };
+            });
+            console.log(`[ShuffleVideo] Loaded ${ranked.length} MVPs from ${prevId} leaderboard (by ACS)`);
+          } else {
+            console.warn(`[ShuffleVideo] ${prevId} leaderboard had no entries with uids matching the current roster`);
+          }
         }
       } catch (e) {
         console.warn("[ShuffleVideo] failed to fetch previous tournament MVPs:", e);

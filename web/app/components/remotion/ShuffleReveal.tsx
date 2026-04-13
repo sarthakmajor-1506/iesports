@@ -892,9 +892,12 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
       }} />
       <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center" }}>
         {members.map((player, i) => {
-          const playerDoneFrame = (i + 1) * PLAYER_DRAFT_FRAMES;
-          const isPlaced = frame >= playerDoneFrame || inHoldPhase;
-          const justPlaced = frame >= playerDoneFrame && frame < playerDoneFrame + 12;
+          // The player appears in their slot at the START of the middle-band
+          // spotlight for that slot, not at the end — so the bottom card is
+          // never "missing" the player who's currently being showcased above.
+          const playerStartFrame = i * PLAYER_DRAFT_FRAMES;
+          const isPlaced = frame >= playerStartFrame || inHoldPhase;
+          const justPlaced = frame >= playerStartFrame && frame < playerStartFrame + 12;
 
           if (!isPlaced) {
             return (
@@ -909,8 +912,8 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
             );
           }
 
-          const placeOp = fade(frame, playerDoneFrame, 8);
-          const placeScale = interpolate(frame, [playerDoneFrame, playerDoneFrame + 10], [0.7, 1], clamp);
+          const placeOp = fade(frame, playerStartFrame, 8);
+          const placeScale = interpolate(frame, [playerStartFrame, playerStartFrame + 10], [0.7, 1], clamp);
           const rc = player.rank ? getRankPalette(player.rank) : null;
           const borderColor = player.isMvp
             ? theme.gold
