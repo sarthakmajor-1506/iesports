@@ -125,39 +125,76 @@ export default function ShuffleVideoPlayer({
       const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
       const el = container as HTMLElement;
 
+      // ── Find Remotion's actual composition root ──────────────────────────
+      // The Player wraps the composition in a div with width: <compositionWidth>
+      // and `transform: scale(...)` to fit the visible preview. We need to
+      // capture from THIS element (not the outer player container) for two
+      // reasons:
+      //   1. html2canvas v1.4.1 doesn't traverse CSS transforms correctly,
+      //      so absolute-positioned children of a scaled parent end up drawn
+      //      OUTSIDE the captured rect — producing the "blue screen with
+      //      only the persistent overlays visible" bug.
+      //   2. Capturing from the inner composition root automatically excludes
+      //      the player's play/seek controls UI, which were getting baked
+      //      into the downloaded MP4.
+      const findCompositionRoot = (root: HTMLElement): HTMLElement | null => {
+        const all = root.querySelectorAll<HTMLElement>("div");
+        for (const node of Array.from(all)) {
+          const w = parseFloat(node.style.width || "");
+          const h = parseFloat(node.style.height || "");
+          if (w === ENCODE_W && h === ENCODE_H) return node;
+        }
+        return null;
+      };
+      const compositionRoot = findCompositionRoot(el);
+      if (!compositionRoot) {
+        throw new Error("Could not locate Remotion composition root (width=" + ENCODE_W + "). Player DOM may have changed.");
+      }
+
+      // Neutralize the scale transform so children render at their native
+      // 1080×1920 coordinates for the duration of the capture pass.
+      const origTransform = compositionRoot.style.transform;
+      const origTransformOrigin = compositionRoot.style.transformOrigin;
+      compositionRoot.style.transform = "none";
+      compositionRoot.style.transformOrigin = "0 0";
+
       // Capture every 2nd frame; each unique frame is duplicated in the encode pass.
       const STEP = 2;
       const captureCount = Math.ceil(totalFrames / STEP);
-      const captureScale = ENCODE_W / el.clientWidth;
 
       setStatus(`Capturing ${captureCount} keyframes...`);
 
       const bitmaps: ImageBitmap[] = [];
       const BATCH = 50;
 
-      for (let k = 0; k < captureCount; k++) {
-        const f = Math.min(k * STEP, totalFrames - 1);
-        player.seekTo(f);
-        // 2 RAFs (~32ms) was too short — Remotion didn't always finish reconciling
-        // and the browser hadn't painted, so the shuffle vortex and start of the
-        // team-draft scene captured as missing/black. 60ms is a safe margin.
-        await new Promise<void>(r => setTimeout(r, 60));
-        try {
-          const canvas = await html2canvas(el, {
-            width: el.clientWidth, height: el.clientHeight,
-            scale: captureScale, backgroundColor: "#0A0F2A", logging: false,
-            useCORS: true, allowTaint: true,
-          });
-          bitmaps.push(await createImageBitmap(canvas));
-        } catch (captureErr) {
-          console.warn("Frame capture failed at", k, captureErr);
-          if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
+      try {
+        for (let k = 0; k < captureCount; k++) {
+          const f = Math.min(k * STEP, totalFrames - 1);
+          player.seekTo(f);
+          // 60ms gives Remotion time to reconcile + the browser to paint.
+          // 2 RAFs (~32ms) was too short and produced black/missing-content frames.
+          await new Promise<void>(r => setTimeout(r, 60));
+          try {
+            const canvas = await html2canvas(compositionRoot, {
+              width: ENCODE_W, height: ENCODE_H,
+              scale: 1, backgroundColor: "#0A0F2A", logging: false,
+              useCORS: true, allowTaint: true,
+            });
+            bitmaps.push(await createImageBitmap(canvas));
+          } catch (captureErr) {
+            console.warn("Frame capture failed at", k, captureErr);
+            if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
+          }
+          setProgress(Math.round(((k + 1) / captureCount) * 45));
+          setStatus(`Capturing frame ${k + 1}/${captureCount}`);
+          if (k % BATCH === 0 && k > 0) {
+            await new Promise(r => setTimeout(r, 10));
+          }
         }
-        setProgress(Math.round(((k + 1) / captureCount) * 45));
-        setStatus(`Capturing frame ${k + 1}/${captureCount}`);
-        if (k % BATCH === 0 && k > 0) {
-          await new Promise(r => setTimeout(r, 10));
-        }
+      } finally {
+        // Always restore the player's original transform, even if capture errored.
+        compositionRoot.style.transform = origTransform;
+        compositionRoot.style.transformOrigin = origTransformOrigin;
       }
 
       if (bitmaps.length === 0) throw new Error("No frames captured. Check browser console for CORS errors.");
