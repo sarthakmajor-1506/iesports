@@ -1382,18 +1382,18 @@ function ValorantTournamentDetailInner() {
                 {id === "league-of-rising-stars-ascension" && (
                   <div style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 16px", marginBottom: 18,
-                    background: "linear-gradient(90deg, rgba(127,255,0,0.10), rgba(127,255,0,0.04))",
-                    border: "1px solid rgba(127,255,0,0.35)", borderRadius: 12,
+                    padding: "14px 18px", marginBottom: 18,
+                    background: "linear-gradient(90deg, rgba(127,255,0,0.12), rgba(127,255,0,0.04))",
+                    border: "1px solid rgba(127,255,0,0.38)", borderRadius: 12,
                   }}>
                     <span style={{
                       display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      width: 28, height: 28, borderRadius: "50%",
-                      background: "rgba(127,255,0,0.18)", color: "#7FFF00", fontWeight: 900, fontSize: 16,
+                      width: 30, height: 30, borderRadius: "50%",
+                      background: "rgba(127,255,0,0.20)", color: "#7FFF00", fontWeight: 900, fontSize: 18,
                     }}>✓</span>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: "#7FFF00", letterSpacing: 0.5 }}>Issue Resolved by Admin</span>
-                      <span style={{ fontSize: 12, color: "#B6D9A0" }}>Team imbalance from the earlier shuffle has been corrected. Latest rosters are live.</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: "#7FFF00", letterSpacing: 0.4 }}>Rank reports resolved by admin and teams are created</span>
+                      <span style={{ fontSize: 12, color: "#B6D9A0" }}>All flagged player ranks have been reviewed, the shuffle algorithm has been re-run, and the latest balanced rosters are live.</span>
                     </div>
                   </div>
                 )}
