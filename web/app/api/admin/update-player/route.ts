@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
       await recalcTiers(tournamentId);
     }
 
+    // 4. Refresh denormalized playersSnapshot on the tournament doc (Valorant only).
+    // Any field touched in tournamentUpdates lives in the snapshot, so resync whenever
+    // we wrote anything to soloPlayers — even when recalcTiers wasn't triggered.
+    if (col === "valorantTournaments" && Object.keys(tournamentUpdates).length > 0) {
+      const { syncPlayerSnapshot } = await import("@/lib/valorantPlayerSnapshot");
+      await syncPlayerSnapshot(tournamentId);
+    }
+
     return NextResponse.json({ success: true, updated: safeUpdates });
   } catch (e: any) {
     console.error("update-player error:", e.message);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { recalcTiers } from "@/lib/recalcTiers";
+import { syncPlayerSnapshot } from "@/lib/valorantPlayerSnapshot";
 import { seedRating, floorCheck, ratingToRank, ratingToTier } from "@/lib/elo";
 import { sendRegistrationDM } from "@/lib/discord";
 
@@ -197,6 +198,9 @@ export async function POST(req: NextRequest) {
 
     // ── Recalculate tiers for all players based on quantiles ──────────────
     await recalcTiers(tournamentId);
+
+    // ── Refresh denormalized playersSnapshot on the tournament doc ────────
+    await syncPlayerSnapshot(tournamentId);
 
     // ── Send registration DM (fire-and-forget — never blocks registration) ──
     const discordId = userData.discordId || (uid.startsWith("discord_") ? uid.replace("discord_", "") : "");

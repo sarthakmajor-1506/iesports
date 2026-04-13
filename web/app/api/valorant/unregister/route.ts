@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { recalcTiers } from "@/lib/recalcTiers";
+import { syncPlayerSnapshot } from "@/lib/valorantPlayerSnapshot";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
 
     // Recalculate tiers for remaining players
     await recalcTiers(tournamentId);
+
+    // Refresh denormalized playersSnapshot on the tournament doc
+    await syncPlayerSnapshot(tournamentId);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

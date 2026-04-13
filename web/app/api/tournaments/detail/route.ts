@@ -13,21 +13,51 @@ export async function GET(req: NextRequest) {
     const col = game === "valorant" ? "valorantTournaments" : game === "cs2" ? "cs2Tournaments" : "tournaments";
     const playersCol = game === "valorant" || game === "cs2" ? "soloPlayers" : "players";
 
-    const [tDoc, playersSnap, teamsSnap, standingsSnap, matchesSnap, lbSnap] = await Promise.all([
-      adminDb.collection(col).doc(id).get(),
-      adminDb.collection(col).doc(id).collection(playersCol).get(),
-      adminDb.collection(col).doc(id).collection("teams").orderBy("teamIndex").get(),
-      adminDb.collection(col).doc(id).collection("standings").get(),
-      adminDb.collection(col).doc(id).collection("matches").get(),
-      adminDb.collection(col).doc(id).collection("leaderboard").get(),
-    ]);
+    // For valorant we read the denormalized `playersSnapshot` from the tournament doc
+    // (1 read instead of 1 + N). For dota/cs2 and for valorant tournaments that haven't
+    // been migrated yet we fall back to fetching the full subcollection.
+    const tDocPromise = adminDb.collection(col).doc(id).get();
+    const teamsSnapPromise = adminDb.collection(col).doc(id).collection("teams").orderBy("teamIndex").get();
+    const standingsSnapPromise = adminDb.collection(col).doc(id).collection("standings").get();
+    const matchesSnapPromise = adminDb.collection(col).doc(id).collection("matches").get();
+    const lbSnapPromise = adminDb.collection(col).doc(id).collection("leaderboard").get();
 
+    const tDoc = await tDocPromise;
     if (!tDoc.exists) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
+    const tDocData = tDoc.data() || {};
 
-    const tournament = { id: tDoc.id, ...tDoc.data() };
-    let players: any[] = playersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Decide whether to use the embedded snapshot (valorant only, when present)
+    // or fetch the full subcollection.
+    const useSnapshot =
+      game === "valorant" && Array.isArray((tDocData as any).playersSnapshot);
+
+    let players: any[];
+    let teamsSnap: FirebaseFirestore.QuerySnapshot;
+    let standingsSnap: FirebaseFirestore.QuerySnapshot;
+    let matchesSnap: FirebaseFirestore.QuerySnapshot;
+    let lbSnap: FirebaseFirestore.QuerySnapshot;
+
+    if (useSnapshot) {
+      const cached = ((tDocData as any).playersSnapshot || []) as any[];
+      players = cached.map((p: any) => ({ id: p.uid, ...p }));
+      [teamsSnap, standingsSnap, matchesSnap, lbSnap] = await Promise.all([
+        teamsSnapPromise, standingsSnapPromise, matchesSnapPromise, lbSnapPromise,
+      ]);
+    } else {
+      const playersSnap = await adminDb.collection(col).doc(id).collection(playersCol).get();
+      players = playersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      [teamsSnap, standingsSnap, matchesSnap, lbSnap] = await Promise.all([
+        teamsSnapPromise, standingsSnapPromise, matchesSnapPromise, lbSnapPromise,
+      ]);
+    }
+
+    // Strip the embedded snapshot from the response — `players` already contains it,
+    // so sending it twice just bloats the payload.
+    const { playersSnapshot: _stripped, ...tournamentRest } = tDocData as any;
+    void _stripped;
+    const tournament = { id: tDoc.id, ...tournamentRest };
     const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const standings = standingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));

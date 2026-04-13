@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { ratingToRank, ratingToTier } from "@/lib/elo";
+import { syncPlayerSnapshotsForUser } from "@/lib/valorantPlayerSnapshot";
 
 /**
  * POST /api/admin/adjust-rating
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // Refresh the denormalized playersSnapshot on every tournament this user is in.
+    // Done after the soloPlayers updates above so each rebuild sees the new values.
+    await syncPlayerSnapshotsForUser(uid, registeredTournaments);
 
     // Create rank history entry
     await userRef.collection("rankHistory").add({

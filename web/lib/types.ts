@@ -317,6 +317,12 @@ export interface ValorantTournament {
   championTeamId?: string;
   championTeamName?: string;
   ownerId?: string;             // uid of cafe admin who owns this tournament
+  // Denormalized cache of the soloPlayers subcollection. Read by /api/tournaments/detail
+  // so the tournament page costs 1 read instead of 1 + N. Kept in sync by
+  // lib/valorantPlayerSnapshot.ts on every mutation. Sorted by iesportsTier desc.
+  // soloPlayers/{uid} remains the authoritative source of truth.
+  playersSnapshot?: ValorantSoloPlayer[];
+  playersSnapshotUpdatedAt?: string;
 }
 
 
@@ -352,6 +358,10 @@ export interface ValorantSoloPlayer {
   riotAvatar: string;
   riotRank: string;                         // human-readable, e.g. "Diamond 3"
   riotTier: number;                         // raw tier number for sorting/quartile computation
+  iesportsRating?: number;                  // ELO-like rating, source of truth for matchmaking
+  iesportsRank?: string;                    // human-readable derived from rating
+  iesportsTier?: number;                    // numeric tier derived from rating
+  skillLevel?: number;                      // 1-4 quartile, populated by recalcTiers
   bracket?: RiotBracket | null;             // null during registration, assigned post-reg
   registeredAt: string;                     // ISO timestamp
 }// ══════════════════════════════════════════════════════════════════════════════
