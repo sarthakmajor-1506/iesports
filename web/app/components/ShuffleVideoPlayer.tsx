@@ -149,6 +149,48 @@ export default function ShuffleVideoPlayer({
         throw new Error("Could not locate Remotion composition root (width=" + ENCODE_W + "). Player DOM may have changed.");
       }
 
+      // ── Neutralize Remotion's preview-fitting transform via !important CSS ─
+      // Remotion's Player applies `transform: scale(0.5)`, `marginLeft: -270px`,
+      // `marginTop: -480px` on the composition root to fit the 540px-wide preview.
+      // Both html2canvas and html2canvas-pro read the element's TRANSFORMED
+      // bounding rect (540×960), so a 1080×1920 capture lands content in only
+      // the top-left quadrant.
+      //
+      // Setting these via DOM `style.transform = "none"` doesn't stick, because
+      // Remotion re-applies its inline style on every seek (~30 times during a
+      // capture). A stylesheet rule with `!important` beats React's plain inline
+      // style application, so the override survives every re-render.
+      const captureId = `__cap${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+      const rootClass = `${captureId}_root`;
+      const ancestorClass = `${captureId}_anc`;
+      const styleTag = document.createElement("style");
+      styleTag.textContent = `
+        .${rootClass} {
+          transform: none !important;
+          transform-origin: 0 0 !important;
+          margin-left: 0 !important;
+          margin-top: 0 !important;
+          overflow: visible !important;
+        }
+        .${ancestorClass} {
+          overflow: visible !important;
+        }
+      `;
+      document.head.appendChild(styleTag);
+      compositionRoot.classList.add(rootClass);
+      // Walk up to body so no clipping ancestor crops the capture
+      const ancestors: HTMLElement[] = [];
+      {
+        let p = compositionRoot.parentElement;
+        while (p && p !== document.body) {
+          ancestors.push(p);
+          p.classList.add(ancestorClass);
+          p = p.parentElement;
+        }
+      }
+      // Force layout to reflect the new styles before capture
+      void compositionRoot.offsetHeight;
+
       // Capture every 2nd frame; each unique frame is duplicated in the encode pass.
       const STEP = 2;
       const captureCount = Math.ceil(totalFrames / STEP);
@@ -158,33 +200,39 @@ export default function ShuffleVideoPlayer({
       const bitmaps: ImageBitmap[] = [];
       const BATCH = 50;
 
-      for (let k = 0; k < captureCount; k++) {
-        const f = Math.min(k * STEP, totalFrames - 1);
-        player.seekTo(f);
-        // 60ms gives Remotion time to reconcile + the browser to paint.
-        // 2 RAFs (~32ms) was too short and produced black/missing-content frames.
-        await new Promise<void>(r => setTimeout(r, 60));
-        try {
-          // html2canvas-pro reads the element's natural composition size
-          // (1080×1920) through the parent transform and renders correctly.
-          const canvas = await html2canvas(compositionRoot, {
-            width: ENCODE_W,
-            height: ENCODE_H,
-            backgroundColor: "#0A0F2A",
-            logging: false,
-            useCORS: true,
-            allowTaint: true,
-          });
-          bitmaps.push(await createImageBitmap(canvas));
-        } catch (captureErr) {
-          console.warn("Frame capture failed at", k, captureErr);
-          if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
+      try {
+        for (let k = 0; k < captureCount; k++) {
+          const f = Math.min(k * STEP, totalFrames - 1);
+          player.seekTo(f);
+          // 60ms gives Remotion time to reconcile + the browser to paint.
+          // 2 RAFs (~32ms) was too short and produced black/missing-content frames.
+          await new Promise<void>(r => setTimeout(r, 60));
+          try {
+            // No width/height — let html2canvas-pro use the element's natural
+            // bounding rect, which is now 1080×1920 because the !important CSS
+            // killed the scale transform and the negative centering margins.
+            const canvas = await html2canvas(compositionRoot, {
+              backgroundColor: "#0A0F2A",
+              logging: false,
+              useCORS: true,
+              allowTaint: true,
+            });
+            bitmaps.push(await createImageBitmap(canvas));
+          } catch (captureErr) {
+            console.warn("Frame capture failed at", k, captureErr);
+            if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
+          }
+          setProgress(Math.round(((k + 1) / captureCount) * 45));
+          setStatus(`Capturing frame ${k + 1}/${captureCount}`);
+          if (k % BATCH === 0 && k > 0) {
+            await new Promise(r => setTimeout(r, 10));
+          }
         }
-        setProgress(Math.round(((k + 1) / captureCount) * 45));
-        setStatus(`Capturing frame ${k + 1}/${captureCount}`);
-        if (k % BATCH === 0 && k > 0) {
-          await new Promise(r => setTimeout(r, 10));
-        }
+      } finally {
+        // Restore the live preview no matter how the capture loop exits
+        compositionRoot.classList.remove(rootClass);
+        for (const a of ancestors) a.classList.remove(ancestorClass);
+        if (styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
       }
 
       if (bitmaps.length === 0) throw new Error("No frames captured. Check browser console for CORS errors.");
