@@ -39,7 +39,12 @@ export interface ShuffleRevealProps {
 
 const FPS = 30;
 const INTRO_FRAMES = 90;
-const SHUFFLE_FRAMES = 120;
+// SHUFFLE: 40f sorting + 5×20f MVP showcase + 30f group shot = 170f
+const SHUFFLE_SORT_FRAMES = 40;
+const SHUFFLE_MVP_FRAMES = 20;
+const SHUFFLE_MVP_COUNT = 5;
+const SHUFFLE_GROUP_FRAMES = 30;
+const SHUFFLE_FRAMES = SHUFFLE_SORT_FRAMES + SHUFFLE_MVP_COUNT * SHUFFLE_MVP_FRAMES + SHUFFLE_GROUP_FRAMES;
 const PLAYER_DRAFT_FRAMES = 42;
 const TEAM_HOLD_FRAMES = 75;
 const OUTRO_FRAMES = 270;
@@ -56,13 +61,15 @@ const SAFE_CENTER_Y = SAFE_TOP + SAFE_H / 2;      // 800
 
 // Three bands stacked vertically inside the safe zone.
 // HEADER strip at the top of the safe zone carries the persistent logos during draft.
+// Bottom band is the BIGGEST band — that's the actively-drafting team and it
+// needs to be readable on a phone screen.
 const HEADER_H = 70;
-const TOP_H = 380;   // revealed-teams band
-const BOT_H = 270;   // current-team band
+const TOP_H = 380;   // revealed-teams band (kept same per request)
+const BOT_H = 480;   // current-team band — much bigger so phone viewers can read it
 const HEADER_Y = SAFE_TOP;
 const TOP_Y = SAFE_TOP + HEADER_H;
 const MID_Y = TOP_Y + TOP_H;
-const MID_H = SAFE_H - HEADER_H - TOP_H - BOT_H;  // 500
+const MID_H = SAFE_H - HEADER_H - TOP_H - BOT_H;  // 430
 const BOT_Y = MID_Y + MID_H;
 
 function getTeamFrames(memberCount: number) {
@@ -73,12 +80,51 @@ export function getShuffleDuration(teamCount: number, membersPerTeam = 5) {
   return INTRO_FRAMES + SHUFFLE_FRAMES + teamCount * getTeamFrames(membersPerTeam) + OUTRO_FRAMES;
 }
 
+// High-contrast palette — bright accents over dark bgs so text stays
+// readable on a phone reel. Each theme also carries a `glow` color used
+// for text-shadow halos on key headlines.
 const THEMES = {
-  valorant: { accent: "#3CCBFF", accentAlt: "#FF4655", bg: "#0A0F2A", bgCard: "#0d1530", rgb: "60,203,255" },
-  dota:     { accent: "#A12B1F", accentAlt: "#FF6B4A", bg: "#0a0e18", bgCard: "#0f1520", rgb: "161,43,31" },
-  cs2:      { accent: "#f0a500", accentAlt: "#FFD700", bg: "#0d0d0d", bgCard: "#151510", rgb: "240,165,0" },
+  valorant: {
+    accent: "#3CCBFF",
+    accentAlt: "#FF4655",
+    accentBright: "#5FE0FF",
+    gold: "#FFD700",
+    bg: "#0A0F2A",
+    bgCard: "#0d1530",
+    bgCardLight: "#162048",
+    rgb: "60,203,255",
+    glow: "rgba(95,224,255,0.55)",
+  },
+  dota: {
+    accent: "#FF6B4A",
+    accentAlt: "#FFD166",
+    accentBright: "#FF8B6A",
+    gold: "#FFD700",
+    bg: "#0a0e18",
+    bgCard: "#0f1520",
+    bgCardLight: "#1a2030",
+    rgb: "255,107,74",
+    glow: "rgba(255,139,106,0.55)",
+  },
+  cs2: {
+    accent: "#FFD700",
+    accentAlt: "#FFA500",
+    accentBright: "#FFE34D",
+    gold: "#FFE34D",
+    bg: "#0d0d0d",
+    bgCard: "#151510",
+    bgCardLight: "#202018",
+    rgb: "255,215,0",
+    glow: "rgba(255,227,77,0.55)",
+  },
 };
 type Theme = typeof THEMES.valorant;
+
+// Reusable text-glow helpers — used on every primary headline so text
+// reads against any background and feels "shiny".
+const glowText = (theme: Theme, intensity = 1) =>
+  `0 0 ${12 * intensity}px ${theme.glow}, 0 0 ${4 * intensity}px ${theme.glow}, 0 2px 6px rgba(0,0,0,0.7)`;
+const softShadow = "0 2px 8px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)";
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -126,41 +172,249 @@ function IntroScene({ frame, theme, tournamentName }: { frame: number; theme: Th
 }
 
 /* ═══════════════════════════════════════════════
-   SCENE 2: SHUFFLE
+   SCENE 2: SHUFFLE — sort + Top-5 MVP showcase
+   Phase 1 (0..SHUFFLE_SORT_FRAMES): cycling list of all players,
+       suggesting the system is sorting through everyone.
+   Phase 2 (sortEnd..mvpEnd): each Top-5 MVP is revealed one by one,
+       depicted as being pulled out of the list with their previous-
+       tournament achievement (their iesports rank).
+   Phase 3 (mvpEnd..end): all 5 MVPs visible as a row, brief hold
+       before the team-formation scenes start.
    ═══════════════════════════════════════════════ */
 
 function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[] }) {
-  const cards = useMemo(() => allPlayers.slice(0, 20).map((p, i) => {
-    const seed = (i * 137 + 42) % 100;
-    return { name: p.name, baseAngle: (i / Math.min(allPlayers.length, 20)) * Math.PI * 2, radius: 180 + (seed % 40) * 5, speed: 0.08 + (seed % 30) * 0.003 };
-  }), [allPlayers]);
+  // Sort by skill so the "MVPs" are the actual top players. Falls back to
+  // tier and name so the order is stable when ratings are missing.
+  const sorted = useMemo(() => {
+    const arr = [...allPlayers];
+    arr.sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0) || (a.name || "").localeCompare(b.name || ""));
+    return arr;
+  }, [allPlayers]);
 
-  const scatter = interpolate(frame, [0, 15], [0, 1], clamp);
-  const vortexSpeed = interpolate(frame, [15, 80], [1, 5], clamp);
-  const collapse = interpolate(frame, [90, 115], [1, 0], clamp);
-  const flash = interpolate(frame, [110, 115, 120], [0, 0.8, 0], clamp);
+  const top5 = sorted.slice(0, SHUFFLE_MVP_COUNT);
+  const sortEnd = SHUFFLE_SORT_FRAMES;
+  const mvpEnd = sortEnd + SHUFFLE_MVP_COUNT * SHUFFLE_MVP_FRAMES;
+
+  // Phase 1: cycling sort animation
+  // We render a vertical list of 8 visible "rows", and each row cycles
+  // through different players from the sorted list, suggesting the
+  // system is rapidly evaluating everyone.
+  const VISIBLE_ROWS = 8;
+  const ROW_H = 80;
+  const listTop = SAFE_TOP + 200;
+
+  // Heading (phase-aware)
+  const inSort = frame < sortEnd;
+  const inMvp = frame >= sortEnd && frame < mvpEnd;
+  const inGroup = frame >= mvpEnd;
+
+  const headingText = inSort
+    ? `Analyzing ${allPlayers.length} Players`
+    : inMvp
+      ? "Top 5 from Prelims"
+      : "Top 5 MVPs";
+
+  const headingOp = interpolate(frame, [0, 8], [0, 1], clamp);
+  const headingScale = interpolate(frame, [0, 8], [0.85, 1], clamp);
+
+  const flash = interpolate(frame, [SHUFFLE_FRAMES - 12, SHUFFLE_FRAMES - 6, SHUFFLE_FRAMES], [0, 0.8, 0], clamp);
 
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
-      <div style={{ position: "absolute", top: SAFE_TOP + 40, left: "50%", transform: "translateX(-50%)", fontSize: 22, fontWeight: 800, color: theme.accent, letterSpacing: 8, textTransform: "uppercase", opacity: interpolate(frame, [5, 15, 90, 100], [0, 0.6, 0.6, 0], clamp), textAlign: "center" }}>
-        Shuffling {allPlayers.length} Players...
+      {/* Phase-aware heading */}
+      <div style={{
+        position: "absolute", top: SAFE_TOP + 60, left: 0, right: 0,
+        textAlign: "center",
+        opacity: headingOp,
+        transform: `scale(${headingScale})`,
+      }}>
+        <div style={{
+          fontSize: 16, fontWeight: 800, color: theme.accentBright,
+          letterSpacing: 6, textTransform: "uppercase", marginBottom: 8,
+          textShadow: glowText(theme, 0.6),
+        }}>
+          {inSort ? "Stage 1" : "Roll of Honor"}
+        </div>
+        <div style={{
+          fontSize: 50, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, lineHeight: 1.05,
+          textShadow: glowText(theme, 1.1),
+        }}>
+          {headingText}
+        </div>
       </div>
-      {cards.map((card, i) => {
-        const angle = card.baseAngle + frame * card.speed * vortexSpeed;
-        const r = card.radius * collapse * scatter;
+
+      {/* ── Phase 1: cycling sort list ── */}
+      {inSort && (() => {
+        // Row scroll speed: faster at start, slows toward sortEnd
+        const speed = interpolate(frame, [0, sortEnd], [3, 0.6], clamp);
         return (
-          <div key={i} style={{
-            position: "absolute", left: W / 2 + Math.cos(angle) * r * 0.8 - 70, top: SAFE_CENTER_Y + Math.sin(angle) * r - 16,
-            width: 140, height: 32, borderRadius: 6,
-            background: `rgba(${theme.rgb}, 0.12)`, border: `1px solid rgba(${theme.rgb}, 0.2)`,
-            display: "flex", alignItems: "center", padding: "0 10px",
-            opacity: scatter * collapse, fontSize: 12, fontWeight: 700, color: "#fff",
+          <div style={{
+            position: "absolute", left: 60, right: 60,
+            top: listTop, height: VISIBLE_ROWS * ROW_H,
+            overflow: "hidden",
           }}>
-            {card.name}
+            {Array.from({ length: VISIBLE_ROWS }).map((_, i) => {
+              // Each row picks a player cycling through the sorted list,
+              // offset by row index so neighboring rows show different players.
+              const offset = Math.floor(frame * speed) + i * 7;
+              const player = sorted[offset % Math.max(sorted.length, 1)] || { name: "", rank: "" };
+              const op = interpolate(frame, [i * 2, i * 2 + 8], [0, 1], clamp)
+                       * interpolate(frame, [sortEnd - 8, sortEnd], [1, 0.15], clamp);
+              return (
+                <div key={i} style={{
+                  position: "absolute", left: 0, right: 0, top: i * ROW_H,
+                  height: ROW_H - 8, borderRadius: 12,
+                  background: `linear-gradient(90deg, rgba(${theme.rgb},0.18), rgba(${theme.rgb},0.05))`,
+                  border: `1px solid rgba(${theme.rgb},0.3)`,
+                  display: "flex", alignItems: "center", padding: "0 22px",
+                  opacity: op,
+                  boxShadow: `0 4px 16px rgba(0,0,0,0.4)`,
+                }}>
+                  <div style={{
+                    fontSize: 18, fontWeight: 900, color: theme.accentBright,
+                    width: 50, letterSpacing: 1,
+                    textShadow: softShadow,
+                  }}>
+                    #{((offset % Math.max(sorted.length, 1)) + 1).toString().padStart(2, "0")}
+                  </div>
+                  <div style={{
+                    flex: 1, fontSize: 26, fontWeight: 800, color: "#fff",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    textShadow: softShadow,
+                  }}>
+                    {player.name}
+                  </div>
+                  {player.rank && (
+                    <div style={{
+                      fontSize: 16, fontWeight: 800, color: theme.gold,
+                      padding: "4px 12px", borderRadius: 100,
+                      background: "rgba(255,215,0,0.12)",
+                      border: "1px solid rgba(255,215,0,0.4)",
+                      textShadow: softShadow,
+                    }}>
+                      {player.rank}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         );
-      })}
-      {flash > 0 && <div style={{ position: "absolute", inset: 0, background: theme.accent, opacity: flash }} />}
+      })()}
+
+      {/* ── Phase 2: MVP showcase, one at a time ── */}
+      {inMvp && (() => {
+        const mvpIdx = Math.min(SHUFFLE_MVP_COUNT - 1, Math.floor((frame - sortEnd) / SHUFFLE_MVP_FRAMES));
+        const local = (frame - sortEnd) - mvpIdx * SHUFFLE_MVP_FRAMES;
+        const player = top5[mvpIdx];
+        if (!player) return null;
+
+        const enterOp = interpolate(local, [0, 6], [0, 1], clamp);
+        const enterScale = interpolate(local, [0, 8], [0.6, 1], clamp);
+        const exitOp = interpolate(local, [SHUFFLE_MVP_FRAMES - 6, SHUFFLE_MVP_FRAMES], [1, 0], clamp);
+        const op = enterOp * exitOp;
+
+        // "Pulled from 50" effect: a thin streaking line shooting in from
+        // the right margin, ending behind the avatar.
+        const pullX = interpolate(local, [0, 6], [400, 0], clamp);
+        return (
+          <div style={{
+            position: "absolute", left: 0, right: 0,
+            top: SAFE_TOP + 230, bottom: SAFE_BOTTOM,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+            padding: "0 60px", gap: 18,
+            opacity: op,
+            transform: `translateX(${pullX}px) scale(${enterScale})`,
+          }}>
+            <div style={{
+              fontSize: 22, fontWeight: 900, color: theme.gold,
+              letterSpacing: 6, textTransform: "uppercase",
+              padding: "8px 28px", borderRadius: 100,
+              background: "rgba(255,215,0,0.15)",
+              border: `2px solid ${theme.gold}`,
+              textShadow: glowText(theme, 0.8),
+            }}>
+              MVP #{mvpIdx + 1}
+            </div>
+            <div style={{ position: "relative" }}>
+              <div style={{
+                position: "absolute", inset: -16, borderRadius: "50%",
+                background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+              }} />
+              <Avatar src={player.avatar} name={player.name} size={260} border={`6px solid ${theme.gold}`} rgb={theme.rgb} />
+            </div>
+            <div style={{
+              fontSize: 56, fontWeight: 900, color: "#fff",
+              letterSpacing: 0.5, textAlign: "center",
+              maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              textShadow: glowText(theme, 1.2),
+            }}>
+              {player.name}
+            </div>
+            {player.rank && (
+              <div style={{
+                fontSize: 26, fontWeight: 800, color: "#fff",
+                padding: "10px 32px", borderRadius: 100,
+                background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
+                border: `2px solid rgba(255,255,255,0.4)`,
+                textShadow: softShadow,
+                boxShadow: `0 8px 30px ${theme.glow}`,
+              }}>
+                {player.rank}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ── Phase 3: all 5 MVPs together ── */}
+      {inGroup && (() => {
+        const local = frame - mvpEnd;
+        const enterOp = interpolate(local, [0, 10], [0, 1], clamp);
+        const enterScale = interpolate(local, [0, 12], [0.85, 1], clamp);
+        return (
+          <div style={{
+            position: "absolute", left: 0, right: 0,
+            top: SAFE_TOP + 240, bottom: SAFE_BOTTOM,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+            padding: "0 30px", gap: 24,
+            opacity: enterOp, transform: `scale(${enterScale})`,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 12 }}>
+              {top5.map((p, i) => (
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14, fontWeight: 900, color: theme.gold,
+                    letterSpacing: 2, textTransform: "uppercase",
+                    textShadow: softShadow,
+                  }}>
+                    #{i + 1}
+                  </div>
+                  <Avatar src={p.avatar} name={p.name} size={130} border={`4px solid ${theme.gold}`} rgb={theme.rgb} />
+                  <div style={{
+                    fontSize: 18, fontWeight: 800, color: "#fff",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    maxWidth: "100%", textAlign: "center",
+                    textShadow: softShadow,
+                  }}>
+                    {p.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{
+              fontSize: 22, fontWeight: 800, color: theme.accentBright,
+              letterSpacing: 4, textTransform: "uppercase", marginTop: 12,
+              textShadow: glowText(theme, 0.8),
+            }}>
+              Now drafting all 50 players →
+            </div>
+          </div>
+        );
+      })()}
+
+      {flash > 0 && <div style={{ position: "absolute", inset: 0, background: theme.accentBright, opacity: flash }} />}
     </AbsoluteFill>
   );
 }
@@ -199,36 +453,57 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
     return (
       <div style={{
         position: "absolute", left: BAND_PAD_X, right: BAND_PAD_X, top: cardTop, height: cardH,
-        background: theme.bgCard,
-        border: `1px solid rgba(${theme.rgb}, 0.28)`,
-        borderRadius: 20,
-        padding: "18px 24px",
+        background: `linear-gradient(180deg, ${theme.bgCardLight}, ${theme.bgCard})`,
+        border: `2px solid rgba(${theme.rgb}, 0.4)`,
+        borderRadius: 22,
+        padding: "20px 26px",
         transform: `translateX(${dx}px)`,
         opacity: op,
-        boxShadow: `0 12px 40px rgba(0,0,0,0.4)`,
+        boxShadow: `0 14px 44px rgba(0,0,0,0.5), 0 0 40px rgba(${theme.rgb}, 0.15) inset`,
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 14,
       }}>
         {/* Team label (top) */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, letterSpacing: 4, textTransform: "uppercase" }}>
+          <div style={{
+            fontSize: 18, fontWeight: 900, color: theme.accentBright,
+            letterSpacing: 4, textTransform: "uppercase",
+            textShadow: glowText(theme, 0.55),
+          }}>
             Team {cardTeamIdx + 1} · Revealed
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: `rgba(${theme.rgb}, 0.5)`, letterSpacing: 3, textTransform: "uppercase" }}>
+          <div style={{
+            fontSize: 14, fontWeight: 800, color: theme.gold,
+            letterSpacing: 3, textTransform: "uppercase",
+            textShadow: softShadow,
+          }}>
             {members.length} Players
           </div>
         </div>
-        <div style={{ fontSize: 34, fontWeight: 900, color: "#fff", letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1 }}>
+        <div style={{
+          fontSize: 38, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1,
+          textShadow: glowText(theme, 0.85),
+        }}>
           {team.teamName}
         </div>
-        <div style={{ height: 2, background: `linear-gradient(90deg, ${theme.accent}, transparent)`, borderRadius: 1 }} />
+        <div style={{
+          height: 2, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,
+          borderRadius: 1,
+          boxShadow: `0 0 10px ${theme.glow}`,
+        }} />
         {/* Horizontal player row (bottom of card) */}
         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
           {members.map((p, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-              <Avatar src={p.avatar} name={p.name} size={82} border={`2px solid rgba(${theme.rgb}, 0.35)`} rgb={theme.rgb} />
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" }}>
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+              <Avatar src={p.avatar} name={p.name} size={86} border={`3px solid ${theme.accent}`} rgb={theme.rgb} />
+              <div style={{
+                fontSize: 16, fontWeight: 900, color: "#fff",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                maxWidth: "100%", textAlign: "center",
+                textShadow: softShadow,
+              }}>
                 {p.name}
               </div>
             </div>
@@ -274,13 +549,30 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
     const fadeOutT = interpolate(holdFrame, [TEAM_HOLD_FRAMES - 12, TEAM_HOLD_FRAMES], [1, 0], clamp);
     return (
       <div style={{ ...band, opacity: op * fadeOutT, transform: `scale(${scale})` }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: theme.accent, letterSpacing: 8, textTransform: "uppercase", marginBottom: 16 }}>
+        <div style={{
+          fontSize: 22, fontWeight: 900, color: theme.accentBright,
+          letterSpacing: 10, textTransform: "uppercase", marginBottom: 14,
+          textShadow: glowText(theme, 0.8),
+        }}>
           Team Locked
         </div>
-        <div style={{ fontSize: 68, fontWeight: 900, color: "#fff", letterSpacing: 1, textAlign: "center", lineHeight: 1.05, marginBottom: 20, maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{
+          fontSize: 76, fontWeight: 900, color: "#fff",
+          letterSpacing: 1, textAlign: "center", lineHeight: 1.02, marginBottom: 18,
+          maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          textShadow: glowText(theme, 1.3),
+        }}>
           {team.teamName}
         </div>
-        <div style={{ padding: "10px 30px", borderRadius: 100, background: `rgba(${theme.rgb}, 0.12)`, border: `2px solid rgba(${theme.rgb}, 0.35)`, fontSize: 16, fontWeight: 800, color: theme.accent, letterSpacing: 3, textTransform: "uppercase" }}>
+        <div style={{
+          padding: "12px 36px", borderRadius: 100,
+          background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
+          border: `2px solid rgba(255,255,255,0.4)`,
+          fontSize: 18, fontWeight: 900, color: "#fff",
+          letterSpacing: 3, textTransform: "uppercase",
+          textShadow: softShadow,
+          boxShadow: `0 6px 24px ${theme.glow}`,
+        }}>
           {members.length} Players · Final Roster
         </div>
       </div>
@@ -294,27 +586,56 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
   const exitE = easeOut(exitT);
   const exitOp = 1 - exitT;
   const exitScale = interpolate(exitE, [0, 1], [1, 0.85]);
-  const exitY = exitE * 50;
+  const exitY = exitE * 40;
 
   return (
     <div style={band}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: `rgba(${theme.rgb}, 0.6)`, letterSpacing: 6, textTransform: "uppercase", marginBottom: 14, opacity: enterOp * exitOp }}>
+      <div style={{
+        fontSize: 18, fontWeight: 900, color: theme.accentBright,
+        letterSpacing: 6, textTransform: "uppercase", marginBottom: 12,
+        opacity: enterOp * exitOp,
+        textShadow: glowText(theme, 0.6),
+      }}>
         Player {currentPlayerIdx + 1} of {members.length}
       </div>
       <div style={{
         opacity: enterOp * exitOp,
         transform: `translateY(${exitY}px) scale(${enterScale * exitScale})`,
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
       }}>
-        <Avatar src={player.avatar} name={player.name} size={230} border={`5px solid ${theme.accent}`} rgb={theme.rgb} />
-        <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", letterSpacing: 0.5, textAlign: "center", maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ position: "relative" }}>
+          <div style={{
+            position: "absolute", inset: -12, borderRadius: "50%",
+            background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+          }} />
+          <Avatar src={player.avatar} name={player.name} size={200} border={`5px solid ${theme.accentBright}`} rgb={theme.rgb} />
+        </div>
+        <div style={{
+          fontSize: 50, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, textAlign: "center",
+          maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          textShadow: glowText(theme, 1.1),
+        }}>
           {player.name}
         </div>
         {player.tag && (
-          <div style={{ fontSize: 18, fontWeight: 500, color: "rgba(255,255,255,0.4)", marginTop: -8 }}>#{player.tag}</div>
+          <div style={{
+            fontSize: 18, fontWeight: 700, color: theme.gold, marginTop: -4,
+            textShadow: softShadow,
+          }}>
+            #{player.tag}
+          </div>
         )}
         {player.rank && (
-          <div style={{ fontSize: 18, fontWeight: 800, color: theme.accent, padding: "7px 26px", borderRadius: 100, background: `rgba(${theme.rgb}, 0.12)`, border: `2px solid rgba(${theme.rgb}, 0.3)`, marginTop: 4 }}>
+          <div style={{
+            fontSize: 20, fontWeight: 900, color: "#fff",
+            padding: "8px 28px", borderRadius: 100,
+            background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
+            border: `2px solid rgba(255,255,255,0.4)`,
+            marginTop: 2,
+            textShadow: softShadow,
+            boxShadow: `0 6px 20px ${theme.glow}`,
+          }}>
             {player.rank}
           </div>
         )}
@@ -332,34 +653,51 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
 }) {
   const members = team.members.slice(0, 5);
   const cardOp = fade(frame, 0, 12);
-  const PAD_X = 28;
-  const PAD_Y = 12;
+  const PAD_X = 26;
+  const PAD_Y = 16;
 
   return (
     <div style={{
       position: "absolute", left: PAD_X, right: PAD_X, top: BOT_Y + PAD_Y, height: BOT_H - PAD_Y * 2,
-      background: theme.bgCard,
-      border: `1px solid rgba(${theme.rgb}, 0.25)`,
-      borderRadius: 20,
-      padding: "14px 24px 18px",
+      background: `linear-gradient(180deg, ${theme.bgCardLight}, ${theme.bgCard})`,
+      border: `2px solid rgba(${theme.rgb}, 0.45)`,
+      borderRadius: 26,
+      padding: "26px 32px 30px",
       opacity: cardOp,
-      boxShadow: `0 -12px 40px rgba(0,0,0,0.45)`,
+      boxShadow: `0 -16px 50px rgba(0,0,0,0.55), 0 0 60px rgba(${theme.rgb}, 0.18) inset`,
       display: "flex",
       flexDirection: "column",
     }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: theme.accent, letterSpacing: 4, textTransform: "uppercase" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{
+          fontSize: 22, fontWeight: 900, color: theme.accentBright,
+          letterSpacing: 5, textTransform: "uppercase",
+          textShadow: glowText(theme, 0.6),
+        }}>
           {inHoldPhase ? "Locked In" : "Now Drafting"}
         </div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: `rgba(${theme.rgb}, 0.6)`, letterSpacing: 3 }}>
+        <div style={{
+          fontSize: 20, fontWeight: 900, color: theme.gold,
+          letterSpacing: 3, textTransform: "uppercase",
+          textShadow: softShadow,
+        }}>
           Team {teamIndex + 1}
         </div>
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", letterSpacing: 0.5, marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1 }}>
+      <div style={{
+        fontSize: 52, fontWeight: 900, color: "#fff",
+        letterSpacing: 0.5, marginBottom: 14,
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1,
+        textShadow: glowText(theme, 1),
+      }}>
         {team.teamName}
       </div>
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${theme.accent}, transparent)`, marginBottom: 12, borderRadius: 1 }} />
-      <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+      <div style={{
+        height: 3, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,
+        marginBottom: 22, borderRadius: 2,
+        boxShadow: `0 0 12px ${theme.glow}`,
+      }} />
+      <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center" }}>
         {members.map((player, i) => {
           const playerDoneFrame = (i + 1) * PLAYER_DRAFT_FRAMES;
           const isPlaced = frame >= playerDoneFrame || inHoldPhase;
@@ -367,9 +705,13 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
 
           if (!isPlaced) {
             return (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, opacity: 0.4 }}>
-                <div style={{ width: 82, height: 82, borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.02)" }} />
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Slot {i + 1}</div>
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, opacity: 0.5 }}>
+                <div style={{ width: 140, height: 140, borderRadius: "50%", border: "3px dashed rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.04)" }} />
+                <div style={{
+                  fontSize: 16, color: "rgba(255,255,255,0.45)", fontWeight: 800,
+                  letterSpacing: 2, textTransform: "uppercase",
+                  textShadow: softShadow,
+                }}>Slot {i + 1}</div>
               </div>
             );
           }
@@ -378,21 +720,42 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
           const placeScale = interpolate(frame, [playerDoneFrame, playerDoneFrame + 10], [0.7, 1], clamp);
           return (
             <div key={i} style={{
-              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
               opacity: placeOp, transform: `scale(${placeScale})`,
             }}>
-              <Avatar
-                src={player.avatar}
-                name={player.name}
-                size={82}
-                border={`3px solid ${justPlaced ? theme.accent : `rgba(${theme.rgb}, 0.4)`}`}
-                rgb={theme.rgb}
-              />
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180, textAlign: "center" }}>
+              <div style={{ position: "relative" }}>
+                {justPlaced && (
+                  <div style={{
+                    position: "absolute", inset: -10, borderRadius: "50%",
+                    background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+                  }} />
+                )}
+                <Avatar
+                  src={player.avatar}
+                  name={player.name}
+                  size={140}
+                  border={`4px solid ${justPlaced ? theme.accentBright : theme.accent}`}
+                  rgb={theme.rgb}
+                />
+              </div>
+              <div style={{
+                fontSize: 22, fontWeight: 900, color: "#fff",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                maxWidth: 220, textAlign: "center", lineHeight: 1.05,
+                textShadow: softShadow,
+              }}>
                 {player.name}
               </div>
               {player.rank && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: theme.accent, padding: "2px 9px", borderRadius: 100, background: `rgba(${theme.rgb}, 0.1)`, border: `1px solid rgba(${theme.rgb}, 0.2)` }}>
+                <div style={{
+                  fontSize: 14, fontWeight: 900, color: "#fff",
+                  padding: "5px 14px", borderRadius: 100,
+                  background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
+                  border: `2px solid rgba(255,255,255,0.4)`,
+                  textShadow: softShadow,
+                  boxShadow: `0 4px 12px ${theme.glow}`,
+                  whiteSpace: "nowrap",
+                }}>
                   {player.rank}
                 </div>
               )}

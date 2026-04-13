@@ -1379,6 +1379,24 @@ function ValorantTournamentDetailInner() {
                   <span className="vtd-card-label" style={{ marginBottom: 0 }}>Registered Players ({players.length})</span>
                   <TabSharePopover tabKey="players" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
+                {id === "league-of-rising-stars-ascension" && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "12px 16px", marginBottom: 18,
+                    background: "linear-gradient(90deg, rgba(127,255,0,0.10), rgba(127,255,0,0.04))",
+                    border: "1px solid rgba(127,255,0,0.35)", borderRadius: 12,
+                  }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: "rgba(127,255,0,0.18)", color: "#7FFF00", fontWeight: 900, fontSize: 16,
+                    }}>✓</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: "#7FFF00", letterSpacing: 0.5 }}>Issue Resolved by Admin</span>
+                      <span style={{ fontSize: 12, color: "#B6D9A0" }}>Team imbalance from the earlier shuffle has been corrected. Latest rosters are live.</span>
+                    </div>
+                  </div>
+                )}
                 {players.length === 0 ? (
                   <div className="vtd-empty"><Users size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No players registered yet</span><span className="vtd-empty-sub">Be the first to register!</span></div>
                 ) : (() => {
