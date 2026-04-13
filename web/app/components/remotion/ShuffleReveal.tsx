@@ -14,11 +14,13 @@ import {
    ═══════════════════════════════════════════════ */
 
 export interface ShufflePlayer {
+  uid?: string;            // for cross-scene MVP matching
   name: string;
   tag?: string;
   avatar?: string;
   rank?: string;
   tier?: number;
+  isMvp?: boolean;         // top performer carried over from the previous tournament
 }
 
 export interface ShuffleTeam {
@@ -31,6 +33,10 @@ export interface ShuffleRevealProps {
   tournamentName: string;
   game: "valorant" | "dota" | "cs2";
   teams: ShuffleTeam[];
+  /** Top performers from the previous tournament who are also playing this league.
+   * Shown in the shuffle scene's 3D orbit and crowned wherever they appear in
+   * the team-formation scenes. */
+  mvps?: ShufflePlayer[];
 }
 
 /* ═══════════════════════════════════════════════
@@ -58,12 +64,16 @@ const OUTRO_FRAMES = 270;
 const W = 1080;
 const H = 1920;
 
-// Instagram Reel safe zone — status bar / handle on top, caption + action buttons on bottom.
-// Bottom needs far more room than top because that's where the caption and action buttons live.
-const SAFE_TOP = 120;
-const SAFE_BOTTOM = 440;
-const SAFE_H = H - SAFE_TOP - SAFE_BOTTOM;        // 1360
-const SAFE_CENTER_Y = SAFE_TOP + SAFE_H / 2;      // 800
+// Instagram Reel safe zone — username bar / handle on top, caption + action buttons on bottom.
+// Slightly wider top + narrower bottom + a small left/right gutter so absolutely
+// nothing of importance touches the canvas edge or gets cropped on phones.
+const SAFE_TOP = 200;
+const SAFE_BOTTOM = 350;
+const SAFE_LEFT = 50;
+const SAFE_RIGHT = 50;
+const SAFE_H = H - SAFE_TOP - SAFE_BOTTOM;        // 1370
+const SAFE_W = W - SAFE_LEFT - SAFE_RIGHT;        // 980
+const SAFE_CENTER_Y = SAFE_TOP + SAFE_H / 2;      // 885
 
 // Three bands stacked vertically inside the safe zone.
 // HEADER strip at the top of the safe zone carries the persistent logos during draft.
@@ -75,7 +85,7 @@ const BOT_H = 480;   // current-team band — much bigger so phone viewers can r
 const HEADER_Y = SAFE_TOP;
 const TOP_Y = SAFE_TOP + HEADER_H;
 const MID_Y = TOP_Y + TOP_H;
-const MID_H = SAFE_H - HEADER_H - TOP_H - BOT_H;  // 430
+const MID_H = SAFE_H - HEADER_H - TOP_H - BOT_H;  // 440
 const BOT_Y = MID_Y + MID_H;
 
 function getTeamFrames(memberCount: number) {
@@ -131,6 +141,52 @@ type Theme = typeof THEMES.valorant;
 const glowText = (theme: Theme, intensity = 1) =>
   `0 0 ${12 * intensity}px ${theme.glow}, 0 0 ${4 * intensity}px ${theme.glow}, 0 2px 6px rgba(0,0,0,0.7)`;
 const softShadow = "0 2px 8px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)";
+
+// Strip "[VAL] " / "[CS2] " / etc prefixes from tournament display names —
+// the canonical names in Firestore carry a game-tag bracket the social
+// post doesn't need.
+function stripGamePrefix(name: string): string {
+  return (name || "").replace(/^\[[A-Z0-9]+\]\s*/i, "");
+}
+
+// Canonical Valorant tier colors. Used for the rank pill on every player so
+// the colors carry meaning at a glance — no more cyan→red gradient.
+type RankPalette = { text: string; bg: string; border: string };
+const RANK_PALETTE: Record<string, RankPalette> = {
+  Radiant:   { text: "#FFE96E", bg: "rgba(255,233,110,0.20)", border: "rgba(255,233,110,0.75)" },
+  Immortal:  { text: "#FF7A8C", bg: "rgba(255,122,140,0.20)", border: "rgba(255,122,140,0.75)" },
+  Ascendant: { text: "#5DD896", bg: "rgba(93,216,150,0.20)",  border: "rgba(93,216,150,0.75)" },
+  Diamond:   { text: "#D7AAEC", bg: "rgba(215,170,236,0.20)", border: "rgba(215,170,236,0.75)" },
+  Platinum:  { text: "#7DDDDD", bg: "rgba(125,221,221,0.20)", border: "rgba(125,221,221,0.75)" },
+  Gold:      { text: "#FFD250", bg: "rgba(255,210,80,0.20)",  border: "rgba(255,210,80,0.75)" },
+  Silver:    { text: "#D5DCE3", bg: "rgba(213,220,227,0.20)", border: "rgba(213,220,227,0.70)" },
+  Bronze:    { text: "#D49B7A", bg: "rgba(212,155,122,0.20)", border: "rgba(212,155,122,0.70)" },
+  Iron:      { text: "#A0A0A0", bg: "rgba(160,160,160,0.20)", border: "rgba(160,160,160,0.65)" },
+};
+function getRankPalette(rank?: string): RankPalette {
+  if (!rank) return { text: "#FFFFFF", bg: "rgba(255,255,255,0.14)", border: "rgba(255,255,255,0.45)" };
+  const base = rank.split(" ")[0];
+  return RANK_PALETTE[base] || { text: "#FFFFFF", bg: "rgba(255,255,255,0.14)", border: "rgba(255,255,255,0.45)" };
+}
+
+// Crown badge for MVP players — drawn as an inline SVG so html2canvas-pro
+// can rasterize it cleanly (emoji fonts are unreliable across systems).
+const Crown = React.memo(({ size = 36, color = "#FFD700", glow = "rgba(255,215,0,0.7)" }: { size?: number; color?: string; glow?: string }) => (
+  <svg width={size} height={size * 0.85} viewBox="0 0 32 28" fill="none" style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 2px 4px rgba(0,0,0,0.6))` }}>
+    <path
+      d="M3 22 L1 6 L9 12 L16 2 L23 12 L31 6 L29 22 Z"
+      fill={color}
+      stroke="#fff"
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    />
+    <rect x="3" y="22" width="26" height="4" rx="1" fill={color} stroke="#fff" strokeWidth={1.5} />
+    <circle cx="16" cy="2" r="1.8" fill="#fff" />
+    <circle cx="1" cy="6" r="1.6" fill="#fff" />
+    <circle cx="31" cy="6" r="1.6" fill="#fff" />
+  </svg>
+));
+Crown.displayName = "Crown";
 
 /* ═══════════════════════════════════════════════
    SCENE BACKGROUND — used by every scene for visual consistency
@@ -220,7 +276,7 @@ function IntroScene({ frame, theme, tournamentName }: { frame: number; theme: Th
           fontSize: 70, fontWeight: 900, color: "#fff",
           letterSpacing: -1, textAlign: "center", maxWidth: 940, lineHeight: 1.05, marginBottom: 70,
           textShadow: glowText(theme, 1.2),
-        }}>{tournamentName}</div>
+        }}>{stripGamePrefix(tournamentName)}</div>
         <div style={{ opacity: btnOp, transform: `scale(${btnScale * clickScale})` }}>
           <div style={{
             padding: "26px 78px", borderRadius: 22, fontSize: 32, fontWeight: 900, color: "#fff",
@@ -248,23 +304,40 @@ function IntroScene({ frame, theme, tournamentName }: { frame: number; theme: Th
        before the team-formation scenes start.
    ═══════════════════════════════════════════════ */
 
-function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[] }) {
+function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[]; providedMvps?: ShufflePlayer[] }) {
   // ── MVP set ────────────────────────────────────────────────────────────
-  // Top N players by tier are treated as the "MVPs from prelims still
-  // playing this league" — filter inherently satisfied because allPlayers
-  // is already the registered roster for THIS tournament. Sorting by tier
-  // (which carries cumulative iesports rating) picks the best historical
-  // performers.
+  // Prefer MVPs explicitly passed in (those are the actual top performers
+  // from the previous tournament who are also playing this one). Otherwise
+  // fall back to top N by tier from the current roster.
   const sorted = useMemo(() => {
     const arr = [...allPlayers];
     arr.sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0) || (a.name || "").localeCompare(b.name || ""));
     return arr;
   }, [allPlayers]);
 
-  const mvps = sorted.slice(0, SHUFFLE_MVP_COUNT);
+  const mvps = useMemo<ShufflePlayer[]>(() => {
+    if (providedMvps && providedMvps.length > 0) {
+      // Match provided MVPs against the registered roster so we always render
+      // the in-tournament version (with up-to-date avatar/rank from the
+      // current tournament's snapshot). Filters out anyone NOT playing.
+      const matched: ShufflePlayer[] = [];
+      for (const mvp of providedMvps) {
+        const inRoster = allPlayers.find(p =>
+          (mvp.uid && p.uid && mvp.uid === p.uid) || p.name === mvp.name
+        );
+        if (inRoster) matched.push(inRoster);
+      }
+      if (matched.length > 0) return matched.slice(0, SHUFFLE_MVP_COUNT);
+    }
+    return sorted.slice(0, SHUFFLE_MVP_COUNT);
+  }, [providedMvps, allPlayers, sorted]);
+
   // Stable index of each MVP within the FULL sorted list — used to compute
   // the orbit angle that puts that MVP at the front position.
-  const mvpFullIdx = mvps.map((m) => sorted.findIndex((p) => p === m));
+  const mvpFullIdx = mvps.map((m) => {
+    const i = sorted.findIndex((p) => (m.uid && p.uid && m.uid === p.uid) || p.name === m.name);
+    return i >= 0 ? i : 0;
+  });
 
   const N = sorted.length || 1;
   const TWO_PI = Math.PI * 2;
@@ -341,24 +414,24 @@ function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Them
   })();
 
   // ── Orbit geometry ───────────────────────────────────────────────────
-  // A horizontal tilted ellipse centered just below the title. Avatars
-  // at the front (cosA close to 1) are larger and brighter; ones at the
-  // back are smaller and dimmer.
+  // A horizontal tilted ellipse. Aggressive depth contrast — front avatar
+  // is huge and unmissable, back ones are tiny and barely visible so the
+  // focal point reads instantly on a phone.
   const orbitCx = W / 2;
-  const orbitCy = SAFE_CENTER_Y + 60;
-  const orbitRx = 380;       // horizontal radius
-  const orbitRy = 80;        // vertical bobbing for tilt
-  const sizeMin = 56;
-  const sizeMax = 156;
+  const orbitCy = SAFE_CENTER_Y + 30;
+  const orbitRx = 360;       // horizontal radius
+  const orbitRy = 60;        // gentle vertical bobbing for tilt
+  const sizeMin = 28;        // back avatars (much smaller than before)
+  const sizeMax = 280;       // front avatar (much bigger than before)
 
   // ── Heading ──────────────────────────────────────────────────────────
   const headingOp = interpolate(frame, [0, 12], [0, 1], clamp);
   const headingFadeOut = interpolate(frame, [SHUFFLE_FRAMES - 14, SHUFFLE_FRAMES], [1, 0.6], clamp);
 
-  // Subline that flips between "Roll of Honor" and the active MVP's name
+  // Subline that flips between the watchlist tag and the active MVP's name
   const subline = currentMvpIdx >= 0
-    ? `MVP #${currentMvpIdx + 1} · ${mvps[currentMvpIdx]?.name ?? ""}`
-    : "Top performers from Prelims";
+    ? `Player to Watch · ${mvps[currentMvpIdx]?.name ?? ""}`
+    : "Players to watch for · From Prelims";
 
   const flash = interpolate(frame, [SHUFFLE_FRAMES - 10, SHUFFLE_FRAMES - 5, SHUFFLE_FRAMES], [0, 0.7, 0], clamp);
 
@@ -368,31 +441,31 @@ function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Them
 
       {/* Heading block */}
       <div style={{
-        position: "absolute", top: SAFE_TOP + 50, left: 0, right: 0,
+        position: "absolute", top: SAFE_TOP + 30, left: SAFE_LEFT, right: SAFE_RIGHT,
         textAlign: "center",
         opacity: headingOp * headingFadeOut,
       }}>
         <div style={{
-          fontSize: 18, fontWeight: 900, color: theme.gold,
-          letterSpacing: 6, textTransform: "uppercase", marginBottom: 12,
+          fontSize: 20, fontWeight: 900, color: theme.gold,
+          letterSpacing: 6, textTransform: "uppercase", marginBottom: 10,
           textShadow: glowText(theme, 0.7),
         }}>
-          Roll of Honor
+          Players to Watch
         </div>
         <div style={{
-          fontSize: 56, fontWeight: 900, color: "#fff",
-          letterSpacing: 0.5, lineHeight: 1.05, marginBottom: 10,
+          fontSize: 52, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, lineHeight: 1.02, marginBottom: 8,
           textShadow: glowText(theme, 1.2),
         }}>
-          {N} Heroes
+          From Prelims
         </div>
         <div style={{
-          fontSize: 22, fontWeight: 800, color: theme.accentBright,
+          fontSize: 20, fontWeight: 800, color: theme.accentBright,
           letterSpacing: 3, textTransform: "uppercase",
-          maxWidth: 980, margin: "0 auto", padding: "0 60px",
+          maxWidth: SAFE_W, margin: "0 auto",
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           textShadow: glowText(theme, 0.6),
-          minHeight: 30,
+          minHeight: 28,
         }}>
           {subline}
         </div>
@@ -474,43 +547,44 @@ function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Them
         const detailOp = interpolate(intoPause, [0, 10], [0, 1], clamp);
         const detailY = interpolate(intoPause, [0, 12], [16, 0], clamp);
 
+        const rc = getRankPalette(cur.rank);
         return (
           <div style={{
-            position: "absolute", left: 0, right: 0,
-            top: orbitCy + orbitRy + 140,
+            position: "absolute", left: SAFE_LEFT, right: SAFE_RIGHT,
+            top: orbitCy + orbitRy + 175,
             display: "flex", flexDirection: "column", alignItems: "center",
             opacity: detailOp,
             transform: `translateY(${detailY}px)`,
           }}>
             <div style={{
-              fontSize: 22, fontWeight: 900, color: theme.gold,
+              display: "inline-flex", alignItems: "center", gap: 12,
+              fontSize: 20, fontWeight: 900, color: theme.gold,
               letterSpacing: 6, textTransform: "uppercase",
-              padding: "8px 28px", borderRadius: 100,
+              padding: "9px 28px", borderRadius: 100,
               background: "rgba(255,215,0,0.15)",
               border: `2px solid ${theme.gold}`,
-              marginBottom: 16,
+              marginBottom: 14,
               textShadow: glowText(theme, 0.8),
             }}>
-              MVP #{currentMvpIdx + 1}
+              <Crown size={26} />
+              Prelims MVP
             </div>
             <div style={{
               fontSize: 60, fontWeight: 900, color: "#fff",
               letterSpacing: 0.5, textAlign: "center",
-              maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              padding: "0 60px",
+              maxWidth: SAFE_W, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               textShadow: glowText(theme, 1.2),
-              marginBottom: 12,
+              marginBottom: 14,
             }}>
               {cur.name}
             </div>
             {cur.rank && (
               <div style={{
-                fontSize: 26, fontWeight: 900, color: "#fff",
-                padding: "10px 34px", borderRadius: 100,
-                background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
-                border: `2px solid rgba(255,255,255,0.4)`,
+                fontSize: 24, fontWeight: 900, color: rc.text,
+                padding: "10px 32px", borderRadius: 100,
+                background: rc.bg,
+                border: `2px solid ${rc.border}`,
                 textShadow: softShadow,
-                boxShadow: `0 8px 30px ${theme.glow}`,
               }}>
                 {cur.rank}
               </div>
@@ -599,12 +673,19 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
           boxShadow: `0 0 12px ${theme.glow}`,
         }} />
         {/* Horizontal player row (bottom of card) */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", paddingTop: 18 }}>
           {members.map((p, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-              <Avatar src={p.avatar} name={p.name} size={96} border={`3px solid ${theme.accentBright}`} rgb={theme.rgb} />
+              <div style={{ position: "relative" }}>
+                <Avatar src={p.avatar} name={p.name} size={96} border={`3px solid ${p.isMvp ? theme.gold : theme.accentBright}`} rgb={theme.rgb} />
+                {p.isMvp && (
+                  <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)" }}>
+                    <Crown size={32} />
+                  </div>
+                )}
+              </div>
               <div style={{
-                fontSize: 20, fontWeight: 900, color: "#fff",
+                fontSize: 20, fontWeight: 900, color: p.isMvp ? theme.gold : "#fff",
                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 maxWidth: "100%", textAlign: "center",
                 textShadow: softShadow,
@@ -713,7 +794,12 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
             position: "absolute", inset: -14, borderRadius: "50%",
             background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
           }} />
-          <Avatar src={player.avatar} name={player.name} size={210} border={`6px solid ${theme.accentBright}`} rgb={theme.rgb} />
+          <Avatar src={player.avatar} name={player.name} size={210} border={`6px solid ${player.isMvp ? theme.gold : theme.accentBright}`} rgb={theme.rgb} />
+          {player.isMvp && (
+            <div style={{ position: "absolute", top: -42, left: "50%", transform: "translateX(-50%)" }}>
+              <Crown size={68} />
+            </div>
+          )}
         </div>
         <div style={{
           fontSize: 58, fontWeight: 900, color: "#fff",
@@ -731,19 +817,21 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
             #{player.tag}
           </div>
         )}
-        {player.rank && (
-          <div style={{
-            fontSize: 24, fontWeight: 900, color: "#fff",
-            padding: "10px 32px", borderRadius: 100,
-            background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
-            border: `2px solid rgba(255,255,255,0.4)`,
-            marginTop: 4,
-            textShadow: softShadow,
-            boxShadow: `0 6px 22px ${theme.glow}`,
-          }}>
-            {player.rank}
-          </div>
-        )}
+        {player.rank && (() => {
+          const rc = getRankPalette(player.rank);
+          return (
+            <div style={{
+              fontSize: 24, fontWeight: 900, color: rc.text,
+              padding: "10px 32px", borderRadius: 100,
+              background: rc.bg,
+              border: `2px solid ${rc.border}`,
+              marginTop: 4,
+              textShadow: softShadow,
+            }}>
+              {player.rank}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -823,25 +911,34 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
 
           const placeOp = fade(frame, playerDoneFrame, 8);
           const placeScale = interpolate(frame, [playerDoneFrame, playerDoneFrame + 10], [0.7, 1], clamp);
+          const rc = player.rank ? getRankPalette(player.rank) : null;
+          const borderColor = player.isMvp
+            ? theme.gold
+            : justPlaced ? theme.accentBright : theme.accent;
           return (
             <div key={i} style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
               opacity: placeOp, transform: `scale(${placeScale})`,
             }}>
               <div style={{ position: "relative" }}>
-                {justPlaced && (
+                {(justPlaced || player.isMvp) && (
                   <div style={{
                     position: "absolute", inset: -12, borderRadius: "50%",
-                    background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+                    background: `radial-gradient(circle, ${player.isMvp ? "rgba(255,215,0,0.5)" : theme.glow} 0%, transparent 70%)`,
                   }} />
                 )}
                 <Avatar
                   src={player.avatar}
                   name={player.name}
                   size={150}
-                  border={`4px solid ${justPlaced ? theme.accentBright : theme.accent}`}
+                  border={`4px solid ${borderColor}`}
                   rgb={theme.rgb}
                 />
+                {player.isMvp && (
+                  <div style={{ position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)" }}>
+                    <Crown size={54} />
+                  </div>
+                )}
               </div>
               <div style={{
                 fontSize: 28, fontWeight: 900, color: "#fff",
@@ -851,14 +948,13 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
               }}>
                 {player.name}
               </div>
-              {player.rank && (
+              {rc && (
                 <div style={{
-                  fontSize: 18, fontWeight: 900, color: "#fff",
+                  fontSize: 18, fontWeight: 900, color: rc.text,
                   padding: "6px 16px", borderRadius: 100,
-                  background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentAlt})`,
-                  border: `2px solid rgba(255,255,255,0.4)`,
+                  background: rc.bg,
+                  border: `2px solid ${rc.border}`,
                   textShadow: softShadow,
-                  boxShadow: `0 4px 14px ${theme.glow}`,
                   whiteSpace: "nowrap",
                 }}>
                   {player.rank}
@@ -935,7 +1031,7 @@ function OutroScene({ frame, theme, teams, tournamentName }: { frame: number; th
         <>
           <div style={{ marginBottom: 24, textAlign: "center", opacity: lockedOp, transform: `scale(${lockedScale})` }}>
             <div style={{ fontSize: 48, fontWeight: 900, color: "#fff", letterSpacing: 6, textTransform: "uppercase" }}>Teams Locked</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: theme.accent, letterSpacing: 4, textTransform: "uppercase", marginTop: 10 }}>{tournamentName}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: theme.accent, letterSpacing: 4, textTransform: "uppercase", marginTop: 10 }}>{stripGamePrefix(tournamentName)}</div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 20, width: "100%", maxWidth: 1000, opacity: gridOp }}>
             {teams.map((team, i) => {
@@ -962,7 +1058,7 @@ function OutroScene({ frame, theme, teams, tournamentName }: { frame: number; th
       )}
       {showInstructions && (
         <div style={{ opacity: instrOp, display: "flex", flexDirection: "column", alignItems: "center", gap: 36, maxWidth: 960, textAlign: "center" }}>
-          <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", letterSpacing: 2, lineHeight: 1.1 }}>{tournamentName}</div>
+          <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", letterSpacing: 2, lineHeight: 1.1 }}>{stripGamePrefix(tournamentName)}</div>
           <div style={{ background: `rgba(${theme.rgb}, 0.08)`, border: `1px solid rgba(${theme.rgb}, 0.2)`, borderRadius: 20, padding: "30px 40px", width: "100%" }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: theme.accent, letterSpacing: 3, textTransform: "uppercase", marginBottom: 16 }}>How to customize your team</div>
             <div style={{ fontSize: 22, color: "rgba(255,255,255,0.8)", lineHeight: 1.55, fontWeight: 500 }}>
@@ -983,7 +1079,7 @@ function OutroScene({ frame, theme, teams, tournamentName }: { frame: number; th
    MAIN COMPOSITION
    ═══════════════════════════════════════════════ */
 
-export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournamentName, game, teams }) => {
+export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournamentName, game, teams, mvps }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const theme = THEMES[game] || THEMES.valorant;
@@ -1000,12 +1096,12 @@ export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournam
   const inDraft = frame >= teamRevealStart && frame < outroStart;
 
   return (
-    <AbsoluteFill style={{ background: theme.bg, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <AbsoluteFill style={{ background: "#02050f", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <Sequence from={0} durationInFrames={INTRO_FRAMES}>
         <IntroScene frame={frame} theme={theme} tournamentName={tournamentName} />
       </Sequence>
       <Sequence from={INTRO_FRAMES} durationInFrames={SHUFFLE_FRAMES}>
-        <ShuffleScene frame={frame - INTRO_FRAMES} theme={theme} allPlayers={allPlayers} />
+        <ShuffleScene frame={frame - INTRO_FRAMES} theme={theme} allPlayers={allPlayers} providedMvps={mvps} />
       </Sequence>
       {teams.map((team, i) => (
         <Sequence key={i} from={teamStarts[i]} durationInFrames={teamFramesList[i]}>
@@ -1040,7 +1136,7 @@ export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournam
             <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 3, textTransform: "uppercase" }}>IEsports</div>
           </div>
           <div style={{ flex: 1, margin: "0 16px", textAlign: "center", fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 3, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {tournamentName}
+            {stripGamePrefix(tournamentName)}
           </div>
           <Img src={game === "valorant" ? "/valorantlogo.png" : game === "cs2" ? "/cs2logo.png" : "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/global/dota2_logo_symbol.png"} style={{ width: 44, height: 44, objectFit: "contain" }} />
         </div>
