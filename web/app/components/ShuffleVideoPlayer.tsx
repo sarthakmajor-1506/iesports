@@ -12,8 +12,8 @@ interface Props {
 }
 
 const FPS = 30;
-const ENCODE_W = 1280;
-const ENCODE_H = 720;
+const ENCODE_W = 1080;
+const ENCODE_H = 1920;
 
 export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }: Props) {
   const playerRef = useRef<PlayerRef>(null);
@@ -101,11 +101,11 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         error: (e) => console.error("VideoEncoder error:", e),
       });
 
-      // Try H.264 High, fallback to Baseline
+      // Try H.264 High, fallback to Baseline — higher bitrate for 1080×1920
       try {
-        encoder.configure({ codec: "avc1.640028", width: encW, height: encH, bitrate: 5_000_000, framerate: FPS });
+        encoder.configure({ codec: "avc1.640028", width: encW, height: encH, bitrate: 7_000_000, framerate: FPS });
       } catch {
-        encoder.configure({ codec: "avc1.42001e", width: encW, height: encH, bitrate: 3_000_000, framerate: FPS });
+        encoder.configure({ codec: "avc1.42001e", width: encW, height: encH, bitrate: 4_500_000, framerate: FPS });
       }
 
       const offscreen = new OffscreenCanvas(ENCODE_W, ENCODE_H);
@@ -162,9 +162,9 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
           inputProps={{ tournamentName, game: "valorant" as const, teams }}
           durationInFrames={totalFrames}
           fps={FPS}
-          compositionWidth={1920}
-          compositionHeight={1080}
-          style={{ width: "100%", aspectRatio: "16/9" }}
+          compositionWidth={1080}
+          compositionHeight={1920}
+          style={{ width: "100%", maxWidth: 540, margin: "0 auto", aspectRatio: "9/16" }}
           controls
           autoPlay
         />
@@ -194,7 +194,7 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         )}
         {!recording && (
           <span style={{ fontSize: "0.62rem", color: "#555" }}>
-            {teamCount} teams · {durationSec}s · 1280×720 · {status || "Use Chrome for best results"}
+            {teamCount} teams · {durationSec}s · 1080×1920 (9:16 Reel) · {status || "Use Chrome for best results"}
           </span>
         )}
       </div>
