@@ -131,15 +131,26 @@ export async function POST(req: NextRequest) {
     }));
 
     // ── Step 2: Greedy assignment — place each player on the weakest team ──
+    // Collect ALL teams tied for the lowest (totalSkill, members) key, then pick one at random.
+    // Previously the loop kept the first-found index, which let Team 1 grab the best player on every
+    // tied round and pushed Team N to the bottom of the average-tier ranking.
     for (const player of sorted) {
-      // Find team with lowest total skill (break ties by fewer members)
-      let minIdx = 0;
+      let bestTotal = teams[0].totalSkill;
+      let bestMembers = teams[0].members.length;
       for (let t = 1; t < numTeams; t++) {
-        if (teams[t].totalSkill < teams[minIdx].totalSkill ||
-            (teams[t].totalSkill === teams[minIdx].totalSkill && teams[t].members.length < teams[minIdx].members.length)) {
-          minIdx = t;
+        if (teams[t].totalSkill < bestTotal ||
+            (teams[t].totalSkill === bestTotal && teams[t].members.length < bestMembers)) {
+          bestTotal = teams[t].totalSkill;
+          bestMembers = teams[t].members.length;
         }
       }
+      const candidates: number[] = [];
+      for (let t = 0; t < numTeams; t++) {
+        if (teams[t].totalSkill === bestTotal && teams[t].members.length === bestMembers) {
+          candidates.push(t);
+        }
+      }
+      const minIdx = candidates[Math.floor(Math.random() * candidates.length)];
       teams[minIdx].members.push(player);
       teams[minIdx].totalSkill += rating(player);
     }
@@ -174,7 +185,7 @@ export async function POST(req: NextRequest) {
               const oldSpread = Math.max(...oldAvgs) - Math.min(...oldAvgs);
               const newSpread = Math.max(...newAvgs) - Math.min(...newAvgs);
 
-              if (newSpread < oldSpread - 1) {
+              if (newSpread < oldSpread - 0.1) {
                 // Swap
                 const tmp = teams[i].members[pi];
                 teams[i].members[pi] = teams[j].members[pj];
