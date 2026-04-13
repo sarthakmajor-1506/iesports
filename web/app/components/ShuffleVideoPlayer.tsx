@@ -1,34 +1,90 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Player, PlayerRef } from "@remotion/player";
 import { ShuffleRevealComposition, getShuffleDuration } from "./remotion/ShuffleReveal";
 import type { ShuffleTeam } from "./remotion/ShuffleReveal";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
 interface Props {
   tournamentName: string;
   teams: ShuffleTeam[];
   teamCount: number;
+  /** Tournament ID — required for caching the rendered video to Firebase Storage. */
+  tournamentId?: string;
+  /** Existing Firebase Storage URL for this tournament's reel, if already rendered. */
+  cachedVideoUrl?: string;
+  /** Admin secret used to call /api/admin/save-shuffle-video after upload. */
+  adminKey?: string;
+  /** Fired after a successful upload + save so the parent can refresh state. */
+  onCacheSaved?: (url: string) => void;
 }
 
 const FPS = 30;
 const ENCODE_W = 1080;
 const ENCODE_H = 1920;
 
-export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }: Props) {
+export default function ShuffleVideoPlayer({
+  tournamentName,
+  teams,
+  teamCount,
+  tournamentId,
+  cachedVideoUrl,
+  adminKey,
+  onCacheSaved,
+}: Props) {
   const playerRef = useRef<PlayerRef>(null);
   const [recording, setRecording] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
+  const [localCachedUrl, setLocalCachedUrl] = useState<string | null>(cachedVideoUrl || null);
+
+  // Sync prop → state when the parent updates the cached URL
+  useEffect(() => {
+    if (cachedVideoUrl) setLocalCachedUrl(cachedVideoUrl);
+  }, [cachedVideoUrl]);
 
   const membersPerTeam = teams.length > 0 ? teams[0].members.length : 5;
   const totalFrames = getShuffleDuration(teamCount, membersPerTeam);
   const durationSec = Math.round(totalFrames / FPS);
 
-  const downloadMp4 = useCallback(async () => {
-    if (recording) return;
+  const triggerDownload = (url: string, filename: string) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
-    // Check browser support
+  // Fetch the cached file as a blob so the browser saves it instead of opening it
+  // inline. Falls back to a direct URL download if CORS blocks the blob fetch.
+  const downloadFromCache = useCallback(async () => {
+    if (!localCachedUrl || recording) return;
+    setRecording(true);
+    setProgress(0);
+    setStatus("Fetching cached video...");
+    try {
+      const res = await fetch(localCachedUrl);
+      if (!res.ok) throw new Error(`storage fetch ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${tournamentName.replace(/\s+/g, "_")}_shuffle.mp4`);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setStatus("Done!");
+      setProgress(100);
+    } catch (e) {
+      console.warn("[ShuffleVideoPlayer] cache fetch failed, falling back to direct URL:", e);
+      triggerDownload(localCachedUrl, `${tournamentName.replace(/\s+/g, "_")}_shuffle.mp4`);
+    } finally {
+      setRecording(false);
+      setTimeout(() => setStatus(""), 3000);
+    }
+  }, [localCachedUrl, recording, tournamentName]);
+
+  const renderAndDownload = useCallback(async () => {
+    if (recording) return;
     if (typeof VideoEncoder === "undefined") {
       alert("Your browser doesn't support video encoding. Please use Chrome 94+ or use screen recording.");
       return;
@@ -44,26 +100,48 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       if (!player || !container) throw new Error("Player not ready");
       player.pause();
 
+      // ── Pre-load all avatar images ─────────────────────────────────────────
+      // Without this, html2canvas captures the shuffle scene + early team-draft
+      // frames before avatar URLs have actually been fetched, and either renders
+      // missing-image placeholders or taints the canvas. Pre-loading warms the
+      // browser cache so by the time we capture, every avatar is decoded.
+      setStatus("Loading avatars...");
+      const avatarUrls = Array.from(new Set(
+        teams.flatMap(t => t.members.map(m => m.avatar)).filter(Boolean) as string[]
+      ));
+      await Promise.all(avatarUrls.map(url => new Promise<void>(resolve => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.referrerPolicy = "no-referrer";
+        const done = () => resolve();
+        img.onload = done;
+        img.onerror = done; // a single broken avatar must not block the render
+        img.src = url;
+        // hard cap so a slow CDN can't stall the whole pipeline
+        setTimeout(done, 4000);
+      })));
+
       const html2canvas = (await import("html2canvas")).default;
       const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
       const el = container as HTMLElement;
 
-      // Capture every 2nd frame for smooth motion (15 unique fps)
+      // Capture every 2nd frame; each unique frame is duplicated in the encode pass.
       const STEP = 2;
       const captureCount = Math.ceil(totalFrames / STEP);
       const captureScale = ENCODE_W / el.clientWidth;
 
       setStatus(`Capturing ${captureCount} keyframes...`);
 
-      // Capture in batches to avoid memory pressure
-      const BATCH = 50;
       const bitmaps: ImageBitmap[] = [];
+      const BATCH = 50;
 
       for (let k = 0; k < captureCount; k++) {
         const f = Math.min(k * STEP, totalFrames - 1);
         player.seekTo(f);
-        // Wait for 2 animation frames to ensure render
-        await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+        // 2 RAFs (~32ms) was too short — Remotion didn't always finish reconciling
+        // and the browser hadn't painted, so the shuffle vortex and start of the
+        // team-draft scene captured as missing/black. 60ms is a safe margin.
+        await new Promise<void>(r => setTimeout(r, 60));
         try {
           const canvas = await html2canvas(el, {
             width: el.clientWidth, height: el.clientHeight,
@@ -73,13 +151,10 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
           bitmaps.push(await createImageBitmap(canvas));
         } catch (captureErr) {
           console.warn("Frame capture failed at", k, captureErr);
-          // Reuse last good frame
           if (bitmaps.length > 0) bitmaps.push(bitmaps[bitmaps.length - 1]);
         }
         setProgress(Math.round(((k + 1) / captureCount) * 45));
         setStatus(`Capturing frame ${k + 1}/${captureCount}`);
-
-        // Yield to UI every batch
         if (k % BATCH === 0 && k > 0) {
           await new Promise(r => setTimeout(r, 10));
         }
@@ -90,7 +165,6 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       setStatus("Encoding video...");
       setProgress(46);
 
-      // Use actual captured size (may differ from ENCODE_W/H)
       const encW = ENCODE_W;
       const encH = ENCODE_H;
 
@@ -101,7 +175,6 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         error: (e) => console.error("VideoEncoder error:", e),
       });
 
-      // Try H.264 High, fallback to Baseline — higher bitrate for 1080×1920
       try {
         encoder.configure({ codec: "avc1.640028", width: encW, height: encH, bitrate: 7_000_000, framerate: FPS });
       } catch {
@@ -121,7 +194,6 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         if (i % 30 === 0) {
           setProgress(46 + Math.round((i / totalFrames) * 50));
           setStatus(`Encoding ${Math.round((i / totalFrames) * 100)}%`);
-          // Yield to UI periodically
           await new Promise(r => setTimeout(r, 0));
         }
       }
@@ -132,26 +204,68 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
       bitmaps.forEach(b => b.close());
 
       const blob = new Blob([target.buffer], { type: "video/mp4" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${tournamentName.replace(/\s+/g, "_")}_shuffle.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      // Trigger the local download immediately so the admin doesn't wait on the
+      // upload before getting the file.
+      const blobUrl = URL.createObjectURL(blob);
+      triggerDownload(blobUrl, `${tournamentName.replace(/\s+/g, "_")}_shuffle.mp4`);
+
+      // ── Cache the rendered video to Firebase Storage so future downloads
+      //    skip the entire render pipeline and just fetch the file.
+      if (tournamentId && adminKey) {
+        try {
+          setStatus("Uploading to cloud...");
+          setProgress(98);
+          const path = `tournament-videos/valorant/${tournamentId}.mp4`;
+          const sref = storageRef(storage, path);
+          await uploadBytes(sref, blob, {
+            contentType: "video/mp4",
+            customMetadata: { tournamentId, generatedAt: new Date().toISOString() },
+          });
+          const downloadUrl = await getDownloadURL(sref);
+
+          const saveRes = await fetch("/api/admin/save-shuffle-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adminKey, tournamentId, videoUrl: downloadUrl }),
+          });
+          if (!saveRes.ok) {
+            const err = await saveRes.json().catch(() => ({}));
+            throw new Error(err.error || `save failed (${saveRes.status})`);
+          }
+
+          setLocalCachedUrl(downloadUrl);
+          onCacheSaved?.(downloadUrl);
+          setStatus("Cached for instant downloads");
+        } catch (uploadErr) {
+          console.warn("[ShuffleVideoPlayer] cache upload failed:", uploadErr);
+          setStatus("Done (cache failed — check console)");
+        }
+      } else {
+        setStatus("Done!");
+      }
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
       setProgress(100);
-      setStatus("Done!");
     } catch (e: any) {
       console.error("MP4 export error:", e, e?.stack);
       const msg = e?.message || e?.name || (typeof e === "string" ? e : "Unknown error");
       alert("MP4 export failed: " + msg + "\n\nCheck browser console (F12) for details.\nTip: Use screen recording as an alternative (OBS or built-in screen recorder).");
     } finally {
       setRecording(false);
-      setTimeout(() => setStatus(""), 3000);
+      setTimeout(() => setStatus(""), 4000);
       playerRef.current?.play();
     }
-  }, [recording, totalFrames, tournamentName]);
+  }, [recording, totalFrames, tournamentName, teams, tournamentId, adminKey, onCacheSaved]);
+
+  // Choose the primary action based on whether a cached video already exists
+  const isCached = !!localCachedUrl;
+  const onClickPrimary = isCached ? downloadFromCache : renderAndDownload;
+  const primaryLabel = recording
+    ? `Working... ${progress}%`
+    : isCached
+      ? "Download MP4 (cached)"
+      : "Render & Download MP4";
 
   return (
     <div>
@@ -170,31 +284,49 @@ export default function ShuffleVideoPlayer({ tournamentName, teams, teamCount }:
         />
       </div>
 
-      {/* Download + info */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
         <button
           disabled={recording}
-          onClick={downloadMp4}
+          onClick={onClickPrimary}
           style={{
-            padding: "8px 20px", borderRadius: 8, border: "1px solid rgba(60,203,255,0.3)",
-            background: recording ? "rgba(60,203,255,0.05)" : "rgba(60,203,255,0.12)",
-            color: recording ? "#555" : "#3CCBFF", fontSize: "0.78rem", fontWeight: 700,
+            padding: "8px 20px", borderRadius: 8,
+            border: `1px solid ${isCached ? "rgba(120,255,180,0.35)" : "rgba(60,203,255,0.3)"}`,
+            background: recording
+              ? "rgba(60,203,255,0.05)"
+              : isCached ? "rgba(120,255,180,0.12)" : "rgba(60,203,255,0.12)",
+            color: recording ? "#555" : (isCached ? "#78FFB4" : "#3CCBFF"),
+            fontSize: "0.78rem", fontWeight: 700,
             cursor: recording ? "default" : "pointer", fontFamily: "inherit",
           }}
         >
-          {recording ? `Exporting... ${progress}%` : "Download MP4"}
+          {primaryLabel}
         </button>
+        {isCached && !recording && (
+          <button
+            onClick={renderAndDownload}
+            disabled={recording}
+            title="Re-render and overwrite the cached file"
+            style={{
+              padding: "8px 14px", borderRadius: 8, border: "1px solid #333",
+              background: "transparent", color: "#888",
+              fontSize: "0.7rem", fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Re-render
+          </button>
+        )}
         {recording && (
           <div style={{ flex: 1, minWidth: 100, display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${progress}%`, background: "#3CCBFF", borderRadius: 2, transition: "width 0.3s" }} />
+              <div style={{ height: "100%", width: `${progress}%`, background: isCached ? "#78FFB4" : "#3CCBFF", borderRadius: 2, transition: "width 0.3s" }} />
             </div>
             {status && <div style={{ fontSize: "0.6rem", color: "#555" }}>{status}</div>}
           </div>
         )}
         {!recording && (
           <span style={{ fontSize: "0.62rem", color: "#555" }}>
-            {teamCount} teams · {durationSec}s · 1080×1920 (9:16 Reel) · {status || "Use Chrome for best results"}
+            {teamCount} teams · {durationSec}s · 1080×1920 · {isCached ? "✓ cached" : (status || "First render takes ~1 min")}
           </span>
         )}
       </div>

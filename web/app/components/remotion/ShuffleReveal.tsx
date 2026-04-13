@@ -93,7 +93,9 @@ function easeOut(t: number) { return 1 - (1 - t) * (1 - t) * (1 - t); }
    ═══════════════════════════════════════════════ */
 
 const Avatar = React.memo(({ src, name, size, border, rgb }: { src?: string; name: string; size: number; border: string; rgb: string }) => {
-  if (src) return <Img src={src} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border }} />;
+  // crossOrigin="anonymous" is required so html2canvas can read the pixels
+  // during MP4 export — without it the canvas is tainted and capture fails.
+  if (src) return <Img src={src} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border }} />;
   return <div style={{ width: size, height: size, borderRadius: "50%", border, background: `rgba(${rgb}, 0.15)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.4, fontWeight: 900, color: `rgba(${rgb}, 0.8)` }}>{(name || "?")[0].toUpperCase()}</div>;
 });
 Avatar.displayName = "Avatar";

@@ -1332,10 +1332,20 @@ export default function AdminPanel() {
                           tournamentName={tournaments.find(t => t.id === tournamentId)?.name || "Tournament"}
                           teams={shuffleVideoTeams}
                           teamCount={shuffleVideoTeams.length}
+                          tournamentId={tournamentId}
+                          cachedVideoUrl={(tournaments.find(t => t.id === tournamentId) as any)?.shuffleVideoUrl}
+                          adminKey={adminKey}
+                          onCacheSaved={(url) => {
+                            // Mirror the new URL onto the local tournaments state so the
+                            // "cached" UI sticks without needing a full refetch.
+                            setTournaments(prev => prev.map(t =>
+                              t.id === tournamentId ? ({ ...t, shuffleVideoUrl: url } as any) : t
+                            ));
+                          }}
                         />
                         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                           <div style={{ fontSize: "0.65rem", color: "#555" }}>
-                            {shuffleVideoTeams.length} teams · {Math.round(getShuffleDuration(shuffleVideoTeams.length) / 30)}s · Use screen recording to capture
+                            {shuffleVideoTeams.length} teams · {Math.round(getShuffleDuration(shuffleVideoTeams.length) / 30)}s · First render uploads to cloud — subsequent downloads are instant
                           </div>
                         </div>
                       </div>

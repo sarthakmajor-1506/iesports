@@ -323,6 +323,11 @@ export interface ValorantTournament {
   // soloPlayers/{uid} remains the authoritative source of truth.
   playersSnapshot?: ValorantSoloPlayer[];
   playersSnapshotUpdatedAt?: string;
+  // Cached MP4 of the shuffle reveal video, uploaded to Firebase Storage after the
+  // admin renders it once in the browser. The Download button on the admin panel
+  // fetches this URL directly when present, skipping the slow html2canvas pass.
+  shuffleVideoUrl?: string;
+  shuffleVideoUpdatedAt?: string;
 }
 
 
