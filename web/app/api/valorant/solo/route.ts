@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
-    // ── Refresh Riot rank from Henrik API ───────────────────────────────
+    // ── Refresh Riot rank from interim Valorant rank API ────────────────
     let currentRank = userData.riotRank || "";
     let currentTier = userData.riotTier || 0;
     let peakTier = userData.riotPeakTier || currentTier;

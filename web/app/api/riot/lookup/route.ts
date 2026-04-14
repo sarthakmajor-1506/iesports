@@ -6,13 +6,12 @@ import { adminDb } from "@/lib/firebaseAdmin";
  *
  * Body: { riotId: "GameName#TAG", region?: "ap", uid?: string }
  *
- * Calls Henrik Dev API to fetch:
+ * Calls the interim Valorant rank API to fetch:
  *   1. Account data (name, tag, avatar, level, puuid)
  *   2. MMR/rank data (current tier, rank name)
  *
  * Returns combined player card data for the connect-riot page.
  *
- * Henrik API docs: https://docs.henrikdev.xyz/valorant/api-reference/accounts
  * Auth: Authorization header with raw API key (no Bearer prefix)
  * Alt auth: ?api_key= query param
  * Region default: "ap" (Asia Pacific — covers India/SEA)
@@ -22,7 +21,7 @@ const HENRIK_BASE = "https://api.henrikdev.xyz/valorant";
 
 function henrikFetch(path: string): Promise<Response> {
   const apiKey = process.env.HENRIK_API_KEY || "";
-  // Henrik API accepts auth via Authorization header (raw key, NOT Bearer)
+  // Accepts auth via Authorization header (raw key, NOT Bearer)
   // AND via ?api_key= query param. We use both for maximum compatibility.
   const separator = path.includes("?") ? "&" : "?";
   const url = apiKey ? `${HENRIK_BASE}${path}${separator}api_key=${apiKey}` : `${HENRIK_BASE}${path}`;
@@ -86,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (!accountRes.ok) {
       const errText = await accountRes.text().catch(() => "Unknown error");
-      console.error("Henrik account API error:", accountRes.status, errText);
+      console.error("Riot account lookup error:", accountRes.status, errText);
       return NextResponse.json(
         { error: "Failed to look up player. Try again." },
         { status: 502 }
@@ -135,11 +134,11 @@ export async function POST(req: NextRequest) {
       } else {
         // MMR fetch failed — player might have no ranked data
         // This is non-blocking, we still return the account info
-        console.warn("Henrik MMR API returned:", mmrRes.status, "— defaulting to Unranked");
+        console.warn("MMR lookup returned:", mmrRes.status, "— defaulting to Unranked");
       }
     } catch (mmrErr) {
       // Non-blocking — rank data is optional
-      console.warn("Henrik MMR fetch failed (non-blocking):", mmrErr);
+      console.warn("MMR fetch failed (non-blocking):", mmrErr);
     }
 
     // ── 3. Return combined player card ───────────────────────────────────
@@ -151,7 +150,7 @@ export async function POST(req: NextRequest) {
       avatar: account.card?.small || account.card?.large || "",
       puuid: account.puuid || "",
       rank,       // e.g. "Diamond 3" or "Unranked"
-      tier,       // e.g. 20 (Henrik API currenttier number)
+      tier,       // e.g. 20 (currenttier integer)
     });
   } catch (e: any) {
     console.error("Riot lookup error:", e.message);

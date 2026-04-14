@@ -111,7 +111,6 @@ export default function Home() {
   }, []);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  const loginWithSteam = () => { window.open("/api/auth/steam", "_blank"); };
 
   const slotsLeft = featuredTournament ? featuredTournament.totalSlots - featuredTournament.slotsBooked : null;
   const slotPct   = featuredTournament ? Math.round((featuredTournament.slotsBooked / featuredTournament.totalSlots) * 100) : 0;
@@ -325,7 +324,7 @@ export default function Home() {
 
       {/* NAVBAR */}
       <nav className="ie-nav">
-        <a className="ie-nav-brand" href="#">
+        <a className="ie-nav-brand" href="/">
           <Image src="/ielogo.png" alt="Indian Esports" width={38} height={38} priority style={{ borderRadius: 7 }} />
           <span className="ie-nav-name">Indian <span>Esports</span></span>
         </a>
@@ -743,11 +742,17 @@ export default function Home() {
             <span className="ie-footer-name">Indian Esports</span>
           </div>
           <div className="ie-footer-links">
-            {["About","Games","Tournaments","Leaderboard","Terms","Privacy","Contact"].map(l => (
-              <a key={l} href="#">{l}</a>
-            ))}
+            <a href="/about">About</a>
+            <a href="/dota2">Dota 2</a>
+            <a href="/valorant">Valorant</a>
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="mailto:iesportsbot@gmail.com">Contact</a>
           </div>
           <div className="ie-footer-copy">© 2026 Indian Esports. All rights reserved.</div>
+          <div style={{ marginTop: 14, padding: "12px 16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.55, maxWidth: 880, marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
+            iesports isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+          </div>
         </div>
       </footer>
 

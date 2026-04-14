@@ -1753,7 +1753,7 @@ export default function AdminPanel() {
                       <div style={stepBox(isLive, isCompleted)}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <span style={stepDone(isCompleted)}>{isCompleted ? "✓" : "4"}</span>
-                          <span style={stepTitle}>Fetch Match Results (Henrik API)</span>
+                          <span style={stepTitle}>Fetch Match Results</span>
                         </div>
                         {!isLive && !isCompleted && <div style={stepHint("#f59e0b")}>Start match first to fetch results</div>}
                         {(isLive || isCompleted) && (

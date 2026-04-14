@@ -2,6 +2,7 @@
 
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 
 type LinkableAccount = {
   type: "steam" | "riot";
@@ -268,7 +269,13 @@ export default function DiscordAccountsPrompt() {
                         {isLinking ? "Linking..." : "Use this"}
                       </button>
                       <button
-                        onClick={() => window.open(manualPath, "_blank")}
+                        onClick={() => {
+                          if (manualPath.startsWith("/api/auth/")) {
+                            navigateWithAppPriority(manualPath);
+                          } else {
+                            window.location.href = manualPath;
+                          }
+                        }}
                         disabled={!!linking}
                         style={{
                           padding: "8px 10px",

@@ -7,7 +7,7 @@ import { sendGameResult, sendTournamentComplete } from "@/lib/discord";
 /**
  * POST /api/valorant/match-fetch
  *
- * Fetches a single Valorant game's stats from Henrik API and stores them.
+ * Fetches a single Valorant game's stats from the interim Valorant rank API and stores them.
  * Designed for BO2 series: admin calls once for Game 1, once for Game 2.
  *
  * KEY IMPROVEMENTS:
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       const v2Url = `https://api.henrikdev.xyz/valorant/v2/match/${valorantMatchId}`;
       const v2Res = await fetch(v2Url, { headers: { Authorization: henrikKey } });
       if (!v2Res.ok) {
-        return NextResponse.json({ error: `Henrik API error: ${v2Res.status}. Match ID may be invalid.` }, { status: 400 });
+        return NextResponse.json({ error: `Match fetch failed: ${v2Res.status}. Match ID may be invalid.` }, { status: 400 });
       }
       const v2Json = await v2Res.json();
       matchData = v2Json.data;

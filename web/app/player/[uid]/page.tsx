@@ -101,6 +101,38 @@ export default function PlayerProfile() {
 
   // Display name state
   const [nameInput, setNameInput] = useState("");
+
+  // Dota rank manual sync state (button on Dota tab for own profile)
+  const [dotaSyncState, setDotaSyncState] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [dotaSyncMsg, setDotaSyncMsg] = useState("");
+  const refreshDotaRank = async () => {
+    if (!isOwnProfile || !profile?.steamId || dotaSyncState === "syncing") return;
+    setDotaSyncState("syncing");
+    setDotaSyncMsg("");
+    try {
+      const { getFirebaseAuth } = await import("@/lib/firebase");
+      const { auth } = await getFirebaseAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) { setDotaSyncState("error"); setDotaSyncMsg("Not signed in"); return; }
+      const res = await fetch("/api/dota/sync", { method: "POST", headers: { Authorization: `Bearer ${idToken}` } });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setDotaSyncState("success");
+        setDotaSyncMsg("Rank updated");
+        // Reload the profile doc so the UI picks up the new values
+        try {
+          const snap = await getDoc(doc(db, "users", uid as string));
+          if (snap.exists()) setProfile({ ...(profile as UserProfile), ...(snap.data() as UserProfile), uid: uid as string });
+        } catch {}
+      } else {
+        setDotaSyncState("error");
+        setDotaSyncMsg(body?.error || `Sync failed (${res.status})`);
+      }
+    } catch (e: any) {
+      setDotaSyncState("error");
+      setDotaSyncMsg(e?.message || "Network error");
+    }
+  };
   const [nameEditing, setNameEditing] = useState(false);
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
@@ -412,7 +444,7 @@ export default function PlayerProfile() {
                     <div style={{ fontSize: "0.72rem", color: "#818cf8", fontWeight: 700 }}>Riot ID not connected</div>
                     <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Riot ID to see your Valorant rank and register for tournaments.</div>
                     {isOwnProfile && (
-                      <button onClick={() => window.open("/connect-riot", "_blank")} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Riot ID</button>
+                      <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/connect-riot"; }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Riot ID</button>
                     )}
                   </div>
                 )}
@@ -421,7 +453,7 @@ export default function PlayerProfile() {
                     <div style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>Steam not connected</div>
                     <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Steam account to see your Dota 2 rank and register for tournaments.</div>
                     {isOwnProfile && (
-                      <button onClick={() => window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank")} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(102,192,244,0.12)", color: "#66c0f4", border: "1px solid rgba(102,192,244,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Steam</button>
+                      <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(102,192,244,0.12)", color: "#66c0f4", border: "1px solid rgba(102,192,244,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Steam</button>
                     )}
                   </div>
                 )}
@@ -457,13 +489,47 @@ export default function PlayerProfile() {
             const exactRank = tier > 0 && medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : "Unranked";
             const bracketLabel = profile.dotaBracket ? ({ herald_guardian: "Herald – Guardian", crusader_archon: "Crusader – Archon", legend_ancient: "Legend – Ancient", divine_immortal: "Divine – Immortal" } as Record<string,string>)[profile.dotaBracket] || profile.dotaBracket : "—";
             return (
-            <div className="pp-stats-row">
-              <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{exactRank}</div><div className="pp-stat-label">Dota 2 Rank</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value">{bracketLabel}</div><div className="pp-stat-label">Bracket</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Tournaments</div></div>
-              <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
-            </div>
+            <>
+              <div className="pp-stats-row">
+                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{exactRank}</div><div className="pp-stat-label">Dota 2 Rank</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value">{bracketLabel}</div><div className="pp-stat-label">Bracket</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Tournaments</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
+              </div>
+              {isOwnProfile && profile.steamId && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "8px 0 18px", padding: "10px 14px", background: "rgba(102,192,244,0.06)", border: "1px solid rgba(102,192,244,0.18)", borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, color: "#8A8880", flex: 1, lineHeight: 1.5 }}>
+                    {tier > 0
+                      ? "Rank fetched from OpenDota. Click refresh to re-sync your latest matches and MMR."
+                      : "Rank data is fetched from OpenDota and can take 30-120 seconds on the first load."}
+                  </div>
+                  <button
+                    onClick={refreshDotaRank}
+                    disabled={dotaSyncState === "syncing"}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: 100,
+                      background: dotaSyncState === "syncing" ? "rgba(102,192,244,0.1)" : "rgba(102,192,244,0.18)",
+                      color: "#66c0f4",
+                      border: "1px solid rgba(102,192,244,0.35)",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      cursor: dotaSyncState === "syncing" ? "default" : "pointer",
+                      fontFamily: "inherit",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {dotaSyncState === "syncing" ? "Syncing..." : dotaSyncState === "success" ? "✓ Synced" : "Refresh Rank"}
+                  </button>
+                </div>
+              )}
+              {isOwnProfile && dotaSyncMsg && dotaSyncState === "error" && (
+                <div style={{ margin: "0 0 18px", padding: "8px 14px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 10, fontSize: 12, color: "#f87171" }}>
+                  {dotaSyncMsg}
+                </div>
+              )}
+            </>
             );
           })()}
 
@@ -840,8 +906,9 @@ export default function PlayerProfile() {
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
                       <button className="pp-acc-link-btn" onClick={() => {
+                        try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {}
                         if (hasDiscordAccount(discordConnections, "steam", steamLinked)) { triggerDiscordPrompt(); }
-                        else { window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); }
+                        else { navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }
                       }}>Connect</button>
                     )}
                   </div>
@@ -862,7 +929,7 @@ export default function PlayerProfile() {
                     {profile.discordId ? (
                       <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                     ) : (
-                      <button className="pp-acc-link-btn" onClick={() => window.open(`/api/auth/discord?uid=${user?.uid}`, "_blank")}>Connect</button>
+                      <button className="pp-acc-link-btn" onClick={() => { try { localStorage.removeItem("pendingRegistration"); } catch {} navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname)}`); }}>Connect</button>
                     )}
                   </div>
 
@@ -884,8 +951,9 @@ export default function PlayerProfile() {
                         <span className="pp-acc-badge pp-acc-pending">⏳ Pending</span>
                       ) : (
                         <button className="pp-acc-link-btn" onClick={() => {
+                          try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {}
                           if (hasDiscordAccount(discordConnections, "riot", !!authRiotData?.riotLinked)) { triggerDiscordPrompt(); }
-                          else { window.open("/connect-riot", "_blank"); }
+                          else { window.location.href = "/connect-riot"; }
                         }}>Connect</button>
                       )}
                       {profile.riotGameName && (

@@ -36,6 +36,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [fullName, setFullName] = useState(userProfile?.fullName || "");
   const [fullNameSaving, setFullNameSaving] = useState(false);
   const [fullNameSaved, setFullNameSaved] = useState(!!userProfile?.fullName);
@@ -289,7 +290,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     action: () => { setShowPhoneOtp(true); setPhoneStep("phone"); setPhoneError(""); setPhoneNum(""); setOtp(["","","","","",""]); setTimeout(() => phoneRef.current?.focus(), 200); },
   });
 
-  // Game-specific account — opens in new tab, modal stays open
+  // Game-specific account — same-tab redirect, return path saved in localStorage
   if (isValorant) {
     requirements.push({
       id: "riot",
@@ -299,7 +300,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       met: hasRiot,
       pending: riotPending,
       actionLabel: "Connect Riot ID",
-      action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open("/connect-riot", "_blank"); },
+      action: () => {
+        setConnecting("riot");
+        try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
+        window.location.href = "/connect-riot";
+      },
     });
   } else {
     requirements.push({
@@ -309,11 +314,15 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       emoji: "\u{1F3AE}",
       met: hasSteam,
       actionLabel: "Connect Steam",
-      action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open(`/api/auth/steam?uid=${user?.uid}`, "_blank"); },
+      action: () => {
+        setConnecting("steam");
+        try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
+        navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`);
+      },
     });
   }
 
-  // Discord — mandatory for both, opens in new tab
+  // Discord — mandatory for both, same-tab redirect
   requirements.push({
     id: "discord",
     label: "Discord",
@@ -321,7 +330,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     emoji: "\u{1F4AC}",
     met: hasDiscord,
     actionLabel: "Connect Discord",
-    action: () => { localStorage.setItem("pendingRegistration", window.location.pathname); window.open(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname + "?register=true")}`, "_blank"); },
+    action: () => {
+      setConnecting("discord");
+      try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
+      navigateWithAppPriority(`/api/auth/discord?uid=${user?.uid}&returnTo=${encodeURIComponent(window.location.pathname + "?register=true")}`);
+    },
   });
 
   const unmetRequirements = requirements.filter(r => !r.met && !r.pending);
@@ -630,26 +643,28 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     </button>
                     {linkFromDiscordError && <p style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>{linkFromDiscordError}</p>}
                     <div style={{ textAlign: "center" as const }}>
-                      <button onClick={currentReq.action} style={{
+                      <button onClick={currentReq.action} disabled={connecting === currentReq.id} style={{
                         background: "none", border: "none", color: "#555", fontSize: 12,
-                        cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" as const,
-                      }}>Connect manually instead</button>
+                        cursor: connecting === currentReq.id ? "default" : "pointer", fontFamily: "inherit", textDecoration: "underline" as const,
+                        opacity: connecting === currentReq.id ? 0.6 : 1,
+                      }}>{connecting === currentReq.id ? "Redirecting..." : "Connect manually instead"}</button>
                     </div>
                   </div>
                 )}
 
                 {!currentDcMatch && (
                   <div>
-                    <button onClick={currentReq.action} style={{
+                    <button onClick={currentReq.action} disabled={connecting === currentReq.id} style={{
                       width: "100%", padding: 14,
-                      background: `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
+                      background: connecting === currentReq.id ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                       border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
-                      cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
+                      cursor: connecting === currentReq.id ? "default" : "pointer", fontFamily: "inherit", marginBottom: 10,
+                      opacity: connecting === currentReq.id ? 0.8 : 1,
                     }}>
-                      {currentReq.actionLabel} {"\u2192"}
+                      {connecting === currentReq.id ? "Connecting..." : `${currentReq.actionLabel} \u2192`}
                     </button>
                     <p style={{ fontSize: 11, color: "#444", textAlign: "center" as const, lineHeight: 1.5 }}>
-                      Opens in a new tab. Return here when done — we detect it automatically.
+                      We&apos;ll redirect you to verify, then bring you right back to finish registration.
                     </p>
                   </div>
                 )}
@@ -664,16 +679,17 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Connect Discord</h3>
                   <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>{currentReq.desc}</p>
                 </div>
-                <button onClick={currentReq.action} style={{
+                <button onClick={currentReq.action} disabled={connecting === "discord"} style={{
                   width: "100%", padding: 14,
-                  background: "linear-gradient(135deg, #5865F2, #4752C4)",
+                  background: connecting === "discord" ? "#222" : "linear-gradient(135deg, #5865F2, #4752C4)",
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14,
-                  cursor: "pointer", fontFamily: "inherit", marginBottom: 10,
+                  cursor: connecting === "discord" ? "default" : "pointer", fontFamily: "inherit", marginBottom: 10,
+                  opacity: connecting === "discord" ? 0.8 : 1,
                 }}>
-                  {"Connect Discord \u2192"}
+                  {connecting === "discord" ? "Connecting..." : "Connect Discord \u2192"}
                 </button>
                 <p style={{ fontSize: 11, color: "#444", textAlign: "center" as const, lineHeight: 1.5 }}>
-                  Opens in a new tab. Return here when done.
+                  We&apos;ll redirect you to Discord, then bring you right back.
                 </p>
               </div>
             )}

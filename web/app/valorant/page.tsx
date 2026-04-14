@@ -232,6 +232,10 @@ export default function Valorant() {
               <span className="val-coming-soon-text">Solo ranked tournaments for Valorant are in development.</span>
             </div>
           )}
+
+          <div style={{ marginTop: 60, padding: "16px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, fontSize: 11, color: "rgba(240,238,234,0.5)", lineHeight: 1.6, textAlign: "center", maxWidth: 880, marginLeft: "auto", marginRight: "auto" }}>
+            iesports isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+          </div>
         </div>
       </div>
     </>

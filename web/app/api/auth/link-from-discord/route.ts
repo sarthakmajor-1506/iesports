@@ -12,7 +12,7 @@ import { fetchAndSyncPlayer } from "@/lib/fetchAndSyncPlayer";
  * Body: { uid, type: "steam" | "riot", platformId, platformName }
  *
  * Steam: Uses Steam API to fetch profile + OpenDota to fetch rank.
- * Riot:  Uses Henrik Dev API to look up rank, saves with "pending" verification.
+ * Riot:  Uses interim Valorant rank API to look up rank, saves with "pending" verification.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid Riot ID format." }, { status: 400 });
       }
 
-      // Look up via Henrik Dev API
+      // Look up via interim Valorant rank API
       const baseUrl = "https://api.henrikdev.xyz";
       const apiKey = process.env.HENRIK_API_KEY;
       const headers: Record<string, string> = {};

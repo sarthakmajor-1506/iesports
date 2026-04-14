@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import openid from "openid";
 import axios from "axios";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
-import { fetchAndSyncPlayer } from "@/lib/fetchAndSyncPlayer";
 
 export async function GET(req: NextRequest) {
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
@@ -100,17 +99,11 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // ── Fetch rank + matches immediately on Steam link ──────────
-        try {
-          await fetchAndSyncPlayer({
-            uid: firebaseUid,
-            steamId,
-            db: adminDb,
-          });
-        } catch (syncErr: any) {
-          // Non-blocking — don't fail the login if OpenDota is down
-          console.error("OpenDota sync failed (non-blocking):", syncErr.message);
-        }
+        // OpenDota rank + match sync is NOT run here. It's slow (30-120s on
+        // OpenDota's free tier) and would block the Steam login. The client
+        // fires POST /api/dota/sync from the steam-success page once the
+        // custom token signs in — that way the user sees their profile
+        // immediately and rank data fills in asynchronously.
 
         const customToken = await adminAuth.createCustomToken(firebaseUid);
         resolve(NextResponse.redirect(`${realm}/auth/steam-success?token=${customToken}`));

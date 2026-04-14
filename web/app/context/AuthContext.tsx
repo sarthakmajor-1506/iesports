@@ -190,6 +190,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, steamLinked, pathname, router]);
 
+  // Auto-sync Dota rank from OpenDota when the user has Steam linked but no rank.
+  // Fires /api/dota/sync in the background; reloads profile data when it completes.
+  // Guarded by a per-session flag so it only runs once per login session per uid
+  // even if components re-render. Rank sync is slow (30-120s on OpenDota free tier)
+  // and intentionally non-blocking — the user can use the site while it runs.
+  useEffect(() => {
+    if (loading || !user || !steamLinked) return;
+    if (dotaProfile?.dotaRankTier && dotaProfile.dotaRankTier > 0) return;
+    const flagKey = `dotaSyncAttempted_${user.uid}`;
+    try { if (sessionStorage.getItem(flagKey)) return; } catch {}
+    try { sessionStorage.setItem(flagKey, "1"); } catch {}
+    console.log("[dota-sync] firing /api/dota/sync for", user.uid);
+    (async () => {
+      try {
+        const { auth } = await getFirebaseAuth();
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) {
+          console.warn("[dota-sync] no ID token available — will retry on next reload");
+          try { sessionStorage.removeItem(flagKey); } catch {}
+          return;
+        }
+        const res = await fetch("/api/dota/sync", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok) {
+          console.log("[dota-sync] success", body);
+          // Rank data is now in Firestore; refresh local state to pick it up.
+          await syncUserData(user);
+        } else {
+          console.error("[dota-sync] failed", res.status, body);
+          // Allow a retry on next reload if OpenDota failed (rate limit, profile private, etc.)
+          try { sessionStorage.removeItem(flagKey); } catch {}
+        }
+      } catch (e: any) {
+        console.error("[dota-sync] exception", e?.message);
+        try { sessionStorage.removeItem(flagKey); } catch {}
+      }
+    })();
+  }, [user, loading, steamLinked, dotaProfile?.dotaRankTier, syncUserData]);
+
   const logout = useCallback(async () => {
     if (user) {
       try { sessionStorage.removeItem(`discord_prompt_dismissed_${user.uid}`); } catch {}

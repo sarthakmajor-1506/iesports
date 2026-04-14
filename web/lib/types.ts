@@ -159,14 +159,14 @@ export type SoloMatchScore = {
 export interface RiotProfile {
   riotGameName: string;
   riotTagLine: string;
-  riotAvatar: string;           // card.small URL from Henrik API
+  riotAvatar: string;           // card.small URL from interim Valorant rank API
   riotRank: string;             // e.g. "Diamond 3" — human-readable
-  riotTier: number;             // Henrik API currenttier: 0=unranked, 3=Iron1 ... 27=Radiant
+  riotTier: number;             // currenttier: 0=unranked, 3=Iron1 ... 27=Radiant
   riotVerified: "unlinked" | "pending" | "verified";
   riotScreenshotUrl?: string;   // Firebase Storage path for manual verification
   riotLinkedAt?: string;        // ISO timestamp
   riotPuuid?: string;           // Riot PUUID for future API calls
-  riotPeakRank?: string;        // highest rank ever seen from Henrik API
+  riotPeakRank?: string;        // highest rank ever seen from interim Valorant rank API
   riotPeakTier?: number;        // highest tier ever seen (0-27)
   iesportsRating?: number;      // internal ELO rating (tier*100 scale, 300-2700)
   iesportsRank?: string;        // derived display rank (e.g. "Diamond 3")

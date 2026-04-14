@@ -3,7 +3,7 @@
  *
  * What it does:
  * 1. Fetches all users with riotPuuid from Firestore
- * 2. Calls Henrik API v2/mmr for fresh current + peak rank
+ * 2. Calls interim Valorant rank API v2/mmr for fresh current + peak rank
  * 3. Seeds iesportsRating = avg(currentTier, peakTier) * 100 for new users
  * 4. Applies floor check for existing users (Riot avg can only bump UP)
  * 5. Creates rankHistory entries for every change
@@ -38,7 +38,7 @@ const API_KEY = process.env.HENRIK_API_KEY || "";
 const BATCH_SIZE = 25;
 const BATCH_DELAY_MS = 60_000; // 60 seconds between batches
 
-// ── Henrik API fetch ────────────────────────────────────────────────────────
+// ── Valorant rank API fetch ─────────────────────────────────────────────────
 
 async function henrikMMR(region: string, name: string, tag: string) {
   const encodedName = encodeURIComponent(name);

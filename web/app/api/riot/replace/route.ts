@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Lookup new Riot ID via Henrik API ──────────────────────────────
+    // ── Lookup new Riot ID via interim Valorant rank API ───────────────
     const henrikKey = process.env.HENRIK_API_KEY || "";
     const searchRegion = region || "ap";
 

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     let accountLevel = userData.riotAccountLevel || 0;
     let region = userData.riotRegion || "ap";
 
-    // Try PUUID-based lookup first (Henrik v1)
+    // Try PUUID-based lookup first
     const acctRes = await fetch(
       `https://api.henrikdev.xyz/valorant/v1/by-puuid/account/${userData.riotPuuid}?api_key=${henrikKey}`,
       { headers: { "Authorization": henrikKey } }

@@ -31,10 +31,6 @@ export async function GET(req: NextRequest) {
     });
 
     const tokenData = await tokenRes.json();
-    console.log("RAW DISCORD RESPONSE:", JSON.stringify(tokenData));
-    console.log("REDIRECT URI:", `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/discord-callback`);
-    console.log("CLIENT ID:", process.env.DISCORD_CLIENT_ID);
-    console.log("CLIENT SECRET exists:", !!process.env.DISCORD_CLIENT_SECRET);
     if (!tokenData.access_token) throw new Error("No access token");
 
     const userRes = await fetch("https://discord.com/api/users/@me", {

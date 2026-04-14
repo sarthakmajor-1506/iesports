@@ -15,6 +15,9 @@ function SteamSuccessInner() {
       router.replace("/?error=steam_failed");
       return;
     }
+    // Sign in, then redirect. The Dota rank sync is triggered automatically
+    // by AuthContext once the user state loads (it watches for
+    // steamLinked + dotaRankTier==null and fires /api/dota/sync once per session).
     getFirebaseAuth().then(({ auth, mod }) => mod.signInWithCustomToken(auth, token))
       .then(() => {
         let dest = "/valorant";
@@ -46,8 +49,11 @@ function SteamSuccessInner() {
           margin: "0 auto 16px",
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p style={{ color: "#666", fontSize: 14, fontFamily: "system-ui, sans-serif" }}>
+        <p style={{ color: "#aaa", fontSize: 15, fontFamily: "system-ui, sans-serif", fontWeight: 600 }}>
           Signing you in via Steam…
+        </p>
+        <p style={{ color: "#666", fontSize: 12, fontFamily: "system-ui, sans-serif", marginTop: 8, maxWidth: 280 }}>
+          Your Dota 2 rank will sync in the background — no need to wait.
         </p>
       </div>
     </div>

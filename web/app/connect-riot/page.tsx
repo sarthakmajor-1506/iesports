@@ -405,7 +405,7 @@ export default function ConnectRiot() {
                 {screenshotExpanded && (
                   <div className="cr-accordion-body">
                     <p style={{ fontSize: 12, color: "#3CCBFF", lineHeight: 1.5, margin: "0 0 12px 0", padding: "8px 10px", background: "rgba(60,203,255,0.08)", border: "1px solid rgba(60,203,255,0.2)", borderRadius: 8 }}>
-                      Open Valorant → Career tab → take a screenshot showing your name and rank. Helps us verify faster.
+                      Optional: open Valorant → Career tab → take a screenshot showing your name and rank. This is part of our interim verification flow and helps the team confirm your account faster while we wait for Riot Sign-On to come online.
                     </p>
                     <div
                       className={`cr-upload-zone${selectedFile ? " has-file" : ""}`}
@@ -472,23 +472,33 @@ export default function ConnectRiot() {
                 <div className="cr-success-icon">🎉</div>
                 <div className="cr-success-title">Riot ID Submitted!</div>
                 <div className="cr-success-text">
-                  Your Riot ID has been submitted for verification. We'll review it within 24 hours.
-                  You can browse Valorant tournaments while you wait.
+                  Your Riot ID has been submitted for verification. We&apos;ll review it within 24 hours.
+                  You can browse Valorant tournaments while you wait. Riot Sign-On will replace this
+                  manual review step once Riot approves our production application.
                 </div>
                 <span className="cr-status-badge pending">⏳ Pending Review</span>
                 <button className="cr-btn" onClick={() => {
                   try {
                     const pending = localStorage.getItem("pendingRegistration");
                     if (pending) { localStorage.removeItem("pendingRegistration"); router.push(pending + "?register=true"); return; }
+                    const saved = sessionStorage.getItem("redirectAfterLogin");
+                    if (saved) { sessionStorage.removeItem("redirectAfterLogin"); router.push(saved); return; }
                   } catch {}
                   router.push("/valorant");
                 }} style={{ marginTop: 24 }}>
-                  {typeof window !== "undefined" && localStorage.getItem("pendingRegistration") ? "Return to Registration →" : "Browse Valorant Tournaments →"}
+                  {typeof window !== "undefined" && localStorage.getItem("pendingRegistration")
+                    ? "Return to Registration →"
+                    : typeof window !== "undefined" && sessionStorage.getItem("redirectAfterLogin")
+                      ? "Continue →"
+                      : "Browse Valorant Tournaments →"}
                 </button>
               </div>
             </div>
           )}
 
+          <div style={{ marginTop: 32, padding: "14px 18px", background: "#121215", border: "1px solid #2A2A30", borderRadius: 10, fontSize: 11, color: "#8A8880", lineHeight: 1.6, textAlign: "center" }}>
+            iesports isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+          </div>
         </div>
       </div>
     </>

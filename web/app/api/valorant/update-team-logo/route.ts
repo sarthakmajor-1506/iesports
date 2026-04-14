@@ -32,14 +32,10 @@ export async function POST(req: NextRequest) {
 
     // 3. Verify the user is a member of this team
     const members = teamData.members || [];
-    const isMember = members.some((m: any) => 
+    const isMember = members.some((m: any) =>
       m.uid === uid || m.id === uid || m.userId === uid || m.playerId === uid
     );
-    
-    console.log("[update-team-logo] uid:", uid);
-    console.log("[update-team-logo] members:", JSON.stringify(members.map((m: any) => ({ uid: m.uid, id: m.id, userId: m.userId, name: m.riotGameName })), null, 2));
-    console.log("[update-team-logo] isMember:", isMember);
-    
+
     if (!isMember) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
