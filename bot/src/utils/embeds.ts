@@ -192,7 +192,6 @@ export function welcomeEmbed(): EmbedBuilder {
     .setColor(BRAND)
     .setDescription(
       `**Get started:**\n` +
-      `• \`/linksteam <steam_id>\` — Link your Steam\n` +
       `• Click **Join Queue** on any active queue\n` +
       `• Queue opens daily — check #queue\n\n` +
       `Lobbies are fully automated. Once the queue fills, we create the Dota 2 lobby, invite everyone, shuffle teams, and post results — all automatically.`
