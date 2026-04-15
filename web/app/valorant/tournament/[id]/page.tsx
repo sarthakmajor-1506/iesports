@@ -205,7 +205,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           {/* Floating 2-2-1 Player Lineup */}
           <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
             {/* Team 1 Players */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "vtd-streak-left 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
+            <div className="vtd-mc-players-col" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "vtd-streak-left 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
               {[t1Sorted.slice(0, 2), t1Sorted.slice(2, 4), t1Sorted.slice(4, 5)].map((row, ri) => (
                 <div key={ri} className="vtd-mc-player-row" style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
                   {row.map((p: any, pi: number) => {
@@ -246,7 +246,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               ))}
             </div>
             {/* VS Center Column with Team Names */}
-            <div className="vtd-mc-vs-col" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "vtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px" }}>
+            <div className="vtd-mc-vs-col" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, flexShrink: 0, animation: "vtd-vs-pop 0.6s cubic-bezier(0.16,1,0.3,1) 0.35s both", zIndex: 3, padding: "0 6px", maxWidth: 140, minWidth: 80 }}>
               {/* Team 1 Logo + Name */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginBottom: 10, animation: "vtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.2s both" }}>
                 <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(60,203,255,0.3)", background: "linear-gradient(135deg, #3CCBFF22, #2563eb22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -283,7 +283,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               </div>
             </div>
             {/* Team 2 Players */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "vtd-streak-right 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
+            <div className="vtd-mc-players-col" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, animation: "vtd-streak-right 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
               {[t2Sorted.slice(0, 2), t2Sorted.slice(2, 4), t2Sorted.slice(4, 5)].map((row, ri) => (
                 <div key={ri} className="vtd-mc-player-row" style={{ display: "flex", justifyContent: "center", gap: 14, width: "100%" }}>
                   {row.map((p: any, pi: number) => {
@@ -1021,14 +1021,16 @@ function ValorantTournamentDetailInner() {
           .vtd-stat-tile { padding: 14px 10px; border-radius: 12px; }
           .vtd-stat-tile-val { font-size: 1.15rem; }
           /* Expanded match section */
-          .vtd-mc-expanded { padding: 14px 8px 12px !important; }
+          .vtd-mc-expanded { padding: 14px 6px 12px !important; }
           .vtd-mc-player-row { gap: 6px !important; }
           .vtd-fighter-card { gap: 2px !important; }
-          .vtd-fighter-card > img { width: 32px !important; height: 32px !important; }
-          .vtd-fighter-card > div:first-child { width: 32px !important; height: 32px !important; font-size: 0.75rem !important; }
-          .vtd-fighter-card > div:last-child { max-width: 40px !important; }
+          .vtd-fighter-card img { width: 34px !important; height: 34px !important; }
+          .vtd-fighter-card > div:first-child > div:first-child { width: 34px !important; height: 34px !important; font-size: 0.8rem !important; }
+          .vtd-fighter-card > div:last-child { max-width: 44px !important; }
           .vtd-fighter-card > div:last-child > div:first-child { font-size: 0.52rem !important; }
-          .vtd-mc-vs-col { padding: 0 2px !important; }
+          .vtd-mc-vs-col { padding: 0 2px !important; max-width: 110px !important; min-width: 70px !important; }
+          .vtd-mc-vs-col > div:first-child > div:last-child,
+          .vtd-mc-vs-col > div:last-child > div:first-child { font-size: 0.68rem !important; line-height: 1.15 !important; }
           .vtd-mc-vs { width: 34px !important; height: 34px !important; font-size: 0.75rem !important; }
           .vtd-mc-game-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
         }
@@ -1049,10 +1051,13 @@ function ValorantTournamentDetailInner() {
           /* Expanded match section */
           .vtd-mc-expanded { padding: 10px 4px 8px !important; }
           .vtd-mc-player-row { gap: 3px !important; }
-          .vtd-fighter-card > img { width: 26px !important; height: 26px !important; }
-          .vtd-fighter-card > div:first-child { width: 26px !important; height: 26px !important; font-size: 0.65rem !important; }
-          .vtd-fighter-card > div:last-child { max-width: 32px !important; }
-          .vtd-mc-vs-col { padding: 0 !important; }
+          .vtd-fighter-card img { width: 28px !important; height: 28px !important; }
+          .vtd-fighter-card > div:first-child > div:first-child { width: 28px !important; height: 28px !important; font-size: 0.65rem !important; }
+          .vtd-fighter-card > div:last-child { max-width: 36px !important; }
+          .vtd-fighter-card > div:last-child > div:first-child { font-size: 0.48rem !important; }
+          .vtd-mc-vs-col { padding: 0 !important; max-width: 90px !important; min-width: 60px !important; }
+          .vtd-mc-vs-col > div:first-child > div:last-child,
+          .vtd-mc-vs-col > div:last-child > div:first-child { font-size: 0.6rem !important; line-height: 1.1 !important; }
           .vtd-mc-vs { width: 28px !important; height: 28px !important; font-size: 0.6rem !important; }
           .vtd-mc-game-grid { grid-template-columns: 1fr !important; }
         }
