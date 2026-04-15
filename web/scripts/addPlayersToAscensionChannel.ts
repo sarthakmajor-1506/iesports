@@ -35,8 +35,16 @@ const DISCORD_CHANNEL_ID = "1493936270060027974";
 const DISCORD_CHANNEL_NAME = "league-of-rising-stars-ascension";
 
 // VIEW_CHANNEL | SEND_MESSAGES | READ_MESSAGE_HISTORY | EMBED_LINKS | ATTACH_FILES | ADD_REACTIONS
+// Using BigInt() constructor (not 1n literals) to stay compatible with
+// TypeScript targets below ES2020 — Next.js typechecks this file during
+// the production build even though it only runs standalone.
 const PERMISSION_ALLOW =
-  (1n << 10n) | (1n << 11n) | (1n << 16n) | (1n << 14n) | (1n << 15n) | (1n << 6n);
+  (BigInt(1) << BigInt(10)) |
+  (BigInt(1) << BigInt(11)) |
+  (BigInt(1) << BigInt(16)) |
+  (BigInt(1) << BigInt(14)) |
+  (BigInt(1) << BigInt(15)) |
+  (BigInt(1) << BigInt(6));
 
 async function resolveDiscordId(uid: string): Promise<string | null> {
   if (uid.startsWith("discord_")) {
