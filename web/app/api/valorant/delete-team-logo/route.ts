@@ -1,17 +1,25 @@
-// app/api/valorant/update-team-logo/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
+/**
+ * POST /api/valorant/delete-team-logo
+ *
+ * Clears the team's logo fields so the card falls back to the initials
+ * placeholder. Any team member can do this. The Storage file itself is
+ * left in place — the next logo upload reuses the same path
+ * (`team-logos/{tournamentId}/{teamId}.{ext}`) and overwrites it.
+ *
+ * Body: { tournamentId, teamId, uid }
+ */
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, teamId, uid, logoUrl } = await req.json();
+    const { tournamentId, teamId, uid } = await req.json();
 
-    if (!tournamentId || !teamId || !uid || !logoUrl) {
+    if (!tournamentId || !teamId || !uid) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // 1. Verify the team exists
     const teamRef = adminDb
       .collection("valorantTournaments")
       .doc(tournamentId)
@@ -24,26 +32,22 @@ export async function POST(req: NextRequest) {
     }
 
     const teamData = teamDoc.data()!;
-
-    // 2. Verify the user is a member of this team
     const members = teamData.members || [];
     const isMember = members.some((m: any) =>
       m.uid === uid || m.id === uid || m.userId === uid || m.playerId === uid
     );
-
     if (!isMember) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
 
-    // 3. Update the team logo
     await teamRef.update({
-      teamLogo: logoUrl,
-      teamLogoSet: true,
+      teamLogo: FieldValue.delete(),
+      teamLogoSet: false,
     });
 
     return NextResponse.json({ success: true });
   } catch (e: any) {
-    console.error("[update-team-logo] Error:", e);
+    console.error("[delete-team-logo] Error:", e);
     return NextResponse.json({ error: e.message || "Internal server error" }, { status: 500 });
   }
 }

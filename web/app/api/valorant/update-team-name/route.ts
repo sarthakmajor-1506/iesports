@@ -4,8 +4,9 @@ import { adminDb } from "@/lib/firebaseAdmin";
 /**
  * POST /api/valorant/update-team-name
  *
- * Allows any team member to set the team name ONCE.
- * After it's set, the `teamNameSet` flag prevents further changes.
+ * Any team member can set or change the team name at any point. The
+ * `teamNameSet` flag is still written so UI can show "customised" vs
+ * default, but it's no longer used to block subsequent edits.
  * Also updates standings and match docs to reflect the new name.
  *
  * Body: { tournamentId, teamId, uid, newTeamName }
@@ -31,11 +32,6 @@ export async function POST(req: NextRequest) {
     }
 
     const teamData = teamDoc.data()!;
-
-    // Check if team name was already set
-    if (teamData.teamNameSet) {
-      return NextResponse.json({ error: "Team name has already been set and cannot be changed" }, { status: 400 });
-    }
 
     // Verify the user is a member of this team
     const isMember = (teamData.members || []).some((m: any) => m.uid === uid);

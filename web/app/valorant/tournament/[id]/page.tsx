@@ -647,6 +647,26 @@ function ValorantTournamentDetailInner() {
     }
   };
 
+  const handleDeleteLogo = async (teamId: string) => {
+    if (!user) return;
+    if (!confirm("Remove this team's logo? You can upload a new one anytime.")) return;
+    setLogoUploading(true);
+    setLogoError("");
+    try {
+      const res = await fetch("/api/valorant/delete-team-logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, teamId, uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+    } catch (e: any) {
+      setLogoError(e.message || "Failed to remove logo");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const downloadShareCard = async () => {
     if (!shareCardRef.current) return;
     try {
@@ -1483,13 +1503,13 @@ function ValorantTournamentDetailInner() {
                   <TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
                 <div className="vtd-teams-grid">
-                  {teams.map((team: any) => { const isMyTeam = userTeam?.id === team.id; const canEdit = isMyTeam && !team.teamNameSet; const isEditing = editingTeamId === team.id; return (
+                  {teams.map((team: any) => { const isMyTeam = userTeam?.id === team.id; const canEdit = isMyTeam; const isEditing = editingTeamId === team.id; return (
                     <div key={team.id} className="vtd-team-box">
                       <span className="vtd-team-box-num">#{team.teamIndex}</span>
                       <div className="vtd-team-box-header">
-                        <div className="vtd-team-logo" style={{ position: "relative", cursor: (isMyTeam && !team.teamLogoSet && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (isMyTeam && !team.teamLogoSet && !logoUploading) logoInputRef.current?.click(); }}>
+                        <div className="vtd-team-logo" style={{ position: "relative", cursor: (isMyTeam && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (isMyTeam && !logoUploading) logoInputRef.current?.click(); }}>
                           {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
-                          {isMyTeam && !team.teamLogoSet && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
+                          {isMyTeam && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
                           {logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 18, height: 18, border: "2px solid #555", borderTopColor: "#3CCBFF", borderRadius: "50%", animation: "vtspin 0.8s linear infinite" }} /></div>)}
                         </div>
                         {isMyTeam && <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(team.id, f); }} />}
@@ -1535,11 +1555,22 @@ function ValorantTournamentDetailInner() {
                       </div>
                       <div className="vtd-team-box-footer">
                         <span>{team.members?.length || 0} players</span>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          {canEdit && !isEditing && <button className="vtd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>✏️ Set Name</button>}
-                          {isMyTeam && !team.teamLogoSet && !logoUploading && <button className="vtd-team-edit-btn" onClick={() => logoInputRef.current?.click()}>📷 Logo</button>}
-                          {team.teamNameSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Name</span>}
-                          {team.teamLogoSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Logo</span>}
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          {canEdit && !isEditing && (
+                            <button className="vtd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>
+                              ✏️ {team.teamNameSet ? "Edit Name" : "Set Name"}
+                            </button>
+                          )}
+                          {isMyTeam && !logoUploading && (
+                            <button className="vtd-team-edit-btn" onClick={() => logoInputRef.current?.click()}>
+                              📷 {team.teamLogoSet ? "Change Logo" : "Upload Logo"}
+                            </button>
+                          )}
+                          {isMyTeam && team.teamLogoSet && !logoUploading && (
+                            <button className="vtd-team-edit-btn" onClick={() => handleDeleteLogo(team.id)} title="Remove logo">
+                              🗑 Remove
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
