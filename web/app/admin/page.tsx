@@ -176,14 +176,19 @@ export default function AdminPanel() {
   // by iesportsRating from the previous tournament who are also playing this
   // one. Each team member is marked with `isMvp` so the team-formation scenes
   // can crown them.
-  async function buildShuffleVideoData(): Promise<{
+  async function buildShuffleVideoData(overrideTeams?: TeamData[]): Promise<{
     videoTeams: ShuffleTeam[];
     mvps: import("@/app/components/remotion/ShuffleReveal").ShufflePlayer[] | undefined;
   }> {
+    // Use overrideTeams when provided (e.g. right after a reshuffle, before the
+    // onSnapshot listener has refreshed the local `teams` state). Otherwise fall
+    // back to whatever `teams` holds from the closure.
+    const sourceTeams: TeamData[] = overrideTeams ?? teams;
+
     // Collect every UID currently registered for THIS tournament
     const currentUidByName: Record<string, string> = {};
     const currentUidSet = new Set<string>();
-    teams.forEach(t => (t.members || []).forEach((m: any) => {
+    sourceTeams.forEach(t => (t.members || []).forEach((m: any) => {
       if (m.uid) currentUidSet.add(m.uid);
       if (m.uid && (m.riotGameName || m.steamName)) {
         currentUidByName[(m.riotGameName || m.steamName)] = m.uid;
@@ -194,7 +199,7 @@ export default function AdminPanel() {
     // (which come from the leaderboard and may lack fresh avatar/rank data)
     // with the player's up-to-date profile for this tournament.
     const currentMembersByUid: Record<string, any> = {};
-    teams.forEach(t => (t.members || []).forEach((m: any) => {
+    sourceTeams.forEach(t => (t.members || []).forEach((m: any) => {
       if (m.uid) currentMembersByUid[m.uid] = m;
     }));
 
@@ -246,7 +251,7 @@ export default function AdminPanel() {
       }
     }
 
-    const videoTeams: ShuffleTeam[] = teams.map(t => ({
+    const videoTeams: ShuffleTeam[] = sourceTeams.map(t => ({
       teamName: t.teamName,
       members: (t.members || []).map((m: any) => ({
         uid: m.uid,
@@ -1386,14 +1391,22 @@ export default function AdminPanel() {
                         setShuffleVideoTeams(null);
                         setShuffleVideoMvps(undefined);
                         await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
-                        // Wait a moment for Firestore listener to update teams, then build video data
-                        setTimeout(async () => {
-                          const { videoTeams, mvps } = await buildShuffleVideoData();
+                        // Fetch the freshly-shuffled teams directly from Firestore instead of
+                        // waiting for the onSnapshot listener to update local state — the old
+                        // 3s setTimeout was reading stale `teams` from the handler's closure,
+                        // so the first-ever shuffle rendered no video at all.
+                        try {
+                          const col = getSelectedCollection();
+                          const freshSnap = await getDocs(query(collection(db, col, tournamentId, "teams"), orderBy("teamIndex")));
+                          const freshTeams = freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData));
+                          const { videoTeams, mvps } = await buildShuffleVideoData(freshTeams);
                           if (videoTeams.length > 0) {
                             setShuffleVideoTeams(videoTeams);
                             setShuffleVideoMvps(mvps);
                           }
-                        }, 3000);
+                        } catch (e) {
+                          console.error("[ShuffleVideo] failed to build after reshuffle:", e);
+                        }
                       }}>Delete & Reshuffle</button>
                       {teams.length > 0 && <div style={{ marginTop: 8 }}>{teams.map(t => { const avg = t.avgSkillLevel < 100 ? Math.round(t.avgSkillLevel * 100) : Math.round(t.avgSkillLevel); return <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {avg})</div>; })}</div>}
                       {teams.length > 0 && (
