@@ -163,95 +163,14 @@ export default function AdminPanel() {
 
   // ─── Shuffle Video ──────────────────────────────────────────────────────────
   const [shuffleVideoTeams, setShuffleVideoTeams] = useState<ShuffleTeam[] | null>(null);
-  const [shuffleVideoMvps, setShuffleVideoMvps] = useState<import("@/app/components/remotion/ShuffleReveal").ShufflePlayer[] | undefined>(undefined);
 
-  // Map: { current tournament id → previous tournament id whose top performers
-  // are highlighted as "players to watch" in the shuffle reveal video }
-  const PREVIOUS_TOURNAMENT_MAP: Record<string, string> = {
-    "league-of-rising-stars-ascension": "league-of-rising-stars-prelims",
-  };
-
-  // Build the videoTeams array AND the MVPs array, fetching the previous
-  // tournament's leaderboard if one is configured. MVPs are the top 5 players
-  // by iesportsRating from the previous tournament who are also playing this
-  // one. Each team member is marked with `isMvp` so the team-formation scenes
-  // can crown them.
-  async function buildShuffleVideoData(overrideTeams?: TeamData[]): Promise<{
-    videoTeams: ShuffleTeam[];
-    mvps: import("@/app/components/remotion/ShuffleReveal").ShufflePlayer[] | undefined;
-  }> {
+  function buildShuffleVideoData(overrideTeams?: TeamData[]): ShuffleTeam[] {
     // Use overrideTeams when provided (e.g. right after a reshuffle, before the
     // onSnapshot listener has refreshed the local `teams` state). Otherwise fall
     // back to whatever `teams` holds from the closure.
     const sourceTeams: TeamData[] = overrideTeams ?? teams;
 
-    // Collect every UID currently registered for THIS tournament
-    const currentUidByName: Record<string, string> = {};
-    const currentUidSet = new Set<string>();
-    sourceTeams.forEach(t => (t.members || []).forEach((m: any) => {
-      if (m.uid) currentUidSet.add(m.uid);
-      if (m.uid && (m.riotGameName || m.steamName)) {
-        currentUidByName[(m.riotGameName || m.steamName)] = m.uid;
-      }
-    }));
-
-    // Build a lookup of current members by uid so we can enrich MVP entries
-    // (which come from the leaderboard and may lack fresh avatar/rank data)
-    // with the player's up-to-date profile for this tournament.
-    const currentMembersByUid: Record<string, any> = {};
-    sourceTeams.forEach(t => (t.members || []).forEach((m: any) => {
-      if (m.uid) currentMembersByUid[m.uid] = m;
-    }));
-
-    // Try to fetch the previous tournament's REAL leaderboard (actual match
-    // performance, sorted by ACS) and filter to players still in this league.
-    const prevId = PREVIOUS_TOURNAMENT_MAP[tournamentId];
-    let mvpUidSet: Set<string> = new Set();
-    let mvps: import("@/app/components/remotion/ShuffleReveal").ShufflePlayer[] | undefined;
-    if (prevId) {
-      try {
-        const res = await fetch(`/api/tournaments/detail?id=${encodeURIComponent(prevId)}&game=valorant`);
-        if (res.ok) {
-          const prev = await res.json();
-          const prevLeaderboard: any[] = prev.leaderboard || [];
-          // Sort by ACS (canonical Valorant MVP metric), fall back to score.
-          // Keep only entries whose uid is in the current registered roster.
-          const ranked = prevLeaderboard
-            .filter(lb => lb.uid && currentUidSet.has(lb.uid))
-            .sort((a, b) => {
-              const aAcs = a.acs ?? 0;
-              const bAcs = b.acs ?? 0;
-              if (bAcs !== aAcs) return bAcs - aAcs;
-              return (b.totalScore ?? 0) - (a.totalScore ?? 0);
-            })
-            .slice(0, 5);
-
-          if (ranked.length > 0) {
-            mvpUidSet = new Set(ranked.map(p => p.uid));
-            mvps = ranked.map(lb => {
-              const cur = currentMembersByUid[lb.uid] || {};
-              return {
-                uid: lb.uid,
-                // Prefer the CURRENT tournament's riot display so avatars stay fresh
-                name: cur.riotGameName || lb.name || "Player",
-                tag: cur.riotTagLine || lb.tag || undefined,
-                avatar: cur.riotAvatar || undefined,
-                rank: cur.iesportsRank || cur.riotRank || undefined,
-                tier: cur.iesportsTier || cur.riotTier || undefined,
-                isMvp: true,
-              };
-            });
-            console.log(`[ShuffleVideo] Loaded ${ranked.length} MVPs from ${prevId} leaderboard (by ACS)`);
-          } else {
-            console.warn(`[ShuffleVideo] ${prevId} leaderboard had no entries with uids matching the current roster`);
-          }
-        }
-      } catch (e) {
-        console.warn("[ShuffleVideo] failed to fetch previous tournament MVPs:", e);
-      }
-    }
-
-    const videoTeams: ShuffleTeam[] = sourceTeams.map(t => ({
+    return sourceTeams.map(t => ({
       teamName: t.teamName,
       members: (t.members || []).map((m: any) => ({
         uid: m.uid,
@@ -260,12 +179,9 @@ export default function AdminPanel() {
         avatar: m.riotAvatar || m.steamAvatar || undefined,
         rank: m.iesportsRank || m.riotRank || undefined,
         tier: m.iesportsTier || m.riotTier || undefined,
-        isMvp: m.uid ? mvpUidSet.has(m.uid) : false,
       })),
       avgSkill: t.avgSkillLevel,
     }));
-
-    return { videoTeams, mvps };
   }
 
   // ─── Swiss Pairings ─────────────────────────────────────────────────────────
@@ -1389,7 +1305,6 @@ export default function AdminPanel() {
                         if (isTournamentEnded) return;
                         if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
                         setShuffleVideoTeams(null);
-                        setShuffleVideoMvps(undefined);
                         await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
                         // Fetch the freshly-shuffled teams directly from Firestore instead of
                         // waiting for the onSnapshot listener to update local state — the old
@@ -1399,10 +1314,9 @@ export default function AdminPanel() {
                           const col = getSelectedCollection();
                           const freshSnap = await getDocs(query(collection(db, col, tournamentId, "teams"), orderBy("teamIndex")));
                           const freshTeams = freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData));
-                          const { videoTeams, mvps } = await buildShuffleVideoData(freshTeams);
+                          const videoTeams = buildShuffleVideoData(freshTeams);
                           if (videoTeams.length > 0) {
                             setShuffleVideoTeams(videoTeams);
-                            setShuffleVideoMvps(mvps);
                           }
                         } catch (e) {
                           console.error("[ShuffleVideo] failed to build after reshuffle:", e);
@@ -1410,10 +1324,8 @@ export default function AdminPanel() {
                       }}>Delete & Reshuffle</button>
                       {teams.length > 0 && <div style={{ marginTop: 8 }}>{teams.map(t => { const avg = t.avgSkillLevel < 100 ? Math.round(t.avgSkillLevel * 100) : Math.round(t.avgSkillLevel); return <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {avg})</div>; })}</div>}
                       {teams.length > 0 && (
-                        <button style={{ ...btnStyle, marginTop: 8, fontSize: "0.72rem" }} onClick={async () => {
-                          const { videoTeams, mvps } = await buildShuffleVideoData();
-                          setShuffleVideoTeams(videoTeams);
-                          setShuffleVideoMvps(mvps);
+                        <button style={{ ...btnStyle, marginTop: 8, fontSize: "0.72rem" }} onClick={() => {
+                          setShuffleVideoTeams(buildShuffleVideoData());
                         }}>{shuffleVideoTeams ? "Regenerate Video" : "Generate Shuffle Video"}</button>
                       )}
                     </div>
@@ -1432,7 +1344,6 @@ export default function AdminPanel() {
                           tournamentId={tournamentId}
                           cachedVideoUrl={(tournaments.find(t => t.id === tournamentId) as any)?.shuffleVideoUrl}
                           adminKey={adminKey}
-                          mvps={shuffleVideoMvps}
                           onCacheSaved={(url) => {
                             // Mirror the new URL onto the local tournaments state so the
                             // "cached" UI sticks without needing a full refetch.

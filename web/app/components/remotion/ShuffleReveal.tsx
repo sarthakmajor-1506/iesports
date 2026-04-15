@@ -14,13 +14,12 @@ import {
    ═══════════════════════════════════════════════ */
 
 export interface ShufflePlayer {
-  uid?: string;            // for cross-scene MVP matching
+  uid?: string;
   name: string;
   tag?: string;
   avatar?: string;
   rank?: string;
   tier?: number;
-  isMvp?: boolean;         // top performer carried over from the previous tournament
 }
 
 export interface ShuffleTeam {
@@ -33,10 +32,6 @@ export interface ShuffleRevealProps {
   tournamentName: string;
   game: "valorant" | "dota" | "cs2";
   teams: ShuffleTeam[];
-  /** Top performers from the previous tournament who are also playing this league.
-   * Shown in the shuffle scene's 3D orbit and crowned wherever they appear in
-   * the team-formation scenes. */
-  mvps?: ShufflePlayer[];
 }
 
 /* ═══════════════════════════════════════════════
@@ -45,18 +40,9 @@ export interface ShuffleRevealProps {
 
 const FPS = 30;
 const INTRO_FRAMES = 90;
-// SHUFFLE: 3D orbit of all players that smoothly rotates between
-// MVP positions and pauses on each one for readability.
-const SHUFFLE_INTRO_FRAMES = 30;            // initial spin-in
-const SHUFFLE_MVP_PAUSE_FRAMES = 36;        // hold on each MVP (~1.2s)
-const SHUFFLE_MVP_ROTATE_FRAMES = 18;       // rotate from one MVP to the next (~0.6s)
-const SHUFFLE_MVP_COUNT = 5;
-const SHUFFLE_OUTRO_FRAMES = 24;            // pre-team-formation breath
-const SHUFFLE_FRAMES =
-  SHUFFLE_INTRO_FRAMES +
-  SHUFFLE_MVP_COUNT * SHUFFLE_MVP_PAUSE_FRAMES +
-  (SHUFFLE_MVP_COUNT - 1) * SHUFFLE_MVP_ROTATE_FRAMES +
-  SHUFFLE_OUTRO_FRAMES;
+// SHUFFLE: 3D orbit of every registered player rotating continuously
+// before the team-formation scenes take over.
+const SHUFFLE_FRAMES = 300;
 const PLAYER_DRAFT_FRAMES = 42;
 const TEAM_HOLD_FRAMES = 75;
 const OUTRO_FRAMES = 270;
@@ -169,25 +155,6 @@ function getRankPalette(rank?: string): RankPalette {
   return RANK_PALETTE[base] || { text: "#FFFFFF", bg: "rgba(255,255,255,0.14)", border: "rgba(255,255,255,0.45)" };
 }
 
-// Crown badge for MVP players — drawn as an inline SVG so html2canvas-pro
-// can rasterize it cleanly (emoji fonts are unreliable across systems).
-const Crown = React.memo(({ size = 36, color = "#FFD700", glow = "rgba(255,215,0,0.7)" }: { size?: number; color?: string; glow?: string }) => (
-  <svg width={size} height={size * 0.85} viewBox="0 0 32 28" fill="none" style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 2px 4px rgba(0,0,0,0.6))` }}>
-    <path
-      d="M3 22 L1 6 L9 12 L16 2 L23 12 L31 6 L29 22 Z"
-      fill={color}
-      stroke="#fff"
-      strokeWidth={1.5}
-      strokeLinejoin="round"
-    />
-    <rect x="3" y="22" width="26" height="4" rx="1" fill={color} stroke="#fff" strokeWidth={1.5} />
-    <circle cx="16" cy="2" r="1.8" fill="#fff" />
-    <circle cx="1" cy="6" r="1.6" fill="#fff" />
-    <circle cx="31" cy="6" r="1.6" fill="#fff" />
-  </svg>
-));
-Crown.displayName = "Crown";
-
 /* ═══════════════════════════════════════════════
    SCENE BACKGROUND — used by every scene for visual consistency
    Stacked radial gradients + faint grid pattern + accent lines.
@@ -294,145 +261,39 @@ function IntroScene({ frame, theme, tournamentName }: { frame: number; theme: Th
 }
 
 /* ═══════════════════════════════════════════════
-   SCENE 2: SHUFFLE — sort + Top-5 MVP showcase
-   Phase 1 (0..SHUFFLE_SORT_FRAMES): cycling list of all players,
-       suggesting the system is sorting through everyone.
-   Phase 2 (sortEnd..mvpEnd): each Top-5 MVP is revealed one by one,
-       depicted as being pulled out of the list with their previous-
-       tournament achievement (their iesports rank).
-   Phase 3 (mvpEnd..end): all 5 MVPs visible as a row, brief hold
-       before the team-formation scenes start.
+   SCENE 2: SHUFFLE — every registered player rotates in a
+   continuous 3D orbit, handing off to the team-draft scenes.
    ═══════════════════════════════════════════════ */
 
-function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[]; providedMvps?: ShufflePlayer[] }) {
-  // ── MVP set ────────────────────────────────────────────────────────────
-  // Prefer MVPs explicitly passed in (those are the actual top performers
-  // from the previous tournament who are also playing this one). Otherwise
-  // fall back to top N by tier from the current roster.
+function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[] }) {
   const sorted = useMemo(() => {
     const arr = [...allPlayers];
     arr.sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0) || (a.name || "").localeCompare(b.name || ""));
     return arr;
   }, [allPlayers]);
 
-  const mvps = useMemo<ShufflePlayer[]>(() => {
-    if (providedMvps && providedMvps.length > 0) {
-      // Match provided MVPs against the registered roster so we always render
-      // the in-tournament version (with up-to-date avatar/rank from the
-      // current tournament's snapshot). Filters out anyone NOT playing.
-      const matched: ShufflePlayer[] = [];
-      for (const mvp of providedMvps) {
-        const inRoster = allPlayers.find(p =>
-          (mvp.uid && p.uid && mvp.uid === p.uid) || p.name === mvp.name
-        );
-        if (inRoster) matched.push(inRoster);
-      }
-      if (matched.length > 0) return matched.slice(0, SHUFFLE_MVP_COUNT);
-    }
-    return sorted.slice(0, SHUFFLE_MVP_COUNT);
-  }, [providedMvps, allPlayers, sorted]);
-
-  // Stable index of each MVP within the FULL sorted list — used to compute
-  // the orbit angle that puts that MVP at the front position.
-  const mvpFullIdx = mvps.map((m) => {
-    const i = sorted.findIndex((p) => (m.uid && p.uid && m.uid === p.uid) || p.name === m.name);
-    return i >= 0 ? i : 0;
-  });
-
   const N = sorted.length || 1;
   const TWO_PI = Math.PI * 2;
   const anglePerSlot = TWO_PI / N;
 
-  // ── Build a deterministic rotation timeline ──────────────────────────
-  // Each MVP has a target rotation that places it at the "front center"
-  // of the orbit. We always rotate forward (increasing rotation) for a
-  // smooth, predictable visual.
-  const keyframes = useMemo(() => {
-    type KF = { frame: number; rotation: number };
-    const kf: KF[] = [];
-    let curFrame = 0;
-    let curRotation = 0;
-
-    // Intro: spin from 0 to MVP[0]
-    kf.push({ frame: curFrame, rotation: curRotation });
-    curFrame += SHUFFLE_INTRO_FRAMES;
-    let target = -mvpFullIdx[0] * anglePerSlot;
-    while (target >= curRotation) target -= TWO_PI; // always rotate forward
-    curRotation = target;
-    kf.push({ frame: curFrame, rotation: curRotation });
-
-    for (let i = 1; i < mvps.length; i++) {
-      // Pause on previous MVP
-      curFrame += SHUFFLE_MVP_PAUSE_FRAMES;
-      kf.push({ frame: curFrame, rotation: curRotation });
-
-      // Rotate forward to next MVP
-      curFrame += SHUFFLE_MVP_ROTATE_FRAMES;
-      let nextTarget = -mvpFullIdx[i] * anglePerSlot;
-      while (nextTarget >= curRotation) nextTarget -= TWO_PI;
-      curRotation = nextTarget;
-      kf.push({ frame: curFrame, rotation: curRotation });
-    }
-
-    // Final pause
-    curFrame += SHUFFLE_MVP_PAUSE_FRAMES;
-    kf.push({ frame: curFrame, rotation: curRotation });
-
-    // Outro
-    curFrame += SHUFFLE_OUTRO_FRAMES;
-    kf.push({ frame: curFrame, rotation: curRotation });
-
-    return kf;
-  }, [mvps, mvpFullIdx, anglePerSlot]);
-
-  // Smooth rotation lookup with ease-in-out between adjacent keyframes.
-  const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-  const rotation = (() => {
-    for (let i = 0; i < keyframes.length - 1; i++) {
-      const a = keyframes[i];
-      const b = keyframes[i + 1];
-      if (frame >= a.frame && frame <= b.frame) {
-        const span = Math.max(1, b.frame - a.frame);
-        const t = (frame - a.frame) / span;
-        const eased = a.rotation === b.rotation ? t : easeInOut(t);
-        return a.rotation + (b.rotation - a.rotation) * eased;
-      }
-    }
-    return keyframes[keyframes.length - 1].rotation;
-  })();
-
-  // Determine which MVP is currently in the "highlighted" pause window.
-  const currentMvpIdx = (() => {
-    let cur = SHUFFLE_INTRO_FRAMES;
-    for (let i = 0; i < mvps.length; i++) {
-      const pauseEnd = cur + SHUFFLE_MVP_PAUSE_FRAMES;
-      if (frame >= cur && frame < pauseEnd) return i;
-      cur = pauseEnd;
-      if (i < mvps.length - 1) cur += SHUFFLE_MVP_ROTATE_FRAMES;
-    }
-    return -1;
-  })();
+  // Continuous rotation: ease in to full speed, hold, ease out to rest.
+  // Two full turns across the whole shuffle scene.
+  const TOTAL_ROTATION = -TWO_PI * 2;
+  const easeInOutCubic = (x: number) =>
+    x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const progress = Math.max(0, Math.min(1, frame / SHUFFLE_FRAMES));
+  const rotation = TOTAL_ROTATION * easeInOutCubic(progress);
 
   // ── Orbit geometry ───────────────────────────────────────────────────
-  // A horizontal tilted ellipse. Aggressive depth contrast — front avatar
-  // is huge and unmissable, back ones are tiny and barely visible so the
-  // focal point reads instantly on a phone.
   const orbitCx = W / 2;
   const orbitCy = SAFE_CENTER_Y + 30;
-  const orbitRx = 360;       // horizontal radius
-  const orbitRy = 60;        // gentle vertical bobbing for tilt
-  const sizeMin = 28;        // back avatars (much smaller than before)
-  const sizeMax = 280;       // front avatar (much bigger than before)
+  const orbitRx = 360;
+  const orbitRy = 60;
+  const sizeMin = 28;
+  const sizeMax = 280;
 
-  // ── Heading ──────────────────────────────────────────────────────────
   const headingOp = interpolate(frame, [0, 12], [0, 1], clamp);
   const headingFadeOut = interpolate(frame, [SHUFFLE_FRAMES - 14, SHUFFLE_FRAMES], [1, 0.6], clamp);
-
-  // Subline that flips between the watchlist tag and the active MVP's name
-  const subline = currentMvpIdx >= 0
-    ? `Player to Watch · ${mvps[currentMvpIdx]?.name ?? ""}`
-    : "Players to watch for · From Prelims";
-
   const flash = interpolate(frame, [SHUFFLE_FRAMES - 10, SHUFFLE_FRAMES - 5, SHUFFLE_FRAMES], [0, 0.7, 0], clamp);
 
   return (
@@ -450,14 +311,14 @@ function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: numbe
           letterSpacing: 6, textTransform: "uppercase", marginBottom: 10,
           textShadow: glowText(theme, 0.7),
         }}>
-          Players to Watch
+          Shuffling Players
         </div>
         <div style={{
           fontSize: 52, fontWeight: 900, color: "#fff",
           letterSpacing: 0.5, lineHeight: 1.02, marginBottom: 8,
           textShadow: glowText(theme, 1.2),
         }}>
-          From Prelims
+          {N} in the Pool
         </div>
         <div style={{
           fontSize: 20, fontWeight: 800, color: theme.accentBright,
@@ -467,7 +328,7 @@ function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: numbe
           textShadow: glowText(theme, 0.6),
           minHeight: 28,
         }}>
-          {subline}
+          Teams forming now
         </div>
       </div>
 
@@ -475,18 +336,15 @@ function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: numbe
       {sorted.map((p, i) => {
         const baseAngle = i * anglePerSlot;
         const eff = baseAngle + rotation;
-        // Normalize to [-PI, PI] for cosine
         const sinA = Math.sin(eff);
         const cosA = Math.cos(eff);
 
         const x = sinA * orbitRx;
-        const y = -cosA * orbitRy; // negative so "front" sits slightly lower than "back"
+        const y = -cosA * orbitRy;
 
         const depth = (cosA + 1) / 2; // 0 (back) to 1 (front)
         const size = sizeMin + (sizeMax - sizeMin) * depth;
         const opacity = 0.18 + 0.82 * depth;
-        const isFront = depth > 0.92;
-        const isHighlightedMvp = isFront && currentMvpIdx >= 0 && i === mvpFullIdx[currentMvpIdx];
 
         return (
           <div key={i} style={{
@@ -498,20 +356,12 @@ function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: numbe
             zIndex: Math.floor(depth * 1000),
             pointerEvents: "none",
           }}>
-            {isHighlightedMvp && (
-              <div style={{
-                position: "absolute", inset: -22, borderRadius: "50%",
-                background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
-              }} />
-            )}
             <div style={{
               position: "relative",
               width: size, height: size,
               borderRadius: "50%",
-              border: `${isHighlightedMvp ? 5 : 3}px solid ${isHighlightedMvp ? theme.gold : theme.accentBright}`,
-              boxShadow: isHighlightedMvp
-                ? `0 0 30px ${theme.glow}, 0 8px 24px rgba(0,0,0,0.6)`
-                : `0 4px 14px rgba(0,0,0,0.5)`,
+              border: `3px solid ${theme.accentBright}`,
+              boxShadow: `0 4px 14px rgba(0,0,0,0.5)`,
               overflow: "hidden",
               background: theme.bgCardLight,
             }}>
@@ -531,67 +381,6 @@ function ShuffleScene({ frame, theme, allPlayers, providedMvps }: { frame: numbe
           </div>
         );
       })}
-
-      {/* MVP detail panel — pinned below the orbit */}
-      {currentMvpIdx >= 0 && (() => {
-        const cur = mvps[currentMvpIdx];
-        if (!cur) return null;
-        // Local time inside the current pause for fade-in
-        const intoPause = (() => {
-          let f = SHUFFLE_INTRO_FRAMES;
-          for (let i = 0; i < currentMvpIdx; i++) {
-            f += SHUFFLE_MVP_PAUSE_FRAMES + SHUFFLE_MVP_ROTATE_FRAMES;
-          }
-          return frame - f;
-        })();
-        const detailOp = interpolate(intoPause, [0, 10], [0, 1], clamp);
-        const detailY = interpolate(intoPause, [0, 12], [16, 0], clamp);
-
-        const rc = getRankPalette(cur.rank);
-        return (
-          <div style={{
-            position: "absolute", left: SAFE_LEFT, right: SAFE_RIGHT,
-            top: orbitCy + orbitRy + 175,
-            display: "flex", flexDirection: "column", alignItems: "center",
-            opacity: detailOp,
-            transform: `translateY(${detailY}px)`,
-          }}>
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 12,
-              fontSize: 20, fontWeight: 900, color: theme.gold,
-              letterSpacing: 6, textTransform: "uppercase",
-              padding: "9px 28px", borderRadius: 100,
-              background: "rgba(255,215,0,0.15)",
-              border: `2px solid ${theme.gold}`,
-              marginBottom: 14,
-              textShadow: glowText(theme, 0.8),
-            }}>
-              <Crown size={26} />
-              Prelims MVP
-            </div>
-            <div style={{
-              fontSize: 60, fontWeight: 900, color: "#fff",
-              letterSpacing: 0.5, textAlign: "center",
-              maxWidth: SAFE_W, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              textShadow: glowText(theme, 1.2),
-              marginBottom: 14,
-            }}>
-              {cur.name}
-            </div>
-            {cur.rank && (
-              <div style={{
-                fontSize: 24, fontWeight: 900, color: rc.text,
-                padding: "10px 32px", borderRadius: 100,
-                background: rc.bg,
-                border: `2px solid ${rc.border}`,
-                textShadow: softShadow,
-              }}>
-                {cur.rank}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {flash > 0 && <div style={{ position: "absolute", inset: 0, background: theme.accentBright, opacity: flash }} />}
     </AbsoluteFill>
@@ -677,15 +466,10 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
           {members.map((p, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
               <div style={{ position: "relative" }}>
-                <Avatar src={p.avatar} name={p.name} size={96} border={`3px solid ${p.isMvp ? theme.gold : theme.accentBright}`} rgb={theme.rgb} />
-                {p.isMvp && (
-                  <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)" }}>
-                    <Crown size={32} />
-                  </div>
-                )}
+                <Avatar src={p.avatar} name={p.name} size={96} border={`3px solid ${theme.accentBright}`} rgb={theme.rgb} />
               </div>
               <div style={{
-                fontSize: 20, fontWeight: 900, color: p.isMvp ? theme.gold : "#fff",
+                fontSize: 20, fontWeight: 900, color: "#fff",
                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 maxWidth: "100%", textAlign: "center",
                 textShadow: softShadow,
@@ -794,12 +578,7 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
             position: "absolute", inset: -14, borderRadius: "50%",
             background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
           }} />
-          <Avatar src={player.avatar} name={player.name} size={210} border={`6px solid ${player.isMvp ? theme.gold : theme.accentBright}`} rgb={theme.rgb} />
-          {player.isMvp && (
-            <div style={{ position: "absolute", top: -42, left: "50%", transform: "translateX(-50%)" }}>
-              <Crown size={68} />
-            </div>
-          )}
+          <Avatar src={player.avatar} name={player.name} size={210} border={`6px solid ${theme.accentBright}`} rgb={theme.rgb} />
         </div>
         <div style={{
           fontSize: 58, fontWeight: 900, color: "#fff",
@@ -915,19 +694,17 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
           const placeOp = fade(frame, playerStartFrame, 8);
           const placeScale = interpolate(frame, [playerStartFrame, playerStartFrame + 10], [0.7, 1], clamp);
           const rc = player.rank ? getRankPalette(player.rank) : null;
-          const borderColor = player.isMvp
-            ? theme.gold
-            : justPlaced ? theme.accentBright : theme.accent;
+          const borderColor = justPlaced ? theme.accentBright : theme.accent;
           return (
             <div key={i} style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
               opacity: placeOp, transform: `scale(${placeScale})`,
             }}>
               <div style={{ position: "relative" }}>
-                {(justPlaced || player.isMvp) && (
+                {justPlaced && (
                   <div style={{
                     position: "absolute", inset: -12, borderRadius: "50%",
-                    background: `radial-gradient(circle, ${player.isMvp ? "rgba(255,215,0,0.5)" : theme.glow} 0%, transparent 70%)`,
+                    background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
                   }} />
                 )}
                 <Avatar
@@ -937,11 +714,6 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
                   border={`4px solid ${borderColor}`}
                   rgb={theme.rgb}
                 />
-                {player.isMvp && (
-                  <div style={{ position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)" }}>
-                    <Crown size={54} />
-                  </div>
-                )}
               </div>
               <div style={{
                 fontSize: 28, fontWeight: 900, color: "#fff",
@@ -1082,7 +854,7 @@ function OutroScene({ frame, theme, teams, tournamentName }: { frame: number; th
    MAIN COMPOSITION
    ═══════════════════════════════════════════════ */
 
-export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournamentName, game, teams, mvps }) => {
+export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournamentName, game, teams }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const theme = THEMES[game] || THEMES.valorant;
@@ -1104,7 +876,7 @@ export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournam
         <IntroScene frame={frame} theme={theme} tournamentName={tournamentName} />
       </Sequence>
       <Sequence from={INTRO_FRAMES} durationInFrames={SHUFFLE_FRAMES}>
-        <ShuffleScene frame={frame - INTRO_FRAMES} theme={theme} allPlayers={allPlayers} providedMvps={mvps} />
+        <ShuffleScene frame={frame - INTRO_FRAMES} theme={theme} allPlayers={allPlayers} />
       </Sequence>
       {teams.map((team, i) => (
         <Sequence key={i} from={teamStarts[i]} durationInFrames={teamFramesList[i]}>

@@ -19,8 +19,6 @@ interface Props {
   adminKey?: string;
   /** Fired after a successful upload + save so the parent can refresh state. */
   onCacheSaved?: (url: string) => void;
-  /** Optional list of MVPs from the previous tournament who are also playing this league. */
-  mvps?: import("./remotion/ShuffleReveal").ShufflePlayer[];
 }
 
 const FPS = 30;
@@ -35,7 +33,6 @@ export default function ShuffleVideoPlayer({
   cachedVideoUrl,
   adminKey,
   onCacheSaved,
-  mvps,
 }: Props) {
   const playerRef = useRef<PlayerRef>(null);
   const [recording, setRecording] = useState(false);
@@ -351,7 +348,7 @@ export default function ShuffleVideoPlayer({
         <Player
           ref={playerRef}
           component={ShuffleRevealComposition as any}
-          inputProps={{ tournamentName, game: "valorant" as const, teams, mvps }}
+          inputProps={{ tournamentName, game: "valorant" as const, teams }}
           durationInFrames={totalFrames}
           fps={FPS}
           compositionWidth={1080}
