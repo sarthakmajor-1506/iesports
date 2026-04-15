@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 
 /**
  * POST /api/valorant/delete-team-logo
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     const isMember = members.some((m: any) =>
       m.uid === uid || m.id === uid || m.userId === uid || m.playerId === uid
     );
-    if (!isMember) {
+    if (!isMember && !canEditAnyTeam(uid)) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
 

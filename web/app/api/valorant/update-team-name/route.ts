@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 
 /**
  * POST /api/valorant/update-team-name
@@ -33,9 +34,9 @@ export async function POST(req: NextRequest) {
 
     const teamData = teamDoc.data()!;
 
-    // Verify the user is a member of this team
+    // Verify the user is a member of this team (or a global team editor)
     const isMember = (teamData.members || []).some((m: any) => m.uid === uid);
-    if (!isMember) {
+    if (!isMember && !canEditAnyTeam(uid)) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
 

@@ -12,6 +12,7 @@ import RankReportBadge from "@/app/components/RankReportBadge";
 import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
+import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -504,6 +505,7 @@ function ValorantTournamentDetailInner() {
   const [teamNameError, setTeamNameError] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
+  const [logoUploadTeamId, setLogoUploadTeamId] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
   const tabsWrapRef = useRef<HTMLDivElement>(null);
@@ -1503,16 +1505,15 @@ function ValorantTournamentDetailInner() {
                   <TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
                 <div className="vtd-teams-grid">
-                  {teams.map((team: any) => { const isMyTeam = userTeam?.id === team.id; const canEdit = isMyTeam; const isEditing = editingTeamId === team.id; return (
+                  {teams.map((team: any) => { const isTeamEditor = canEditAnyTeam(user?.uid); const isMyTeam = userTeam?.id === team.id; const canManageTeam = isMyTeam || isTeamEditor; const canEdit = canManageTeam; const isEditing = editingTeamId === team.id; return (
                     <div key={team.id} className="vtd-team-box">
                       <span className="vtd-team-box-num">#{team.teamIndex}</span>
                       <div className="vtd-team-box-header">
-                        <div className="vtd-team-logo" style={{ position: "relative", cursor: (isMyTeam && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (isMyTeam && !logoUploading) logoInputRef.current?.click(); }}>
+                        <div className="vtd-team-logo" style={{ position: "relative", cursor: (canManageTeam && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (canManageTeam && !logoUploading) { setLogoUploadTeamId(team.id); logoInputRef.current?.click(); } }}>
                           {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
-                          {isMyTeam && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
+                          {canManageTeam && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
                           {logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 18, height: 18, border: "2px solid #555", borderTopColor: "#3CCBFF", borderRadius: "50%", animation: "vtspin 0.8s linear infinite" }} /></div>)}
                         </div>
-                        {isMyTeam && <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(team.id, f); }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {isEditing ? (
                             <div>
@@ -1521,7 +1522,7 @@ function ValorantTournamentDetailInner() {
                               <div className="vtd-team-edit-actions"><button className="vtd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="vtd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
                           ) : (
-                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
+                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && canManageTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
                           )}
                         </div>
                       </div>
@@ -1561,12 +1562,12 @@ function ValorantTournamentDetailInner() {
                               ✏️ {team.teamNameSet ? "Edit Name" : "Set Name"}
                             </button>
                           )}
-                          {isMyTeam && !logoUploading && (
-                            <button className="vtd-team-edit-btn" onClick={() => logoInputRef.current?.click()}>
+                          {canManageTeam && !logoUploading && (
+                            <button className="vtd-team-edit-btn" onClick={() => { setLogoUploadTeamId(team.id); logoInputRef.current?.click(); }}>
                               📷 {team.teamLogoSet ? "Change Logo" : "Upload Logo"}
                             </button>
                           )}
-                          {isMyTeam && team.teamLogoSet && !logoUploading && (
+                          {canManageTeam && team.teamLogoSet && !logoUploading && (
                             <button className="vtd-team-edit-btn" onClick={() => handleDeleteLogo(team.id)} title="Remove logo">
                               🗑 Remove
                             </button>
@@ -1576,6 +1577,7 @@ function ValorantTournamentDetailInner() {
                     </div>
                   ); })}
                 </div>
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f && logoUploadTeamId) handleLogoUpload(logoUploadTeamId, f); }} />
                 </div>
               )}
             </div>
@@ -1604,10 +1606,18 @@ function ValorantTournamentDetailInner() {
                           const inUB = i < ubCount;
                           const inLB = i >= ubCount && i < bracketCount;
                           const eliminated = i >= bracketCount;
+                          const isBottomTwo = i >= standings.length - 2;
+                          const rowStyle: React.CSSProperties = isBottomTwo
+                            ? { background: "rgba(239,68,68,0.08)" }
+                            : inUB ? { background: "rgba(60,203,255,0.04)" }
+                            : inLB ? { background: "rgba(245,158,11,0.04)" }
+                            : eliminated ? { opacity: 0.5 } : {};
+                          const rankColor = isBottomTwo ? "#ef4444" : inUB ? "#3CCBFF" : inLB ? "#f59e0b" : "#555550";
+                          const nameColor = isBottomTwo ? "#ef4444" : undefined;
                           return (
-                            <tr key={s.id} style={inUB ? { background: "rgba(60,203,255,0.04)" } : inLB ? { background: "rgba(245,158,11,0.04)" } : eliminated ? { opacity: 0.5 } : {}}>
-                              <td style={{ fontWeight: 800, color: inUB ? "#3CCBFF" : inLB ? "#f59e0b" : "#555550" }}>{i + 1}</td>
-                              <td style={{ fontWeight: 700, textTransform: "capitalize" }}>{s.teamName}</td>
+                            <tr key={s.id} style={rowStyle}>
+                              <td style={{ fontWeight: 800, color: rankColor }}>{i + 1}</td>
+                              <td style={{ fontWeight: 700, textTransform: "capitalize", color: nameColor }}>{s.teamName}</td>
                               <td>{s.played || 0}</td>
                               <td>{s.wins || 0}</td>
                               <td>{s.draws || 0}</td>

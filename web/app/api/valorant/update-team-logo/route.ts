@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,13 +26,13 @@ export async function POST(req: NextRequest) {
 
     const teamData = teamDoc.data()!;
 
-    // 2. Verify the user is a member of this team
+    // 2. Verify the user is a member of this team (or a global team editor)
     const members = teamData.members || [];
     const isMember = members.some((m: any) =>
       m.uid === uid || m.id === uid || m.userId === uid || m.playerId === uid
     );
 
-    if (!isMember) {
+    if (!isMember && !canEditAnyTeam(uid)) {
       return NextResponse.json({ error: "You are not a member of this team" }, { status: 403 });
     }
 

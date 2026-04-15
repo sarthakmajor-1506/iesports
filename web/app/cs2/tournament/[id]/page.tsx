@@ -12,6 +12,7 @@ import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
+import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -498,6 +499,7 @@ function CS2TournamentDetailInner() {
   const [teamNameError, setTeamNameError] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
+  const [logoUploadTeamId, setLogoUploadTeamId] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
   const tabsWrapRef = useRef<HTMLDivElement>(null);
@@ -636,6 +638,22 @@ function CS2TournamentDetailInner() {
     } finally {
       setLogoUploading(false);
       if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteLogo = async (teamId: string) => {
+    if (!user) return;
+    setLogoError("");
+    try {
+      const res = await fetch("/api/valorant/delete-team-logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournamentId: id, teamId, uid: user.uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+    } catch (e: any) {
+      setLogoError(e.message || "Failed to remove logo");
     }
   };
 
@@ -1448,16 +1466,15 @@ function CS2TournamentDetailInner() {
                   <TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
                 <div className="csd-teams-grid">
-                  {teams.map((team: any) => { const isMyTeam = userTeam?.id === team.id; const canEdit = isMyTeam && !team.teamNameSet; const isEditing = editingTeamId === team.id; return (
+                  {teams.map((team: any) => { const isTeamEditor = canEditAnyTeam(user?.uid); const isMyTeam = userTeam?.id === team.id; const canManageTeam = isMyTeam || isTeamEditor; const canEdit = isTeamEditor || (isMyTeam && !team.teamNameSet); const canUploadLogo = isTeamEditor || (isMyTeam && !team.teamLogoSet); const isEditing = editingTeamId === team.id; return (
                     <div key={team.id} className="csd-team-box">
                       <span className="csd-team-box-num">#{team.teamIndex}</span>
                       <div className="csd-team-box-header">
-                        <div className="csd-team-logo" style={{ position: "relative", cursor: (isMyTeam && !team.teamLogoSet && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (isMyTeam && !team.teamLogoSet && !logoUploading) logoInputRef.current?.click(); }}>
+                        <div className="csd-team-logo" style={{ position: "relative", cursor: (canUploadLogo && !logoUploading) ? "pointer" : "default" }} onClick={() => { if (canUploadLogo && !logoUploading) { setLogoUploadTeamId(team.id); logoInputRef.current?.click(); } }}>
                           {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
-                          {isMyTeam && !team.teamLogoSet && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
+                          {canUploadLogo && !logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}><span style={{ color: "#fff", fontSize: 18 }}>📷</span></div>)}
                           {logoUploading && (<div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 18, height: 18, border: "2px solid #555", borderTopColor: "#f0a500", borderRadius: "50%", animation: "vtspin 0.8s linear infinite" }} /></div>)}
                         </div>
-                        {isMyTeam && <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(team.id, f); }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {isEditing ? (
                             <div>
@@ -1466,7 +1483,7 @@ function CS2TournamentDetailInner() {
                               <div className="csd-team-edit-actions"><button className="csd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="csd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
                           ) : (
-                            <><div className="csd-team-box-name">{team.teamName}</div><div className="csd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.cs2RankTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && isMyTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
+                            <><div className="csd-team-box-name">{team.teamName}</div><div className="csd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.cs2RankTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && canManageTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
                           )}
                         </div>
                       </div>
@@ -1487,15 +1504,17 @@ function CS2TournamentDetailInner() {
                       <div className="csd-team-box-footer">
                         <span>{team.members?.length || 0} players</span>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          {canEdit && !isEditing && <button className="csd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>✏️ Set Name</button>}
-                          {isMyTeam && !team.teamLogoSet && !logoUploading && <button className="csd-team-edit-btn" onClick={() => logoInputRef.current?.click()}>📷 Logo</button>}
-                          {team.teamNameSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Name</span>}
-                          {team.teamLogoSet && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Logo</span>}
+                          {canEdit && !isEditing && <button className="csd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>✏️ {team.teamNameSet ? "Edit Name" : "Set Name"}</button>}
+                          {canUploadLogo && !logoUploading && <button className="csd-team-edit-btn" onClick={() => { setLogoUploadTeamId(team.id); logoInputRef.current?.click(); }}>📷 {team.teamLogoSet ? "Change Logo" : "Logo"}</button>}
+                          {isTeamEditor && team.teamLogoSet && !logoUploading && <button className="csd-team-edit-btn" onClick={() => handleDeleteLogo(team.id)} title="Remove logo">🗑 Remove</button>}
+                          {team.teamNameSet && !isTeamEditor && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Name</span>}
+                          {team.teamLogoSet && !isTeamEditor && <span style={{ fontSize: "0.62rem", color: "#6fcf8a" }}>✓ Logo</span>}
                         </div>
                       </div>
                     </div>
                   ); })}
                 </div>
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f && logoUploadTeamId) handleLogoUpload(logoUploadTeamId, f); }} />
                 </div>
               )}
             </div>

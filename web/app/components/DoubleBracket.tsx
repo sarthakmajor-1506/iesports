@@ -316,15 +316,22 @@ export default function DoubleBracket({ matches, bracketSize, standings = [], br
     return m;
   }, [matches]);
 
-  // Get sorted teams from standings for seeding
+  // Get sorted teams from standings for seeding.
+  // Until bracket matches are generated, keep all slots TBD so the playoffs
+  // view doesn't leak standings into the bracket visualisation.
   const seededTeams = useMemo(() => {
+    if (matches.length === 0) {
+      return Array.from({ length: bracketSize }, () => ({
+        teamId: "TBD", teamName: "TBD", seed: 0, members: [],
+      } as TeamSlot));
+    }
     return standings.map((s, i) => ({
       teamId: s.id || s.teamId || s.teamName,
       teamName: s.teamName,
       seed: i + 1,
       members: [],
     } as TeamSlot));
-  }, [standings]);
+  }, [standings, matches.length, bracketSize]);
 
   const teamCount = seededTeams.length || bracketSize;
   const tId = tournamentId;
