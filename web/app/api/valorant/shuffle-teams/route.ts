@@ -5,12 +5,17 @@ import { adminDb } from "@/lib/firebaseAdmin";
 /**
  * POST /api/valorant/shuffle-teams
  *
- * Now supports `deleteExisting: true` which deletes all existing teams
- * and related matches/standings before reshuffling.
+ * Supports:
+ * - `deleteExisting: true` → deletes all existing teams/matches/standings
+ *    before reshuffling.
+ * - `dryRun: true` → runs the balance algorithm and returns the full team
+ *    layout WITHOUT touching Firestore. Used by the admin preview flow:
+ *    the admin reviews the draft in the panel, generates the video from it,
+ *    and only commits once happy via /api/valorant/publish-teams.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, teamCount, teamNames, deleteExisting } = await req.json();
+    const { tournamentId, adminKey, teamCount, teamNames, deleteExisting, dryRun } = await req.json();
 
     // ── Auth ────────────────────────────────────────────────────────────────
     if (!tournamentId || !adminKey) {
@@ -29,7 +34,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Delete existing teams, matches, standings if requested ───────────────
-    if (deleteExisting) {
+    // Dry-run never mutates Firestore, even when deleteExisting is set.
+    if (deleteExisting && !dryRun) {
       const subcollections = ["teams", "matches", "standings", "leaderboard"];
       for (const sub of subcollections) {
         const snap = await tournamentRef.collection(sub).get();
@@ -118,26 +124,39 @@ export async function POST(req: NextRequest) {
     // ── Step 1: Sort players by rating (highest first) ──
     const sorted = [...players].sort((a, b) => rating(b) - rating(a));
 
+    // ── High-tier cap — Immortal+ must spread across teams ──
+    // Without this, the balance optimizer can happily cluster two Immortals
+    // on the same team if it shaves a point off the overall spread. Hard
+    // constraint: every team holds at most ⌈highCount/numTeams⌉ Immortals.
+    const HIGH_TIER_MIN = 24; // Valorant Immortal 1 competitiveTier
+    const isHighTier = (p: typeof players[0]) =>
+      (p.riotTier || 0) >= HIGH_TIER_MIN;
+    const highCount = players.filter(isHighTier).length;
+    const highCap = highCount > 0 ? Math.ceil(highCount / numTeams) : 0;
+
     const teams: {
       teamIndex: number;
       teamName: string;
       members: typeof players;
       totalSkill: number;
+      highCount: number;
     }[] = Array.from({ length: numTeams }, (_, i) => ({
       teamIndex: i + 1,
       teamName: (teamNames?.[i] || `Team ${i + 1}`).toUpperCase(),
       members: [],
       totalSkill: 0,
+      highCount: 0,
     }));
 
-    // ── Step 2: Greedy assignment — place each player on the weakest team ──
-    // Collect ALL teams tied for the lowest (totalSkill, members) key, then pick one at random.
-    // Previously the loop kept the first-found index, which let Team 1 grab the best player on every
-    // tied round and pushed Team N to the bottom of the average-tier ranking.
+    // ── Step 2: Greedy assignment — place each player on the weakest team.
+    // Respects the high-tier cap: an Immortal+ player can only land on a
+    // team that still has room for Immortals.
     for (const player of sorted) {
-      let bestTotal = teams[0].totalSkill;
-      let bestMembers = teams[0].members.length;
-      for (let t = 1; t < numTeams; t++) {
+      const playerHigh = isHighTier(player);
+      let bestTotal = Infinity;
+      let bestMembers = Infinity;
+      for (let t = 0; t < numTeams; t++) {
+        if (playerHigh && highCap > 0 && teams[t].highCount >= highCap) continue;
         if (teams[t].totalSkill < bestTotal ||
             (teams[t].totalSkill === bestTotal && teams[t].members.length < bestMembers)) {
           bestTotal = teams[t].totalSkill;
@@ -146,103 +165,236 @@ export async function POST(req: NextRequest) {
       }
       const candidates: number[] = [];
       for (let t = 0; t < numTeams; t++) {
+        if (playerHigh && highCap > 0 && teams[t].highCount >= highCap) continue;
         if (teams[t].totalSkill === bestTotal && teams[t].members.length === bestMembers) {
           candidates.push(t);
         }
       }
+      // Fallback if the cap blocked every team (shouldn't happen with the
+      // ceil() cap, but stay safe): pick the globally weakest team.
+      if (candidates.length === 0) {
+        let idx = 0;
+        for (let t = 1; t < numTeams; t++) {
+          if (teams[t].totalSkill < teams[idx].totalSkill) idx = t;
+        }
+        candidates.push(idx);
+      }
       const minIdx = candidates[Math.floor(Math.random() * candidates.length)];
       teams[minIdx].members.push(player);
       teams[minIdx].totalSkill += rating(player);
+      if (playerHigh) teams[minIdx].highCount++;
     }
 
-    // ── Step 3: Swap optimization — reduce max-min spread ──
+    // ── Step 3: Balance refinement — run 1-for-1 and 2-for-2 swap passes
+    // until no improvement, minimizing the max-min spread of team averages.
+    // Previous version stopped at 0.1 rating-point improvements and only did
+    // single-player swaps, which left noticeable gaps between the top and
+    // bottom teams. 2-for-2 unlocks redistributions a 1-for-1 can't reach.
+    const getAvg = (t: typeof teams[0]) =>
+      t.members.length > 0 ? t.totalSkill / t.members.length : 0;
     const getSpread = () => {
-      const avgs = teams.map(t => t.members.length > 0 ? t.totalSkill / t.members.length : 0);
-      return Math.max(...avgs) - Math.min(...avgs);
+      let min = Infinity;
+      let max = -Infinity;
+      for (const t of teams) {
+        const a = getAvg(t);
+        if (a < min) min = a;
+        if (a > max) max = a;
+      }
+      return max - min;
     };
+    // Variance as a secondary signal — even when max-min is stuck on an
+    // unbreakable outlier, shrinking variance keeps all other teams tight.
+    const getVariance = () => {
+      const avgs = teams.map(getAvg);
+      const mean = avgs.reduce((a, b) => a + b, 0) / avgs.length;
+      return avgs.reduce((s, a) => s + (a - mean) ** 2, 0);
+    };
+    // Doubled from 1e-4 — reject micro-improvements so the optimizer doesn't
+    // thrash on floating-point noise and makes only confidently better moves.
+    const IMPROVE_EPS = 2e-4;
 
-    for (let pass = 0; pass < 20; pass++) {
+    const MAX_PASSES = 100;
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
       let improved = false;
+
+      // 1-for-1 swap: move one player from team i to team j and vice-versa.
       for (let i = 0; i < numTeams; i++) {
         for (let j = i + 1; j < numTeams; j++) {
           for (let pi = 0; pi < teams[i].members.length; pi++) {
             for (let pj = 0; pj < teams[j].members.length; pj++) {
-              const rI = rating(teams[i].members[pi]);
-              const rJ = rating(teams[j].members[pj]);
+              const pA = teams[i].members[pi];
+              const pB = teams[j].members[pj];
+              const rI = rating(pA);
+              const rJ = rating(pB);
               if (rI === rJ) continue;
 
-              // Simulate swap
-              const newTotalI = teams[i].totalSkill - rI + rJ;
-              const newTotalJ = teams[j].totalSkill - rJ + rI;
-              const newAvgI = newTotalI / teams[i].members.length;
-              const newAvgJ = newTotalJ / teams[j].members.length;
+              // Enforce the high-tier cap — never let a swap push a team over.
+              const aHigh = isHighTier(pA) ? 1 : 0;
+              const bHigh = isHighTier(pB) ? 1 : 0;
+              if (highCap > 0) {
+                const iNew = teams[i].highCount - aHigh + bHigh;
+                const jNew = teams[j].highCount - bHigh + aHigh;
+                if (iNew > highCap || jNew > highCap) continue;
+              }
 
-              const oldAvgs = teams.map(t => t.members.length > 0 ? t.totalSkill / t.members.length : 0);
-              const newAvgs = [...oldAvgs];
-              newAvgs[i] = newAvgI;
-              newAvgs[j] = newAvgJ;
+              const oldSpread = getSpread();
+              const oldVar = getVariance();
+              teams[i].totalSkill += (rJ - rI);
+              teams[j].totalSkill += (rI - rJ);
+              const newSpread = getSpread();
+              const newVar = getVariance();
 
-              const oldSpread = Math.max(...oldAvgs) - Math.min(...oldAvgs);
-              const newSpread = Math.max(...newAvgs) - Math.min(...newAvgs);
-
-              if (newSpread < oldSpread - 0.1) {
-                // Swap
-                const tmp = teams[i].members[pi];
-                teams[i].members[pi] = teams[j].members[pj];
-                teams[j].members[pj] = tmp;
-                teams[i].totalSkill = newTotalI;
-                teams[j].totalSkill = newTotalJ;
+              const accept =
+                newSpread < oldSpread - IMPROVE_EPS ||
+                (newSpread <= oldSpread + IMPROVE_EPS && newVar < oldVar - IMPROVE_EPS);
+              if (accept) {
+                teams[i].members[pi] = pB;
+                teams[j].members[pj] = pA;
+                teams[i].highCount += (bHigh - aHigh);
+                teams[j].highCount += (aHigh - bHigh);
                 improved = true;
+              } else {
+                teams[i].totalSkill -= (rJ - rI);
+                teams[j].totalSkill -= (rI - rJ);
               }
             }
           }
         }
       }
+
+      // 2-for-2 swap: trade a pair of players for a pair from another team.
+      // This can break deadlocks 1-for-1 can't — e.g. when no single player
+      // swap improves spread but shifting two-at-a-time does.
+      for (let i = 0; i < numTeams; i++) {
+        for (let j = i + 1; j < numTeams; j++) {
+          const mi = teams[i].members;
+          const mj = teams[j].members;
+          if (mi.length < 2 || mj.length < 2) continue;
+          for (let a1 = 0; a1 < mi.length; a1++) {
+            for (let a2 = a1 + 1; a2 < mi.length; a2++) {
+              const rIpair = rating(mi[a1]) + rating(mi[a2]);
+              const iOut = (isHighTier(mi[a1]) ? 1 : 0) + (isHighTier(mi[a2]) ? 1 : 0);
+              for (let b1 = 0; b1 < mj.length; b1++) {
+                for (let b2 = b1 + 1; b2 < mj.length; b2++) {
+                  const rJpair = rating(mj[b1]) + rating(mj[b2]);
+                  if (rIpair === rJpair) continue;
+
+                  // Cap enforcement for the two-player trade.
+                  const jOut = (isHighTier(mj[b1]) ? 1 : 0) + (isHighTier(mj[b2]) ? 1 : 0);
+                  if (highCap > 0) {
+                    const iNew = teams[i].highCount - iOut + jOut;
+                    const jNew = teams[j].highCount - jOut + iOut;
+                    if (iNew > highCap || jNew > highCap) continue;
+                  }
+
+                  const oldSpread = getSpread();
+                  const oldVar = getVariance();
+                  teams[i].totalSkill += (rJpair - rIpair);
+                  teams[j].totalSkill += (rIpair - rJpair);
+                  const newSpread = getSpread();
+                  const newVar = getVariance();
+
+                  const accept =
+                    newSpread < oldSpread - IMPROVE_EPS ||
+                    (newSpread <= oldSpread + IMPROVE_EPS && newVar < oldVar - IMPROVE_EPS);
+                  if (accept) {
+                    const tA1 = mi[a1];
+                    const tA2 = mi[a2];
+                    mi[a1] = mj[b1];
+                    mi[a2] = mj[b2];
+                    mj[b1] = tA1;
+                    mj[b2] = tA2;
+                    teams[i].highCount += (jOut - iOut);
+                    teams[j].highCount += (iOut - jOut);
+                    improved = true;
+                  } else {
+                    teams[i].totalSkill -= (rJpair - rIpair);
+                    teams[j].totalSkill -= (rIpair - rJpair);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       if (!improved) break;
     }
 
-    // ── Write teams to Firestore ────────────────────────────────────────────
-    const batch = adminDb.batch();
-    const teamsCollection = tournamentRef.collection("teams");
-    const teamSummaries: { id: string; teamName: string; memberCount: number; avgSkill: number }[] = [];
-
+    // Sort each team's members by rank descending (highest rank first). Use
+    // the same continuous `rating()` function the balance algorithm uses —
+    // the integer Valorant tier alone can't separate two players at the same
+    // tier with different iesportsRatings.
     for (const team of teams) {
+      team.members.sort(
+        (a: any, b: any) =>
+          rating(b) - rating(a) ||
+          String(a.riotGameName || "").localeCompare(String(b.riotGameName || ""))
+      );
+    }
+
+    // ── Build full team objects (shared between dry-run and write paths) ────
+    const fullTeams = teams.map((team) => {
       const avgSkill = team.members.length > 0
         ? Math.round((team.totalSkill / team.members.length) * 100) / 100
         : 0;
-
-      const teamRef = teamsCollection.doc(`team-${team.teamIndex}`);
-      batch.set(teamRef, {
+      return {
+        id: `team-${team.teamIndex}`,
         tournamentId,
         teamIndex: team.teamIndex,
         teamName: team.teamName,
         members: team.members,
         avgSkillLevel: avgSkill,
         totalSkillLevel: team.totalSkill,
-        createdAt: new Date().toISOString(),
-      });
+      };
+    });
 
-      teamSummaries.push({
-        id: `team-${team.teamIndex}`,
-        teamName: team.teamName,
-        memberCount: team.members.length,
-        avgSkill,
+    // ── Balance stats (computed from the full layout) ──
+    const avgs = fullTeams.map(t => t.avgSkillLevel);
+    const spread = Math.round((Math.max(...avgs) - Math.min(...avgs)) * 100) / 100;
+    const mean = avgs.reduce((a, b) => a + b, 0) / avgs.length;
+    const stdDev = Math.round(Math.sqrt(avgs.reduce((s, v) => s + (v - mean) ** 2, 0) / avgs.length) * 100) / 100;
+    const balance = { spread, stdDev, mean: Math.round(mean * 100) / 100 };
+
+    // ── Dry-run: return full teams without writing ─────────────────────────
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        totalPlayers: players.length,
+        teamCount: numTeams,
+        teams: fullTeams,
+        balance,
       });
     }
 
-    // Update tournament doc
+    // ── Write teams to Firestore ────────────────────────────────────────────
+    const batch = adminDb.batch();
+    const teamsCollection = tournamentRef.collection("teams");
+    const createdAt = new Date().toISOString();
+    for (const team of fullTeams) {
+      batch.set(teamsCollection.doc(team.id), {
+        tournamentId: team.tournamentId,
+        teamIndex: team.teamIndex,
+        teamName: team.teamName,
+        members: team.members,
+        avgSkillLevel: team.avgSkillLevel,
+        totalSkillLevel: team.totalSkillLevel,
+        createdAt,
+      });
+    }
     batch.update(tournamentRef, {
       teamsGenerated: true,
       teamCount: numTeams,
     });
-
     await batch.commit();
 
-    // ── Balance stats ──
-    const avgs = teamSummaries.map(t => t.avgSkill);
-    const spread = Math.round((Math.max(...avgs) - Math.min(...avgs)) * 100) / 100;
-    const mean = avgs.reduce((a, b) => a + b, 0) / avgs.length;
-    const stdDev = Math.round(Math.sqrt(avgs.reduce((s, v) => s + (v - mean) ** 2, 0) / avgs.length) * 100) / 100;
+    const teamSummaries = fullTeams.map(t => ({
+      id: t.id,
+      teamName: t.teamName,
+      memberCount: t.members.length,
+      avgSkill: t.avgSkillLevel,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -250,7 +402,7 @@ export async function POST(req: NextRequest) {
       teamCount: numTeams,
       teams: teamSummaries,
       deletedExisting: !!deleteExisting,
-      balance: { spread, stdDev, mean: Math.round(mean * 100) / 100 },
+      balance,
     });
   } catch (e: any) {
     console.error("Shuffle teams error:", e);

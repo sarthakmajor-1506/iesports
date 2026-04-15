@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
+import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
@@ -1262,12 +1263,16 @@ function DotaTournamentDetailInner() {
                         </div>
                       </div>
                       <div className="dtd-team-box-members">
-                        {(team.members || []).map((m: any, i: number) => {
+                        {[...(team.members || [])]
+                          .sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0))
+                          .map((m: any, i: number) => {
                           const isMeMember = user?.uid === m.uid;
                           return (
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="dtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
-                              {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                              <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
+                                {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                              </PlayerAvatarBadge>
                               <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
                             </div>
                           </Link>

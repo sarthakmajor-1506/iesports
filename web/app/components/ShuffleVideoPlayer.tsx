@@ -1,11 +1,17 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { Player, PlayerRef } from "@remotion/player";
 import { ShuffleRevealComposition, getShuffleDuration } from "./remotion/ShuffleReveal";
 import type { ShuffleTeam } from "./remotion/ShuffleReveal";
+import {
+  ShuffleRevealHorizontalComposition,
+  getShuffleHorizontalDuration,
+} from "./remotion/ShuffleRevealHorizontal";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+
+type Orientation = "vertical" | "horizontal";
 
 interface Props {
   tournamentName: string;
@@ -19,11 +25,11 @@ interface Props {
   adminKey?: string;
   /** Fired after a successful upload + save so the parent can refresh state. */
   onCacheSaved?: (url: string) => void;
+  /** 9:16 Instagram reel (default) or 16:9 Discord/YouTube live. */
+  orientation?: Orientation;
 }
 
 const FPS = 30;
-const ENCODE_W = 1080;
-const ENCODE_H = 1920;
 
 export default function ShuffleVideoPlayer({
   tournamentName,
@@ -33,6 +39,7 @@ export default function ShuffleVideoPlayer({
   cachedVideoUrl,
   adminKey,
   onCacheSaved,
+  orientation = "vertical",
 }: Props) {
   const playerRef = useRef<PlayerRef>(null);
   const [recording, setRecording] = useState(false);
@@ -45,8 +52,34 @@ export default function ShuffleVideoPlayer({
     if (cachedVideoUrl) setLocalCachedUrl(cachedVideoUrl);
   }, [cachedVideoUrl]);
 
-  const membersPerTeam = teams.length > 0 ? teams[0].members.length : 5;
-  const totalFrames = getShuffleDuration(teamCount, membersPerTeam);
+  // Encoding dimensions + composition + duration all key off orientation.
+  // Vertical = 1080×1920 Instagram reel, horizontal = 1920×1080 Discord live.
+  const { ENCODE_W, ENCODE_H, Composition, totalFrames, storageField, storagePath, maxPreviewWidth, aspectRatio } = useMemo(() => {
+    const membersPerTeam = teams.length > 0 ? teams[0].members.length : 5;
+    if (orientation === "horizontal") {
+      return {
+        ENCODE_W: 1920,
+        ENCODE_H: 1080,
+        Composition: ShuffleRevealHorizontalComposition as any,
+        totalFrames: getShuffleHorizontalDuration(teamCount, membersPerTeam),
+        storageField: "shuffleVideoUrlHorizontal",
+        storagePath: `tournament-videos/valorant/${tournamentId}-horizontal.mp4`,
+        maxPreviewWidth: 960,
+        aspectRatio: "16/9",
+      };
+    }
+    return {
+      ENCODE_W: 1080,
+      ENCODE_H: 1920,
+      Composition: ShuffleRevealComposition as any,
+      totalFrames: getShuffleDuration(teamCount, membersPerTeam),
+      storageField: "shuffleVideoUrl",
+      storagePath: `tournament-videos/valorant/${tournamentId}.mp4`,
+      maxPreviewWidth: 540,
+      aspectRatio: "9/16",
+    };
+  }, [orientation, teams, teamCount, tournamentId]);
+
   const durationSec = Math.round(totalFrames / FPS);
 
   const triggerDownload = (url: string, filename: string) => {
@@ -291,18 +324,17 @@ export default function ShuffleVideoPlayer({
         try {
           setStatus("Uploading to cloud...");
           setProgress(98);
-          const path = `tournament-videos/valorant/${tournamentId}.mp4`;
-          const sref = storageRef(storage, path);
+          const sref = storageRef(storage, storagePath);
           await uploadBytes(sref, blob, {
             contentType: "video/mp4",
-            customMetadata: { tournamentId, generatedAt: new Date().toISOString() },
+            customMetadata: { tournamentId, orientation, generatedAt: new Date().toISOString() },
           });
           const downloadUrl = await getDownloadURL(sref);
 
           const saveRes = await fetch("/api/admin/save-shuffle-video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ adminKey, tournamentId, videoUrl: downloadUrl }),
+            body: JSON.stringify({ adminKey, tournamentId, videoUrl: downloadUrl, field: storageField }),
           });
           if (!saveRes.ok) {
             const err = await saveRes.json().catch(() => ({}));
@@ -331,7 +363,7 @@ export default function ShuffleVideoPlayer({
       setTimeout(() => setStatus(""), 4000);
       playerRef.current?.play();
     }
-  }, [recording, totalFrames, tournamentName, teams, tournamentId, adminKey, onCacheSaved]);
+  }, [recording, totalFrames, tournamentName, teams, tournamentId, adminKey, onCacheSaved, ENCODE_W, ENCODE_H, storagePath, storageField, orientation]);
 
   // Choose the primary action based on whether a cached video already exists
   const isCached = !!localCachedUrl;
@@ -347,13 +379,13 @@ export default function ShuffleVideoPlayer({
       <div style={{ borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 30px rgba(0,0,0,0.5)" }}>
         <Player
           ref={playerRef}
-          component={ShuffleRevealComposition as any}
+          component={Composition}
           inputProps={{ tournamentName, game: "valorant" as const, teams }}
           durationInFrames={totalFrames}
           fps={FPS}
-          compositionWidth={1080}
-          compositionHeight={1920}
-          style={{ width: "100%", maxWidth: 540, margin: "0 auto", aspectRatio: "9/16" }}
+          compositionWidth={ENCODE_W}
+          compositionHeight={ENCODE_H}
+          style={{ width: "100%", maxWidth: maxPreviewWidth, margin: "0 auto", aspectRatio }}
           controls
           autoPlay
         />

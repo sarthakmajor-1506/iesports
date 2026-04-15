@@ -9,6 +9,7 @@ import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
+import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import Link from "next/link";
@@ -214,22 +215,24 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                         animation: `vtd-player-reveal 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
                       }}>
-                        {p.riotAvatar ? (
-                          <img src={p.riotAvatar} alt="" style={{
-                            width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
-                            border: "2px solid rgba(60,203,255,0.3)",
-                            boxShadow: "0 0 10px rgba(60,203,255,0.15), 0 3px 10px rgba(0,0,0,0.35)",
-                          }} />
-                        ) : (
-                          <div style={{
-                            width: 46, height: 46, borderRadius: "50%",
-                            background: "linear-gradient(135deg, #3CCBFF, #2563eb)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "0.95rem", fontWeight: 800, color: "#fff",
-                            border: "2px solid rgba(60,203,255,0.3)",
-                            boxShadow: "0 0 10px rgba(60,203,255,0.15)",
-                          }}>{(p.riotGameName || "?")[0]}</div>
-                        )}
+                        <PlayerAvatarBadge mvpBracket={p.mvpBracket} isChampion={p.isChampion} size={46}>
+                          {p.riotAvatar ? (
+                            <img src={p.riotAvatar} alt="" style={{
+                              width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
+                              border: "2px solid rgba(60,203,255,0.3)",
+                              boxShadow: "0 0 10px rgba(60,203,255,0.15), 0 3px 10px rgba(0,0,0,0.35)",
+                            }} />
+                          ) : (
+                            <div style={{
+                              width: 46, height: 46, borderRadius: "50%",
+                              background: "linear-gradient(135deg, #3CCBFF, #2563eb)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "0.95rem", fontWeight: 800, color: "#fff",
+                              border: "2px solid rgba(60,203,255,0.3)",
+                              boxShadow: "0 0 10px rgba(60,203,255,0.15)",
+                            }}>{(p.riotGameName || "?")[0]}</div>
+                          )}
+                        </PlayerAvatarBadge>
                         <div style={{ textAlign: "center", maxWidth: 56 }}>
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
                           {(p.iesportsRank || p.riotRank) && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.iesportsRank || p.riotRank}</div>}
@@ -290,22 +293,24 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                         animation: `vtd-player-reveal-right 0.5s cubic-bezier(0.16,1,0.3,1) ${idx * 0.09}s both`,
                       }}>
-                        {p.riotAvatar ? (
-                          <img src={p.riotAvatar} alt="" style={{
-                            width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
-                            border: "2px solid rgba(208,112,112,0.3)",
-                            boxShadow: "0 0 10px rgba(239,68,68,0.15), 0 3px 10px rgba(0,0,0,0.35)",
-                          }} />
-                        ) : (
-                          <div style={{
-                            width: 46, height: 46, borderRadius: "50%",
-                            background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "0.95rem", fontWeight: 800, color: "#fff",
-                            border: "2px solid rgba(208,112,112,0.3)",
-                            boxShadow: "0 0 10px rgba(239,68,68,0.15)",
-                          }}>{(p.riotGameName || "?")[0]}</div>
-                        )}
+                        <PlayerAvatarBadge mvpBracket={p.mvpBracket} isChampion={p.isChampion} size={46}>
+                          {p.riotAvatar ? (
+                            <img src={p.riotAvatar} alt="" style={{
+                              width: 46, height: 46, borderRadius: "50%", objectFit: "cover",
+                              border: "2px solid rgba(208,112,112,0.3)",
+                              boxShadow: "0 0 10px rgba(239,68,68,0.15), 0 3px 10px rgba(0,0,0,0.35)",
+                            }} />
+                          ) : (
+                            <div style={{
+                              width: 46, height: 46, borderRadius: "50%",
+                              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "0.95rem", fontWeight: 800, color: "#fff",
+                              border: "2px solid rgba(208,112,112,0.3)",
+                              boxShadow: "0 0 10px rgba(239,68,68,0.15)",
+                            }}>{(p.riotGameName || "?")[0]}</div>
+                          )}
+                        </PlayerAvatarBadge>
                         <div style={{ textAlign: "center", maxWidth: 56 }}>
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#E6E6E6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotGameName || "TBD"}</div>
                           {(p.iesportsRank || p.riotRank) && <div style={{ fontSize: "0.5rem", fontWeight: 600, color: "#8A8880", marginTop: 1 }}>{p.iesportsRank || p.riotRank}</div>}
@@ -1443,7 +1448,9 @@ function ValorantTournamentDetailInner() {
                               return (
                               <div key={p.uid} onClick={() => router.push(`/player/${p.uid}?tab=valorant`)} style={{ textDecoration: "none", color: "inherit", display: "block", cursor: "pointer" }}>
                                 <div className="vtd-tier-player" style={{ animationDelay: `${pi * 0.04}s`, ...(isMe ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 10 } : {}) }}>
-                                  {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
+                                  <PlayerAvatarBadge mvpBracket={p.mvpBracket} isChampion={p.isChampion} size={36} inset>
+                                    {p.riotAvatar ? <img className="vtd-tier-player-avatar" src={p.riotAvatar} alt={p.riotGameName} /> : <div className="vtd-tier-player-avatar-init">{(p.riotGameName || "?")[0].toUpperCase()}</div>}
+                                  </PlayerAvatarBadge>
                                   <div className="vtd-tier-player-info">
                                     <span className="vtd-tier-player-name">{p.riotGameName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1499,12 +1506,28 @@ function ValorantTournamentDetailInner() {
                         </div>
                       </div>
                       <div className="vtd-team-box-members">
-                        {(team.members || []).map((m: any, i: number) => {
+                        {[...(team.members || [])]
+                          .sort((a: any, b: any) => {
+                            // iesportsRating primary, tier*100 fallback — matches
+                            // the shuffle algorithm so the video, admin, and site
+                            // all render the same order.
+                            const score = (m: any) =>
+                              m.iesportsRating && m.iesportsRating > 0
+                                ? m.iesportsRating
+                                : (m.iesportsTier || m.riotTier || 0) * 100;
+                            return (
+                              score(b) - score(a) ||
+                              String(a.riotGameName || "").localeCompare(String(b.riotGameName || ""))
+                            );
+                          })
+                          .map((m: any, i: number) => {
                           const isMeMember = user?.uid === m.uid;
                           return (
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="vtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
-                              {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
+                              <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
+                                {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} className="vtd-team-box-member-avatar" /> : <div className="vtd-team-box-member-init">{(m.riotGameName || "?")[0]}</div>}
+                              </PlayerAvatarBadge>
                               <div style={{ flex: 1, minWidth: 0 }}><div className="vtd-team-box-member-name">{m.riotGameName}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div><div className="vtd-team-box-member-rank">{m.iesportsRank || m.riotRank || "Unranked"}</div></div>
                             </div>
                           </Link>

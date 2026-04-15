@@ -49,6 +49,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       personalPhoto: d.personalPhoto || null,
       discordConnections: d.discordConnections || [],
       registeredValorantTournaments: d.registeredValorantTournaments || [],
+      // Point-in-time tournament honors — see scripts/markTournamentHonors.ts.
+      // Drives the crown / trophy on the player's avatar across the site.
+      mvpBracket: d.mvpBracket || null,
+      isChampion: d.isChampion || null,
+      honorTournamentId: d.honorTournamentId || null,
+      honorTournamentName: d.honorTournamentName || null,
       rankHistory,
     });
   } catch (e) {

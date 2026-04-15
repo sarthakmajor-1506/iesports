@@ -90,6 +90,62 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Enrich team members + leaderboard + players with honor fields ──
+    // Honors (mvpBracket / isChampion) live on the user doc and are stamped /
+    // cleared by scripts/markTournamentHonors.ts at the end of every
+    // tournament. They drive the crown / trophy badge over avatars site-wide.
+    // Single batched read of every relevant uid keeps page load cheap.
+    const honorUidSet = new Set<string>();
+    for (const t of teams as any[]) {
+      const tm = (t as any).members || [];
+      for (const m of tm) if (m?.uid) honorUidSet.add(m.uid);
+    }
+    for (const lb of leaderboard as any[]) {
+      const uid = (lb as any).uid || (lb as any).id;
+      if (uid) honorUidSet.add(uid);
+    }
+    for (const p of players as any[]) {
+      const uid = (p as any).uid || (p as any).id;
+      if (uid) honorUidSet.add(uid);
+    }
+    if (honorUidSet.size > 0) {
+      const honorUids = Array.from(honorUidSet);
+      const honorRefs = honorUids.map(uid => adminDb.collection("users").doc(uid));
+      const honorDocs = await adminDb.getAll(...honorRefs);
+      const honorByUid: Record<string, { mvpBracket?: string; isChampion?: boolean; honorTournamentId?: string; honorTournamentName?: string }> = {};
+      honorDocs.forEach((d, i) => {
+        const data = d.data();
+        if (!data) return;
+        const honor: any = {};
+        if (data.mvpBracket) honor.mvpBracket = data.mvpBracket;
+        if (data.isChampion) honor.isChampion = true;
+        if (data.honorTournamentId) honor.honorTournamentId = data.honorTournamentId;
+        if (data.honorTournamentName) honor.honorTournamentName = data.honorTournamentName;
+        if (Object.keys(honor).length > 0) honorByUid[honorUids[i]] = honor;
+      });
+      // Patch teams' member objects in place.
+      for (const t of teams as any[]) {
+        const tm = (t as any).members || [];
+        (t as any).members = tm.map((m: any) => {
+          const h = m?.uid ? honorByUid[m.uid] : null;
+          return h ? { ...m, ...h } : m;
+        });
+      }
+      // Patch leaderboard + players.
+      for (let i = 0; i < (leaderboard as any[]).length; i++) {
+        const lb: any = leaderboard[i];
+        const uid = lb.uid || lb.id;
+        const h = uid ? honorByUid[uid] : null;
+        if (h) (leaderboard as any[])[i] = { ...lb, ...h };
+      }
+      for (let i = 0; i < (players as any[]).length; i++) {
+        const p: any = players[i];
+        const uid = p.uid || p.id;
+        const h = uid ? honorByUid[uid] : null;
+        if (h) (players as any[])[i] = { ...p, ...h };
+      }
+    }
+
     return NextResponse.json({ tournament, players, teams, standings, matches, leaderboard });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

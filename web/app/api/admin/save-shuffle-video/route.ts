@@ -15,9 +15,13 @@ import { adminDb } from "@/lib/firebaseAdmin";
  *   videoUrl: string,
  * }
  */
+// Only these field names may be written — prevents an attacker from setting
+// arbitrary fields on the tournament doc via the API.
+const ALLOWED_FIELDS = new Set(["shuffleVideoUrl", "shuffleVideoUrlHorizontal"]);
+
 export async function POST(req: NextRequest) {
   try {
-    const { adminKey, tournamentId, videoUrl } = await req.json();
+    const { adminKey, tournamentId, videoUrl, field } = await req.json();
 
     if (!adminKey || adminKey !== process.env.ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,6 +33,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "videoUrl must be a https URL" }, { status: 400 });
     }
 
+    const fieldName = typeof field === "string" && ALLOWED_FIELDS.has(field) ? field : "shuffleVideoUrl";
+
     const tournRef = adminDb.collection("valorantTournaments").doc(tournamentId);
     const tournDoc = await tournRef.get();
     if (!tournDoc.exists) {
@@ -36,7 +42,7 @@ export async function POST(req: NextRequest) {
     }
 
     await tournRef.update({
-      shuffleVideoUrl: videoUrl,
+      [fieldName]: videoUrl,
       shuffleVideoUpdatedAt: new Date().toISOString(),
     });
 

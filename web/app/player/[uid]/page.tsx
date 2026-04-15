@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar, { triggerPhoneModal } from "@/app/components/Navbar";
+import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
@@ -398,27 +399,33 @@ export default function PlayerProfile() {
           {/* ═══ HEADER — changes per tab ═══ */}
           <div className="pp-header">
             <div className="pp-header-left">
-              {activeTab === "valorant" ? (
-                profile.riotAvatar ? (
-                  <img src={profile.riotAvatar} alt={displayName} className="pp-avatar" />
-                ) : profile.discordId ? (
-                  <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)" }}>{(profile.discordUsername || displayName)[0]?.toUpperCase()}</div>
+              <PlayerAvatarBadge
+                mvpBracket={(profile as any).mvpBracket}
+                isChampion={(profile as any).isChampion}
+                size={92}
+              >
+                {activeTab === "valorant" ? (
+                  profile.riotAvatar ? (
+                    <img src={profile.riotAvatar} alt={displayName} className="pp-avatar" />
+                  ) : profile.discordId ? (
+                    <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)" }}>{(profile.discordUsername || displayName)[0]?.toUpperCase()}</div>
+                  ) : (
+                    <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
+                  )
+                ) : activeTab === "dota" ? (
+                  profile.steamAvatar ? (
+                    <img src={profile.steamAvatar} alt={profile.steamName || displayName} className="pp-avatar" />
+                  ) : (
+                    <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #1b2838 0%, #2a475e 100%)" }}>{(profile.steamName || displayName)[0]?.toUpperCase()}</div>
+                  )
                 ) : (
-                  <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
-                )
-              ) : activeTab === "dota" ? (
-                profile.steamAvatar ? (
-                  <img src={profile.steamAvatar} alt={profile.steamName || displayName} className="pp-avatar" />
-                ) : (
-                  <div className="pp-avatar-init" style={{ background: "linear-gradient(135deg, #1b2838 0%, #2a475e 100%)" }}>{(profile.steamName || displayName)[0]?.toUpperCase()}</div>
-                )
-              ) : (
-                profile.personalPhoto ? (
-                  <img src={profile.personalPhoto} alt={displayName} className="pp-avatar" />
-                ) : (
-                  <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
-                )
-              )}
+                  profile.personalPhoto ? (
+                    <img src={profile.personalPhoto} alt={displayName} className="pp-avatar" />
+                  ) : (
+                    <div className="pp-avatar-init">{displayName[0]?.toUpperCase()}</div>
+                  )
+                )}
+              </PlayerAvatarBadge>
               <div className="pp-header-info">
                 <h1 className="pp-name">
                   {activeTab === "valorant" ? (profile.riotGameName || profile.discordUsername || displayName) : activeTab === "dota" ? (profile.steamName || profile.discordUsername || displayName) : (profile.fullName || displayName)}

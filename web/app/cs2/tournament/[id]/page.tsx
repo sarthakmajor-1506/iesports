@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/Navbar";
+import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
@@ -1475,7 +1476,9 @@ function CS2TournamentDetailInner() {
                           return (
                           <Link key={m.uid || i} href={`/player/${m.uid}?tab=cs2`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                             <div className="csd-team-box-member" style={isMeMember ? { background: "rgba(240,165,0,0.10)", boxShadow: "inset 2px 0 0 #f0a500", borderRadius: 8 } : {}}>
-                              {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="csd-team-box-member-avatar" /> : <div className="csd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                              <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
+                                {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="csd-team-box-member-avatar" /> : <div className="csd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                              </PlayerAvatarBadge>
                               <div style={{ flex: 1, minWidth: 0 }}><div className="csd-team-box-member-name">{m.steamName}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(240,165,0,0.15)", color: "#f0a500", border: "1px solid rgba(240,165,0,0.3)" }}>YOU</span>}</div><div className="csd-team-box-member-rank">{m.cs2Rank || m.cs2Rank || "Unranked"}</div></div>
                             </div>
                           </Link>

@@ -172,6 +172,21 @@ export interface RiotProfile {
   iesportsRank?: string;        // derived display rank (e.g. "Diamond 3")
   iesportsTier?: number;        // derived integer tier (0-27)
   iesportsMatchesPlayed?: number; // count of rated matches played
+  // ── Current honor (single most-recent tournament). Set + cleared by
+  //    scripts/markTournamentHonors.ts when each tournament concludes.
+  //    Drives the crown / trophy badge over the player's avatar everywhere
+  //    they appear on the site. Both fields are cleared the moment the next
+  //    tournament's honors are stamped — they are explicitly point-in-time.
+  /** Base Valorant rank bracket they were MVP of last tournament — e.g.
+   * "Immortal", "Diamond". Null/undefined if not currently a bracket MVP. */
+  mvpBracket?: string | null;
+  /** True if they were on the most recent tournament's championship team. */
+  isChampion?: boolean | null;
+  /** Tournament that granted the current honor — used by the script to
+   * detect "stale" honors when a newer tournament gets stamped. */
+  honorTournamentId?: string | null;
+  honorTournamentName?: string | null;
+  honorUpdatedAt?: string | null;
 }
 
 

@@ -163,25 +163,175 @@ export default function AdminPanel() {
 
   // ─── Shuffle Video ──────────────────────────────────────────────────────────
   const [shuffleVideoTeams, setShuffleVideoTeams] = useState<ShuffleTeam[] | null>(null);
+  // Draft teams from a dry-run shuffle. Lives in memory only — the admin
+  // iterates here before committing via /api/valorant/publish-teams. When
+  // present, the team list + video player render from the draft instead of
+  // the live `teams` state (which still reflects what's on the public site).
+  const [draftTeams, setDraftTeams] = useState<TeamData[] | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
 
-  function buildShuffleVideoData(overrideTeams?: TeamData[]): ShuffleTeam[] {
+  // ── Per-player history for the shuffle video spotlight card ──
+  // Maps uid → { prevBracket, prevBracketRank, prevBracketTotal, isBracketMvp,
+  // isWinner, isNew }, computed once when a preview/live video is built so the
+  // video doesn't have to do any async fetching.
+  //
+  // The grouping here MUST match the public Valorant leaderboard page
+  // (app/valorant/tournament/[id]/page.tsx around line 1700) — bucket by
+  // base Valorant rank (Immortal / Ascendant / Diamond / ...), KDA-sort,
+  // top of each bucket = MVP. The S/A/B/C quartile bracket is unrelated.
+  type PlayerHistory = {
+    prevBracket?: string;          // "Immortal" | "Ascendant" | "Diamond" | ... | "Unranked"
+    prevBracketRank?: number;
+    prevBracketTotal?: number;
+    isBracketMvp?: boolean;
+    isWinner?: boolean;            // was on the previous tournament's championship team
+    isNew: boolean;
+  };
+  const [playerHistoryByUid, setPlayerHistoryByUid] = useState<Record<string, PlayerHistory>>({});
+
+  // Map: current tournament id → previous tournament id that has the leaderboard
+  // we should cite in the video spotlight. Extend this when you spin up a new
+  // league — the video silently falls back to "new to iesports" for everyone
+  // if the current tournament has no mapping.
+  const PREVIOUS_TOURNAMENT_MAP: Record<string, string> = {
+    "league-of-rising-stars-ascension": "league-of-rising-stars-prelims",
+  };
+
+  async function fetchPlayerHistory(currentTournamentId: string): Promise<Record<string, PlayerHistory>> {
+    const prevId = PREVIOUS_TOURNAMENT_MAP[currentTournamentId];
+    if (!prevId) return {};
+    try {
+      const res = await fetch(`/api/tournaments/detail?id=${encodeURIComponent(prevId)}&game=valorant`);
+      if (!res.ok) return {};
+      const data = await res.json();
+      const prevPlayers: any[] = data.players || [];
+      const prevLeaderboard: any[] = data.leaderboard || [];
+      const prevTournament: any = data.tournament || {};
+      if (prevLeaderboard.length === 0) return {};
+
+      // Build uid → base-rank lookup the same way the public leaderboard does.
+      // baseRank is the first word of iesportsRank (preferred) or riotRank.
+      const RANK_ORDER = ["Radiant", "Immortal", "Ascendant", "Diamond", "Platinum", "Gold", "Silver", "Bronze", "Iron", "Unranked"];
+      const baseRankByUid: Record<string, string> = {};
+      for (const p of prevPlayers) {
+        const uid = p.uid || p.id;
+        if (!uid) continue;
+        const display = p.iesportsRank || p.riotRank || "";
+        const base = display.split(" ")[0];
+        baseRankByUid[uid] = RANK_ORDER.includes(base) ? base : "Unranked";
+      }
+
+      // KDA score — same formula the leaderboard page uses.
+      const kdaScore = (lb: any) =>
+        ((lb.totalKills || 0) + 0.5 * (lb.totalAssists || 0)) / Math.max(1, lb.totalDeaths || 1);
+
+      // Group leaderboard entries by base rank.
+      const grouped: Record<string, any[]> = {};
+      for (const lb of prevLeaderboard) {
+        const uid = lb.uid || lb.id;
+        if (!uid) continue;
+        const bracket = baseRankByUid[uid] || "Unranked";
+        if (!grouped[bracket]) grouped[bracket] = [];
+        grouped[bracket].push(lb);
+      }
+
+      // KDA-sort each group, then assign rank within the group.
+      const history: Record<string, PlayerHistory> = {};
+      for (const bracket of Object.keys(grouped)) {
+        const sorted = grouped[bracket].sort((a: any, b: any) => {
+          const diff = kdaScore(b) - kdaScore(a);
+          if (Math.abs(diff) > 0.01) return diff;
+          return (b.totalKills || 0) - (a.totalKills || 0);
+        });
+        for (let i = 0; i < sorted.length; i++) {
+          const uid = sorted[i].uid || sorted[i].id;
+          history[uid] = {
+            prevBracket: bracket,
+            prevBracketRank: i + 1,
+            prevBracketTotal: sorted.length,
+            isBracketMvp: i === 0,
+            isWinner: false,
+            isNew: false,
+          };
+        }
+      }
+
+      // Mark champions — every member of the prev tournament's winning team
+      // gets a trophy in the video. championMembers is set on tournament-end
+      // by api/valorant/match-fetch when the Grand Final concludes.
+      const championMembers: any[] = prevTournament.championMembers || [];
+      for (const cm of championMembers) {
+        if (!cm?.uid) continue;
+        if (history[cm.uid]) {
+          history[cm.uid].isWinner = true;
+        } else {
+          history[cm.uid] = {
+            isWinner: true,
+            isNew: false,
+          };
+        }
+      }
+
+      return history;
+    } catch (e) {
+      console.warn("[ShuffleVideo] fetchPlayerHistory failed:", e);
+      return {};
+    }
+  }
+
+  // Continuous skill score: iesportsRating if present, else riotTier*100.
+  // Matches the shuffle balance algorithm so every display agrees on ordering.
+  const memberRating = (m: any) => {
+    if (m.iesportsRating && m.iesportsRating > 0) return m.iesportsRating;
+    return (m.iesportsTier || m.riotTier || 0) * 100;
+  };
+
+  function buildShuffleVideoData(
+    overrideTeams?: TeamData[],
+    historyOverride?: Record<string, PlayerHistory>,
+  ): ShuffleTeam[] {
     // Use overrideTeams when provided (e.g. right after a reshuffle, before the
     // onSnapshot listener has refreshed the local `teams` state). Otherwise fall
     // back to whatever `teams` holds from the closure.
     const sourceTeams: TeamData[] = overrideTeams ?? teams;
+    const hist = historyOverride ?? playerHistoryByUid;
 
-    return sourceTeams.map(t => ({
-      teamName: t.teamName,
-      members: (t.members || []).map((m: any) => ({
-        uid: m.uid,
-        name: m.riotGameName || m.steamName || "Player",
-        tag: m.riotTagLine || undefined,
-        avatar: m.riotAvatar || m.steamAvatar || undefined,
-        rank: m.iesportsRank || m.riotRank || undefined,
-        tier: m.iesportsTier || m.riotTier || undefined,
-      })),
-      avgSkill: t.avgSkillLevel,
-    }));
+    return sourceTeams.map(t => {
+      // Sort the raw members first so we have access to iesportsRating, then
+      // map into ShufflePlayer shape for the video.
+      const sortedRaw = [...(t.members || [])].sort(
+        (a: any, b: any) =>
+          memberRating(b) - memberRating(a) ||
+          String(a.riotGameName || "").localeCompare(String(b.riotGameName || ""))
+      );
+      const members = sortedRaw.map((m: any) => {
+        const h = m.uid ? hist[m.uid] : undefined;
+        return {
+          uid: m.uid,
+          name: m.riotGameName || m.steamName || "Player",
+          tag: m.riotTagLine || undefined,
+          avatar: m.riotAvatar || m.steamAvatar || undefined,
+          rank: m.iesportsRank || m.riotRank || undefined,
+          tier: m.iesportsTier || m.riotTier || undefined,
+          rating: memberRating(m),
+          prevBracket: h?.prevBracket,
+          prevBracketRank: h?.prevBracketRank,
+          prevBracketTotal: h?.prevBracketTotal,
+          isBracketMvp: h?.isBracketMvp,
+          isWinner: h?.isWinner,
+          // If we attempted history lookup (map has prev) but this uid isn't
+          // present, mark new. If the tournament has no prev mapping at all,
+          // we leave isNew undefined so the video doesn't mislead.
+          isNew: h ? false : Object.keys(hist).length > 0 ? true : undefined,
+        };
+      });
+      return {
+        teamName: t.teamName,
+        members,
+        avgSkill: t.avgSkillLevel,
+      };
+    });
   }
 
   // ─── Swiss Pairings ─────────────────────────────────────────────────────────
@@ -501,6 +651,9 @@ export default function AdminPanel() {
 
   // ─── Fetch teams & matches ──────────────────────────────────────────────────
   useEffect(() => {
+    // Any tournament switch invalidates an in-memory shuffle preview.
+    setDraftTeams(null);
+    setShuffleVideoTeams(null);
     if (!tournamentId || !authenticated) { setTeams([]); setMatches([]); return; }
     const col = getSelectedCollection();
     const unsub1 = onSnapshot(
@@ -939,15 +1092,69 @@ export default function AdminPanel() {
   // ═══════════════════════════════════════════════════════════════════════════
   // STYLES — DARK MODE
   // ═══════════════════════════════════════════════════════════════════════════
-  const sectionStyle: React.CSSProperties = { background: "#141416", border: "1px solid #2a2a2e", borderRadius: 14, padding: "20px 24px", marginBottom: 16 };
-  const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#666", marginBottom: 14 };
-  const inputStyle: React.CSSProperties = { width: "100%", padding: 10, border: "1.5px solid #2a2a2e", borderRadius: 8, fontSize: "0.88rem", outline: "none", boxSizing: "border-box" as const, marginBottom: 8, background: "#1a1a1e", color: "#e0e0e0" };
-  const btnStyle: React.CSSProperties = { padding: "10px 20px", background: "#3CCBFF", color: "#fff", border: "none", borderRadius: 100, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", opacity: loading ? 0.6 : 1 };
-  const btnSecondary: React.CSSProperties = { ...btnStyle, background: "#e0e0e0", color: "#111" };
-  const btnWarning: React.CSSProperties = { ...btnStyle, background: "#f59e0b" };
-  const btnDanger: React.CSSProperties = { ...btnStyle, background: "#dc2626" };
-  const btnSuccess: React.CSSProperties = { ...btnStyle, background: "#16a34a" };
-  const smallLabel: React.CSSProperties = { fontSize: "0.68rem", fontWeight: 700, color: "#777", display: "block", marginBottom: 4 };
+  const sectionStyle: React.CSSProperties = {
+    background: "linear-gradient(180deg, #13141a 0%, #0f1015 100%)",
+    border: "1px solid #22232b",
+    borderRadius: 16,
+    padding: "22px 26px",
+    marginBottom: 18,
+    boxShadow: "0 12px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block", fontSize: "0.62rem", fontWeight: 800,
+    letterSpacing: "0.14em", textTransform: "uppercase" as const,
+    color: "#7a7d8a", marginBottom: 16,
+  };
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "11px 14px",
+    border: "1.5px solid #22232b", borderRadius: 10,
+    fontSize: "0.88rem", outline: "none",
+    boxSizing: "border-box" as const, marginBottom: 10,
+    background: "#0e0f14", color: "#e6e7ee",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+  };
+  const btnStyle: React.CSSProperties = {
+    padding: "11px 22px",
+    background: "linear-gradient(180deg, #3CCBFF 0%, #2BA8D9 100%)",
+    color: "#051520",
+    border: "none", borderRadius: 100,
+    fontWeight: 800, fontSize: "0.80rem",
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    opacity: loading ? 0.6 : 1,
+    boxShadow: "0 6px 18px rgba(60,203,255,0.28), 0 1px 0 rgba(255,255,255,0.3) inset",
+    transition: "transform 0.12s, box-shadow 0.15s, filter 0.15s",
+    fontFamily: "inherit",
+  };
+  const btnSecondary: React.CSSProperties = {
+    ...btnStyle,
+    background: "linear-gradient(180deg, #2a2c36 0%, #1d1e26 100%)",
+    color: "#d4d6e0",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset",
+  };
+  const btnWarning: React.CSSProperties = {
+    ...btnStyle,
+    background: "linear-gradient(180deg, #F59E0B 0%, #D97706 100%)",
+    color: "#1a0d00",
+    boxShadow: "0 6px 18px rgba(245,158,11,0.28), 0 1px 0 rgba(255,255,255,0.3) inset",
+  };
+  const btnDanger: React.CSSProperties = {
+    ...btnStyle,
+    background: "linear-gradient(180deg, #EF4444 0%, #C0392B 100%)",
+    color: "#fff",
+    boxShadow: "0 6px 18px rgba(239,68,68,0.32), 0 1px 0 rgba(255,255,255,0.25) inset",
+  };
+  const btnSuccess: React.CSSProperties = {
+    ...btnStyle,
+    background: "linear-gradient(180deg, #22C55E 0%, #16A34A 100%)",
+    color: "#052010",
+    boxShadow: "0 6px 18px rgba(34,197,94,0.3), 0 1px 0 rgba(255,255,255,0.25) inset",
+  };
+  const smallLabel: React.CSSProperties = {
+    fontSize: "0.64rem", fontWeight: 800, color: "#8b8e9d",
+    display: "block", marginBottom: 6,
+    letterSpacing: "0.1em", textTransform: "uppercase" as const,
+  };
   const selectStyle: React.CSSProperties = { ...inputStyle, cursor: "pointer", colorScheme: "dark" };
   const textareaStyle: React.CSSProperties = { ...inputStyle, minHeight: 80, resize: "vertical" as const, fontFamily: "inherit" };
   const checkboxRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: "0.82rem", color: "#aaa" };
@@ -965,15 +1172,39 @@ export default function AdminPanel() {
   return (
     <>
       <style>{`
-        .adm-page { min-height: 100vh; background: #0a0a0b; font-family: var(--font-geist-sans), system-ui, sans-serif; color: #e0e0e0; }
-        .adm-content { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
-        .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .adm-page {
+          min-height: 100vh;
+          background:
+            radial-gradient(ellipse 1200px 800px at 15% -10%, rgba(60,203,255,0.06) 0%, transparent 60%),
+            radial-gradient(ellipse 1000px 700px at 85% 100%, rgba(167,139,250,0.05) 0%, transparent 60%),
+            linear-gradient(180deg, #060709 0%, #08090d 100%);
+          font-family: var(--font-geist-sans), system-ui, sans-serif;
+          color: #e6e7ee;
+        }
+        .adm-content { max-width: 1280px; margin: 0 auto; padding: 28px 28px 80px; }
+        .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
         @media (max-width: 700px) { .adm-grid { grid-template-columns: 1fr; } }
-        .adm-log { background: #000; border-radius: 10px; padding: 14px; max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.72rem; color: #888; line-height: 1.8; }
-        .adm-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #2a2a2e; margin-bottom: 20px; overflow-x: auto; }
-        .adm-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #666; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; white-space: nowrap; }
-        .adm-tab:hover { color: #aaa; }
-        .adm-tab.active { color: #3CCBFF; border-bottom-color: #3CCBFF; }
+        .adm-log { background: rgba(0,0,0,0.6); border: 1px solid #1a1b22; border-radius: 12px; padding: 16px; max-height: 260px; overflow-y: auto; font-family: ui-monospace, "SF Mono", monospace; font-size: 0.72rem; color: #8b8e9d; line-height: 1.75; }
+        .adm-tab-bar { display: flex; gap: 2px; border-bottom: 1px solid #22232b; margin-bottom: 24px; overflow-x: auto; padding: 0 2px; }
+        .adm-tab {
+          padding: 12px 26px;
+          font-size: 0.84rem; font-weight: 800;
+          color: #6b6e7a;
+          cursor: pointer;
+          border-bottom: 2.5px solid transparent;
+          margin-bottom: -1px;
+          transition: color 0.15s, border-color 0.15s, background 0.15s;
+          background: none; border-top: none; border-left: none; border-right: none;
+          font-family: inherit; white-space: nowrap;
+          letter-spacing: 0.02em;
+        }
+        .adm-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
+        .adm-btn:active:not(:disabled) { transform: translateY(0); filter: brightness(0.95); }
+        .adm-btn:disabled { cursor: not-allowed; filter: saturate(0.3) brightness(0.75); }
+        .adm-input:focus { border-color: #3CCBFF !important; box-shadow: 0 0 0 3px rgba(60,203,255,0.12) !important; }
+        .adm-card-hover:hover { border-color: rgba(60,203,255,0.22) !important; }
+        .adm-tab:hover { color: #c3c5d0; }
+        .adm-tab.active { color: #3CCBFF; border-bottom-color: #3CCBFF; background: linear-gradient(180deg, transparent, rgba(60,203,255,0.05)); }
         .adm-match-card { background: #1a1a1e; border: 1px solid #2a2a2e; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; font-size: 0.78rem; }
         .adm-match-day { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; color: #555; text-transform: uppercase; }
         .adm-match-teams { flex: 1; font-weight: 600; color: #ccc; }
@@ -1298,66 +1529,285 @@ export default function AdminPanel() {
                 {showSetup && (
                   <div className="adm-grid" style={{ marginTop: 12 }}>
                     {/* Shuffle */}
-                    <div style={{ padding: 16, background: "#0f0f11", borderRadius: 10, border: "1px solid #222" }}>
-                      <span style={smallLabel}>Shuffle Teams</span>
-                      <input value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
-                      <button disabled={loading || isTournamentEnded} style={{ ...btnDanger, ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }} onClick={async () => {
-                        if (isTournamentEnded) return;
-                        if (!confirm("This will DELETE all existing teams and reshuffle. Continue?")) return;
-                        setShuffleVideoTeams(null);
-                        await apiCall("/api/valorant/shuffle-teams", { tournamentId, teamCount: parseInt(teamCount), deleteExisting: true });
-                        // Fetch the freshly-shuffled teams directly from Firestore instead of
-                        // waiting for the onSnapshot listener to update local state — the old
-                        // 3s setTimeout was reading stale `teams` from the handler's closure,
-                        // so the first-ever shuffle rendered no video at all.
-                        try {
-                          const col = getSelectedCollection();
-                          const freshSnap = await getDocs(query(collection(db, col, tournamentId, "teams"), orderBy("teamIndex")));
-                          const freshTeams = freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData));
-                          const videoTeams = buildShuffleVideoData(freshTeams);
-                          if (videoTeams.length > 0) {
-                            setShuffleVideoTeams(videoTeams);
+                    <div style={{
+                      padding: 22,
+                      background: "linear-gradient(180deg, #11131c 0%, #0c0d14 100%)",
+                      borderRadius: 14,
+                      border: "1px solid rgba(60,203,255,0.18)",
+                      boxShadow: "0 10px 30px rgba(0,0,0,0.4), 0 0 0 1px rgba(60,203,255,0.04) inset",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                        <div style={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          background: "#3CCBFF", boxShadow: "0 0 12px #3CCBFF",
+                        }} />
+                        <span style={{ ...smallLabel, margin: 0, color: "#3CCBFF" }}>Shuffle Teams</span>
+                      </div>
+                      <input className="adm-input" value={teamCount} onChange={e => setTeamCount(e.target.value)} placeholder="Number of teams" style={inputStyle} type="number" min="2" />
+                      {/* Preview / Re-preview */}
+                      <button
+                        className="adm-btn"
+                        disabled={previewLoading || publishLoading || isTournamentEnded}
+                        style={{ ...btnStyle, width: "100%", ...(isTournamentEnded ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
+                        onClick={async () => {
+                          if (isTournamentEnded) return;
+                          if (draftTeams && !confirm("Discard current preview and generate a new one?")) return;
+                          setPreviewLoading(true);
+                          try {
+                            const [data, history] = await Promise.all([
+                              apiCall("/api/valorant/shuffle-teams", {
+                                tournamentId,
+                                teamCount: parseInt(teamCount),
+                                dryRun: true,
+                              }),
+                              fetchPlayerHistory(tournamentId),
+                            ]);
+                            const fresh = (data.teams || []) as TeamData[];
+                            setPlayerHistoryByUid(history);
+                            setDraftTeams(fresh);
+                            setShuffleVideoTeams(buildShuffleVideoData(fresh, history));
+                          } catch (e) {
+                            console.error("[ShuffleVideo] preview failed:", e);
+                          } finally {
+                            setPreviewLoading(false);
                           }
-                        } catch (e) {
-                          console.error("[ShuffleVideo] failed to build after reshuffle:", e);
-                        }
-                      }}>Delete & Reshuffle</button>
-                      {teams.length > 0 && <div style={{ marginTop: 8 }}>{teams.map(t => { const avg = t.avgSkillLevel < 100 ? Math.round(t.avgSkillLevel * 100) : Math.round(t.avgSkillLevel); return <div key={t.id} style={{ fontSize: "0.68rem", color: "#777", padding: "2px 0" }}>{t.teamName} — {t.members?.length || 0}p (avg {avg})</div>; })}</div>}
-                      {teams.length > 0 && (
-                        <button style={{ ...btnStyle, marginTop: 8, fontSize: "0.72rem" }} onClick={() => {
-                          setShuffleVideoTeams(buildShuffleVideoData());
-                        }}>{shuffleVideoTeams ? "Regenerate Video" : "Generate Shuffle Video"}</button>
+                        }}
+                      >
+                        {previewLoading
+                          ? "Shuffling..."
+                          : draftTeams
+                            ? "Re-preview Shuffle"
+                            : "Preview Shuffle"}
+                      </button>
+
+                      {/* Draft actions — only when a preview exists */}
+                      {draftTeams && draftTeams.length > 0 && (
+                        <>
+                          <button
+                            className="adm-btn"
+                            disabled={publishLoading || previewLoading}
+                            style={{ ...btnSuccess, width: "100%", marginTop: 10 }}
+                            onClick={async () => {
+                              if (!confirm(`Publish this preview to the live site? ${teams.length > 0 ? "This replaces the current live teams." : ""}`)) return;
+                              setPublishLoading(true);
+                              try {
+                                await apiCall("/api/valorant/publish-teams", {
+                                  tournamentId,
+                                  teams: draftTeams,
+                                });
+                                setDraftTeams(null);
+                              } catch (e) {
+                                console.error("[ShuffleVideo] publish failed:", e);
+                              } finally {
+                                setPublishLoading(false);
+                              }
+                            }}
+                          >
+                            {publishLoading ? "Publishing..." : "Publish Teams to Live Site"}
+                          </button>
+                          <button
+                            className="adm-btn"
+                            disabled={publishLoading || previewLoading}
+                            style={{
+                              ...btnStyle,
+                              width: "100%",
+                              marginTop: 8,
+                              fontSize: "0.72rem",
+                              background: "transparent",
+                              color: "#8b8e9d",
+                              boxShadow: "none",
+                              border: "1px solid #22232b",
+                            }}
+                            onClick={() => {
+                              setDraftTeams(null);
+                              setShuffleVideoTeams(null);
+                            }}
+                          >
+                            Discard Preview
+                          </button>
+                        </>
+                      )}
+
+                      {/* Video from live teams — only when no preview is active */}
+                      {!draftTeams && teams.length > 0 && (
+                        <button
+                          className="adm-btn"
+                          style={{ ...btnSecondary, width: "100%", marginTop: 10, fontSize: "0.74rem" }}
+                          onClick={async () => {
+                            const history = await fetchPlayerHistory(tournamentId);
+                            setPlayerHistoryByUid(history);
+                            setShuffleVideoTeams(buildShuffleVideoData(undefined, history));
+                          }}>{shuffleVideoTeams ? "Regenerate Video from Live" : "Generate Video from Live Teams"}</button>
                       )}
                     </div>
 
-                    {/* Shuffle Video Player */}
-                    {shuffleVideoTeams && shuffleVideoTeams.length > 0 && (
-                      <div style={{ padding: 16, background: "#0a0a0f", borderRadius: 10, border: "1px solid #3CCBFF33", gridColumn: "1 / -1" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <span style={{ ...smallLabel, color: "#3CCBFF" }}>Shuffle Reveal Video</span>
-                          <button style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14 }} onClick={() => setShuffleVideoTeams(null)}>✕</button>
-                        </div>
-                        <ShuffleVideoPlayer
-                          tournamentName={tournaments.find(t => t.id === tournamentId)?.name || "Tournament"}
-                          teams={shuffleVideoTeams}
-                          teamCount={shuffleVideoTeams.length}
-                          tournamentId={tournamentId}
-                          cachedVideoUrl={(tournaments.find(t => t.id === tournamentId) as any)?.shuffleVideoUrl}
-                          adminKey={adminKey}
-                          onCacheSaved={(url) => {
-                            // Mirror the new URL onto the local tournaments state so the
-                            // "cached" UI sticks without needing a full refetch.
-                            setTournaments(prev => prev.map(t =>
-                              t.id === tournamentId ? ({ ...t, shuffleVideoUrl: url } as any) : t
-                            ));
-                          }}
-                        />
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <div style={{ fontSize: "0.65rem", color: "#555" }}>
-                            {shuffleVideoTeams.length} teams · {Math.round(getShuffleDuration(shuffleVideoTeams.length) / 30)}s · First render uploads to cloud — subsequent downloads are instant
+                    {/* Team detail cards — full-width row. Shows draft if present,
+                        otherwise the live teams. Players sorted by rank desc. */}
+                    {(() => {
+                      const source = draftTeams && draftTeams.length > 0 ? draftTeams : teams;
+                      if (source.length === 0) return null;
+                      const isDraft = !!(draftTeams && draftTeams.length > 0);
+                      const tierOf = (m: any) => m.iesportsTier || m.riotTier || 0;
+                      return (
+                        <div style={{
+                          padding: 16,
+                          background: "#0a0a0f",
+                          borderRadius: 10,
+                          border: `1px solid ${isDraft ? "rgba(255,176,32,0.35)" : "#222"}`,
+                          gridColumn: "1 / -1",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                            <span style={{ ...smallLabel, color: isDraft ? "#FFB020" : "#3CCBFF" }}>
+                              {isDraft ? "Preview Teams (Not Live)" : "Live Teams"}
+                            </span>
+                            <span style={{ fontSize: "0.62rem", color: "#555" }}>
+                              {source.length} team{source.length === 1 ? "" : "s"} · {source.reduce((s, t: any) => s + (t.members?.length || 0), 0)} players
+                            </span>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+                            {source.map((t: TeamData) => {
+                              // iesportsRating-primary sort — matches the shuffle
+                              // algorithm and video orbit.
+                              const members = [...(t.members || [])].sort(
+                                (a: any, b: any) =>
+                                  memberRating(b) - memberRating(a) ||
+                                  String(a.riotGameName || "").localeCompare(String(b.riotGameName || ""))
+                              );
+                              const avgTier = members.length > 0
+                                ? Math.round((members.reduce((s, m: any) => s + tierOf(m), 0) / members.length) * 10) / 10
+                                : 0;
+                              const avgRating = t.avgSkillLevel
+                                ? (t.avgSkillLevel < 100 ? Math.round(t.avgSkillLevel * 100) : Math.round(t.avgSkillLevel))
+                                : 0;
+                              return (
+                                <div key={t.id} style={{
+                                  background: "#0f0f11",
+                                  border: `1px solid ${isDraft ? "rgba(255,176,32,0.25)" : "#1f1f24"}`,
+                                  borderRadius: 8,
+                                  padding: 12,
+                                }}>
+                                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#fff", letterSpacing: 0.3, textTransform: "uppercase" }}>
+                                      {t.teamName}
+                                    </div>
+                                    <div style={{ fontSize: "0.56rem", color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>
+                                      #{t.teamIndex}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                                    <span style={{ fontSize: "0.56rem", fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(60,203,255,0.12)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>
+                                      Avg Tier {avgTier}
+                                    </span>
+                                    <span style={{ fontSize: "0.56rem", fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(255,255,255,0.05)", color: "#888", border: "1px solid #2a2a2e" }}>
+                                      Rating {avgRating}
+                                    </span>
+                                    <span style={{ fontSize: "0.56rem", fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(255,255,255,0.05)", color: "#888", border: "1px solid #2a2a2e" }}>
+                                      {members.length}p
+                                    </span>
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    {members.map((m: any, i: number) => {
+                                      const name = m.riotGameName || m.steamName || "Player";
+                                      const tag = m.riotTagLine ? `#${m.riotTagLine}` : "";
+                                      const rank = m.iesportsRank || m.riotRank || "Unranked";
+                                      const tier = tierOf(m);
+                                      return (
+                                        <div key={m.uid || i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 6, background: "rgba(255,255,255,0.02)" }}>
+                                          {m.riotAvatar ? (
+                                            <img src={m.riotAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", border: "1px solid #333" }} />
+                                          ) : (
+                                            <div style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid #333", background: "#1a1a1f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 800, color: "#666" }}>
+                                              {name[0]?.toUpperCase() || "?"}
+                                            </div>
+                                          )}
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: "0.68rem", color: "#ddd", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                              {name}
+                                              {tag && <span style={{ color: "#555", fontWeight: 500 }}>{tag}</span>}
+                                            </div>
+                                            <div style={{ fontSize: "0.56rem", color: "#777", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                              {rank}
+                                            </div>
+                                          </div>
+                                          <div style={{ fontSize: "0.58rem", fontWeight: 800, color: "#3CCBFF", minWidth: 24, textAlign: "right" }}>
+                                            T{tier}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
+                      );
+                    })()}
+
+                    {/* Shuffle Video Players — vertical (IG Reel) + horizontal (Discord live) */}
+                    {shuffleVideoTeams && shuffleVideoTeams.length > 0 && (
+                      <>
+                        <div style={{
+                          padding: 20,
+                          background: "linear-gradient(180deg, #0b0f1c, #080a14)",
+                          borderRadius: 14,
+                          border: "1px solid rgba(60,203,255,0.25)",
+                          gridColumn: "1 / -1",
+                          boxShadow: "0 10px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(60,203,255,0.05) inset",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                            <div>
+                              <div style={{ ...smallLabel, color: "#3CCBFF", margin: 0 }}>Shuffle Reveal · Vertical (9:16)</div>
+                              <div style={{ fontSize: "0.62rem", color: "#666", marginTop: 2 }}>Instagram Reel / TikTok · {shuffleVideoTeams.length} teams · {Math.round(getShuffleDuration(shuffleVideoTeams.length) / 30)}s</div>
+                            </div>
+                            <button style={{ background: "none", border: "1px solid #2a2a2e", color: "#888", cursor: "pointer", fontSize: 12, padding: "4px 10px", borderRadius: 6 }} onClick={() => setShuffleVideoTeams(null)}>Close both</button>
+                          </div>
+                          <ShuffleVideoPlayer
+                            orientation="vertical"
+                            tournamentName={tournaments.find(t => t.id === tournamentId)?.name || "Tournament"}
+                            teams={shuffleVideoTeams}
+                            teamCount={shuffleVideoTeams.length}
+                            tournamentId={tournamentId}
+                            cachedVideoUrl={(tournaments.find(t => t.id === tournamentId) as any)?.shuffleVideoUrl}
+                            adminKey={adminKey}
+                            onCacheSaved={(url) => {
+                              setTournaments(prev => prev.map(t =>
+                                t.id === tournamentId ? ({ ...t, shuffleVideoUrl: url } as any) : t
+                              ));
+                            }}
+                          />
+                        </div>
+
+                        <div style={{
+                          padding: 20,
+                          background: "linear-gradient(180deg, #0e0b1c, #0a0815)",
+                          borderRadius: 14,
+                          border: "1px solid rgba(167,139,250,0.28)",
+                          gridColumn: "1 / -1",
+                          boxShadow: "0 10px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.05) inset",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                            <div>
+                              <div style={{ ...smallLabel, color: "#A78BFA", margin: 0 }}>Shuffle Reveal · Horizontal (16:9)</div>
+                              <div style={{ fontSize: "0.62rem", color: "#666", marginTop: 2 }}>Discord Live / YouTube · Big current team, revealed teams grid alongside</div>
+                            </div>
+                          </div>
+                          <ShuffleVideoPlayer
+                            orientation="horizontal"
+                            tournamentName={tournaments.find(t => t.id === tournamentId)?.name || "Tournament"}
+                            teams={shuffleVideoTeams}
+                            teamCount={shuffleVideoTeams.length}
+                            tournamentId={tournamentId}
+                            cachedVideoUrl={(tournaments.find(t => t.id === tournamentId) as any)?.shuffleVideoUrlHorizontal}
+                            adminKey={adminKey}
+                            onCacheSaved={(url) => {
+                              setTournaments(prev => prev.map(t =>
+                                t.id === tournamentId ? ({ ...t, shuffleVideoUrlHorizontal: url } as any) : t
+                              ));
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
 
                     {/* Swiss Pairings */}

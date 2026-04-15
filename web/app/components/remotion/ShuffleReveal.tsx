@@ -20,6 +20,27 @@ export interface ShufflePlayer {
   avatar?: string;
   rank?: string;
   tier?: number;
+  /** Continuous skill score (iesportsRating, else riotTier*100). Used as the
+   * primary sort key so two players at the same integer tier still order by
+   * their finer-grained rating. */
+  rating?: number;
+  // ── History enrichment (sourced from the previous tournament's leaderboard
+  //    grouped by base Valorant rank — see admin/page.tsx fetchPlayerHistory).
+  /** Base Valorant rank bracket from the previous tournament: "Immortal",
+   * "Ascendant", "Diamond", "Platinum", "Gold", "Silver", "Bronze", "Iron",
+   * "Radiant", or "Unranked". */
+  prevBracket?: string;
+  /** 1-indexed rank within their previous-tournament rank bracket (by KDA). */
+  prevBracketRank?: number;
+  /** Total number of players in that bracket last tournament. */
+  prevBracketTotal?: number;
+  /** True if `prevBracketRank === 1` — earns the MVP crown. */
+  isBracketMvp?: boolean;
+  /** True if this player was on the previous tournament's championship team —
+   * earns the trophy (which takes priority over the MVP crown). */
+  isWinner?: boolean;
+  /** True if the player has no history in the configured previous tournament. */
+  isNew?: boolean;
 }
 
 export interface ShuffleTeam {
@@ -85,7 +106,7 @@ export function getShuffleDuration(teamCount: number, membersPerTeam = 5) {
 // High-contrast palette — bright accents over dark bgs so text stays
 // readable on a phone reel. Each theme also carries a `glow` color used
 // for text-shadow halos on key headlines.
-const THEMES = {
+export const THEMES = {
   valorant: {
     accent: "#3CCBFF",
     accentAlt: "#FF4655",
@@ -120,24 +141,24 @@ const THEMES = {
     glow: "rgba(255,227,77,0.55)",
   },
 };
-type Theme = typeof THEMES.valorant;
+export type Theme = typeof THEMES.valorant;
 
 // Reusable text-glow helpers — used on every primary headline so text
 // reads against any background and feels "shiny".
-const glowText = (theme: Theme, intensity = 1) =>
+export const glowText = (theme: Theme, intensity = 1) =>
   `0 0 ${12 * intensity}px ${theme.glow}, 0 0 ${4 * intensity}px ${theme.glow}, 0 2px 6px rgba(0,0,0,0.7)`;
-const softShadow = "0 2px 8px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)";
+export const softShadow = "0 2px 8px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)";
 
 // Strip "[VAL] " / "[CS2] " / etc prefixes from tournament display names —
 // the canonical names in Firestore carry a game-tag bracket the social
 // post doesn't need.
-function stripGamePrefix(name: string): string {
+export function stripGamePrefix(name: string): string {
   return (name || "").replace(/^\[[A-Z0-9]+\]\s*/i, "");
 }
 
 // Canonical Valorant tier colors. Used for the rank pill on every player so
 // the colors carry meaning at a glance — no more cyan→red gradient.
-type RankPalette = { text: string; bg: string; border: string };
+export type RankPalette = { text: string; bg: string; border: string };
 const RANK_PALETTE: Record<string, RankPalette> = {
   Radiant:   { text: "#FFE96E", bg: "rgba(255,233,110,0.20)", border: "rgba(255,233,110,0.75)" },
   Immortal:  { text: "#FF7A8C", bg: "rgba(255,122,140,0.20)", border: "rgba(255,122,140,0.75)" },
@@ -149,7 +170,50 @@ const RANK_PALETTE: Record<string, RankPalette> = {
   Bronze:    { text: "#D49B7A", bg: "rgba(212,155,122,0.20)", border: "rgba(212,155,122,0.70)" },
   Iron:      { text: "#A0A0A0", bg: "rgba(160,160,160,0.20)", border: "rgba(160,160,160,0.65)" },
 };
-function getRankPalette(rank?: string): RankPalette {
+// Trophy — last-tournament champion. Drawn inline so html2canvas-pro can
+// capture it (no emoji fallbacks). Takes priority over the MVP crown.
+export const Trophy = React.memo(({ size = 36, color = "#FFD700", glow = "rgba(255,215,0,0.75)" }: { size?: number; color?: string; glow?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 2px 4px rgba(0,0,0,0.6))` }}>
+    {/* cup body */}
+    <path
+      d="M9 4 H23 V11 C23 16 20 19 16 19 C12 19 9 16 9 11 Z"
+      fill={color}
+      stroke="#fff"
+      strokeWidth={1.4}
+      strokeLinejoin="round"
+    />
+    {/* left handle */}
+    <path d="M9 7 C5 7 4 9 4 11 C4 13 6 14 8 14" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
+    {/* right handle */}
+    <path d="M23 7 C27 7 28 9 28 11 C28 13 26 14 24 14" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
+    {/* stem */}
+    <rect x="14" y="19" width="4" height="4" fill={color} stroke="#fff" strokeWidth={1.2} />
+    {/* base */}
+    <rect x="10" y="23" width="12" height="3" rx="1" fill={color} stroke="#fff" strokeWidth={1.2} />
+    <rect x="8" y="26" width="16" height="3" rx="1" fill={color} stroke="#fff" strokeWidth={1.2} />
+  </svg>
+));
+Trophy.displayName = "Trophy";
+
+// MVP crown — drawn inline so html2canvas-pro can capture it.
+export const Crown = React.memo(({ size = 36, color = "#FFD700", glow = "rgba(255,215,0,0.7)" }: { size?: number; color?: string; glow?: string }) => (
+  <svg width={size} height={size * 0.85} viewBox="0 0 32 28" fill="none" style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 2px 4px rgba(0,0,0,0.6))` }}>
+    <path
+      d="M3 22 L1 6 L9 12 L16 2 L23 12 L31 6 L29 22 Z"
+      fill={color}
+      stroke="#fff"
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    />
+    <rect x="3" y="22" width="26" height="4" rx="1" fill={color} stroke="#fff" strokeWidth={1.5} />
+    <circle cx="16" cy="2" r="1.8" fill="#fff" />
+    <circle cx="1" cy="6" r="1.6" fill="#fff" />
+    <circle cx="31" cy="6" r="1.6" fill="#fff" />
+  </svg>
+));
+Crown.displayName = "Crown";
+
+export function getRankPalette(rank?: string): RankPalette {
   if (!rank) return { text: "#FFFFFF", bg: "rgba(255,255,255,0.14)", border: "rgba(255,255,255,0.45)" };
   const base = rank.split(" ")[0];
   return RANK_PALETTE[base] || { text: "#FFFFFF", bg: "rgba(255,255,255,0.14)", border: "rgba(255,255,255,0.45)" };
@@ -161,7 +225,7 @@ function getRankPalette(rank?: string): RankPalette {
    No filter:blur (html2canvas-pro can't render that reliably).
    ═══════════════════════════════════════════════ */
 
-const SceneBackground = React.memo(({ theme }: { theme: Theme }) => (
+export const SceneBackground = React.memo(({ theme }: { theme: Theme }) => (
   <>
     {/* Base layered radial + linear gradients */}
     <div style={{
@@ -199,15 +263,15 @@ SceneBackground.displayName = "SceneBackground";
    HELPERS
    ═══════════════════════════════════════════════ */
 
-const clamp = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-function fade(f: number, s: number, d = 15) { return interpolate(f, [s, s + d], [0, 1], clamp); }
-function easeOut(t: number) { return 1 - (1 - t) * (1 - t) * (1 - t); }
+export const clamp = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
+export function fade(f: number, s: number, d = 15) { return interpolate(f, [s, s + d], [0, 1], clamp); }
+export function easeOut(t: number) { return 1 - (1 - t) * (1 - t) * (1 - t); }
 
 /* ═══════════════════════════════════════════════
    AVATAR
    ═══════════════════════════════════════════════ */
 
-const Avatar = React.memo(({ src, name, size, border, rgb }: { src?: string; name: string; size: number; border: string; rgb: string }) => {
+export const Avatar = React.memo(({ src, name, size, border, rgb }: { src?: string; name: string; size: number; border: string; rgb: string }) => {
   // crossOrigin="anonymous" is required so html2canvas can read the pixels
   // during MP4 export — without it the canvas is tainted and capture fails.
   if (src) return <Img src={src} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border }} />;
@@ -267,8 +331,10 @@ function IntroScene({ frame, theme, tournamentName }: { frame: number; theme: Th
 
 function ShuffleScene({ frame, theme, allPlayers }: { frame: number; theme: Theme; allPlayers: ShufflePlayer[] }) {
   const sorted = useMemo(() => {
+    const score = (p: ShufflePlayer) =>
+      p.rating && p.rating > 0 ? p.rating : (p.tier ?? 0) * 100;
     const arr = [...allPlayers];
-    arr.sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0) || (a.name || "").localeCompare(b.name || ""));
+    arr.sort((a, b) => score(b) - score(a) || (a.name || "").localeCompare(b.name || ""));
     return arr;
   }, [allPlayers]);
 
@@ -463,21 +529,39 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
         }} />
         {/* Horizontal player row (bottom of card) */}
         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", paddingTop: 18 }}>
-          {members.map((p, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-              <div style={{ position: "relative" }}>
-                <Avatar src={p.avatar} name={p.name} size={96} border={`3px solid ${theme.accentBright}`} rgb={theme.rgb} />
+          {members.map((p, i) => {
+            const honored = p.isWinner || p.isBracketMvp;
+            return (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                <div style={{ position: "relative" }}>
+                  <Avatar
+                    src={p.avatar}
+                    name={p.name}
+                    size={96}
+                    border={`3px solid ${honored ? theme.gold : theme.accentBright}`}
+                    rgb={theme.rgb}
+                  />
+                  {p.isWinner ? (
+                    <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)" }}>
+                      <Trophy size={36} />
+                    </div>
+                  ) : p.isBracketMvp ? (
+                    <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)" }}>
+                      <Crown size={36} />
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{
+                  fontSize: 20, fontWeight: 900, color: honored ? theme.gold : "#fff",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  maxWidth: "100%", textAlign: "center",
+                  textShadow: softShadow,
+                }}>
+                  {p.name}
+                </div>
               </div>
-              <div style={{
-                fontSize: 20, fontWeight: 900, color: "#fff",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                maxWidth: "100%", textAlign: "center",
-                textShadow: softShadow,
-              }}>
-                {p.name}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -578,7 +662,23 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
             position: "absolute", inset: -14, borderRadius: "50%",
             background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
           }} />
-          <Avatar src={player.avatar} name={player.name} size={210} border={`6px solid ${theme.accentBright}`} rgb={theme.rgb} />
+          <Avatar
+            src={player.avatar}
+            name={player.name}
+            size={210}
+            border={`6px solid ${player.isWinner || player.isBracketMvp ? theme.gold : theme.accentBright}`}
+            rgb={theme.rgb}
+          />
+          {/* Champion → trophy, MVP → crown, otherwise nothing. */}
+          {player.isWinner ? (
+            <div style={{ position: "absolute", top: -56, left: "50%", transform: "translateX(-50%)" }}>
+              <Trophy size={84} />
+            </div>
+          ) : player.isBracketMvp ? (
+            <div style={{ position: "absolute", top: -52, left: "50%", transform: "translateX(-50%)" }}>
+              <Crown size={84} />
+            </div>
+          ) : null}
         </div>
         <div style={{
           fontSize: 58, fontWeight: 900, color: "#fff",
@@ -694,17 +794,18 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
           const placeOp = fade(frame, playerStartFrame, 8);
           const placeScale = interpolate(frame, [playerStartFrame, playerStartFrame + 10], [0.7, 1], clamp);
           const rc = player.rank ? getRankPalette(player.rank) : null;
-          const borderColor = justPlaced ? theme.accentBright : theme.accent;
+          const honored = player.isWinner || player.isBracketMvp;
+          const borderColor = honored ? theme.gold : justPlaced ? theme.accentBright : theme.accent;
           return (
             <div key={i} style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
               opacity: placeOp, transform: `scale(${placeScale})`,
             }}>
               <div style={{ position: "relative" }}>
-                {justPlaced && (
+                {(justPlaced || honored) && (
                   <div style={{
                     position: "absolute", inset: -12, borderRadius: "50%",
-                    background: `radial-gradient(circle, ${theme.glow} 0%, transparent 70%)`,
+                    background: `radial-gradient(circle, ${honored ? "rgba(255,215,0,0.5)" : theme.glow} 0%, transparent 70%)`,
                   }} />
                 )}
                 <Avatar
@@ -714,6 +815,15 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
                   border={`4px solid ${borderColor}`}
                   rgb={theme.rgb}
                 />
+                {player.isWinner ? (
+                  <div style={{ position: "absolute", top: -42, left: "50%", transform: "translateX(-50%)" }}>
+                    <Trophy size={58} />
+                  </div>
+                ) : player.isBracketMvp ? (
+                  <div style={{ position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)" }}>
+                    <Crown size={58} />
+                  </div>
+                ) : null}
               </div>
               <div style={{
                 fontSize: 28, fontWeight: 900, color: "#fff",
