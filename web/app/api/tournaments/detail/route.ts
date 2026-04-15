@@ -63,8 +63,13 @@ export async function GET(req: NextRequest) {
     const matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const leaderboard = lbSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // For Dota, refresh rank data from user docs so tournament shows current rank
-    if (game === "dota2" && players.length > 0) {
+    // Rank refresh via ?refreshRank=1 query param (opt-in, NOT run on polled fetches).
+    // The polled tournament detail calls must NOT trigger this — it's an N-read scan
+    // across every registered player's user doc. Rank data stored on the player's
+    // tournament doc at registration time is used by default; clients that need a
+    // fresh snapshot can opt in with ?refreshRank=1 once (on mount, not on poll).
+    const refreshRank = req.nextUrl.searchParams.get("refreshRank") === "1";
+    if (refreshRank && game === "dota2" && players.length > 0) {
       const uids = players.map((p: any) => p.uid || p.id).filter(Boolean);
       if (uids.length > 0) {
         const userRefs = uids.map((uid: string) => adminDb.collection("users").doc(uid));

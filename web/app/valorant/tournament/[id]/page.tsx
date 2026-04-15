@@ -549,11 +549,16 @@ function ValorantTournamentDetailInner() {
       .catch(() => setTLoading(false));
   };
 
-  // Initial data load via API + 30s polling (replaces onSnapshot real-time listeners)
+  // Initial data load + 60s polling, paused when tab is hidden. Refetches
+  // immediately on visibility change so the view is current when the user
+  // returns. Replaces the old 30s always-on polling.
   useEffect(() => {
     refetchData(); fetchRankReports(); fetchWaitlist();
-    const interval = setInterval(refetchData, 30_000);
-    return () => clearInterval(interval);
+    const tick = () => { if (!document.hidden) refetchData(); };
+    const interval = setInterval(tick, 60_000);
+    const onVis = () => { if (!document.hidden) refetchData(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };
   }, [id]);
 
   useEffect(() => {

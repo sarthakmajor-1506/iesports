@@ -472,9 +472,10 @@ function DotaTournamentDetailInner() {
       .catch(() => {});
   };
 
-  const refetchData = () => {
+  const refetchData = (refreshRank = false) => {
     if (!id) return;
-    fetch(`/api/tournaments/detail?id=${id}&game=dota2`)
+    const qs = refreshRank ? `&refreshRank=1` : "";
+    fetch(`/api/tournaments/detail?id=${id}&game=dota2${qs}`)
       .then(r => r.json())
       .then(data => {
         if (data.tournament) setTournament(data.tournament);
@@ -497,11 +498,17 @@ function DotaTournamentDetailInner() {
       .catch(() => setTLoading(false));
   };
 
-  // Initial data load via API + 30s polling (replaces onSnapshot real-time listeners)
+  // Initial data load + 60s polling, paused when tab is hidden. Refetches
+  // immediately on visibility change so the view is current when the user
+  // returns. This replaces the old 30s always-on polling that was burning
+  // Firestore reads when users left tabs open in the background.
   useEffect(() => {
-    refetchData(); fetchRankReports();
-    const interval = setInterval(refetchData, 30_000);
-    return () => clearInterval(interval);
+    refetchData(true); fetchRankReports(); // initial fetch refreshes rank from user docs
+    const tick = () => { if (!document.hidden) refetchData(false); };
+    const interval = setInterval(tick, 60_000);
+    const onVis = () => { if (!document.hidden) refetchData(false); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };
   }, [id]);
 
   // Registration check for logged-in users (debounced on focus)

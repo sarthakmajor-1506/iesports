@@ -472,8 +472,12 @@ function SoloPageInner() {
 
   useEffect(() => {
     fetchSoloData();
-    const interval = setInterval(fetchSoloData, 30_000);
-    return () => clearInterval(interval);
+    // 60s polling, paused when tab is hidden. Refetches on visibility change.
+    const tick = () => { if (!document.hidden) fetchSoloData(); };
+    const interval = setInterval(tick, 60_000);
+    const onVis = () => { if (!document.hidden) fetchSoloData(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };
   }, [id, user]);
 
   useEffect(() => {
