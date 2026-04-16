@@ -171,7 +171,7 @@ const RANK_PALETTE: Record<string, RankPalette> = {
   Iron:      { text: "#A0A0A0", bg: "rgba(160,160,160,0.20)", border: "rgba(160,160,160,0.65)" },
 };
 // Trophy — last-tournament champion. Drawn inline so html2canvas-pro can
-// capture it (no emoji fallbacks). Takes priority over the MVP crown.
+// capture it (no emoji fallbacks). Crown (MVP) takes priority over trophy.
 export const Trophy = React.memo(({ size = 36, color = "#FFD700", glow = "rgba(255,215,0,0.75)" }: { size?: number; color?: string; glow?: string }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 2px 4px rgba(0,0,0,0.6))` }}>
     {/* cup body */}
@@ -541,13 +541,13 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
                     border={`3px solid ${honored ? theme.gold : theme.accentBright}`}
                     rgb={theme.rgb}
                   />
-                  {p.isWinner ? (
-                    <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)" }}>
-                      <Trophy size={36} />
+                  {p.isBracketMvp ? (
+                    <div style={{ position: "absolute", top: -26, right: -10, transform: "rotate(32deg)" }}>
+                      <Crown size={44} />
                     </div>
-                  ) : p.isBracketMvp ? (
-                    <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)" }}>
-                      <Crown size={36} />
+                  ) : p.isWinner ? (
+                    <div style={{ position: "absolute", top: -26, right: -10 }}>
+                      <Trophy size={44} />
                     </div>
                   ) : null}
                 </div>
@@ -669,14 +669,14 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
             border={`6px solid ${player.isWinner || player.isBracketMvp ? theme.gold : theme.accentBright}`}
             rgb={theme.rgb}
           />
-          {/* Champion → trophy, MVP → crown, otherwise nothing. */}
-          {player.isWinner ? (
-            <div style={{ position: "absolute", top: -56, left: "50%", transform: "translateX(-50%)" }}>
-              <Trophy size={84} />
+          {/* MVP → crown (priority), Champion → trophy */}
+          {player.isBracketMvp ? (
+            <div style={{ position: "absolute", top: -52, right: -22, transform: "rotate(32deg)" }}>
+              <Crown size={100} />
             </div>
-          ) : player.isBracketMvp ? (
-            <div style={{ position: "absolute", top: -52, left: "50%", transform: "translateX(-50%)" }}>
-              <Crown size={84} />
+          ) : player.isWinner ? (
+            <div style={{ position: "absolute", top: -52, right: -22 }}>
+              <Trophy size={100} />
             </div>
           ) : null}
         </div>
@@ -815,13 +815,13 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
                   border={`4px solid ${borderColor}`}
                   rgb={theme.rgb}
                 />
-                {player.isWinner ? (
-                  <div style={{ position: "absolute", top: -42, left: "50%", transform: "translateX(-50%)" }}>
-                    <Trophy size={58} />
+                {player.isBracketMvp ? (
+                  <div style={{ position: "absolute", top: -38, right: -14, transform: "rotate(32deg)" }}>
+                    <Crown size={70} />
                   </div>
-                ) : player.isBracketMvp ? (
-                  <div style={{ position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)" }}>
-                    <Crown size={58} />
+                ) : player.isWinner ? (
+                  <div style={{ position: "absolute", top: -38, right: -14 }}>
+                    <Trophy size={70} />
                   </div>
                 ) : null}
               </div>

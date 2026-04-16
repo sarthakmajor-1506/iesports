@@ -27,13 +27,14 @@ import {
   type ShuffleRevealProps,
 } from "./ShuffleReveal";
 
-// Trophy beats crown — a champion is also typically a high performer, but
-// the user specifically wants the trophy in that case. Helpers below let us
-// pick the right icon and badge text without scattering ternaries everywhere.
+// Crown (leaderboard MVP) takes priority over trophy (champion).
 function playerHonorIcon(p: ShufflePlayer, size: number) {
-  if (p.isWinner) return <Trophy size={size} />;
   if (p.isBracketMvp) return <Crown size={size} />;
+  if (p.isWinner) return <Trophy size={size} />;
   return null;
+}
+function playerHonorIsCrown(p: ShufflePlayer) {
+  return !!p.isBracketMvp;
 }
 
 /* ═══════════════════════════════════════════════
@@ -363,14 +364,12 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
               border={`8px solid ${player.isWinner || player.isBracketMvp ? theme.gold : theme.accentBright}`}
               rgb={theme.rgb}
             />
-            {/* Honor badge — trophy if last-tournament champion, otherwise
-                crown for the bracket MVP. Stays empty for everyone else. */}
             {(player.isWinner || player.isBracketMvp) && (
               <div style={{
-                position: "absolute", top: -78, left: "50%",
-                transform: "translateX(-50%)",
+                position: "absolute", top: -72, right: -30,
+                transform: playerHonorIsCrown(player) ? "rotate(32deg)" : "none",
               }}>
-                {playerHonorIcon(player, 120)}
+                {playerHonorIcon(player, 144)}
               </div>
             )}
           </div>
@@ -394,21 +393,7 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
             {/* History badge: champion → trophy pill, MVP → crown pill,
                 placed → bracket rank, never played → "new to iesports".
                 Replaces the Riot hashtag entirely. */}
-            {player.isWinner ? (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 12,
-                fontSize: 22, fontWeight: 900, color: theme.gold,
-                padding: "12px 26px", borderRadius: 100,
-                background: "rgba(255,215,0,0.16)",
-                border: `3px solid ${theme.gold}`,
-                marginBottom: 18,
-                textShadow: glowText(theme, 0.9),
-                letterSpacing: 4, textTransform: "uppercase",
-              }}>
-                <Trophy size={28} />
-                Last Tournament Champion
-              </div>
-            ) : player.isBracketMvp && player.prevBracket ? (
+            {player.isBracketMvp && player.prevBracket ? (
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 12,
                 fontSize: 22, fontWeight: 900, color: theme.gold,
@@ -419,8 +404,22 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                 textShadow: glowText(theme, 0.9),
                 letterSpacing: 4, textTransform: "uppercase",
               }}>
-                <Crown size={28} />
+                <Crown size={34} />
                 {player.prevBracket} Bracket MVP
+              </div>
+            ) : player.isWinner ? (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 12,
+                fontSize: 22, fontWeight: 900, color: theme.gold,
+                padding: "12px 26px", borderRadius: 100,
+                background: "rgba(255,215,0,0.16)",
+                border: `3px solid ${theme.gold}`,
+                marginBottom: 18,
+                textShadow: glowText(theme, 0.9),
+                letterSpacing: 4, textTransform: "uppercase",
+              }}>
+                <Trophy size={34} />
+                Last Tournament Champion
               </div>
             ) : player.prevBracket && player.prevBracketRank && player.prevBracketTotal ? (
               <div style={{
@@ -490,10 +489,10 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                   />
                   {honored && (
                     <div style={{
-                      position: "absolute", top: -32, left: "50%",
-                      transform: "translateX(-50%)",
+                      position: "absolute", top: -30, right: -12,
+                      transform: playerHonorIsCrown(m) ? "rotate(32deg)" : "none",
                     }}>
-                      {playerHonorIcon(m, 46)}
+                      {playerHonorIcon(m, 56)}
                     </div>
                   )}
                 </div>

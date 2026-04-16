@@ -5,21 +5,8 @@
  * bracket MVP) or Trophy (current tournament champion) icon when the
  * underlying user doc has those honor fields set.
  *
- * Honor fields live on the user doc (see lib/types.ts → User, fields
- * `mvpBracket`, `isChampion`, `honorTournamentId`) and are stamped /
- * cleared by scripts/markTournamentHonors.ts at the end of every
- * tournament. They are explicitly point-in-time, not cumulative.
- *
- * Trophy beats Crown — a champion who is also bracket MVP shows the trophy.
- *
- * Usage:
- *   <PlayerAvatarBadge
- *     mvpBracket={user.mvpBracket}
- *     isChampion={user.isChampion}
- *     size={96}
- *   >
- *     <img src={avatarUrl} ... />
- *   </PlayerAvatarBadge>
+ * Crown beats Trophy — a player who is both bracket MVP and champion
+ * shows the crown (leaderboard MVP takes priority).
  */
 
 import React from "react";
@@ -88,16 +75,16 @@ export function PlayerAvatarBadge({
   inset = false,
   title,
 }: PlayerAvatarBadgeProps) {
-  const showTrophy = !!isChampion;
-  const showCrown = !showTrophy && !!mvpBracket;
+  const showCrown = !!mvpBracket;
+  const showTrophy = !showCrown && !!isChampion;
   const honored = showTrophy || showCrown;
-  const computedIconSize = iconSize ?? Math.max(14, Math.round(size * 0.42));
+  const computedIconSize = iconSize ?? Math.max(16, Math.round(size * 0.55));
 
   // Auto tooltip — admin can pass `title` to override.
-  const autoTitle = showTrophy
-    ? "Last tournament champion"
-    : showCrown
-      ? `${mvpBracket} bracket MVP last tournament`
+  const autoTitle = showCrown
+    ? `${mvpBracket} bracket MVP last tournament`
+    : showTrophy
+      ? "Last tournament champion"
       : undefined;
 
   return (
@@ -118,14 +105,14 @@ export function PlayerAvatarBadge({
         <div
           style={{
             position: "absolute",
-            top: inset ? -Math.round(computedIconSize * 0.35) : -Math.round(computedIconSize * 0.7),
-            left: "50%",
-            transform: "translateX(-50%)",
+            top: inset ? -Math.round(computedIconSize * 0.25) : -Math.round(computedIconSize * 0.55),
+            right: -Math.round(computedIconSize * 0.2),
+            transform: showCrown ? "rotate(32deg)" : "none",
             pointerEvents: "none",
             zIndex: 2,
           }}
         >
-          {showTrophy ? <Trophy size={computedIconSize} /> : <Crown size={computedIconSize} />}
+          {showCrown ? <Crown size={computedIconSize} /> : <Trophy size={computedIconSize} />}
         </div>
       )}
     </div>
