@@ -9,7 +9,7 @@
  * shows the crown (leaderboard MVP takes priority).
  */
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export interface PlayerAvatarBadgeProps {
   mvpBracket?: string | null;
@@ -80,40 +80,77 @@ export function PlayerAvatarBadge({
   const honored = showTrophy || showCrown;
   const computedIconSize = iconSize ?? Math.max(16, Math.round(size * 0.55));
 
-  // Auto tooltip — admin can pass `title` to override.
   const autoTitle = showCrown
-    ? `${mvpBracket} bracket MVP last tournament`
+    ? `${mvpBracket} Bracket MVP`
     : showTrophy
-      ? "Last tournament champion"
+      ? "Tournament Champion"
       : undefined;
+  const tooltipText = title ?? autoTitle;
+
+  const [showTooltip, setShowTooltip] = useState(false);
+  useEffect(() => {
+    if (!honored) return;
+    const showTimer = setTimeout(() => setShowTooltip(true), 600);
+    const hideTimer = setTimeout(() => setShowTooltip(false), 3200);
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+  }, [honored]);
 
   return (
     <div
       style={{
         position: "relative",
         display: "inline-block",
-        // Reserve headroom for the badge so it doesn't get clipped by parent
-        // overflow. Caller's existing margin compensation should account for
-        // this when laying things out.
-        // We don't add padding because that would shift the avatar — instead
-        // the badge floats above with a negative top.
       }}
-      title={title ?? autoTitle}
+      title={tooltipText}
     >
       {children}
       {honored && (
-        <div
-          style={{
-            position: "absolute",
-            top: inset ? -Math.round(computedIconSize * 0.25) : -Math.round(computedIconSize * 0.55),
-            right: -Math.round(computedIconSize * 0.2),
-            transform: showCrown ? "rotate(32deg)" : "none",
-            pointerEvents: "none",
-            zIndex: 2,
-          }}
-        >
-          {showCrown ? <Crown size={computedIconSize} /> : <Trophy size={computedIconSize} />}
-        </div>
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: inset ? -Math.round(computedIconSize * 0.25) : -Math.round(computedIconSize * 0.55),
+              right: -Math.round(computedIconSize * 0.2),
+              transform: showCrown ? "rotate(32deg)" : "none",
+              pointerEvents: "none",
+              zIndex: 2,
+            }}
+          >
+            {showCrown ? <Crown size={computedIconSize} /> : <Trophy size={computedIconSize} />}
+          </div>
+          {showTooltip && tooltipText && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: -Math.max(16, Math.round(size * 0.18)),
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "rgba(0,0,0,0.85)",
+                color: "#FFD700",
+                fontSize: Math.max(9, Math.min(11, Math.round(size * 0.12))),
+                fontWeight: 800,
+                padding: "3px 8px",
+                borderRadius: 6,
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                zIndex: 3,
+                border: "1px solid rgba(255,215,0,0.3)",
+                letterSpacing: "0.03em",
+                animation: "pab-tooltip-pop 2.6s ease forwards",
+              }}
+            >
+              {showCrown ? "\u{1F451}" : "\u{1F3C6}"} {tooltipText}
+            </div>
+          )}
+          <style>{`
+            @keyframes pab-tooltip-pop {
+              0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.9); }
+              10% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              75% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              100% { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.95); }
+            }
+          `}</style>
+        </>
       )}
     </div>
   );
