@@ -991,7 +991,8 @@ function CS2TournamentDetailInner() {
           .csd-tier-columns { flex-wrap: wrap; }
           .csd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .csd-mc-team { padding: 8px 10px; gap: 8px; }
-          .csd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
+          .csd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
+          .csd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
           .csd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .csd-tab-label { display: none; }
           .csd-tab-count { display: none; }
@@ -1029,7 +1030,7 @@ function CS2TournamentDetailInner() {
           .csd-stat-tiles { gap: 8px; }
           /* Match cards at tiny screens */
           .csd-mc-team { padding: 6px 6px !important; gap: 6px !important; }
-          .csd-mc-team-logo { width: 26px !important; height: 26px !important; font-size: 8px !important; border-radius: 7px !important; }
+          .csd-mc-team-logo { width: 38px !important; height: 38px !important; font-size: 10px !important; border-radius: 9px !important; }
           .csd-mc-center { min-width: 54px !important; }
           .csd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
           .csd-mc-team-name { font-size: 0.7rem !important; }

@@ -852,7 +852,8 @@ function DotaTournamentDetailInner() {
           .dtd-tier-columns { flex-wrap: wrap; }
           .dtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .dtd-mc-team { padding: 8px 10px; gap: 8px; }
-          .dtd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
+          .dtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
+          .dtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
           .dtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .dtd-tab-label { display: none; }
           .dtd-tab-count { display: none; }
@@ -887,7 +888,7 @@ function DotaTournamentDetailInner() {
           .dtd-stat-tiles { gap: 8px; }
           /* Match cards at tiny screens */
           .dtd-mc-team { padding: 6px 6px !important; gap: 6px !important; }
-          .dtd-mc-team-logo { width: 26px !important; height: 26px !important; font-size: 8px !important; border-radius: 7px !important; }
+          .dtd-mc-team-logo { width: 38px !important; height: 38px !important; font-size: 10px !important; border-radius: 9px !important; }
           .dtd-mc-center { min-width: 54px !important; }
           .dtd-mc-index { width: 28px !important; }
           .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }

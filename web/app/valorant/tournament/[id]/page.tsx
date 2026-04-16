@@ -1003,7 +1003,8 @@ function ValorantTournamentDetailInner() {
           .vtd-tier-columns { flex-wrap: wrap; }
           .vtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .vtd-mc-team { padding: 8px 10px; gap: 8px; }
-          .vtd-mc-team-logo { width: 32px; height: 32px; font-size: 9px; }
+          .vtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
+          .vtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
           .vtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .vtd-tab-label { display: none; }
           .vtd-tab-count { display: none; }
@@ -1043,7 +1044,7 @@ function ValorantTournamentDetailInner() {
           .vtd-stat-tiles { gap: 8px; }
           /* Match cards at tiny screens */
           .vtd-mc-team { padding: 6px 6px !important; gap: 6px !important; }
-          .vtd-mc-team-logo { width: 26px !important; height: 26px !important; font-size: 8px !important; border-radius: 7px !important; }
+          .vtd-mc-team-logo { width: 38px !important; height: 38px !important; font-size: 10px !important; border-radius: 9px !important; }
           .vtd-mc-center { min-width: 54px !important; }
           .vtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
           .vtd-mc-team-name { font-size: 0.7rem !important; }
