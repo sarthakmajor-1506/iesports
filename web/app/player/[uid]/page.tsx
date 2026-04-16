@@ -396,13 +396,14 @@ export default function PlayerProfile() {
             )}
           </div>
 
-          {/* ═══ HEADER — changes per tab ═══ */}
-          <div className="pp-header">
-            <div className="pp-header-left">
+          {/* ═══ HERO HEADER ═══ */}
+          <div className="pp-hero">
+            <div className="pp-hero-bg" />
+            <div className="pp-hero-content">
               <PlayerAvatarBadge
                 mvpBracket={(profile as any).mvpBracket}
                 isChampion={(profile as any).isChampion}
-                size={92}
+                size={110}
               >
                 {activeTab === "valorant" ? (
                   profile.riotAvatar ? (
@@ -426,68 +427,126 @@ export default function PlayerProfile() {
                   )
                 )}
               </PlayerAvatarBadge>
-              <div className="pp-header-info">
+
+              <div className="pp-hero-info">
                 <h1 className="pp-name">
                   {activeTab === "valorant" ? (profile.riotGameName || profile.discordUsername || displayName) : activeTab === "dota" ? (profile.steamName || profile.discordUsername || displayName) : (profile.fullName || displayName)}
+                  {displayTag && <span className="pp-tag">#{displayTag}</span>}
                 </h1>
-                {activeTab === "valorant" && profile.iesportsRank ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
-                    <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#3CCBFF" }}>{profile.iesportsRank}</span>
-                    <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#555550", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: 100, letterSpacing: "0.04em" }}>iE RANK</span>
+
+                {activeTab === "valorant" && (
+                  <div className="pp-rank-badges">
+                    {profile.iesportsRank && (
+                      <span className="pp-rank-pill pp-rank-pill-primary">
+                        <span className="pp-rank-pill-icon">⚡</span>
+                        {profile.iesportsRank}
+                        <span className="pp-rank-pill-sub">iE</span>
+                      </span>
+                    )}
                     {profile.riotRank && (
-                      <span style={{ fontSize: "0.68rem", color: "#555550", fontWeight: 600 }}>Riot: {profile.riotRank}</span>
+                      <span className="pp-rank-pill">
+                        {profile.riotRank}
+                        <span className="pp-rank-pill-sub">RIOT</span>
+                      </span>
                     )}
-                  </div>
-                ) : activeTab === "valorant" ? (
-                  <div className="pp-rank">{profile.riotRank || "Unranked"}</div>
-                ) : activeTab === "dota" ? (
-                  <div className="pp-rank">{profile.steamName ? (profile.steamId ? "Steam Linked" : "") : "Steam not connected"}</div>
-                ) : (
-                  <div style={{ fontSize: "0.68rem", color: "#555550", marginTop: 4, fontWeight: 700, letterSpacing: "0.06em" }}>YOUR PROFILE</div>
-                )}
-                {/* Discord-only notice for valorant tab */}
-                {activeTab === "valorant" && !profile.riotGameName && profile.discordId && (
-                  <div style={{ marginTop: 8, padding: "8px 14px", background: "rgba(129,140,248,0.06)", border: "1px solid rgba(129,140,248,0.15)", borderRadius: 8 }}>
-                    <div style={{ fontSize: "0.72rem", color: "#818cf8", fontWeight: 700 }}>Riot ID not connected</div>
-                    <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Riot ID to see your Valorant rank and register for tournaments.</div>
-                    {isOwnProfile && (
-                      <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/connect-riot"; }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Riot ID</button>
+                    {profile.riotPeakRank && profile.riotPeakRank !== profile.riotRank && (
+                      <span className="pp-rank-pill pp-rank-pill-peak">
+                        {profile.riotPeakRank}
+                        <span className="pp-rank-pill-sub">PEAK</span>
+                      </span>
                     )}
                   </div>
                 )}
-                {activeTab === "dota" && !profile.steamId && profile.discordId && (
-                  <div style={{ marginTop: 8, padding: "8px 14px", background: "rgba(102,192,244,0.06)", border: "1px solid rgba(102,192,244,0.15)", borderRadius: 8 }}>
-                    <div style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>Steam not connected</div>
-                    <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Steam account to see your Dota 2 rank and register for tournaments.</div>
-                    {isOwnProfile && (
-                      <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(102,192,244,0.12)", color: "#66c0f4", border: "1px solid rgba(102,192,244,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Steam</button>
-                    )}
+                {activeTab === "dota" && (
+                  <div className="pp-rank-badges">
+                    {profile.dotaRankTier ? (() => {
+                      const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+                      const medal = Math.floor((profile.dotaRankTier || 0) / 10);
+                      const stars = (profile.dotaRankTier || 0) % 10;
+                      const exactRank = medal >= 1 && medal <= 8 ? `${dotaRanks[medal]}${stars > 0 ? ` ${stars}` : ""}` : "Unranked";
+                      return <span className="pp-rank-pill pp-rank-pill-steam">{exactRank}</span>;
+                    })() : <span className="pp-rank-pill" style={{ opacity: 0.5 }}>Unranked</span>}
+                    {profile.dotaMMR && <span className="pp-rank-pill pp-rank-pill-steam">{profile.dotaMMR} MMR</span>}
                   </div>
+                )}
+                {activeTab === "account" && (
+                  <div style={{ fontSize: "0.72rem", color: "#555550", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Your Profile</div>
                 )}
               </div>
             </div>
+
+            {/* Connection notices */}
+            {activeTab === "valorant" && !profile.riotGameName && profile.discordId && (
+              <div style={{ margin: "0 20px 16px", padding: "10px 16px", background: "rgba(129,140,248,0.06)", border: "1px solid rgba(129,140,248,0.15)", borderRadius: 10 }}>
+                <div style={{ fontSize: "0.72rem", color: "#818cf8", fontWeight: 700 }}>Riot ID not connected</div>
+                <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Riot ID to see your Valorant rank and register for tournaments.</div>
+                {isOwnProfile && (
+                  <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/connect-riot"; }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Riot ID</button>
+                )}
+              </div>
+            )}
+            {activeTab === "dota" && !profile.steamId && profile.discordId && (
+              <div style={{ margin: "0 20px 16px", padding: "10px 16px", background: "rgba(102,192,244,0.06)", border: "1px solid rgba(102,192,244,0.15)", borderRadius: 10 }}>
+                <div style={{ fontSize: "0.72rem", color: "#66c0f4", fontWeight: 700 }}>Steam not connected</div>
+                <div style={{ fontSize: "0.62rem", color: "#8A8880", marginTop: 2 }}>Connect your Steam account to see your Dota 2 rank and register for tournaments.</div>
+                {isOwnProfile && (
+                  <button onClick={() => { try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} navigateWithAppPriority(`/api/auth/steam?uid=${user?.uid}`); }} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 100, background: "rgba(102,192,244,0.12)", color: "#66c0f4", border: "1px solid rgba(102,192,244,0.3)", fontSize: "0.66rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Connect Steam</button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ═══ STATS CARDS — tab-aware ═══ */}
-          {activeTab === "valorant" && (
-            vStats ? (
+          {activeTab === "valorant" && (() => {
+            const kd = vStats ? (vStats.totalDeaths > 0 ? Math.round(((vStats.totalKills || 0) / vStats.totalDeaths) * 100) / 100 : (vStats.totalKills || 0)) : 0;
+            const hsP = vStats?.hsPercent || 0;
+            return vStats ? (
               <div className="pp-stats-row">
-                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value">{totalGames}</div><div className="pp-stat-label">Games Played</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value pp-stat-green">{gamesWon}</div><div className="pp-stat-label">Wins</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value pp-stat-red">{gamesLost}</div><div className="pp-stat-label">Losses</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: winRate >= 50 ? "#6fcf8a" : "#d07070" }}>{winRate}%</div><div className="pp-stat-label">Win Rate</div></div>
+                <div className="pp-stat-card pp-stat-hero">
+                  <div className="pp-stat-value" style={{ fontSize: "2.2rem", color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div>
+                  <div className="pp-stat-label">Rank</div>
+                  {profile.iesportsRating && <div style={{ fontSize: "0.65rem", color: "#555550", marginTop: 2 }}>{profile.iesportsRating} SR</div>}
+                </div>
+                <div className="pp-stat-card">
+                  <div className="pp-stat-value">{totalGames}</div>
+                  <div className="pp-stat-label">Maps</div>
+                </div>
+                <div className="pp-stat-card">
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 4 }}>
+                    <span className="pp-stat-value pp-stat-green">{gamesWon}</span>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#555550" }}>/</span>
+                    <span className="pp-stat-value pp-stat-red">{gamesLost}</span>
+                  </div>
+                  <div className="pp-stat-label">W / L</div>
+                </div>
+                <div className="pp-stat-card">
+                  <div className="pp-stat-value" style={{ color: winRate >= 50 ? "#4ade80" : "#f87171" }}>{winRate}%</div>
+                  <div className="pp-stat-label">Win Rate</div>
+                  <div className="pp-winbar"><div className="pp-winbar-fill" style={{ width: `${Math.min(100, winRate)}%`, background: winRate >= 50 ? "linear-gradient(90deg, #22c55e, #4ade80)" : "linear-gradient(90deg, #dc2626, #f87171)" }} /></div>
+                </div>
+                <div className="pp-stat-card">
+                  <div className="pp-stat-value" style={{ color: kd >= 1 ? "#4ade80" : "#f87171" }}>{kd.toFixed(2)}</div>
+                  <div className="pp-stat-label">K/D</div>
+                </div>
+                <div className="pp-stat-card">
+                  <div className="pp-stat-value" style={{ color: "#a78bfa" }}>{computedAcs}</div>
+                  <div className="pp-stat-label">ACS</div>
+                </div>
               </div>
             ) : (
               <div className="pp-stats-row">
-                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div><div className="pp-stat-label">IEsports Rank</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value">0</div><div className="pp-stat-label">Official Games</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">ACS</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">K/D</div></div>
+                <div className="pp-stat-card pp-stat-hero">
+                  <div className="pp-stat-value" style={{ fontSize: "2.2rem", color: "#3CCBFF" }}>{profile.iesportsRank || profile.riotRank || "Unranked"}</div>
+                  <div className="pp-stat-label">Rank</div>
+                </div>
+                <div className="pp-stat-card"><div className="pp-stat-value">0</div><div className="pp-stat-label">Maps</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">W / L</div></div>
                 <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">K/D</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">ACS</div></div>
               </div>
-            )
-          )}
+            );
+          })()}
           {activeTab === "dota" && (() => {
             const dotaRanks = ["", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
             const tier = profile.dotaRankTier || 0;
@@ -498,9 +557,9 @@ export default function PlayerProfile() {
             return (
             <>
               <div className="pp-stats-row">
-                <div className="pp-stat-card pp-stat-primary"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{exactRank}</div><div className="pp-stat-label">Dota 2 Rank</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value">{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
-                <div className="pp-stat-card"><div className="pp-stat-value">{bracketLabel}</div><div className="pp-stat-label">Bracket</div></div>
+                <div className="pp-stat-card pp-stat-hero" style={{ borderColor: "rgba(102,192,244,0.2)", background: "linear-gradient(135deg, rgba(102,192,244,0.06) 0%, #121218 100%)" }}><div className="pp-stat-value" style={{ fontSize: "2.2rem", color: "#66c0f4" }}>{exactRank}</div><div className="pp-stat-label">Dota 2 Rank</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#66c0f4" }}>{profile.dotaMMR || "—"}</div><div className="pp-stat-label">MMR</div></div>
+                <div className="pp-stat-card"><div className="pp-stat-value" style={{ fontSize: "0.95rem" }}>{bracketLabel}</div><div className="pp-stat-label">Bracket</div></div>
                 <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Tournaments</div></div>
                 <div className="pp-stat-card"><div className="pp-stat-value" style={{ color: "#555550" }}>—</div><div className="pp-stat-label">Win Rate</div></div>
               </div>
@@ -543,31 +602,43 @@ export default function PlayerProfile() {
           {/* ═══ VALORANT TAB CONTENT ═══ */}
           {activeTab === "valorant" && (<>
           {/* ═══ IESPORTS RANK CARD ═══ */}
-          {profile.iesportsRank && (
-            <div className="pp-section" style={{ borderColor: "rgba(60,203,255,0.2)", background: "linear-gradient(135deg, rgba(60,203,255,0.04) 0%, #121215 100%)" }}>
-              <span className="pp-section-label">IEsports Rank</span>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div style={{ fontSize: "2rem", fontWeight: 900, color: "#3CCBFF" }}>{profile.iesportsRank}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: "0.68rem", color: "#8A8880", fontWeight: 700 }}>Rating: <span style={{ color: "#F0EEEA" }}>{profile.iesportsRating}</span></span>
-                    <span style={{ fontSize: "0.68rem", color: "#8A8880", fontWeight: 700 }}>Games: <span style={{ color: "#F0EEEA" }}>{profile.iesportsMatchesPlayed || 0}</span></span>
+          {profile.iesportsRank && (() => {
+            const rating = profile.iesportsRating || 0;
+            const ratingPct = Math.min(100, Math.max(0, ((rating - 300) / 2400) * 100));
+            return (
+            <div className="pp-rank-card">
+              <div className="pp-rank-card-glow" />
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <span className="pp-section-label" style={{ marginBottom: 0, color: "#3CCBFF" }}>iEsports Rating</span>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#555550" }}>{profile.iesportsMatchesPlayed || 0} games played</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: "2.8rem", fontWeight: 900, color: "#3CCBFF", lineHeight: 1, textShadow: "0 0 30px rgba(60,203,255,0.3)" }}>{profile.iesportsRank}</div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#F0EEEA", marginTop: 4 }}>{rating} <span style={{ fontSize: "0.7rem", color: "#555550", fontWeight: 700 }}>SR</span></div>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", gap: 12 }}>
+                    <div className="pp-rank-mini-card">
+                      <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotRank || "Unranked"}</div>
+                      <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Current</div>
+                    </div>
+                    <div className="pp-rank-mini-card">
+                      <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotPeakRank || "—"}</div>
+                      <div style={{ fontSize: "0.52rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Peak</div>
+                    </div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotRank || "Unranked"}</div>
-                    <div style={{ fontSize: "0.56rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Current Rank</div>
-                  </div>
-                  <div style={{ width: 1, background: "#2A2A30" }} />
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#F0EEEA" }}>{profile.riotPeakRank || "—"}</div>
-                    <div style={{ fontSize: "0.56rem", fontWeight: 700, color: "#555550", textTransform: "uppercase", letterSpacing: "0.08em" }}>Peak Rank</div>
+                <div className="pp-rating-bar">
+                  <div className="pp-rating-bar-fill" style={{ width: `${ratingPct}%` }} />
+                  <div className="pp-rating-bar-marks">
+                    <span>300</span><span>900</span><span>1500</span><span>2100</span><span>2700</span>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ═══ NON-MATCH RANK EVENTS (seed, admin, refresh) ═══ */}
           {rankHistory.filter(rh => rh.type !== "match").length > 0 && (
@@ -1064,47 +1135,78 @@ const baseStyles = `
   .pp-content { max-width: 860px; margin: 0 auto; padding: 20px 24px 60px; }
   .pp-loading { text-align: center; padding: 80px 20px; color: #555550; font-size: 0.9rem; }
 
-  .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-  .pp-header-left { display: flex; align-items: center; gap: 16px; }
-  .pp-avatar { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; border: 2px solid #2A2A30; }
-  .pp-avatar-init { width: 72px; height: 72px; border-radius: 14px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; }
-  .pp-name { font-size: 1.5rem; font-weight: 900; color: #F0EEEA; margin: 0; }
-  .pp-tag { color: #555550; font-weight: 400; font-size: 1.1rem; }
-  .pp-rank { font-size: 0.82rem; color: #3CCBFF; font-weight: 700; margin-top: 2px; }
+  /* ── Hero Header ── */
+  .pp-hero { position: relative; margin-bottom: 24px; border-radius: 18px; overflow: hidden; background: #0E0E14; border: 1px solid #1E1E28; }
+  .pp-hero-bg { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(60,203,255,0.08) 0%, transparent 40%, rgba(99,102,241,0.06) 70%, transparent 100%); pointer-events: none; }
+  .pp-hero-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 20%, rgba(60,203,255,0.06) 0%, transparent 60%); }
+  .pp-hero-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 24px; padding: 32px 28px 28px; }
+  .pp-hero-info { flex: 1; min-width: 0; }
 
-  .pp-stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
-  .pp-stat-card { background: #121215; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px 16px; text-align: center; }
-  .pp-stat-primary { border-color: #3CCBFF; background: rgba(60,203,255,0.06); }
-  .pp-stat-value { font-size: 1.6rem; font-weight: 900; color: #F0EEEA; }
+  .pp-avatar { width: 100px; height: 100px; border-radius: 18px; object-fit: cover; border: 3px solid rgba(60,203,255,0.25); box-shadow: 0 0 24px rgba(60,203,255,0.12), 0 4px 20px rgba(0,0,0,0.4); }
+  .pp-avatar-init { width: 100px; height: 100px; border-radius: 18px; background: linear-gradient(135deg, #3CCBFF 0%, #2A9FCC 100%); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; color: #fff; border: 3px solid rgba(60,203,255,0.25); box-shadow: 0 0 24px rgba(60,203,255,0.12); }
+  .pp-name { font-size: 1.8rem; font-weight: 900; color: #F0EEEA; margin: 0; line-height: 1.15; }
+  .pp-tag { color: #555550; font-weight: 600; font-size: 0.95rem; margin-left: 4px; }
+
+  /* Rank pills */
+  .pp-rank-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .pp-rank-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 100px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; font-weight: 800; color: #e0e0da; }
+  .pp-rank-pill-primary { background: rgba(60,203,255,0.1); border-color: rgba(60,203,255,0.3); color: #3CCBFF; }
+  .pp-rank-pill-peak { background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.25); color: #fbbf24; }
+  .pp-rank-pill-steam { background: rgba(102,192,244,0.1); border-color: rgba(102,192,244,0.25); color: #66c0f4; }
+  .pp-rank-pill-icon { font-size: 0.72rem; }
+  .pp-rank-pill-sub { font-size: 0.5rem; font-weight: 700; color: #555550; letter-spacing: 0.1em; margin-left: 2px; }
+
+  /* ── Stats Row ── */
+  .pp-stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
+  .pp-stat-card { background: #121218; border: 1px solid #1E1E28; border-radius: 14px; padding: 18px 10px; text-align: center; position: relative; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
+  .pp-stat-card:hover { border-color: rgba(60,203,255,0.2); box-shadow: 0 0 16px rgba(60,203,255,0.06); }
+  .pp-stat-hero { grid-column: span 2; background: linear-gradient(135deg, rgba(60,203,255,0.06) 0%, #121218 100%); border-color: rgba(60,203,255,0.2); }
+  .pp-stat-value { font-size: 1.5rem; font-weight: 900; color: #F0EEEA; line-height: 1.15; }
   .pp-stat-green { color: #4ade80; }
   .pp-stat-red { color: #f87171; }
-  .pp-stat-label { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; margin-top: 4px; }
+  .pp-stat-label { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #555550; margin-top: 6px; }
 
-  .pp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #2A2A30; margin-bottom: 24px; }
+  /* Win rate bar */
+  .pp-winbar { width: 100%; height: 3px; background: rgba(255,255,255,0.06); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .pp-winbar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+  /* ── Rank Card ── */
+  .pp-rank-card { position: relative; background: #0E0E14; border: 1px solid rgba(60,203,255,0.2); border-radius: 16px; padding: 24px; margin-bottom: 16px; overflow: hidden; }
+  .pp-rank-card-glow { position: absolute; top: -40px; left: -40px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(60,203,255,0.12) 0%, transparent 70%); pointer-events: none; }
+  .pp-rank-mini-card { flex: 1; text-align: center; padding: 12px 8px; background: rgba(255,255,255,0.03); border: 1px solid #1E1E28; border-radius: 12px; }
+  .pp-rating-bar { position: relative; width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; }
+  .pp-rating-bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #2A9FCC, #3CCBFF, #60d5ff); transition: width 0.8s ease; box-shadow: 0 0 12px rgba(60,203,255,0.4); }
+  .pp-rating-bar-marks { display: flex; justify-content: space-between; margin-top: 4px; }
+  .pp-rating-bar-marks span { font-size: 0.48rem; font-weight: 700; color: #3a3a42; }
+
+  /* ── Tab Bar ── */
+  .pp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid #1E1E28; margin-bottom: 24px; }
   .pp-tab { padding: 10px 24px; font-size: 0.86rem; font-weight: 700; color: #555550; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
   .pp-tab.active { color: #3CCBFF; border-bottom-color: #3CCBFF; }
   .pp-tab-private { margin-left: auto; }
   .pp-tab-private.active { color: #60a5fa; border-bottom-color: #60a5fa; }
 
-  .pp-section { background: #121215; border: 1px solid #2A2A30; border-radius: 14px; padding: 20px 24px; margin-bottom: 16px; }
+  /* ── Sections ── */
+  .pp-section { background: #121218; border: 1px solid #1E1E28; border-radius: 14px; padding: 20px 24px; margin-bottom: 16px; }
   .pp-section-label { display: block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #555550; margin-bottom: 16px; }
 
-  .pp-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .pp-detail-item { text-align: center; padding: 12px; background: #18181C; border-radius: 10px; }
+  .pp-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pp-detail-item { text-align: center; padding: 14px 10px; background: rgba(255,255,255,0.02); border: 1px solid #1E1E28; border-radius: 12px; }
   .pp-detail-num { display: block; font-size: 1.4rem; font-weight: 800; color: #F0EEEA; }
-  .pp-detail-lbl { display: block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; margin-top: 4px; }
+  .pp-detail-lbl { display: block; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; margin-top: 4px; }
 
   .pp-agents-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .pp-agent-chip { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #18181C; border: 1px solid #2A2A30; border-radius: 100px; }
+  .pp-agent-chip { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(255,255,255,0.03); border: 1px solid #1E1E28; border-radius: 100px; }
   .pp-agent-name { font-size: 0.82rem; font-weight: 700; color: #e0e0da; }
   .pp-agent-count { font-size: 0.68rem; color: #555550; }
 
   .pp-empty { text-align: center; padding: 40px 20px; color: #555550; font-size: 0.85rem; }
 
+  /* ── Match History ── */
   .pp-matches { display: flex; flex-direction: column; gap: 8px; }
-  .pp-match-card { border: 1px solid #2A2A30; border-radius: 10px; overflow: hidden; }
+  .pp-match-card { border: 1px solid #1E1E28; border-radius: 12px; overflow: hidden; background: #121218; }
   .pp-match-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background 0.1s; }
-  .pp-match-header:hover { background: #18181C; }
+  .pp-match-header:hover { background: rgba(255,255,255,0.03); }
   .pp-match-meta { display: flex; flex-direction: column; min-width: 120px; }
   .pp-match-tournament { font-size: 0.62rem; font-weight: 700; color: #555550; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
   .pp-match-round { font-size: 0.72rem; font-weight: 800; color: #3CCBFF; }
@@ -1116,8 +1218,8 @@ const baseStyles = `
 
   .pp-match-detail { padding: 0 16px 12px; }
   .pp-game-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; }
-  .pp-game-row.won { background: rgba(22,163,74,0.1); }
-  .pp-game-row.lost { background: rgba(239,68,68,0.08); }
+  .pp-game-row.won { background: rgba(22,163,74,0.08); }
+  .pp-game-row.lost { background: rgba(239,68,68,0.06); }
   .pp-game-map { display: flex; align-items: center; gap: 10px; }
   .pp-game-num { font-size: 0.62rem; font-weight: 800; color: #555550; text-transform: uppercase; }
   .pp-game-map-name { font-size: 0.82rem; font-weight: 700; color: #e0e0da; }
@@ -1130,7 +1232,8 @@ const baseStyles = `
   .pp-game-result.win { background: rgba(22,163,74,0.15); color: #4ade80; }
   .pp-game-result.loss { background: rgba(239,68,68,0.12); color: #f87171; }
 
-  .pp-acc-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #18181C; border-radius: 10px; }
+  /* ── Account ── */
+  .pp-acc-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(255,255,255,0.02); border: 1px solid #1E1E28; border-radius: 10px; }
   .pp-acc-left { display: flex; align-items: center; gap: 12px; }
   .pp-acc-name { font-size: 0.84rem; font-weight: 700; color: #e0e0da; }
   .pp-acc-detail { font-size: 0.72rem; color: #555550; margin-top: 1px; }
@@ -1141,7 +1244,7 @@ const baseStyles = `
   .pp-acc-link-btn { font-size: 0.72rem; font-weight: 800; padding: 5px 14px; border-radius: 100px; background: rgba(96,165,250,0.1); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); cursor: pointer; font-family: inherit; transition: background 0.15s; }
   .pp-acc-link-btn:hover { background: rgba(96,165,250,0.18); }
 
-  .pp-upi-input { flex: 1; background: #18181C; border: 1px solid #2A2A30; border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; color: #F0EEEA; font-family: inherit; outline: none; transition: border-color 0.15s; }
+  .pp-upi-input { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid #1E1E28; border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; color: #F0EEEA; font-family: inherit; outline: none; transition: border-color 0.15s; }
   .pp-upi-input:focus { border-color: #60a5fa; }
   .pp-upi-input::placeholder { color: #3a3a42; }
   .pp-upi-btn { padding: 10px 20px; border-radius: 10px; background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: background 0.15s; white-space: nowrap; }
@@ -1149,13 +1252,26 @@ const baseStyles = `
   .pp-upi-btn:disabled { opacity: 0.5; cursor: default; }
 
   @media (max-width: 700px) {
+    .pp-hero-content { padding: 24px 20px 20px; gap: 16px; }
+    .pp-avatar { width: 80px; height: 80px; border-radius: 16px; }
+    .pp-avatar-init { width: 80px; height: 80px; border-radius: 16px; font-size: 30px; }
+    .pp-name { font-size: 1.35rem; }
     .pp-stats-row { grid-template-columns: repeat(3, 1fr); }
+    .pp-stat-hero { grid-column: span 3; }
+    .pp-stat-value { font-size: 1.3rem; }
     .pp-detail-grid { grid-template-columns: repeat(2, 1fr); }
     .pp-match-meta { min-width: 80px; }
     .pp-match-team { max-width: 80px; font-size: 0.72rem; }
     .pp-game-row { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .pp-name { font-size: 1.2rem; }
-    .pp-avatar { width: 56px; height: 56px; }
-    .pp-avatar-init { width: 56px; height: 56px; font-size: 22px; }
+    .pp-rank-card { padding: 20px 16px; }
+  }
+  @media (max-width: 420px) {
+    .pp-hero-content { padding: 20px 16px 16px; gap: 12px; }
+    .pp-avatar { width: 68px; height: 68px; }
+    .pp-avatar-init { width: 68px; height: 68px; font-size: 26px; }
+    .pp-name { font-size: 1.15rem; }
+    .pp-stats-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .pp-stat-hero { grid-column: span 2; }
+    .pp-rank-pill { font-size: 0.68rem; padding: 4px 10px; }
   }
 `;
