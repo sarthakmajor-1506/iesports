@@ -11,7 +11,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 const DEDUP_MS = 30_000;
 
 export default function ValorantTournaments() {
-  const { registeredValorantTournaments: registeredIds, refreshUser } = useAuth();
+  const { registeredValorantTournaments: registeredIds, refreshUser, userProfile } = useAuth();
   const router = useRouter();
   const lastRefreshRef = useRef(0);
 
@@ -20,7 +20,11 @@ export default function ValorantTournaments() {
     dedupingInterval: DEDUP_MS,
   });
 
-  const tournaments: ValorantTournament[] = data?.tournaments || [];
+  const allTournaments: ValorantTournament[] = data?.tournaments || [];
+  const isMajorUser = /\bmajor\b/i.test(userProfile?.fullName || "");
+  const tournaments: ValorantTournament[] = allTournaments.filter(
+    (t) => isMajorUser || !/bangalore/i.test(t.name || "")
+  );
 
   useEffect(() => {
     const onFocus = () => {

@@ -16,16 +16,17 @@ export async function GET() {
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const isBangalore = (t: any) => /bangalore/i.test(t.name || "");
     const valIsEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
     const valFeatured = valAll
-      .filter((t: any) => !t.isTestTournament && !valIsEnded(t))
+      .filter((t: any) => !t.isTestTournament && !isBangalore(t) && !valIsEnded(t))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     // If no active/upcoming Valorant tournament, show the most recent ended one
     let valResult = valFeatured.length > 0 ? valFeatured[0] : null;
     if (!valResult) {
       const valEnded = valAll
-        .filter((t: any) => !t.isTestTournament && valIsEnded(t))
+        .filter((t: any) => !t.isTestTournament && !isBangalore(t) && valIsEnded(t))
         .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
       if (valEnded.length > 0) valResult = valEnded[0];
     }
@@ -50,7 +51,7 @@ export async function GET() {
       .filter((t: any) => dotaIsEnded(t))
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     const valCompleted = valAll
-      .filter((t: any) => !t.isTestTournament && valIsEnded(t))
+      .filter((t: any) => !t.isTestTournament && !isBangalore(t) && valIsEnded(t))
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
 
     // ── Detect champion from grand final if not set on tournament doc ──
