@@ -77,6 +77,7 @@ export default function MatchDetail() {
       case "kd": return kd;
       case "adr": return adr;
       case "hs": return hs;
+      case "acs": return roundsPlayed > 0 ? Math.round((p.score || 0) / roundsPlayed) : 0;
       case "fk": return p.firstKills ?? 0;
       case "fd": return p.firstDeaths ?? 0;
       default: return 0;
@@ -97,12 +98,27 @@ export default function MatchDetail() {
   const sortArrow = (col: string) => sortCol === col ? (sortDir === "desc" ? " ▼" : " ▲") : "";
   const thSortStyle = (col: string): React.CSSProperties => ({ cursor: "pointer", color: sortCol === col ? "#3CCBFF" : undefined });
 
-  const t1Players = sortPlayers((activeGameData?.playerStats || []).filter((p: any) =>
-    p.tournamentTeam === "team1" || p.teamId === match.team1Id
-  ));
-  const t2Players = sortPlayers((activeGameData?.playerStats || []).filter((p: any) =>
-    p.tournamentTeam === "team2" || p.teamId === match.team2Id
-  ));
+  const allStats: any[] = activeGameData?.playerStats || [];
+  const t1Side = activeGameData?.team1ValorantSide || null;
+  const t2Side = activeGameData?.team2ValorantSide || (t1Side === "Red" ? "Blue" : t1Side === "Blue" ? "Red" : null);
+
+  const isTeam1 = (p: any) =>
+    p.tournamentTeam === "team1" ||
+    p.teamId === match.team1Id ||
+    (t1Side && p.team === t1Side);
+  const isTeam2 = (p: any) =>
+    p.tournamentTeam === "team2" ||
+    p.teamId === match.team2Id ||
+    (t2Side && p.team === t2Side);
+
+  let t1Players = sortPlayers(allStats.filter(isTeam1));
+  let t2Players = sortPlayers(allStats.filter(isTeam2));
+
+  if (t1Players.length === 0 && t2Players.length === 0 && allStats.length > 0) {
+    const half = Math.ceil(allStats.length / 2);
+    t1Players = sortPlayers(allStats.slice(0, half));
+    t2Players = sortPlayers(allStats.slice(half));
+  }
 
   return (
     <>
@@ -281,25 +297,28 @@ export default function MatchDetail() {
                     <div className="md-stats-cell md-stats-d" style={thSortStyle("deaths")} onClick={() => handleSort("deaths")}>D{sortArrow("deaths")}</div>
                     <div className="md-stats-cell" style={thSortStyle("assists")} onClick={() => handleSort("assists")}>A{sortArrow("assists")}</div>
                     <div className="md-stats-cell md-stats-kd" style={thSortStyle("kd")} onClick={() => handleSort("kd")}>K/D{sortArrow("kd")}</div>
+                    <div className="md-stats-cell md-stats-acs" style={thSortStyle("acs")} onClick={() => handleSort("acs")}>ACS{sortArrow("acs")}</div>
                     <div className="md-stats-cell" style={thSortStyle("adr")} onClick={() => handleSort("adr")}>ADR{sortArrow("adr")}</div>
                     <div className="md-stats-cell" style={thSortStyle("hs")} onClick={() => handleSort("hs")}>HS%{sortArrow("hs")}</div>
                     <div className="md-stats-cell md-stats-fk" style={thSortStyle("fk")} onClick={() => handleSort("fk")}>FK{sortArrow("fk")}</div>
                     <div className="md-stats-cell md-stats-fd" style={thSortStyle("fd")} onClick={() => handleSort("fd")}>FD{sortArrow("fd")}</div>
                   </div>
                   {t1Players.map((p: any, i: number) => {
-                    const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
+                    const kd = Math.round((p.kills || 0) / Math.max(1, p.deaths || 0) * 100) / 100;
+                    const acs = roundsPlayed > 0 ? Math.round((p.score || 0) / roundsPlayed) : 0;
                     const adr = roundsPlayed > 0 ? Math.round((p.damageDealt || 0) / roundsPlayed) : 0;
-                    const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
+                    const hs = Math.round((p.headshots || 0) / Math.max(1, (p.headshots || 0) + (p.bodyshots || 0) + (p.legshots || 0)) * 100);
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
                           <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">{p.name || "Unknown"}</Link>
                         </div>
-                        <div className="md-stats-cell md-stats-agent">{p.agent}</div>
-                        <div className="md-stats-cell md-stats-k">{p.kills}</div>
-                        <div className="md-stats-cell md-stats-d">{p.deaths}</div>
-                        <div className="md-stats-cell">{p.assists}</div>
+                        <div className="md-stats-cell md-stats-agent">{p.agent || "—"}</div>
+                        <div className="md-stats-cell md-stats-k">{p.kills || 0}</div>
+                        <div className="md-stats-cell md-stats-d">{p.deaths || 0}</div>
+                        <div className="md-stats-cell">{p.assists || 0}</div>
                         <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
+                        <div className="md-stats-cell md-stats-acs">{acs}</div>
                         <div className="md-stats-cell" style={{ fontWeight: 600 }}>{adr}</div>
                         <div className="md-stats-cell">{hs}%</div>
                         <div className="md-stats-cell md-stats-fk">{p.firstKills ?? 0}</div>
@@ -324,25 +343,28 @@ export default function MatchDetail() {
                     <div className="md-stats-cell md-stats-d" style={thSortStyle("deaths")} onClick={() => handleSort("deaths")}>D{sortArrow("deaths")}</div>
                     <div className="md-stats-cell" style={thSortStyle("assists")} onClick={() => handleSort("assists")}>A{sortArrow("assists")}</div>
                     <div className="md-stats-cell md-stats-kd" style={thSortStyle("kd")} onClick={() => handleSort("kd")}>K/D{sortArrow("kd")}</div>
+                    <div className="md-stats-cell md-stats-acs" style={thSortStyle("acs")} onClick={() => handleSort("acs")}>ACS{sortArrow("acs")}</div>
                     <div className="md-stats-cell" style={thSortStyle("adr")} onClick={() => handleSort("adr")}>ADR{sortArrow("adr")}</div>
                     <div className="md-stats-cell" style={thSortStyle("hs")} onClick={() => handleSort("hs")}>HS%{sortArrow("hs")}</div>
                     <div className="md-stats-cell md-stats-fk" style={thSortStyle("fk")} onClick={() => handleSort("fk")}>FK{sortArrow("fk")}</div>
                     <div className="md-stats-cell md-stats-fd" style={thSortStyle("fd")} onClick={() => handleSort("fd")}>FD{sortArrow("fd")}</div>
                   </div>
                   {t2Players.map((p: any, i: number) => {
-                    const kd = Math.round(p.kills / Math.max(1, p.deaths) * 100) / 100;
+                    const kd = Math.round((p.kills || 0) / Math.max(1, p.deaths || 0) * 100) / 100;
+                    const acs = roundsPlayed > 0 ? Math.round((p.score || 0) / roundsPlayed) : 0;
                     const adr = roundsPlayed > 0 ? Math.round((p.damageDealt || 0) / roundsPlayed) : 0;
-                    const hs = Math.round(p.headshots / Math.max(1, p.headshots + p.bodyshots + p.legshots) * 100);
+                    const hs = Math.round((p.headshots || 0) / Math.max(1, (p.headshots || 0) + (p.bodyshots || 0) + (p.legshots || 0)) * 100);
                     return (
                       <div key={i} className="md-stats-row">
                         <div className="md-stats-cell md-stats-player">
                           <Link href={`/player/${findUidByPuuid(p.puuid, p.name, teams, match) || "_"}`} className="md-player-link">{p.name || "Unknown"}</Link>
                         </div>
-                        <div className="md-stats-cell md-stats-agent">{p.agent}</div>
-                        <div className="md-stats-cell md-stats-k">{p.kills}</div>
-                        <div className="md-stats-cell md-stats-d">{p.deaths}</div>
-                        <div className="md-stats-cell">{p.assists}</div>
+                        <div className="md-stats-cell md-stats-agent">{p.agent || "—"}</div>
+                        <div className="md-stats-cell md-stats-k">{p.kills || 0}</div>
+                        <div className="md-stats-cell md-stats-d">{p.deaths || 0}</div>
+                        <div className="md-stats-cell">{p.assists || 0}</div>
                         <div className="md-stats-cell md-stats-kd" style={{ color: kd >= 1.0 ? "#4ade80" : "#f87171" }}>{kd}</div>
+                        <div className="md-stats-cell md-stats-acs">{acs}</div>
                         <div className="md-stats-cell" style={{ fontWeight: 600 }}>{adr}</div>
                         <div className="md-stats-cell">{hs}%</div>
                         <div className="md-stats-cell md-stats-fk">{p.firstKills ?? 0}</div>
@@ -534,10 +556,10 @@ const styles = `
   .md-team-winner { font-size: 0.56rem; padding: 2px 8px; background: rgba(22,163,74,0.12); color: #4ade80; border-radius: 100px; border: 1px solid rgba(34,197,94,0.3); }
 
   .md-stats-table { width: 100%; min-width: 520px; }
-  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
+  .md-stats-header { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 6px 0; border-bottom: 1.5px solid #2A2A30; }
   .md-stats-header .md-stats-cell { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555550; cursor: pointer; user-select: none; transition: color 0.15s; }
   .md-stats-header .md-stats-cell:hover { color: #3CCBFF; }
-  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
+  .md-stats-row { display: grid; grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.7fr 0.6fr 0.6fr 0.5fr 0.5fr 0.5fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid #1e1e22; align-items: center; }
   .md-stats-row:last-child { border-bottom: none; }
   .md-stats-cell { font-size: 0.82rem; color: #e0e0da; }
   .md-stats-player { font-weight: 700; }
@@ -548,6 +570,7 @@ const styles = `
   .md-stats-k { color: #4ade80; font-weight: 700; }
   .md-stats-d { color: #f87171; }
   .md-stats-kd { font-weight: 800; }
+  .md-stats-acs { color: #a78bfa; font-weight: 700; }
   .md-stats-fk { color: #f59e0b; font-weight: 700; }
   .md-stats-fd { color: #f87171; }
 
@@ -563,7 +586,7 @@ const styles = `
     .md-header { flex-direction: column; gap: 16px; padding: 20px; }
     .md-header-team { align-items: center !important; min-width: auto !important; }
     .md-header-score { font-size: 1.8rem; }
-    .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.5fr 0.4fr 0.4fr 0.4fr; }
+    .md-stats-header, .md-stats-row { grid-template-columns: 1.5fr 0.8fr 0.4fr 0.4fr 0.4fr 0.6fr 0.5fr 0.5fr 0.4fr 0.4fr 0.4fr; }
     .md-stats-cell { font-size: 0.72rem; }
     .md-stats-agent { font-size: 0.62rem; }
     .md-content { padding: 20px 16px 60px; }

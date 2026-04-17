@@ -1775,7 +1775,65 @@ function ValorantTournamentDetailInner() {
                   <TabSharePopover tabKey="leaderboard" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
                 {leaderboard.length === 0 ? (
-                  <div className="vtd-empty"><BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No stats yet</span><span className="vtd-empty-sub">Player stats will appear once match data is fetched.</span></div>
+                  <div>
+                    <div style={{ textAlign: "center", padding: "24px 0 20px" }}>
+                      <BarChart3 size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} />
+                      <span className="vtd-empty-title" style={{ display: "block", fontSize: "1rem", fontWeight: 800, color: "#8A8880", marginBottom: 6 }}>No stats yet</span>
+                      <span className="vtd-empty-sub" style={{ display: "block", fontSize: "0.78rem", color: "#555550" }}>Player stats will appear once match data is fetched.</span>
+                    </div>
+
+                    {/* Placeholder table showing column structure */}
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ background: "rgba(85,85,85,0.10)", border: "1px solid rgba(85,85,85,0.30)", color: "#777", fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
+                        <span>Leaderboard Preview</span>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table className="vtd-standings-table" style={{ opacity: 0.45 }}>
+                          <thead><tr>
+                            <th>Player</th>
+                            <th>Team</th>
+                            <th>Agent(s)</th>
+                            <th>Maps</th>
+                            <th style={{ color: "#6fcf8a" }}>K</th>
+                            <th style={{ color: "#d07070" }}>D</th>
+                            <th>A</th>
+                            <th style={{ color: "#3CCBFF" }}>KDA</th>
+                            <th style={{ color: "#a78bfa" }}>ACS</th>
+                            <th>ADR</th>
+                            <th>HS%</th>
+                            <th style={{ color: "#f59e0b" }}>FK</th>
+                            <th style={{ color: "#d07070" }}>FD</th>
+                          </tr></thead>
+                          <tbody>
+                            {[
+                              { name: "Player 1", team: "Team Alpha", agent: "Jett", maps: 5, k: 86, d: 58, a: 31, kda: "1.75", acs: 260, adr: 156, hs: "34.4%", fk: 12, fd: 5 },
+                              { name: "Player 2", team: "Team Beta", agent: "Omen, Sage", maps: 5, k: 64, d: 74, a: 27, kda: "0.91", acs: 169, adr: 115, hs: "24.2%", fk: 4, fd: 8 },
+                              { name: "Player 3", team: "Team Gamma", agent: "Reyna", maps: 3, k: 45, d: 32, a: 12, kda: "1.59", acs: 221, adr: 142, hs: "31.0%", fk: 7, fd: 3 },
+                            ].map((row, i) => (
+                              <tr key={i}>
+                                <td><div style={{ fontWeight: 700 }}>{row.name}</div></td>
+                                <td style={{ fontSize: "0.72rem", color: "#8A8880" }}>{row.team}</td>
+                                <td style={{ fontSize: "0.78rem", color: "#8A8880" }}>{row.agent}</td>
+                                <td>{row.maps}</td>
+                                <td style={{ fontWeight: 700, color: "#6fcf8a" }}>{row.k}</td>
+                                <td style={{ color: "#d07070" }}>{row.d}</td>
+                                <td>{row.a}</td>
+                                <td style={{ fontWeight: 800, color: "#6fcf8a" }}>{row.kda}</td>
+                                <td style={{ fontWeight: 700, color: "#a78bfa" }}>{row.acs}</td>
+                                <td style={{ fontWeight: 600 }}>{row.adr}</td>
+                                <td>{row.hs}</td>
+                                <td style={{ fontWeight: 700, color: "#f59e0b" }}>{row.fk}</td>
+                                <td style={{ color: "#d07070" }}>{row.fd}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)", marginTop: 12 }}>
+                        <strong style={{ color: "#8A8880" }}>How it works:</strong> Players are grouped by rank bracket. Each bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.5 &times; A) / D. Click any column header to sort. <strong style={{ color: "#8A8880" }}>K</strong> = Kills, <strong style={{ color: "#8A8880" }}>D</strong> = Deaths, <strong style={{ color: "#8A8880" }}>A</strong> = Assists, <strong style={{ color: "#8A8880" }}>ACS</strong> = Avg Combat Score, <strong style={{ color: "#8A8880" }}>ADR</strong> = Avg Damage/Round, <strong style={{ color: "#8A8880" }}>FK</strong> = First Kills, <strong style={{ color: "#8A8880" }}>FD</strong> = First Deaths.
+                      </div>
+                    </div>
+                  </div>
                 ) : (() => {
                       // Build player rank lookup from soloPlayers data
                       const rankOrder = ["Radiant", "Immortal", "Ascendant", "Diamond", "Platinum", "Gold", "Silver", "Bronze", "Iron", "Unranked"];
