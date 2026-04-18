@@ -2024,10 +2024,20 @@ export default function AdminPanel() {
                               </select>
                             </div>
                             <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-                            <button disabled={loading || !lobbyName} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
-                              tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
-                              action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
-                            })}>Re-send Lobby & Notify</button>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button disabled={loading || !lobbyName} style={{ ...btnStyle, flex: 1, background: "#1e3a5f", border: "1px solid #3CCBFF66" }}
+                                title="Post new lobby credentials to Discord — keep everyone in the existing team VCs. Use this for Game 2+ in a series."
+                                onClick={() => apiCall("/api/valorant/match-update", {
+                                  tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                                  action: "next-game", lobbyName, lobbyPassword, notifyDiscord: true,
+                                })}>📢 Continue in same VCs</button>
+                              <button disabled={loading || !lobbyName} style={{ ...btnStyle, flex: 1 }}
+                                title="Re-create a fresh waiting room VC — use this only if players need to be regrouped."
+                                onClick={() => apiCall("/api/valorant/match-update", {
+                                  tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                                  action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                                })}>🆕 New VCs</button>
+                            </div>
                           </div>
                         ) : hasLobby ? (
                           <div style={stepHint("#4ade80")}>Lobby set: {m.lobbyName}{m.lobbyPassword ? ` / ${m.lobbyPassword}` : ""}</div>

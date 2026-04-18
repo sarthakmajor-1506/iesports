@@ -487,6 +487,85 @@ export async function POST(req: NextRequest) {
         deletedChannels: vcsToDelete.length,
       });
 
+    } else if (action === "next-game") {
+      // ═══════════════════════════════════════════════════════════════════════
+      // ACTION: NEXT GAME (BO2/BO3)
+      // → Post a new lobby credentials message to Discord for Game N
+      // → Does NOT create/destroy any voice channels — players stay in the
+      //   existing team VCs from Game 1. Use this when the series continues
+      //   on the same Discord VCs but the Valorant lobby name/password has
+      //   changed for the next map.
+      // ═══════════════════════════════════════════════════════════════════════
+      const gn = gameNumber || 2;
+      const gameKey = `game${gn}`;
+      const nextUpdateData: any = {
+        [`games.${gameKey}.lobbyName`]: lobbyName || "",
+        [`games.${gameKey}.lobbyPassword`]: lobbyPassword || "",
+        [`games.${gameKey}.status`]: "lobby_set",
+        lobbyName: lobbyName || "",
+        lobbyPassword: lobbyPassword || "",
+        lobbySetAt: new Date().toISOString(),
+      };
+
+      let discordSent = false;
+      let discordSkipReason = "";
+
+      if (!notifyDiscord) discordSkipReason = "notifyDiscord flag is false";
+      else if (!botToken) discordSkipReason = "DISCORD_BOT_TOKEN env var missing";
+      else if (!guildId) discordSkipReason = "DISCORD_GUILD_ID / DISCORD_SERVER_ID env var missing";
+      else if (!notifyChannelId) discordSkipReason = "notify channel env var missing";
+
+      if (notifyDiscord && botToken && guildId && notifyChannelId) {
+        try {
+          const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
+          const allMentions = [...team1Players, ...team2Players]
+            .map(p => p.discordId).filter(Boolean)
+            .map(id => `<@${id}>`);
+
+          const team1Vc = matchData.team1VcId ? `<#${matchData.team1VcId}>` : null;
+          const team2Vc = matchData.team2VcId ? `<#${matchData.team2VcId}>` : null;
+          const vcLines = (team1Vc || team2Vc)
+            ? ["", `🔊 Stay in your team VCs: ${team1Vc || "—"} · ${team2Vc || "—"}`].join("\n")
+            : "";
+
+          const messagePayload = {
+            content: allMentions.length > 0 ? allMentions.join(" ") : undefined,
+            embeds: [{
+              title: `🗺️ Game ${gn} — ${matchData.team1Name} vs ${matchData.team2Name}`,
+              description: [
+                `**New Lobby Name:** \`${lobbyName}\``,
+                `**Password:** \`${lobbyPassword}\``,
+                "",
+                `Create the new custom game in Valorant — teams stay in the same Discord VCs.`,
+                vcLines,
+              ].join("\n"),
+              color: 0x3CCBFF,
+              footer: { text: "IEsports Tournament" },
+              timestamp: new Date().toISOString(),
+            }],
+          };
+
+          discordSent = await sendMessage(notifyChannelId, messagePayload);
+        } catch (discordErr: any) {
+          discordSkipReason = `Discord error: ${discordErr.message}`;
+          console.error("[Discord] next-game error:", discordErr.message);
+        }
+      }
+
+      await matchRef.update(nextUpdateData);
+
+      return NextResponse.json({
+        success: true,
+        matchId,
+        action: "next-game",
+        gameNumber: gn,
+        lobbyName,
+        discordNotified: discordSent,
+        ...(discordSkipReason ? { discordSkipReason } : {}),
+        // Hint for admin UI: if these VCs aren't set we should warn them
+        hasExistingTeamVcs: !!(matchData.team1VcId && matchData.team2VcId),
+      });
+
     } else if (action === "check-vc") {
       // ═══════════════════════════════════════════════════════════════════════
       // ACTION: CHECK VC STATUS
