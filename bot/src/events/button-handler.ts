@@ -21,13 +21,17 @@ import {
 } from "../services/firebase";
 import { getDotaBot } from "../services/dota-gc";
 import { cleanupVoiceChannels, createVCsAndMovePlayers } from "../services/match-orchestrator";
-import { handleTossChoice, handleVetoMap } from "../services/map-veto";
+import { handleTossChoice, handleVetoMap, handleRandomReveal } from "../services/map-veto";
 import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
 
 export async function handleButton(interaction: ButtonInteraction): Promise<void> {
   // ── Valorant map veto buttons (multi-part customId) ──────────
-  if (interaction.customId.startsWith("toss_") || interaction.customId.startsWith("veto_")) {
+  if (
+    interaction.customId.startsWith("toss_") ||
+    interaction.customId.startsWith("veto_") ||
+    interaction.customId.startsWith("random_")
+  ) {
     const parts = interaction.customId.split(":");
     const action = parts[0];
     const tournamentId = parts[1];
@@ -38,6 +42,8 @@ export async function handleButton(interaction: ButtonInteraction): Promise<void
       await handleTossChoice(interaction, tournamentId, matchId, data);
     } else if (action === "veto_map") {
       await handleVetoMap(interaction, tournamentId, matchId, parseInt(data));
+    } else if (action === "random_reveal") {
+      await handleRandomReveal(interaction, tournamentId, matchId);
     } else {
       await interaction.reply({ content: "Unknown veto action.", ephemeral: true });
     }

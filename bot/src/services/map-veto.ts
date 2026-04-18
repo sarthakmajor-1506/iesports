@@ -51,7 +51,7 @@ export interface VetoAction {
 }
 
 export interface VetoState {
-  status: "toss_choice" | "veto" | "complete";
+  status: "toss_choice" | "veto" | "random" | "complete";
   bo: number;
   tossWinner: "team1" | "team2";
   banFirst: "team1" | "team2" | null;
@@ -241,6 +241,22 @@ export async function handleTossChoice(
     return;
   }
 
+  if (choice === "random") {
+    // Random-maps mode: toss winner clicks first, then the other team. Each
+    // click reveals one random map. No bans, no decider. Total picks = bo.
+    state.status = "random";
+    state.currentStep = 0;
+    state.banFirst = null;
+    state.sidePickOnDecider = state.tossWinner; // first reveal = toss winner
+    await setVetoState(tournamentId, matchId, state);
+
+    await interaction.editReply({
+      embeds: [buildRandomEmbed(state)],
+      components: [buildRandomRevealRow(state, tournamentId, matchId)],
+    });
+    return;
+  }
+
   if (choice === "ban_first") {
     state.banFirst = state.tossWinner;
     state.sidePickOnDecider = otherTeam(state.tossWinner);
@@ -257,6 +273,111 @@ export async function handleTossChoice(
   await interaction.editReply({
     embeds: [buildVetoEmbed(state)],
     components: buildMapButtons(state, tournamentId, matchId),
+  });
+}
+
+// ── Random map flow ────────────────────────────────────────────────
+// Whose turn is it to click? Toss winner goes first; each click advances.
+function getRandomActor(state: VetoState): "team1" | "team2" {
+  return state.currentStep % 2 === 0 ? state.tossWinner : otherTeam(state.tossWinner);
+}
+
+function buildRandomEmbed(state: VetoState): EmbedBuilder {
+  const picks = state.actions.filter((a) => a.action === "pick");
+  const lines: string[] = [];
+  picks.forEach((p, i) => {
+    lines.push(`🗺️ **Game ${i + 1}:** ${p.map} — *${tName(state, p.team)} reveal*`);
+  });
+
+  const totalPicks = state.bo;
+  const remainingReveals = totalPicks - picks.length;
+  const actor = getRandomActor(state);
+
+  const desc = [
+    picks.length === 0
+      ? `🎲 **Random map mode** — ${state.bo} map${state.bo > 1 ? "s" : ""} to reveal, toss winner goes first.`
+      : `🎲 Revealed so far:`,
+    ...lines,
+    "",
+    remainingReveals > 0
+      ? `▶️ **${tName(state, actor)}** — click the button to reveal your random map.`
+      : `✅ All maps revealed.`,
+  ].join("\n");
+
+  return new EmbedBuilder()
+    .setTitle(`🎲 RANDOM MAPS — BO${state.bo}`)
+    .setDescription(desc)
+    .setColor(0x22c55e)
+    .setFooter({ text: `Only ${tName(state, actor)} captain can click next` });
+}
+
+function buildRandomRevealRow(
+  state: VetoState,
+  tournamentId: string,
+  matchId: string,
+): ActionRowBuilder<ButtonBuilder> {
+  const actor = getRandomActor(state);
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`random_reveal:${tournamentId}:${matchId}`)
+      .setLabel(`${tName(state, actor)} — Reveal My Map`)
+      .setEmoji({ name: "🎲" })
+      .setStyle(ButtonStyle.Success),
+  );
+}
+
+export async function handleRandomReveal(
+  interaction: ButtonInteraction,
+  tournamentId: string,
+  matchId: string,
+): Promise<void> {
+  await interaction.deferUpdate();
+
+  const state = await getVetoState(tournamentId, matchId);
+  if (!state || state.status !== "random") {
+    await interaction.followUp({ content: "❌ No active random-maps session.", ephemeral: true });
+    return;
+  }
+
+  const actor = getRandomActor(state);
+  if (interaction.user.id !== captainId(state, actor)) {
+    await interaction.followUp({
+      content: `❌ It's **${tName(state, actor)}**'s turn to reveal.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (state.remainingMaps.length === 0) {
+    await interaction.followUp({ content: "❌ No maps left to reveal.", ephemeral: true });
+    return;
+  }
+
+  // Pick one at random
+  const idx = Math.floor(Math.random() * state.remainingMaps.length);
+  const chosen = state.remainingMaps[idx];
+  state.actions.push({ team: actor, action: "pick", map: chosen });
+  state.remainingMaps = state.remainingMaps.filter((m) => m !== chosen);
+  state.currentStep++;
+
+  const totalPicks = state.bo;
+  const picksSoFar = state.actions.filter((a) => a.action === "pick").length;
+  const done = picksSoFar >= totalPicks;
+
+  if (done) {
+    state.status = "complete";
+    await setVetoState(tournamentId, matchId, state);
+    await interaction.editReply({
+      embeds: [buildVetoEmbed(state)],
+      components: [],
+    });
+    return;
+  }
+
+  await setVetoState(tournamentId, matchId, state);
+  await interaction.editReply({
+    embeds: [buildRandomEmbed(state)],
+    components: [buildRandomRevealRow(state, tournamentId, matchId)],
   });
 }
 
