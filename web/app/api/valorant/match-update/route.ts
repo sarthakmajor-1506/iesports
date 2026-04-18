@@ -638,8 +638,8 @@ export async function POST(req: NextRequest) {
     } else if (action === "toss") {
       const bo = bodyBo || matchData.bo || 3;
 
-      if (![1, 3, 5].includes(bo)) {
-        return NextResponse.json({ error: "bo must be 1, 3, or 5" }, { status: 400 });
+      if (![1, 2, 3, 5].includes(bo)) {
+        return NextResponse.json({ error: "bo must be 1, 2, 3, or 5" }, { status: 400 });
       }
       if (!notifyChannelId) {
         return NextResponse.json({ error: "No Discord channel configured" }, { status: 400 });

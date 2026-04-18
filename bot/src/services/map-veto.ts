@@ -23,6 +23,12 @@ const VETO_SEQUENCES: Record<number, VetoStep[]> = {
     { actor: "first", action: "ban" }, { actor: "second", action: "ban" },
     { actor: "first", action: "ban" }, { actor: "second", action: "ban" },
   ],
+  2: [
+    // BO2: ban-ban-pick-pick — each team bans one then picks one.
+    // 1-1 is an accepted BO2 result, so there is no decider.
+    { actor: "first", action: "ban" },  { actor: "second", action: "ban" },
+    { actor: "first", action: "pick" }, { actor: "second", action: "pick" },
+  ],
   3: [
     // BO3: ban-ban-pick-pick-ban-ban, decider remains
     { actor: "first", action: "ban" },  { actor: "second", action: "ban" },
