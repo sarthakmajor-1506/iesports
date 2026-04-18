@@ -73,8 +73,11 @@ export async function sendGameResult(opts: {
   topPerformers: { name: string; kills: number; deaths: number; acs: number }[];
   isBracket?: boolean;
   bracketLabel?: string;
+  /** Override the default Valorant channel — used by test tournaments to
+   *  keep all Discord traffic routed to a single isolated channel. */
+  channelIdOverride?: string;
 }) {
-  const channelId = getValorantChannelId();
+  const channelId = opts.channelIdOverride || getValorantChannelId();
   if (!channelId) return { ok: false, error: "No channel ID configured" };
 
   const winnerName = opts.gameWinner === "team1" ? opts.team1Name : opts.team2Name;
@@ -113,8 +116,10 @@ export async function sendTournamentComplete(opts: {
   team2SeriesScore: number;
   gameSummaries: string[];
   leaderboardTop3: { tag: string; name: string; kd: number; acs: number }[];
+  /** Override the default Valorant channel — see sendGameResult. */
+  channelIdOverride?: string;
 }) {
-  const channelId = getValorantChannelId();
+  const channelId = opts.channelIdOverride || getValorantChannelId();
   if (!channelId) return { ok: false, error: "No channel ID configured" };
 
   const medals = ["🥇", "🥈", "🥉"];

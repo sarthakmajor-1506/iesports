@@ -309,6 +309,10 @@ export async function POST(req: NextRequest) {
     const team1Id = existingMatch.team1Id;
     const team2Id = existingMatch.team2Id;
 
+    // Test tournaments can pin Discord traffic to a single isolated channel.
+    const tournamentDocForOverride = await tournamentRef.get();
+    const testChannelOverride: string | undefined = tournamentDocForOverride.data()?.testDiscordChannelId;
+
     // Load both teams' member lists
     const [team1Doc, team2Doc] = await Promise.all([
       tournamentRef.collection("teams").doc(team1Id).get(),
@@ -992,6 +996,7 @@ export async function POST(req: NextRequest) {
         topPerformers,
         isBracket: existingMatch.isBracket,
         bracketLabel: existingMatch.bracketLabel,
+        channelIdOverride: testChannelOverride,
       });
       discordGameUpdate = gameRes.ok;
       if (!gameRes.ok) console.error("[Discord] Game update failed:", gameRes.error);
@@ -1072,6 +1077,7 @@ export async function POST(req: NextRequest) {
           team2SeriesScore,
           gameSummaries,
           leaderboardTop3: top3,
+          channelIdOverride: testChannelOverride,
         });
 
         if (result.ok) {

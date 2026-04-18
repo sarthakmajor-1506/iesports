@@ -214,9 +214,36 @@ export async function POST(req: NextRequest) {
     const guildId = process.env.DISCORD_GUILD_ID || process.env.DISCORD_SERVER_ID;
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const voiceCategoryId = process.env.VOICE_CATEGORY_ID;
-    const notifyChannelId = process.env.Valorant_lobby
+
+    // Test tournaments can pin all Discord traffic to one isolated channel and
+    // optionally skip every VC create/move/delete so staging runs never touch
+    // production server state. Override is read once here and flows through
+    // the whole request.
+    const tournamentDoc = await tournamentRef.get();
+    const tournamentData = tournamentDoc.exists ? (tournamentDoc.data() || {}) : {};
+    const testChannelOverride: string | undefined = tournamentData.testDiscordChannelId;
+    const skipVcOps: boolean = !!tournamentData.skipVcOps;
+
+    const notifyChannelId = testChannelOverride
+      || process.env.Valorant_lobby
       || process.env.LOBBY_CONTROL_CHANNEL_ID
       || process.env.RESULTS_CHANNEL_ID;
+
+    // Wrap the VC helpers so a test tournament with skipVcOps=true becomes
+    // a no-op for guild state — useful when you want to exercise the message
+    // pipeline without actually creating/moving/deleting voice channels.
+    const maybeCreateVoice: typeof createVoiceChannel = async (...args) => {
+      if (skipVcOps) { console.log("[test-tournament] skip createVoiceChannel:", args[1]); return null; }
+      return createVoiceChannel(...args);
+    };
+    const maybeMoveToVoice: typeof moveToVoice = async (...args) => {
+      if (skipVcOps) { console.log("[test-tournament] skip moveToVoice:", args[1], "→", args[2]); return false; }
+      return moveToVoice(...args);
+    };
+    const maybeDeleteChannel: typeof deleteChannel = async (...args) => {
+      if (skipVcOps) { console.log("[test-tournament] skip deleteChannel:", args[0]); return; }
+      return deleteChannel(...args);
+    };
 
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -264,7 +291,7 @@ export async function POST(req: NextRequest) {
 
           // ── Create Waiting Room VC ───────────────────────────────────────
           const wrName = `🎮 ${matchData.team1Name} vs ${matchData.team2Name}`;
-          waitingRoomVcId = await createVoiceChannel(
+          waitingRoomVcId = await maybeCreateVoice(
             guildId,
             wrName,
             voiceCategoryId,
@@ -320,7 +347,7 @@ export async function POST(req: NextRequest) {
             const notInVc: string[] = [];
             for (const p of [...team1Players, ...team2Players]) {
               if (!p.discordId) { notInVc.push(p.name); continue; }
-              const moved = await moveToVoice(guildId, p.discordId, waitingRoomVcId);
+              const moved = await maybeMoveToVoice(guildId, p.discordId, waitingRoomVcId);
               if (moved) inVc.push(p.name);
               else notInVc.push(p.name);
             }
@@ -375,7 +402,7 @@ export async function POST(req: NextRequest) {
           const allDiscordIds = [...team1DiscordIds, ...team2DiscordIds];
 
           // ── Create Team 1 VC ────────────────────────────────────────────
-          team1VcId = await createVoiceChannel(
+          team1VcId = await maybeCreateVoice(
             guildId,
             `🔴 ${matchData.team1Name}`,
             voiceCategoryId,
@@ -383,7 +410,7 @@ export async function POST(req: NextRequest) {
           );
 
           // ── Create Team 2 VC ────────────────────────────────────────────
-          team2VcId = await createVoiceChannel(
+          team2VcId = await maybeCreateVoice(
             guildId,
             `🔵 ${matchData.team2Name}`,
             voiceCategoryId,
@@ -398,19 +425,19 @@ export async function POST(req: NextRequest) {
           // (only moves users who are currently in a voice channel)
           if (team1VcId) {
             for (const id of team1DiscordIds) {
-              await moveToVoice(guildId, id, team1VcId);
+              await maybeMoveToVoice(guildId, id, team1VcId);
             }
           }
           if (team2VcId) {
             for (const id of team2DiscordIds) {
-              await moveToVoice(guildId, id, team2VcId);
+              await maybeMoveToVoice(guildId, id, team2VcId);
             }
           }
 
           // ── Delete waiting room VC if it exists ─────────────────────────
           const waitingRoomVcId = matchData.waitingRoomVcId;
           if (waitingRoomVcId) {
-            await deleteChannel(waitingRoomVcId);
+            await maybeDeleteChannel(waitingRoomVcId);
             startUpdateData.waitingRoomVcId = null; // clean up reference
           }
 
@@ -471,7 +498,7 @@ export async function POST(req: NextRequest) {
       ].filter(Boolean);
 
       for (const vcId of vcsToDelete) {
-        await deleteChannel(vcId);
+        await maybeDeleteChannel(vcId);
       }
 
       await matchRef.update({
@@ -588,7 +615,7 @@ export async function POST(req: NextRequest) {
           team1Players.some(t => t.uid === p.uid) ? matchData.team1VcId : matchData.team2VcId
         );
         if (!vc) { notInVc.push(p.name); continue; }
-        const moved = await moveToVoice(guildId, p.discordId, vc);
+        const moved = await maybeMoveToVoice(guildId, p.discordId, vc);
         if (moved) inVc.push(p.name);
         else notInVc.push(p.name);
       }
