@@ -429,6 +429,7 @@ export async function POST(req: NextRequest) {
         r.winTeam === team2ValorantSide ? "team2" : null,
     }));
 
+    const gameStartedAt = matchData?.metadata?.started_at || matchData?.metadata?.game_start || null;
     const gameData = {
       valorantMatchId,
       mapName,
@@ -445,6 +446,7 @@ export async function POST(req: NextRequest) {
       roundResults: mappedRoundResults,
       killMatrix,
       fetchedAt: new Date().toISOString(),
+      startedAt: gameStartedAt,
       apiVersion,
       status: "completed",
     };

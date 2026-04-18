@@ -386,6 +386,25 @@ export default function AdminPanel() {
   const [gameMatchIds, setGameMatchIds] = useState<string[]>(["", ""]);
   const [fetchRegion, setFetchRegion] = useState("ap");
   const [gameExcludedPuuids, setGameExcludedPuuids] = useState<string[]>(["", ""]);
+  // Per-game auto-find state: map from game index → discovery result/status.
+  // Admin clicks "Find latest match" → hits /api/valorant/match-find → we
+  // stash the preview here so the admin can eyeball map/score/MVP before
+  // committing via the existing Fetch button.
+  type FindPreview = {
+    matchId: string;
+    map: string;
+    mode: string;
+    startedAt: string | null;
+    team1Side: "Red" | "Blue" | null;
+    team1RoundsWon: number;
+    team2RoundsWon: number;
+    team1PlayersFound: number;
+    team2PlayersFound: number;
+    mvp: { name: string; tag: string; acs: number; kills: number; deaths: number; assists: number; rosterTeam: string } | null;
+    players: { puuid: string; name: string; tag: string; side: string; agent: string; kills: number; deaths: number; assists: number; acs: number; rosterTeam: string }[];
+  };
+  type FindState = { loading: boolean; candidates: FindPreview[]; index: number; error: string | null; debug: any };
+  const [findState, setFindState] = useState<Record<number, FindState>>({});
 
   // ─── Delete Game Data ───────────────────────────────────────────────────────
   const [deleteGameMatchId, setDeleteGameMatchId] = useState("");
@@ -525,6 +544,36 @@ export default function AdminPanel() {
       setLoading(false);
     }
   }, [adminKey]);
+
+  // Auto-discover the Valorant match for a given game slot by hitting
+  // /api/valorant/match-find. Stash candidates in findState so the UI can
+  // render a preview card without the admin having to paste a match UUID.
+  const findLatestMatch = useCallback(async (gameIdx: number, matchDocId: string, opts?: { beforeTimestamp?: string | null }) => {
+    setFindState(prev => ({ ...prev, [gameIdx]: { loading: true, candidates: [], index: 0, error: null, debug: null } }));
+    try {
+      const res = await fetch("/api/valorant/match-find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminKey, tournamentId, matchDocId,
+          region: fetchRegion,
+          beforeTimestamp: opts?.beforeTimestamp || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.found) {
+        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: data.candidates || [], index: 0, error: null, debug: null } }));
+        addLog(`🔍 match-find G${gameIdx + 1}: ${data.candidateCount} candidates (scanned ${data.historyScanned}, ${data.historySource})`);
+      } else {
+        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: data.reason || "No match found", debug: data.debug } }));
+        addLog(`🔍 match-find G${gameIdx + 1}: no candidates — ${data.reason}`);
+      }
+    } catch (e: any) {
+      setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: e.message || "Lookup failed", debug: null } }));
+      addLog(`❌ match-find G${gameIdx + 1}: ${e.message}`);
+    }
+  }, [adminKey, tournamentId, fetchRegion]);
 
   // ─── Fetch registered players for selected tournament ─────────────────────
   const fetchRegPlayers = useCallback(async () => {
@@ -2170,6 +2219,12 @@ export default function AdminPanel() {
                                 const vetoMap = hasVeto && m.vetoState ? (
                                   m.vetoState.actions.filter((a: any) => a.action === "pick")[i]?.map || m.vetoState.remainingMaps?.[0]
                                 ) : null;
+                                // Use the preceding game's startedAt as the "before" cutoff so
+                                // Find on game 1 doesn't return game 2 when both are already played.
+                                const prevGameData = i > 0 ? (m.games?.[`game${i}`] || (m as any)?.[`game${i}`]) : null;
+                                const beforeTs = prevGameData?.startedAt || null;
+                                const fs = findState[i];
+                                const preview = fs?.candidates[fs?.index ?? 0] || null;
                                 return (
                                   <div key={i} style={{ padding: 12, background: fetched ? "#0a200f" : gameBgs[i % gameBgs.length], borderRadius: 10, border: `1px solid ${fetched ? "#16a34a44" : gameBorders[i % gameBorders.length]}` }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -2179,13 +2234,91 @@ export default function AdminPanel() {
                                     {fetched && gameData && (
                                       <div style={{ fontSize: "0.68rem", color: "#888", marginBottom: 6 }}>{gameData.mapName} — {gameData.team1RoundsWon || 0}-{gameData.team2RoundsWon || 0}</div>
                                     )}
-                                    <input value={val} onChange={e => { const arr = [...gameMatchIds]; arr[i] = e.target.value; setGameMatchIds(arr); }} placeholder="Valorant Match UUID" style={inputStyle} />
-                                    <input value={gameExcludedPuuids[i] || ""} onChange={e => { const arr = [...gameExcludedPuuids]; arr[i] = e.target.value; setGameExcludedPuuids(arr); }} placeholder="Sub PUUIDs (comma sep)" style={{ ...inputStyle, fontSize: "0.72rem" }} />
-                                    <button disabled={loading || !val} style={{ ...(fetched ? btnSuccess : btnStyle), width: "100%", fontSize: "0.72rem" }}
-                                      onClick={() => apiCall("/api/valorant/match-fetch", {
-                                        tournamentId, matchDocId: opsMatchId, valorantMatchId: val,
-                                        gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
-                                      })}>{fetched ? "Re-fetch" : "Fetch"} Game {i + 1}</button>
+                                    {!fetched && (
+                                      <button disabled={fs?.loading || loading} style={{ ...btnStyle, width: "100%", fontSize: "0.7rem", background: "#1e3a5f", border: "1px solid #3CCBFF44", marginBottom: 6 }}
+                                        onClick={() => findLatestMatch(i, opsMatchId, { beforeTimestamp: beforeTs })}>
+                                        {fs?.loading ? "Searching…" : preview ? "🔄 Search again" : "🔍 Find latest match"}
+                                      </button>
+                                    )}
+                                    {!fetched && fs?.error && (
+                                      <div style={{ fontSize: "0.62rem", color: "#f87171", background: "#2a0f0f", border: "1px solid #7f1d1d44", borderRadius: 6, padding: "6px 8px", marginBottom: 6 }}>
+                                        {fs.error}
+                                        {fs.debug?.matches?.length > 0 && (
+                                          <div style={{ marginTop: 4, color: "#888", fontSize: "0.56rem" }}>
+                                            Recent history (none had both teams):
+                                            {fs.debug.matches.slice(0, 3).map((d: any, di: number) => (
+                                              <div key={di}>· {d.map} — t1:{d.team1Players} t2:{d.team2Players}</div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    {!fetched && preview && (
+                                      <div style={{ fontSize: "0.68rem", color: "#e0e0e0", background: "#0a1420", border: "1px solid #3CCBFF44", borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                                          <span style={{ fontWeight: 800, color: "#3CCBFF" }}>{preview.map}</span>
+                                          <span style={{ fontSize: "0.56rem", color: "#666" }}>{preview.mode}{preview.startedAt ? ` · ${new Date(preview.startedAt).toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}` : ""}</span>
+                                        </div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: 900, textAlign: "center", marginBottom: 8, color: "#fff" }}>
+                                          {preview.team1RoundsWon} — {preview.team2RoundsWon}
+                                          <span style={{ fontSize: "0.56rem", fontWeight: 500, color: "#666", marginLeft: 8 }}>T1 {preview.team1Side || "?"} side</span>
+                                        </div>
+                                        {preview.mvp && (
+                                          <div style={{ fontSize: "0.62rem", color: "#fbbf24", marginBottom: 6 }}>
+                                            👑 MVP: {preview.mvp.name}#{preview.mvp.tag} — {preview.mvp.acs} ACS · {preview.mvp.kills}/{preview.mvp.deaths}/{preview.mvp.assists}
+                                          </div>
+                                        )}
+                                        <div style={{ fontSize: "0.56rem", color: "#666", marginBottom: 8 }}>
+                                          {preview.team1PlayersFound} team1 · {preview.team2PlayersFound} team2 · {preview.players.filter(p => p.rosterTeam === "sub").length} subs
+                                        </div>
+                                        <details style={{ marginBottom: 8 }}>
+                                          <summary style={{ fontSize: "0.56rem", color: "#888", cursor: "pointer" }}>Show scoreboard</summary>
+                                          <div style={{ marginTop: 6, fontSize: "0.58rem" }}>
+                                            {preview.players.slice().sort((a, b) => b.acs - a.acs).map((p) => (
+                                              <div key={p.puuid} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: p.rosterTeam === "sub" ? "#666" : p.rosterTeam === "team1" ? "#60A5FA" : "#f87171" }}>
+                                                <span>{p.name}#{p.tag} · {p.agent}</span>
+                                                <span>{p.acs} · {p.kills}/{p.deaths}/{p.assists}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </details>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          <button disabled={loading} style={{ ...btnSuccess, flex: 1, fontSize: "0.7rem" }}
+                                            onClick={async () => {
+                                              const arr = [...gameMatchIds]; arr[i] = preview.matchId; setGameMatchIds(arr);
+                                              try {
+                                                await apiCall("/api/valorant/match-fetch", {
+                                                  tournamentId, matchDocId: opsMatchId, valorantMatchId: preview.matchId,
+                                                  gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
+                                                });
+                                                setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null } }));
+                                              } catch {/* apiCall already logged */}
+                                            }}>
+                                            ✓ Confirm & Post
+                                          </button>
+                                          {fs && fs.candidates.length > 1 && fs.index < fs.candidates.length - 1 && (
+                                            <button disabled={loading} style={{ ...btnStyle, fontSize: "0.62rem", padding: "6px 10px" }}
+                                              onClick={() => setFindState(prev => ({ ...prev, [i]: { ...fs, index: fs.index + 1 } }))}>
+                                              Older ({fs.candidates.length - 1 - fs.index} left)
+                                            </button>
+                                          )}
+                                          <button disabled={loading} style={{ ...btnStyle, fontSize: "0.62rem", padding: "6px 10px", background: "#2a2a2e" }}
+                                            onClick={() => setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null } }))}>
+                                            Discard
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <details style={{ marginBottom: 6 }}>
+                                      <summary style={{ fontSize: "0.56rem", color: "#555", cursor: "pointer" }}>Manual entry</summary>
+                                      <input value={val} onChange={e => { const arr = [...gameMatchIds]; arr[i] = e.target.value; setGameMatchIds(arr); }} placeholder="Valorant Match UUID" style={{ ...inputStyle, marginTop: 6 }} />
+                                      <input value={gameExcludedPuuids[i] || ""} onChange={e => { const arr = [...gameExcludedPuuids]; arr[i] = e.target.value; setGameExcludedPuuids(arr); }} placeholder="Sub PUUIDs (comma sep)" style={{ ...inputStyle, fontSize: "0.72rem" }} />
+                                      <button disabled={loading || !val} style={{ ...(fetched ? btnSuccess : btnStyle), width: "100%", fontSize: "0.72rem" }}
+                                        onClick={() => apiCall("/api/valorant/match-fetch", {
+                                          tournamentId, matchDocId: opsMatchId, valorantMatchId: val,
+                                          gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
+                                        })}>{fetched ? "Re-fetch" : "Fetch"} Game {i + 1}</button>
+                                    </details>
                                   </div>
                                 );
                               })}
