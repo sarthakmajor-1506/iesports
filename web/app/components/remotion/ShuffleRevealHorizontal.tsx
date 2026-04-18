@@ -492,37 +492,38 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
       )}
 
       {inHoldPhase && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 16 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, minHeight: 0 }}>
           {members.map((m, i) => {
             const rc = m.rank ? getRankPalette(m.rank) : null;
             const honored = !!(m.isWinner || m.isBracketMvp);
             return (
               <div key={m.uid || i} style={{
-                display: "flex", alignItems: "center", gap: 22,
-                padding: "12px 18px", borderRadius: 16,
+                display: "flex", alignItems: "center", gap: 18,
+                padding: "8px 14px", borderRadius: 14,
                 background: honored ? "rgba(255,215,0,0.06)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${honored ? "rgba(255,215,0,0.4)" : "rgba(255,255,255,0.06)"}`,
+                minHeight: 0,
               }}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <Avatar
                     src={m.avatar}
                     name={m.name}
-                    size={78}
+                    size={62}
                     border={`3px solid ${honored ? theme.gold : theme.accentBright}`}
                     rgb={theme.rgb}
                   />
                   {honored && (
                     <div style={{
-                      position: "absolute", top: -30, right: -12,
+                      position: "absolute", top: -24, right: -10,
                       transform: playerHonorIsCrown(m) ? "rotate(32deg)" : "none",
                     }}>
-                      {playerHonorIcon(m, 56)}
+                      {playerHonorIcon(m, 42)}
                     </div>
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: 28, fontWeight: 900, color: honored ? theme.gold : "#fff",
+                    fontSize: 24, fontWeight: 900, color: honored ? theme.gold : "#fff",
                     display: "-webkit-box",
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: "vertical",
@@ -535,14 +536,14 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                   </div>
                   {m.isWinner ? (
                     <div style={{
-                      fontSize: 14, fontWeight: 800, color: theme.gold,
+                      fontSize: 12, fontWeight: 800, color: theme.gold,
                       letterSpacing: 2, textTransform: "uppercase", marginTop: 2,
                     }}>
                       Last Tournament Champion
                     </div>
                   ) : m.prevBracket && m.prevBracketRank && m.prevBracketTotal ? (
                     <div style={{
-                      fontSize: 14, fontWeight: 800,
+                      fontSize: 12, fontWeight: 800,
                       color: m.isBracketMvp ? theme.gold : `rgba(${theme.rgb}, 0.9)`,
                       letterSpacing: 2, textTransform: "uppercase", marginTop: 2,
                     }}>
@@ -550,7 +551,7 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                     </div>
                   ) : m.isNew ? (
                     <div style={{
-                      fontSize: 14, fontWeight: 800,
+                      fontSize: 12, fontWeight: 800,
                       color: `rgba(${theme.rgb}, 0.8)`,
                       letterSpacing: 2, textTransform: "uppercase", marginTop: 2,
                     }}>
@@ -560,11 +561,12 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                 </div>
                 {rc && (
                   <div style={{
-                    fontSize: 18, fontWeight: 900, color: rc.text,
-                    padding: "8px 20px", borderRadius: 100,
+                    fontSize: 15, fontWeight: 900, color: rc.text,
+                    padding: "5px 14px", borderRadius: 100,
                     background: rc.bg,
                     border: `2px solid ${rc.border}`,
                     textShadow: softShadow,
+                    flexShrink: 0,
                   }}>
                     {m.rank}
                   </div>
@@ -623,7 +625,7 @@ const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount, current
     ? { avatar: 60, name: 26, rankPillFontSize: 16, teamName: 44, teamLabelFontSize: 16, honorIcon: 30, rowGap: 12, padding: "22px 26px" }
     : density === "medium"
       ? { avatar: 46, name: 20, rankPillFontSize: 13, teamName: 34, teamLabelFontSize: 14, honorIcon: 24, rowGap: 9, padding: "18px 22px" }
-      : { avatar: 34, name: 16, rankPillFontSize: 11, teamName: 26, teamLabelFontSize: 12, honorIcon: 16, rowGap: 6, padding: "16px 18px" };
+      : { avatar: 30, name: 15, rankPillFontSize: 10, teamName: 24, teamLabelFontSize: 11, honorIcon: 16, rowGap: 4, padding: "12px 16px" };
 
   return (
     <div style={{
