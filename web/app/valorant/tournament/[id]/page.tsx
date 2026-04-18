@@ -129,7 +129,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </div>
           <div className="vtd-mc-team-info">
             {/* tag removed — full name shown below */}
-            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t1Win ? { color: "#8ad4a0" } : t2Win ? { color: "#b8726e" } : {}) }}>{m.team1Name}</div>
+            <div className="vtd-mc-team-name" style={{ fontWeight: 800, ...(t1Win ? { color: "#8ad4a0" } : t2Win ? { color: "#b8726e" } : {}) }}>{m.team1Name}</div>
             {/* avatars shown in expanded view */}
           </div>
         </div>
@@ -182,7 +182,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </div>
           <div className="vtd-mc-team-info" style={{ textAlign: "right" }}>
             {/* tag removed — full name shown below */}
-            <div className="vtd-mc-team-name" style={{ fontSize: "0.92rem", fontWeight: 800, ...(t2Win ? { color: "#8ad4a0" } : t1Win ? { color: "#b8726e" } : {}) }}>{m.team2Name}</div>
+            <div className="vtd-mc-team-name" style={{ fontWeight: 800, ...(t2Win ? { color: "#8ad4a0" } : t1Win ? { color: "#b8726e" } : {}) }}>{m.team2Name}</div>
             {/* avatars shown in expanded view */}
           </div>
         </div>
@@ -918,7 +918,7 @@ function ValorantTournamentDetailInner() {
         .vtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .vtd-mc-team-info { flex: 1; min-width: 0; }
         .vtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #3CCBFF; text-transform: uppercase; }
-        .vtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #c8c8c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+        .vtd-mc-team-name { font-size: 0.92rem; font-weight: 700; color: #c8c8c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
         .vtd-mc-avatars { display: flex; gap: 0; margin-top: 4px; }
         .vtd-mc-avatars img, .vtd-mc-avatars .vtd-mc-av-init { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(18,18,21,0.9); margin-left: -4px; object-fit: cover; }
         .vtd-mc-avatars img:first-child, .vtd-mc-avatars .vtd-mc-av-init:first-child { margin-left: 0; }
@@ -1004,7 +1004,7 @@ function ValorantTournamentDetailInner() {
           .vtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .vtd-mc-team { padding: 8px 10px; gap: 8px; }
           .vtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
-          .vtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
+          .vtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; font-size: 0.72rem !important; word-break: break-word; }
           .vtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .vtd-tab-label { display: none; }
           .vtd-tab-count { display: none; }

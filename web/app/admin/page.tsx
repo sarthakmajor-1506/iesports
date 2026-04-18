@@ -330,6 +330,7 @@ export default function AdminPanel() {
         teamName: t.teamName,
         members,
         avgSkill: t.avgSkillLevel,
+        teamLogo: (t as any).teamLogo || undefined,
       };
     });
   }

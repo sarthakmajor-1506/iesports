@@ -47,6 +47,7 @@ export interface ShuffleTeam {
   teamName: string;
   members: ShufflePlayer[];
   avgSkill?: number;
+  teamLogo?: string;
 }
 
 export interface ShuffleRevealProps {
@@ -603,6 +604,18 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
     const fadeOutT = interpolate(holdFrame, [TEAM_HOLD_FRAMES - 12, TEAM_HOLD_FRAMES], [1, 0], clamp);
     return (
       <div style={{ ...band, opacity: op * fadeOutT, transform: `scale(${scale})` }}>
+        {team.teamLogo && (
+          <div style={{
+            width: 260, height: 260, borderRadius: "50%",
+            marginBottom: 24,
+            overflow: "hidden",
+            border: `6px solid ${theme.gold}`,
+            boxShadow: `0 0 60px ${theme.glow}, 0 0 120px rgba(${theme.rgb}, 0.35)`,
+            background: "rgba(0,0,0,0.4)",
+          }}>
+            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        )}
         <div style={{
           fontSize: 26, fontWeight: 900, color: theme.accentBright,
           letterSpacing: 10, textTransform: "uppercase", marginBottom: 16,
@@ -644,6 +657,29 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
 
   return (
     <div style={band}>
+      {team.teamLogo && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
+          opacity: enterOp * exitOp,
+        }}>
+          <div style={{
+            width: 96, height: 96, borderRadius: "50%", overflow: "hidden",
+            border: `3px solid ${theme.accentBright}`,
+            boxShadow: `0 0 24px ${theme.glow}`,
+            background: "rgba(0,0,0,0.4)", flexShrink: 0,
+          }}>
+            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+          <div style={{
+            fontSize: 30, fontWeight: 900, color: "#fff",
+            letterSpacing: 1, maxWidth: 620,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            textShadow: glowText(theme, 0.9),
+          }}>
+            {team.teamName}
+          </div>
+        </div>
+      )}
       <div style={{
         fontSize: 22, fontWeight: 900, color: theme.accentBright,
         letterSpacing: 6, textTransform: "uppercase", marginBottom: 14,
@@ -757,12 +793,27 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
         </div>
       </div>
       <div style={{
-        fontSize: 64, fontWeight: 900, color: "#fff",
-        letterSpacing: 0.5, marginBottom: 16,
-        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1,
-        textShadow: glowText(theme, 1.1),
+        display: "flex", alignItems: "center", gap: 16, marginBottom: 16,
       }}>
-        {team.teamName}
+        {team.teamLogo && (
+          <div style={{
+            width: 76, height: 76, borderRadius: "50%", overflow: "hidden",
+            border: `3px solid ${theme.accentBright}`,
+            boxShadow: `0 0 18px ${theme.glow}`,
+            background: "rgba(0,0,0,0.4)", flexShrink: 0,
+          }}>
+            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        )}
+        <div style={{
+          fontSize: 64, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, lineHeight: 1,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          textShadow: glowText(theme, 1.1),
+          flex: 1, minWidth: 0,
+        }}>
+          {team.teamName}
+        </div>
       </div>
       <div style={{
         height: 4, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,

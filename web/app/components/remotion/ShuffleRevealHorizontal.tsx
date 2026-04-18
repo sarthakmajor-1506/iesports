@@ -309,12 +309,30 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
         </div>
       </div>
       <div style={{
-        fontSize: 92, fontWeight: 900, color: "#fff",
-        letterSpacing: 1, lineHeight: 1, marginBottom: 14,
-        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        textShadow: glowText(theme, 1.4),
+        display: "flex", alignItems: "center", gap: 18, marginBottom: 14,
       }}>
-        {team.teamName}
+        {team.teamLogo && (
+          <div style={{
+            width: inHoldPhase ? 140 : 92,
+            height: inHoldPhase ? 140 : 92,
+            borderRadius: "50%", overflow: "hidden",
+            border: `4px solid ${inHoldPhase ? theme.gold : theme.accentBright}`,
+            boxShadow: `0 0 30px ${theme.glow}${inHoldPhase ? `, 0 0 70px rgba(${theme.rgb}, 0.35)` : ""}`,
+            background: "rgba(0,0,0,0.4)", flexShrink: 0,
+            transition: "all 0.3s ease",
+          }}>
+            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        )}
+        <div style={{
+          fontSize: 92, fontWeight: 900, color: "#fff",
+          letterSpacing: 1, lineHeight: 1,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          textShadow: glowText(theme, 1.4),
+          flex: 1, minWidth: 0,
+        }}>
+          {team.teamName}
+        </div>
       </div>
       <div style={{
         height: 5, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,
