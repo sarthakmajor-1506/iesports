@@ -133,22 +133,26 @@ export default function ShuffleVideoPlayer({
       if (!player || !container) throw new Error("Player not ready");
       player.pause();
 
-      // ── Pre-load all avatar images ─────────────────────────────────────────
+      // ── Pre-load all avatar + team logo images ─────────────────────────────
       // Without this, html2canvas captures the shuffle scene + early team-draft
-      // frames before avatar URLs have actually been fetched, and either renders
+      // frames before the URLs have actually been fetched, and either renders
       // missing-image placeholders or taints the canvas. Pre-loading warms the
-      // browser cache so by the time we capture, every avatar is decoded.
+      // browser cache so by the time we capture, every image is decoded.
       setStatus("Loading avatars...");
       const avatarUrls = Array.from(new Set(
         teams.flatMap(t => t.members.map(m => m.avatar)).filter(Boolean) as string[]
       ));
-      await Promise.all(avatarUrls.map(url => new Promise<void>(resolve => {
+      const logoUrls = Array.from(new Set(
+        teams.map(t => t.teamLogo).filter(Boolean) as string[]
+      ));
+      const allUrls = [...avatarUrls, ...logoUrls];
+      await Promise.all(allUrls.map(url => new Promise<void>(resolve => {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.referrerPolicy = "no-referrer";
         const done = () => resolve();
         img.onload = done;
-        img.onerror = done; // a single broken avatar must not block the render
+        img.onerror = done; // a single broken image must not block the render
         img.src = url;
         // hard cap so a slow CDN can't stall the whole pipeline
         setTimeout(done, 4000);
