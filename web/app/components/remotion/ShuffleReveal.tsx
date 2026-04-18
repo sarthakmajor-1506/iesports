@@ -548,12 +548,27 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
             {members.length} Players
           </div>
         </div>
-        <div style={{
-          fontSize: 46, fontWeight: 900, color: "#fff",
-          letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1,
-          textShadow: glowText(theme, 0.85),
-        }}>
-          {team.teamName}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <TeamLogoBadge
+            team={team}
+            theme={theme}
+            size={72}
+            borderColor={theme.accentBright}
+            glow={`0 0 16px ${theme.glow}`}
+          />
+          <div style={{
+            fontSize: 44, fontWeight: 900, color: "#fff",
+            letterSpacing: 0.5, lineHeight: 1.05,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            wordBreak: "break-word",
+            textShadow: glowText(theme, 0.85),
+            flex: 1, minWidth: 0,
+          }}>
+            {team.teamName}
+          </div>
         </div>
         <div style={{
           height: 3, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,
