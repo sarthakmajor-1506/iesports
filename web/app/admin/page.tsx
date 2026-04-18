@@ -326,14 +326,36 @@ export default function AdminPanel() {
           isNew: h ? false : Object.keys(hist).length > 0 ? true : undefined,
         };
       });
+      const rawLogo = (t as any).teamLogo as string | undefined;
+      // Route Firebase Storage logos through our same-origin proxy so the
+      // Remotion `<Img crossOrigin="anonymous">` request always gets a
+      // CORS-friendly response — some Storage buckets don't return CORS
+      // headers by default, which silently breaks logo rendering.
+      const teamLogo = rawLogo && /^https?:\/\/(?:[a-z0-9-]+\.)?(?:firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//i.test(rawLogo)
+        ? `/api/proxy-image?url=${encodeURIComponent(rawLogo)}`
+        : rawLogo;
       return {
         teamName: t.teamName,
         members,
         avgSkill: t.avgSkillLevel,
-        teamLogo: (t as any).teamLogo || undefined,
+        teamLogo,
       };
     });
   }
+
+  // Diagnostic: log logo presence whenever the source team list changes so we
+  // can tell from the browser console whether teamLogo is flowing through.
+  useEffect(() => {
+    if (!teams.length) return;
+    const rows = teams.map(t => ({
+      team: t.teamName,
+      teamLogo: (t as any).teamLogo ? (t as any).teamLogo.slice(0, 80) + "…" : null,
+      teamLogoSet: (t as any).teamLogoSet ?? null,
+    }));
+    console.log("[ShuffleVideo] team logo audit", rows);
+    const withLogo = rows.filter(r => r.teamLogo).length;
+    console.log(`[ShuffleVideo] ${withLogo}/${rows.length} teams have a teamLogo URL`);
+  }, [teams]);
 
   // ─── Swiss Pairings ─────────────────────────────────────────────────────────
   const [totalRounds, setTotalRounds] = useState("5");
