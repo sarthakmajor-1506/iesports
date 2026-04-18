@@ -107,6 +107,9 @@ function captainId(state: VetoState, team: "team1" | "team2"): string {
 // ── Embed Builders ──────────────────────────────────────────────
 
 function buildVetoEmbed(state: VetoState): EmbedBuilder {
+  const tossLine = `🏆 Toss: **${tName(state, state.tossWinner)}**`;
+  const matchLine = `**${state.team1Name}** vs **${state.team2Name}**`;
+
   // ── Complete ──
   if (state.status === "complete") {
     const picks = state.actions.filter(a => a.action === "pick");
@@ -117,31 +120,40 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
     for (const pick of picks) {
       const sidePicker = otherTeam(pick.team);
       mapLines.push(
-        `🗺️ **Game ${gameNum}:** ${pick.map} — *${tName(state, pick.team)} pick* · ${tName(state, sidePicker)} picks side`
+        `**Game ${gameNum}:** 🗺️ ${pick.map}`,
+        `   └ Map picked by **${tName(state, pick.team)}** · **${tName(state, sidePicker)}** picks attack/defence`,
       );
       gameNum++;
     }
 
-    // Decider (remaining map)
+    // Decider (remaining map after all picks + bans are exhausted)
     if (state.remainingMaps.length === 1) {
       const decider = state.remainingMaps[0];
       const sidePicker = state.sidePickOnDecider || state.tossWinner;
       if (state.bo === 1) {
-        mapLines.push(`🗺️ **Map:** ${decider} — ${tName(state, sidePicker)} picks side`);
+        mapLines.push(
+          `**Map:** 🗺️ ${decider}`,
+          `   └ **${tName(state, sidePicker)}** picks attack/defence (last map standing)`,
+        );
       } else {
         mapLines.push(
-          `🗺️ **Game ${gameNum}:** ${decider} — *decider* · ${tName(state, sidePicker)} picks side`
+          `**Game ${gameNum}:** 🗺️ ${decider}  *(decider)*`,
+          `   └ **${tName(state, sidePicker)}** picks attack/defence`,
         );
       }
     }
 
     const banStr = bans.length > 0
-      ? `\n\n**Bans:** ${bans.map(b => `~~${b.map}~~ (${tName(state, b.team)})`).join(" · ")}`
+      ? `\n\n**Bans in order:** ${bans.map(b => `~~${b.map}~~ *(${tName(state, b.team)})*`).join(" · ")}`
+      : "";
+
+    const advantageNote = state.banFirst
+      ? `\n\n🎯 **${tName(state, state.banFirst)}** banned first · **${tName(state, state.sidePickOnDecider || otherTeam(state.banFirst))}** had side pick on decider`
       : "";
 
     return new EmbedBuilder()
       .setTitle("✅ MAP VETO COMPLETE")
-      .setDescription(mapLines.join("\n") + banStr)
+      .setDescription([matchLine, tossLine, "", mapLines.join("\n") + banStr + advantageNote].join("\n"))
       .setColor(0x16a34a)
       .setFooter({ text: `BO${state.bo} · IEsports Tournament` });
   }
@@ -149,18 +161,35 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
   // ── In progress ──
   const step = getCurrentStep(state);
   const currentName = step ? tName(state, step.team) : "";
-  const actionLabel = step?.action === "ban" ? "BAN" : "PICK";
+  const actionVerb = step?.action === "ban" ? "ban a map" : "pick a map";
+  const actionEmoji = step?.action === "ban" ? "❌" : "✅";
+
+  const sequence = VETO_SEQUENCES[state.bo] || [];
+  const stepOf = sequence.length > 0 ? `Step ${state.currentStep + 1} of ${sequence.length}` : "";
+  const banFirstLine = state.banFirst
+    ? `🎯 Banning first: **${tName(state, state.banFirst)}**${state.sidePickOnDecider ? ` · Side pick on decider: **${tName(state, state.sidePickOnDecider)}**` : ""}`
+    : "";
 
   const historyLines = state.actions.map(a => {
     const emoji = a.action === "ban" ? "❌" : "✅";
     return `${emoji} ${tName(state, a.team)} ${a.action === "ban" ? "banned" : "picked"} **${a.map}**`;
   });
 
+  const remainingLine = state.remainingMaps.length > 0
+    ? `\n**Maps still available:** ${state.remainingMaps.join(" · ")}`
+    : "";
+
   const desc = [
-    `**${currentName}**'s turn to **${actionLabel}**`,
+    matchLine,
+    tossLine,
+    banFirstLine,
+    stepOf ? `📍 ${stepOf}` : "",
     "",
-    ...(historyLines.length > 0 ? historyLines : []),
-  ].join("\n");
+    `▶️ **${currentName}**, it's your turn to ${actionEmoji} **${actionVerb}**.`,
+    historyLines.length > 0 ? "\n**History:**" : "",
+    ...historyLines,
+    remainingLine,
+  ].filter(Boolean).join("\n");
 
   return new EmbedBuilder()
     .setTitle(`🗺️ MAP VETO — BO${state.bo}`)
@@ -284,31 +313,38 @@ function getRandomActor(state: VetoState): "team1" | "team2" {
 
 function buildRandomEmbed(state: VetoState): EmbedBuilder {
   const picks = state.actions.filter((a) => a.action === "pick");
-  const lines: string[] = [];
-  picks.forEach((p, i) => {
-    lines.push(`🗺️ **Game ${i + 1}:** ${p.map} — *${tName(state, p.team)} reveal*`);
-  });
-
   const totalPicks = state.bo;
   const remainingReveals = totalPicks - picks.length;
   const actor = getRandomActor(state);
+  const tossLine = `🏆 Toss: **${tName(state, state.tossWinner)}**`;
+  const matchLine = `**${state.team1Name}** vs **${state.team2Name}**`;
+
+  const mapLines: string[] = picks.map((p, i) => {
+    const sidePicker = otherTeam(p.team);
+    return [
+      `**Game ${i + 1}:** 🗺️ ${p.map}`,
+      `   └ Revealed by **${tName(state, p.team)}** · **${tName(state, sidePicker)}** picks attack/defence`,
+    ].join("\n");
+  });
 
   const desc = [
-    picks.length === 0
-      ? `🎲 **Random map mode** — ${state.bo} map${state.bo > 1 ? "s" : ""} to reveal, toss winner goes first.`
-      : `🎲 Revealed so far:`,
-    ...lines,
+    matchLine,
+    tossLine,
+    `🎲 Mode: **Random Maps** · ${totalPicks} total`,
+    "",
+    picks.length === 0 ? "*No maps revealed yet.*" : "**Revealed maps:**",
+    ...mapLines,
     "",
     remainingReveals > 0
-      ? `▶️ **${tName(state, actor)}** — click the button to reveal your random map.`
-      : `✅ All maps revealed.`,
-  ].join("\n");
+      ? `▶️ **${tName(state, actor)}** captain — click below to reveal the next map (${remainingReveals} remaining).`
+      : `✅ All ${totalPicks} maps revealed. Good luck!`,
+  ].filter(Boolean).join("\n");
 
   return new EmbedBuilder()
     .setTitle(`🎲 RANDOM MAPS — BO${state.bo}`)
     .setDescription(desc)
     .setColor(0x22c55e)
-    .setFooter({ text: `Only ${tName(state, actor)} captain can click next` });
+    .setFooter({ text: remainingReveals > 0 ? `Only ${tName(state, actor)} captain can click next` : `BO${state.bo} · IEsports Tournament` });
 }
 
 function buildRandomRevealRow(

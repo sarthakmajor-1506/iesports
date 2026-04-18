@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     const {
       tournamentId, adminKey, matchId, action,
       gameNumber, lobbyName, lobbyPassword,
-      notifyDiscord, scheduledTime, bo: bodyBo,
+      notifyDiscord, scheduledTime, bo: bodyBo, vetoMode: bodyVetoMode,
     } = await req.json();
 
     if (!tournamentId || !adminKey || !matchId || !action) {
@@ -637,6 +637,7 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════
     } else if (action === "toss") {
       const bo = bodyBo || matchData.bo || 3;
+      const vetoMode: "veto" | "random" = bodyVetoMode === "random" ? "random" : "veto";
 
       if (![1, 2, 3, 5].includes(bo)) {
         return NextResponse.json({ error: "bo must be 1, 2, 3, or 5" }, { status: 400 });
@@ -683,73 +684,132 @@ export async function POST(req: NextRequest) {
 
       const VALORANT_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split"];
 
-      // ── Post toss message with buttons ─────────────────────────────
-      const tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
-        content: `<@${winnerCaptainTag}> your team won the toss! Pick your advantage below.`,
-        embeds: [{
-          title: "🎲 COIN TOSS",
-          description: [
-            `**${matchData.team1Name}** vs **${matchData.team2Name}**\n`,
-            `🏆 **${winnerName}** wins the toss!\n`,
-            `Choose how maps are decided:`,
-            `**🎯 Ban First** — Traditional veto, your team bans first`,
-            `**🗺️ Pick Side on Decider** — Traditional veto, other team bans first, you pick side on decider`,
-            `**🎲 Random Maps** — Each captain clicks to reveal a random map. No bans.`,
-          ].join("\n"),
-          color: 0xff4655,
-          footer: { text: `BO${bo} · Only ${winnerName} captain can choose` },
-        }],
-        components: [{
-          type: 1,
-          components: [
-            {
-              type: 2,
-              style: 1,
-              label: "Ban First",
-              emoji: { name: "🎯" },
-              custom_id: `toss_choice:${tournamentId}:${matchId}:ban_first`,
-            },
-            {
-              type: 2,
-              style: 2,
-              label: "Pick Side on Decider",
-              emoji: { name: "🗺️" },
-              custom_id: `toss_choice:${tournamentId}:${matchId}:side_first`,
-            },
-            {
-              type: 2,
-              style: 3,
-              label: "Random Maps",
-              emoji: { name: "🎲" },
-              custom_id: `toss_choice:${tournamentId}:${matchId}:random`,
-            },
-          ],
-        }],
-      });
+      // ── Post toss message, branching on the admin-selected mode ────
+      const mapPoolLine = `🗺️ **Map pool:** ${VALORANT_MAPS.join(" · ")}`;
+      let tossRes: any;
+      let vetoState: any;
+
+      if (vetoMode === "random") {
+        // Random mode: no captain choice. Toss winner gets the first reveal
+        // button directly; the loser's button appears after the first pick.
+        tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
+          content: `<@${winnerCaptainTag}>`,
+          embeds: [{
+            title: "🎲 COIN TOSS — Random Maps",
+            description: [
+              `**${matchData.team1Name}** vs **${matchData.team2Name}**`,
+              ``,
+              `🏆 Toss winner: **${winnerName}**`,
+              `🎲 Mode: **Random Maps** (no bans, no side advantage — pure RNG)`,
+              ``,
+              mapPoolLine,
+              ``,
+              `▶️ **${winnerName}** captain, click below to reveal your map first.`,
+              `Once you pick, **${tossWinner === "team1" ? matchData.team2Name : matchData.team1Name}** gets their reveal button.`,
+              `Total maps to reveal: **${bo}**`,
+            ].join("\n"),
+            color: 0x22c55e,
+            footer: { text: `BO${bo} · Only ${winnerName} captain can click next` },
+          }],
+          components: [{
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 3,
+                label: `${winnerName} — Reveal My Map`,
+                emoji: { name: "🎲" },
+                custom_id: `random_reveal:${tournamentId}:${matchId}`,
+              },
+            ],
+          }],
+        });
+
+        vetoState = {
+          status: "random",
+          bo,
+          tossWinner,
+          banFirst: null,
+          sidePickOnDecider: tossWinner, // first reveal belongs to toss winner
+          currentStep: 0,
+          actions: [],
+          remainingMaps: [...VALORANT_MAPS],
+          team1Name: matchData.team1Name,
+          team2Name: matchData.team2Name,
+          team1CaptainDiscordId,
+          team2CaptainDiscordId,
+          channelId: notifyChannelId,
+          messageId: "",
+        };
+      } else {
+        // Traditional veto mode: captain chooses between banning first or
+        // letting the other side ban first in exchange for side choice on
+        // the decider.
+        const otherName = tossWinner === "team1" ? matchData.team2Name : matchData.team1Name;
+        tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
+          content: `<@${winnerCaptainTag}>`,
+          embeds: [{
+            title: "🎲 COIN TOSS — Traditional Veto",
+            description: [
+              `**${matchData.team1Name}** vs **${matchData.team2Name}**`,
+              ``,
+              `🏆 Toss winner: **${winnerName}**`,
+              `🎯 Mode: **Traditional Veto** (alternating bans + picks)`,
+              ``,
+              mapPoolLine,
+              ``,
+              `**${winnerName}**, pick your advantage:`,
+              `• **🎯 Ban First** — you take the first ban. Side pick on the decider goes to **${otherName}**.`,
+              `• **🗺️ Pick Side on Decider** — **${otherName}** bans first. You get the side of your choice on the decider.`,
+            ].join("\n"),
+            color: 0xff4655,
+            footer: { text: `BO${bo} · Only ${winnerName} captain can choose` },
+          }],
+          components: [{
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 1,
+                label: "Ban First",
+                emoji: { name: "🎯" },
+                custom_id: `toss_choice:${tournamentId}:${matchId}:ban_first`,
+              },
+              {
+                type: 2,
+                style: 2,
+                label: "Pick Side on Decider",
+                emoji: { name: "🗺️" },
+                custom_id: `toss_choice:${tournamentId}:${matchId}:side_first`,
+              },
+            ],
+          }],
+        });
+
+        vetoState = {
+          status: "toss_choice",
+          bo,
+          tossWinner,
+          banFirst: null,
+          sidePickOnDecider: null,
+          currentStep: 0,
+          actions: [],
+          remainingMaps: [...VALORANT_MAPS],
+          team1Name: matchData.team1Name,
+          team2Name: matchData.team2Name,
+          team1CaptainDiscordId,
+          team2CaptainDiscordId,
+          channelId: notifyChannelId,
+          messageId: "",
+        };
+      }
 
       let messageId = "";
       if (tossRes.ok) {
         const data = await tossRes.json();
         messageId = data.id;
       }
-
-      // ── Store veto state on match doc ──────────────────────────────
-      const vetoState = {
-        status: "toss_choice",
-        bo,
-        tossWinner,
-        banFirst: null,
-        sidePickOnDecider: null,
-        currentStep: 0,
-        actions: [],
-        remainingMaps: [...VALORANT_MAPS],
-        team1Name: matchData.team1Name,
-        team2Name: matchData.team2Name,
-        team1CaptainDiscordId,
-        team2CaptainDiscordId,
-        channelId: notifyChannelId,
-        messageId,
-      };
+      vetoState.messageId = messageId;
 
       await matchRef.update({ vetoState });
 

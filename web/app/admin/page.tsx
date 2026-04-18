@@ -372,6 +372,10 @@ export default function AdminPanel() {
   // already has a lobby set — so the Redo button reliably opens it even when
   // the prefilled inputs happen to equal the committed lobby values.
   const [lobbyRedoing, setLobbyRedoing] = useState(false);
+  // Admin decides up front whether this match uses traditional ban/pick veto
+  // or the random-maps flow. Captains no longer choose — they see only the
+  // buttons that match the mode.
+  const [vetoMode, setVetoMode] = useState<"veto" | "random">("veto");
   const [showSetup, setShowSetup] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
 
@@ -2087,9 +2091,20 @@ export default function AdminPanel() {
                             {vetoStatus === "toss_choice" && <div style={stepHint("#f59e0b")}>Toss posted — waiting for captain to choose in Discord</div>}
                             {vetoStatus === "veto" && <div style={stepHint("#f59e0b")}>Map veto in progress — captains are picking in Discord</div>}
                             {!vetoStatus && (
-                              <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
-                                tournamentId, matchId: opsMatchId, action: "toss", bo,
-                              })}>Start Toss (BO{bo})</button>
+                              <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                                <div style={{ flex: "0 0 180px" }}>
+                                  <label style={{ ...smallLabel, fontSize: "0.58rem" }}>Map Pick Mode</label>
+                                  <select value={vetoMode} onChange={e => setVetoMode(e.target.value as "veto" | "random")} style={selectStyle}>
+                                    <option value="veto">Traditional Veto</option>
+                                    <option value="random">Random Maps</option>
+                                  </select>
+                                </div>
+                                <div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}>
+                                  <button disabled={loading} style={{ ...btnStyle, width: "100%" }} onClick={() => apiCall("/api/valorant/match-update", {
+                                    tournamentId, matchId: opsMatchId, action: "toss", bo, vetoMode,
+                                  })}>Start Toss (BO{bo}) — {vetoMode === "random" ? "Random" : "Veto"}</button>
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
