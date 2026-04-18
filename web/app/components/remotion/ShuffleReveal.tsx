@@ -280,6 +280,38 @@ export const Avatar = React.memo(({ src, name, size, border, rgb }: { src?: stri
 });
 Avatar.displayName = "Avatar";
 
+/* Team logo badge with fallback to a team-initial circle so the visual
+ * element is always present, even before a logo has been uploaded. */
+export const TeamLogoBadge = React.memo(({ team, theme, size, borderColor, glow }: {
+  team: ShuffleTeam;
+  theme: Theme;
+  size: number;
+  borderColor: string;
+  glow?: string;
+}) => {
+  const initial = ((team.teamName || "?").trim()[0] || "?").toUpperCase();
+  const borderW = Math.max(3, Math.round(size / 30));
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", overflow: "hidden",
+      border: `${borderW}px solid ${borderColor}`,
+      boxShadow: glow,
+      background: `linear-gradient(135deg, rgba(${theme.rgb}, 0.4), rgba(0,0,0,0.6))`,
+      flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {team.teamLogo ? (
+        <Img src={team.teamLogo} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        <div style={{ fontSize: Math.round(size * 0.5), fontWeight: 900, color: "#fff", letterSpacing: 1, textShadow: glowText(theme, 1) }}>
+          {initial}
+        </div>
+      )}
+    </div>
+  );
+});
+TeamLogoBadge.displayName = "TeamLogoBadge";
+
 /* ═══════════════════════════════════════════════
    SCENE 1: INTRO
    ═══════════════════════════════════════════════ */
@@ -604,18 +636,15 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
     const fadeOutT = interpolate(holdFrame, [TEAM_HOLD_FRAMES - 12, TEAM_HOLD_FRAMES], [1, 0], clamp);
     return (
       <div style={{ ...band, opacity: op * fadeOutT, transform: `scale(${scale})` }}>
-        {team.teamLogo && (
-          <div style={{
-            width: 260, height: 260, borderRadius: "50%",
-            marginBottom: 24,
-            overflow: "hidden",
-            border: `6px solid ${theme.gold}`,
-            boxShadow: `0 0 60px ${theme.glow}, 0 0 120px rgba(${theme.rgb}, 0.35)`,
-            background: "rgba(0,0,0,0.4)",
-          }}>
-            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-        )}
+        <div style={{ marginBottom: 24 }}>
+          <TeamLogoBadge
+            team={team}
+            theme={theme}
+            size={260}
+            borderColor={theme.gold}
+            glow={`0 0 60px ${theme.glow}, 0 0 120px rgba(${theme.rgb}, 0.35)`}
+          />
+        </div>
         <div style={{
           fontSize: 26, fontWeight: 900, color: theme.accentBright,
           letterSpacing: 10, textTransform: "uppercase", marginBottom: 16,
@@ -624,9 +653,14 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
           Team Locked
         </div>
         <div style={{
-          fontSize: 84, fontWeight: 900, color: "#fff",
-          letterSpacing: 1, textAlign: "center", lineHeight: 1.02, marginBottom: 22,
-          maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          fontSize: 72, fontWeight: 900, color: "#fff",
+          letterSpacing: 1, textAlign: "center", lineHeight: 1.05, marginBottom: 22,
+          maxWidth: 960,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          wordBreak: "break-word",
           textShadow: glowText(theme, 1.4),
         }}>
           {team.teamName}
@@ -657,29 +691,31 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
 
   return (
     <div style={band}>
-      {team.teamLogo && (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
+        opacity: enterOp * exitOp,
+      }}>
+        <TeamLogoBadge
+          team={team}
+          theme={theme}
+          size={96}
+          borderColor={theme.accentBright}
+          glow={`0 0 24px ${theme.glow}`}
+        />
         <div style={{
-          display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
-          opacity: enterOp * exitOp,
+          fontSize: 30, fontWeight: 900, color: "#fff",
+          letterSpacing: 1, maxWidth: 780,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          wordBreak: "break-word",
+          lineHeight: 1.1,
+          textShadow: glowText(theme, 0.9),
         }}>
-          <div style={{
-            width: 96, height: 96, borderRadius: "50%", overflow: "hidden",
-            border: `3px solid ${theme.accentBright}`,
-            boxShadow: `0 0 24px ${theme.glow}`,
-            background: "rgba(0,0,0,0.4)", flexShrink: 0,
-          }}>
-            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-          <div style={{
-            fontSize: 30, fontWeight: 900, color: "#fff",
-            letterSpacing: 1, maxWidth: 620,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            textShadow: glowText(theme, 0.9),
-          }}>
-            {team.teamName}
-          </div>
+          {team.teamName}
         </div>
-      )}
+      </div>
       <div style={{
         fontSize: 22, fontWeight: 900, color: theme.accentBright,
         letterSpacing: 6, textTransform: "uppercase", marginBottom: 14,
@@ -795,20 +831,21 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
       <div style={{
         display: "flex", alignItems: "center", gap: 16, marginBottom: 16,
       }}>
-        {team.teamLogo && (
-          <div style={{
-            width: 76, height: 76, borderRadius: "50%", overflow: "hidden",
-            border: `3px solid ${theme.accentBright}`,
-            boxShadow: `0 0 18px ${theme.glow}`,
-            background: "rgba(0,0,0,0.4)", flexShrink: 0,
-          }}>
-            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-        )}
+        <TeamLogoBadge
+          team={team}
+          theme={theme}
+          size={84}
+          borderColor={theme.accentBright}
+          glow={`0 0 18px ${theme.glow}`}
+        />
         <div style={{
-          fontSize: 64, fontWeight: 900, color: "#fff",
-          letterSpacing: 0.5, lineHeight: 1,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          fontSize: 52, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, lineHeight: 1.05,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          wordBreak: "break-word",
           textShadow: glowText(theme, 1.1),
           flex: 1, minWidth: 0,
         }}>

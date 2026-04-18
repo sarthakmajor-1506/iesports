@@ -25,6 +25,7 @@ import {
   type ShufflePlayer,
   type ShuffleTeam,
   type ShuffleRevealProps,
+  TeamLogoBadge,
 } from "./ShuffleReveal";
 
 // Crown (leaderboard MVP) takes priority over trophy (champion).
@@ -248,6 +249,7 @@ const LEFT_X = SAFE_PAD;
 const RIGHT_X = LEFT_X + LEFT_W + 40;
 const RIGHT_W = W - RIGHT_X - SAFE_PAD;
 
+
 const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayerIdx, playerLocalFrame, inHoldPhase, frame, totalDraftFrames }: {
   theme: Theme;
   team: ShuffleTeam;
@@ -311,25 +313,23 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
       <div style={{
         display: "flex", alignItems: "center", gap: 18, marginBottom: 14,
       }}>
-        {team.teamLogo && (
-          <div style={{
-            width: inHoldPhase ? 140 : 92,
-            height: inHoldPhase ? 140 : 92,
-            borderRadius: "50%", overflow: "hidden",
-            border: `4px solid ${inHoldPhase ? theme.gold : theme.accentBright}`,
-            boxShadow: `0 0 30px ${theme.glow}${inHoldPhase ? `, 0 0 70px rgba(${theme.rgb}, 0.35)` : ""}`,
-            background: "rgba(0,0,0,0.4)", flexShrink: 0,
-            transition: "all 0.3s ease",
-          }}>
-            <Img src={team.teamLogo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-        )}
+        <TeamLogoBadge
+          team={team}
+          theme={theme}
+          size={inHoldPhase ? 140 : 100}
+          borderColor={inHoldPhase ? theme.gold : theme.accentBright}
+          glow={inHoldPhase ? `0 0 30px ${theme.glow}, 0 0 70px rgba(${theme.rgb}, 0.35)` : `0 0 22px ${theme.glow}`}
+        />
         <div style={{
-          fontSize: 92, fontWeight: 900, color: "#fff",
-          letterSpacing: 1, lineHeight: 1,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          fontSize: 68, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, lineHeight: 1.04,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
           textShadow: glowText(theme, 1.4),
           flex: 1, minWidth: 0,
+          wordBreak: "break-word",
         }}>
           {team.teamName}
         </div>
@@ -570,7 +570,7 @@ BigTeamCard.displayName = "BigTeamCard";
 
 const RECENT_TEAMS_CAP = 3;
 
-const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount }: {
+const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount, currentPlayerIdx, inHoldPhase }: {
   theme: Theme;
   /** Every team in the tournament — used only to know the total count
    * for the header. The actual panel body renders just the last N
@@ -578,19 +578,31 @@ const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount }: {
   allTeams: ShuffleTeam[];
   /** How many entries from the head of allTeams are "revealed" (past draft). */
   revealedCount: number;
+  /** Live draft state from the active TeamDraftScene so the right panel
+   * can mirror reveals that are happening in the centre. */
+  currentPlayerIdx: number;
+  inHoldPhase: boolean;
 }) => {
   const cardTop = SAFE_PAD + 60;
   const cardH = H - SAFE_PAD * 2 - 60;
   const total = allTeams.length;
 
-  // Rolling window of the most recent N revealed teams. Hard cap at 3 so
-  // the right panel always has room to show name + rank per player without
-  // the layout feeling cramped.
-  const allRevealed = allTeams.slice(0, revealedCount);
-  const startIdx = Math.max(0, allRevealed.length - RECENT_TEAMS_CAP);
-  const recent = allRevealed
-    .slice(startIdx)
-    .map((t, idx) => ({ team: t, originalIndex: startIdx + idx }));
+  // Rolling window of the most recent N teams — locked teams plus the one
+  // currently being drafted (so the right side mirrors the centre reveal).
+  type PanelCard = { team: ShuffleTeam; originalIndex: number; isDrafting: boolean; visible: number };
+  const cards: PanelCard[] = [];
+  for (let i = 0; i < revealedCount; i++) cards.push({ team: allTeams[i], originalIndex: i, isDrafting: false, visible: 5 });
+  const drafting = allTeams[revealedCount];
+  if (drafting) {
+    cards.push({
+      team: drafting,
+      originalIndex: revealedCount,
+      isDrafting: !inHoldPhase,
+      visible: inHoldPhase ? Math.min(5, drafting.members.length) : Math.min(5, currentPlayerIdx + 1),
+    });
+  }
+  const startIdx = Math.max(0, cards.length - RECENT_TEAMS_CAP);
+  const recent = cards.slice(startIdx);
 
   // When fewer than 3 teams are in the window, scale the content up so each
   // card fills the available space comfortably. Team 1 alone → big card,
@@ -638,42 +650,88 @@ const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount }: {
           display: "flex", flexDirection: "column",
           gap: 14, minHeight: 0,
         }}>
-          {recent.map(({ team: t, originalIndex: i }) => {
+          {recent.map(({ team: t, originalIndex: i, isDrafting, visible }) => {
             const honored = t.members.find(m => m.isWinner || m.isBracketMvp);
+            const logoSize = density === "large" ? 64 : density === "medium" ? 52 : 40;
             return (
               <div key={i} style={{
                 flex: 1,
-                background: `linear-gradient(180deg, ${theme.bgCardLight}, ${theme.bgCard})`,
-                border: `2px solid rgba(${theme.rgb}, 0.4)`,
+                background: isDrafting
+                  ? `linear-gradient(180deg, rgba(${theme.rgb}, 0.22), ${theme.bgCard})`
+                  : `linear-gradient(180deg, ${theme.bgCardLight}, ${theme.bgCard})`,
+                border: isDrafting
+                  ? `3px solid ${theme.accentBright}`
+                  : `2px solid rgba(${theme.rgb}, 0.4)`,
                 borderRadius: 18,
                 padding: sizes.padding,
                 display: "flex", flexDirection: "column",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                boxShadow: isDrafting
+                  ? `0 8px 28px rgba(0,0,0,0.5), 0 0 30px ${theme.glow}`
+                  : "0 8px 24px rgba(0,0,0,0.45)",
                 minHeight: 0,
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                   <div style={{
                     fontSize: sizes.teamLabelFontSize, fontWeight: 800,
-                    color: `rgba(${theme.rgb}, 0.9)`,
+                    color: isDrafting ? theme.accentBright : `rgba(${theme.rgb}, 0.9)`,
                     letterSpacing: 2.5, textTransform: "uppercase",
                   }}>
-                    Team {i + 1}
+                    {isDrafting ? "Now Drafting" : `Team ${i + 1}`}
                   </div>
-                  {honored && playerHonorIcon(honored, sizes.honorIcon)}
+                  {honored && !isDrafting && playerHonorIcon(honored, sizes.honorIcon)}
                 </div>
                 <div style={{
-                  fontSize: sizes.teamName, fontWeight: 900, color: "#fff",
-                  letterSpacing: 0.3, lineHeight: 1.05, marginBottom: 14,
-                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  textShadow: glowText(theme, 1),
+                  display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
                 }}>
-                  {t.teamName}
+                  <TeamLogoBadge
+                    team={t}
+                    theme={theme}
+                    size={logoSize}
+                    borderColor={isDrafting ? theme.accentBright : `rgba(${theme.rgb}, 0.6)`}
+                  />
+                  <div style={{
+                    fontSize: sizes.teamName, fontWeight: 900, color: "#fff",
+                    letterSpacing: 0.3, lineHeight: 1.05,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    wordBreak: "break-word",
+                    textShadow: glowText(theme, 1),
+                    flex: 1, minWidth: 0,
+                  }}>
+                    {t.teamName}
+                  </div>
                 </div>
                 <div style={{
                   display: "flex", flexDirection: "column", gap: sizes.rowGap,
                   marginTop: 2,
                 }}>
                   {t.members.slice(0, 5).map((m, mi) => {
+                    const isPlaceholder = mi >= visible;
+                    if (isPlaceholder) {
+                      return (
+                        <div key={m.uid || mi} style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          minWidth: 0, opacity: 0.4,
+                        }}>
+                          <div style={{
+                            width: sizes.avatar, height: sizes.avatar, borderRadius: "50%",
+                            border: `2px dashed rgba(${theme.rgb}, 0.4)`,
+                            background: "rgba(255,255,255,0.03)",
+                            flexShrink: 0,
+                          }} />
+                          <div style={{
+                            flex: 1, minWidth: 0,
+                            fontSize: sizes.name, fontWeight: 800,
+                            color: `rgba(${theme.rgb}, 0.5)`,
+                            letterSpacing: 2, textTransform: "uppercase",
+                          }}>
+                            Slot {mi + 1}
+                          </div>
+                        </div>
+                      );
+                    }
                     const isHonored = !!(m.isWinner || m.isBracketMvp);
                     const rc = m.rank ? getRankPalette(m.rank) : null;
                     return (
@@ -767,6 +825,8 @@ function TeamDraftScene({ frame, theme, team, teamIndex, allTeams }: {
         theme={theme}
         allTeams={allTeams}
         revealedCount={teamIndex}
+        currentPlayerIdx={currentPlayerIdx}
+        inHoldPhase={inHoldPhase}
       />
     </AbsoluteFill>
   );
