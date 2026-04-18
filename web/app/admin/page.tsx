@@ -368,6 +368,10 @@ export default function AdminPanel() {
   const [selectedGameForLobby, setSelectedGameForLobby] = useState("1");
   const [lobbyName, setLobbyName] = useState("");
   const [lobbyPassword, setLobbyPassword] = useState("");
+  // When true, the Set-Lobby edit form is forced open for a tournament that
+  // already has a lobby set — so the Redo button reliably opens it even when
+  // the prefilled inputs happen to equal the committed lobby values.
+  const [lobbyRedoing, setLobbyRedoing] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
 
@@ -2011,10 +2015,10 @@ export default function AdminPanel() {
                           </div>
                           {hasLobby && !isCompleted && (
                             <button style={{ fontSize: "0.62rem", padding: "3px 12px", background: "transparent", border: "1px solid #444", borderRadius: 6, color: "#888", cursor: "pointer", fontFamily: "inherit" }}
-                              onClick={() => { setLobbyName(m.lobbyName || ""); setLobbyPassword(m.lobbyPassword || ""); }}>Redo</button>
+                              onClick={() => { setLobbyName(m.lobbyName || ""); setLobbyPassword(m.lobbyPassword || ""); setLobbyRedoing(true); }}>Redo</button>
                           )}
                         </div>
-                        {hasLobby && lobbyName !== m.lobbyName && !isCompleted ? (
+                        {hasLobby && (lobbyRedoing || lobbyName !== m.lobbyName) && !isCompleted ? (
                           <div style={{ marginTop: 10 }}>
                             <div style={stepHint("#f59e0b")}>Previous lobby: {m.lobbyName} — set new details below to re-send</div>
                             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginTop: 8 }}>
@@ -2027,16 +2031,28 @@ export default function AdminPanel() {
                             <div style={{ display: "flex", gap: 6 }}>
                               <button disabled={loading || !lobbyName} style={{ ...btnStyle, flex: 1, background: "#1e3a5f", border: "1px solid #3CCBFF66" }}
                                 title="Post new lobby credentials to Discord — keep everyone in the existing team VCs. Use this for Game 2+ in a series."
-                                onClick={() => apiCall("/api/valorant/match-update", {
-                                  tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
-                                  action: "next-game", lobbyName, lobbyPassword, notifyDiscord: true,
-                                })}>📢 Continue in same VCs</button>
+                                onClick={async () => {
+                                  try {
+                                    await apiCall("/api/valorant/match-update", {
+                                      tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                                      action: "next-game", lobbyName, lobbyPassword, notifyDiscord: true,
+                                    });
+                                    setLobbyRedoing(false);
+                                  } catch {/* apiCall logged */}
+                                }}>📢 Continue in same VCs</button>
                               <button disabled={loading || !lobbyName} style={{ ...btnStyle, flex: 1 }}
                                 title="Re-create a fresh waiting room VC — use this only if players need to be regrouped."
-                                onClick={() => apiCall("/api/valorant/match-update", {
-                                  tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
-                                  action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
-                                })}>🆕 New VCs</button>
+                                onClick={async () => {
+                                  try {
+                                    await apiCall("/api/valorant/match-update", {
+                                      tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
+                                      action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                                    });
+                                    setLobbyRedoing(false);
+                                  } catch {/* apiCall logged */}
+                                }}>🆕 New VCs</button>
+                              <button style={{ ...btnStyle, background: "#2a2a2e", fontSize: "0.62rem", padding: "6px 10px" }}
+                                onClick={() => setLobbyRedoing(false)}>Cancel</button>
                             </div>
                           </div>
                         ) : hasLobby ? (
