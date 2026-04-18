@@ -26,13 +26,15 @@ async function refreshCache(): Promise<void> {
     const newMap = new Map<string, VcRef>();
 
     for (const tDoc of snap.docs) {
-      const matchesSnap = await tDoc.ref
-        .collection("matches")
-        .where("status", "in", ["pending", "live"])
-        .get();
+      // Any match with a VC ID assigned is worth tracking — waiting rooms get
+      // created during the `scheduled` phase (set-lobby), well before the
+      // match flips to `live`, so filtering on status here used to miss the
+      // entire pre-match voice activity window.
+      const matchesSnap = await tDoc.ref.collection("matches").get();
 
       for (const mDoc of matchesSnap.docs) {
         const d = mDoc.data();
+        if (d.status === "completed") continue; // post-match, VCs torn down
         const ref: VcRef = { tournamentId: tDoc.id, matchId: mDoc.id };
         if (d.waitingRoomVcId) newMap.set(d.waitingRoomVcId, ref);
         if (d.team1VcId) newMap.set(d.team1VcId, ref);
@@ -107,6 +109,15 @@ export function registerVcTracker(client: Client): void {
     const affectedChannels = new Set<string>();
     if (oldState.channelId) affectedChannels.add(oldState.channelId);
     if (newState.channelId) affectedChannels.add(newState.channelId);
+
+    // If none of the affected channels are in cache, the VC may have been
+    // created since the last refresh (30s poll). Force one refresh and retry
+    // — this is the "user just joined the freshly-created waiting room"
+    // case, which used to silently drop until the next interval.
+    const anyCached = Array.from(affectedChannels).some((c) => vcMap.has(c));
+    if (!anyCached && affectedChannels.size > 0) {
+      await refreshCache();
+    }
 
     // Deduplicate by matchId so we don't update the same doc twice
     const matchesToUpdate = new Map<string, VcRef>();
