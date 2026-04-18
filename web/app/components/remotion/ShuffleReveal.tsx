@@ -596,7 +596,12 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
                 </div>
                 <div style={{
                   fontSize: 12, fontWeight: 800, color: honored ? theme.gold : "rgba(255,255,255,0.8)",
-                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  wordBreak: "break-word",
+                  lineHeight: 1.15,
                   maxWidth: "100%", textAlign: "center",
                   textShadow: softShadow,
                 }}>
@@ -738,9 +743,15 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
           ) : null}
         </div>
         <div style={{
-          fontSize: 76, fontWeight: 900, color: "#fff",
+          fontSize: 70, fontWeight: 900, color: "#fff",
           letterSpacing: 0.5, textAlign: "center", marginTop: 12,
-          maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          maxWidth: 960,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          wordBreak: "break-word",
+          lineHeight: 1.08,
           textShadow: glowText(theme, 1.2),
         }}>
           {player.name}
@@ -899,9 +910,13 @@ function CurrentTeamCard({ theme, team, teamIndex, frame, inHoldPhase }: {
                 ) : null}
               </div>
               <div style={{
-                fontSize: 28, fontWeight: 900, color: "#fff",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                maxWidth: 220, textAlign: "center", lineHeight: 1.05,
+                fontSize: 26, fontWeight: 900, color: "#fff",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                maxWidth: 220, textAlign: "center", lineHeight: 1.1,
                 textShadow: softShadow,
               }}>
                 {player.name}

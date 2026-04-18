@@ -291,6 +291,7 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
       padding: PAD,
       opacity: cardOp,
       display: "flex", flexDirection: "column",
+      overflow: "hidden",
       boxShadow: `0 18px 60px rgba(0,0,0,0.55), 0 0 80px rgba(${theme.rgb}, 0.20) inset`,
     }}>
       {/* Header */}
@@ -400,9 +401,14 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
               Player {currentPlayerIdx + 1} of {members.length}
             </div>
             <div style={{
-              fontSize: 78, fontWeight: 900, color: "#fff",
-              letterSpacing: 0.5, lineHeight: 1, marginBottom: 18,
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              fontSize: 68, fontWeight: 900, color: "#fff",
+              letterSpacing: 0.5, lineHeight: 1.08, marginBottom: 18,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              wordBreak: "break-word",
+              maxWidth: "100%",
               textShadow: glowText(theme, 1.3),
             }}>
               {player.name}
@@ -516,8 +522,13 @@ const BigTeamCard = React.memo(({ theme, team, teamIndex, members, currentPlayer
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: 30, fontWeight: 900, color: honored ? theme.gold : "#fff",
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    fontSize: 28, fontWeight: 900, color: honored ? theme.gold : "#fff",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    wordBreak: "break-word",
+                    lineHeight: 1.1,
                     textShadow: softShadow,
                   }}>
                     {m.name}
@@ -665,6 +676,7 @@ const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount, current
                 borderRadius: 18,
                 padding: sizes.padding,
                 display: "flex", flexDirection: "column",
+                overflow: "hidden",
                 boxShadow: isDrafting
                   ? `0 8px 28px rgba(0,0,0,0.5), 0 0 30px ${theme.glow}`
                   : "0 8px 24px rgba(0,0,0,0.45)",
@@ -761,7 +773,12 @@ const RevealedTeamsPanel = React.memo(({ theme, allTeams, revealedCount, current
                           flex: 1, minWidth: 0,
                           fontSize: sizes.name, fontWeight: 800,
                           color: isHonored ? theme.gold : "#e4e5ec",
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          wordBreak: "break-word",
+                          lineHeight: 1.15,
                           textShadow: softShadow,
                         }}>
                           {m.name}
