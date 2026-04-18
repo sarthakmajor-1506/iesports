@@ -88,13 +88,24 @@ const SAFE_CENTER_Y = SAFE_TOP + SAFE_H / 2;      // 885
 // Bottom band is the BIGGEST band — that's the actively-drafting team and it
 // needs to be readable on a phone screen.
 const HEADER_H = 70;
-const TOP_H = 380;   // revealed-teams band (kept same per request)
-const BOT_H = 480;   // current-team band — much bigger so phone viewers can read it
+// NEW ORDER (top→bottom): player spotlight → drafting team → last drafted
+// The player spotlight claims the top + centre for maximum hero-shot real
+// estate. The current drafting team sits in the middle. The most-recently
+// revealed team is compressed into a small strip at the bottom.
+const PLAYER_H = 780;    // hero spotlight — was MID_H at 610
+const DRAFT_H = 480;     // current drafting team — was BOT_H
+const REVEALED_H = SAFE_H - HEADER_H - PLAYER_H - DRAFT_H; // ≈ 210
 const HEADER_Y = SAFE_TOP;
-const TOP_Y = SAFE_TOP + HEADER_H;
-const MID_Y = TOP_Y + TOP_H;
-const MID_H = SAFE_H - HEADER_H - TOP_H - BOT_H;  // 440
-const BOT_Y = MID_Y + MID_H;
+const PLAYER_Y = SAFE_TOP + HEADER_H;
+const DRAFT_Y = PLAYER_Y + PLAYER_H;
+const REVEALED_Y = DRAFT_Y + DRAFT_H;
+// Legacy aliases kept for any downstream refs; remove once fully migrated.
+const MID_Y = PLAYER_Y;
+const MID_H = PLAYER_H;
+const BOT_Y = DRAFT_Y;
+const BOT_H = DRAFT_H;
+const TOP_Y = REVEALED_Y;
+const TOP_H = REVEALED_H;
 
 function getTeamFrames(memberCount: number) {
   return Math.min(memberCount, 5) * PLAYER_DRAFT_FRAMES + TEAM_HOLD_FRAMES;
@@ -512,8 +523,9 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
   }
 
   const renderCard = (team: ShuffleTeam, cardTeamIdx: number, progress: number, isIncoming: boolean) => {
-    // incoming slides right → 0; outgoing slides 0 → left. Both cross-fade.
-    const dx = isIncoming ? (1 - progress) * 260 : -progress * 260;
+    // Incoming slides down from above → 0; outgoing slides 0 → down out of frame.
+    // Both cross-fade during the transition.
+    const dy = isIncoming ? (1 - progress) * -180 : progress * 180;
     const op = isIncoming ? progress : 1 - progress;
     const members = team.members.slice(0, 5);
 
@@ -522,85 +534,68 @@ const TopRevealedBand = React.memo(({ theme, oldTeam, newTeam, transT, teamIndex
         position: "absolute", left: BAND_PAD_X, right: BAND_PAD_X, top: cardTop, height: cardH,
         background: `linear-gradient(180deg, ${theme.bgCardLight}, ${theme.bgCard})`,
         border: `2px solid rgba(${theme.rgb}, 0.4)`,
-        borderRadius: 22,
-        padding: "20px 26px",
-        transform: `translateX(${dx}px)`,
+        borderRadius: 20,
+        padding: "14px 22px",
+        transform: `translateY(${dy}px)`,
         opacity: op,
-        boxShadow: `0 14px 44px rgba(0,0,0,0.5), 0 0 40px rgba(${theme.rgb}, 0.15) inset`,
+        boxShadow: `0 10px 32px rgba(0,0,0,0.45), 0 0 30px rgba(${theme.rgb}, 0.12) inset`,
         display: "flex",
         flexDirection: "column",
-        gap: 14,
+        gap: 10,
       }}>
-        {/* Team label (top) */}
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
-          <div style={{
-            fontSize: 22, fontWeight: 900, color: theme.accentBright,
-            letterSpacing: 4, textTransform: "uppercase",
-            textShadow: glowText(theme, 0.55),
-          }}>
-            Team {cardTeamIdx + 1} · Revealed
-          </div>
-          <div style={{
-            fontSize: 18, fontWeight: 800, color: theme.gold,
-            letterSpacing: 3, textTransform: "uppercase",
-            textShadow: softShadow,
-          }}>
-            {members.length} Players
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {/* Compact header: tiny label + logo + team name + player row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <TeamLogoBadge
             team={team}
             theme={theme}
-            size={72}
+            size={48}
             borderColor={theme.accentBright}
-            glow={`0 0 16px ${theme.glow}`}
+            glow={`0 0 12px ${theme.glow}`}
           />
-          <div style={{
-            fontSize: 44, fontWeight: 900, color: "#fff",
-            letterSpacing: 0.5, lineHeight: 1.05,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            wordBreak: "break-word",
-            textShadow: glowText(theme, 0.85),
-            flex: 1, minWidth: 0,
-          }}>
-            {team.teamName}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{
+              fontSize: 13, fontWeight: 900, color: theme.accentBright,
+              letterSpacing: 3, textTransform: "uppercase",
+              textShadow: glowText(theme, 0.45),
+            }}>
+              Last Drafted · Team {cardTeamIdx + 1}
+            </div>
+            <div style={{
+              fontSize: 30, fontWeight: 900, color: "#fff",
+              letterSpacing: 0.3, lineHeight: 1.05,
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              textShadow: glowText(theme, 0.8),
+            }}>
+              {team.teamName}
+            </div>
           </div>
         </div>
-        <div style={{
-          height: 3, background: `linear-gradient(90deg, ${theme.accentBright}, ${theme.accent}, transparent)`,
-          borderRadius: 2,
-          boxShadow: `0 0 12px ${theme.glow}`,
-        }} />
-        {/* Horizontal player row (bottom of card) */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", paddingTop: 18 }}>
+        {/* Tight player strip */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 4 }}>
           {members.map((p, i) => {
             const honored = p.isWinner || p.isBracketMvp;
             return (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0, flex: 1 }}>
                 <div style={{ position: "relative" }}>
                   <Avatar
                     src={p.avatar}
                     name={p.name}
-                    size={96}
-                    border={`3px solid ${honored ? theme.gold : theme.accentBright}`}
+                    size={52}
+                    border={`2px solid ${honored ? theme.gold : theme.accentBright}`}
                     rgb={theme.rgb}
                   />
                   {p.isBracketMvp ? (
-                    <div style={{ position: "absolute", top: -26, right: -10, transform: "rotate(32deg)" }}>
-                      <Crown size={44} />
+                    <div style={{ position: "absolute", top: -16, right: -6, transform: "rotate(32deg)" }}>
+                      <Crown size={24} />
                     </div>
                   ) : p.isWinner ? (
-                    <div style={{ position: "absolute", top: -26, right: -10 }}>
-                      <Trophy size={44} />
+                    <div style={{ position: "absolute", top: -16, right: -6 }}>
+                      <Trophy size={24} />
                     </div>
                   ) : null}
                 </div>
                 <div style={{
-                  fontSize: 20, fontWeight: 900, color: honored ? theme.gold : "#fff",
+                  fontSize: 12, fontWeight: 800, color: honored ? theme.gold : "rgba(255,255,255,0.8)",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   maxWidth: "100%", textAlign: "center",
                   textShadow: softShadow,
@@ -727,24 +722,24 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
           <Avatar
             src={player.avatar}
             name={player.name}
-            size={210}
-            border={`6px solid ${player.isWinner || player.isBracketMvp ? theme.gold : theme.accentBright}`}
+            size={320}
+            border={`8px solid ${player.isWinner || player.isBracketMvp ? theme.gold : theme.accentBright}`}
             rgb={theme.rgb}
           />
           {/* MVP → crown (priority), Champion → trophy */}
           {player.isBracketMvp ? (
-            <div style={{ position: "absolute", top: -52, right: -22, transform: "rotate(32deg)" }}>
-              <Crown size={100} />
+            <div style={{ position: "absolute", top: -72, right: -30, transform: "rotate(32deg)" }}>
+              <Crown size={140} />
             </div>
           ) : player.isWinner ? (
-            <div style={{ position: "absolute", top: -52, right: -22 }}>
-              <Trophy size={100} />
+            <div style={{ position: "absolute", top: -72, right: -30 }}>
+              <Trophy size={140} />
             </div>
           ) : null}
         </div>
         <div style={{
-          fontSize: 58, fontWeight: 900, color: "#fff",
-          letterSpacing: 0.5, textAlign: "center",
+          fontSize: 76, fontWeight: 900, color: "#fff",
+          letterSpacing: 0.5, textAlign: "center", marginTop: 12,
           maxWidth: 960, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           textShadow: glowText(theme, 1.2),
         }}>
@@ -752,7 +747,7 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
         </div>
         {player.tag && (
           <div style={{
-            fontSize: 22, fontWeight: 800, color: theme.gold, marginTop: -4,
+            fontSize: 26, fontWeight: 800, color: theme.gold, marginTop: -4,
             textShadow: softShadow,
           }}>
             #{player.tag}
@@ -762,11 +757,11 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
           const rc = getRankPalette(player.rank);
           return (
             <div style={{
-              fontSize: 24, fontWeight: 900, color: rc.text,
-              padding: "10px 32px", borderRadius: 100,
+              fontSize: 28, fontWeight: 900, color: rc.text,
+              padding: "12px 36px", borderRadius: 100,
               background: rc.bg,
               border: `2px solid ${rc.border}`,
-              marginTop: 4,
+              marginTop: 6,
               textShadow: softShadow,
             }}>
               {player.rank}
@@ -968,9 +963,9 @@ function TeamDraftScene({ frame, theme, team, teamIndex, teams }: {
       />
       <CurrentTeamCard theme={theme} team={team} teamIndex={teamIndex} frame={frame} inHoldPhase={inHoldPhase} />
 
-      {/* Band separators */}
-      <div style={{ position: "absolute", left: 60, right: 60, top: MID_Y - 1, height: 1, background: `linear-gradient(90deg, transparent, rgba(${theme.rgb}, 0.35), transparent)` }} />
-      <div style={{ position: "absolute", left: 60, right: 60, top: BOT_Y - 1, height: 1, background: `linear-gradient(90deg, transparent, rgba(${theme.rgb}, 0.35), transparent)` }} />
+      {/* Band separators — between player/draft and between draft/revealed */}
+      <div style={{ position: "absolute", left: 60, right: 60, top: DRAFT_Y - 1, height: 1, background: `linear-gradient(90deg, transparent, rgba(${theme.rgb}, 0.35), transparent)` }} />
+      <div style={{ position: "absolute", left: 60, right: 60, top: REVEALED_Y - 1, height: 1, background: `linear-gradient(90deg, transparent, rgba(${theme.rgb}, 0.35), transparent)` }} />
     </AbsoluteFill>
   );
 }
