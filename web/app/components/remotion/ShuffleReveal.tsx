@@ -76,7 +76,7 @@ const H = 1920;
 // Slightly wider top + narrower bottom + a small left/right gutter so absolutely
 // nothing of importance touches the canvas edge or gets cropped on phones.
 const SAFE_TOP = 200;
-const SAFE_BOTTOM = 350;
+const SAFE_BOTTOM = 180;
 const SAFE_LEFT = 50;
 const SAFE_RIGHT = 50;
 const SAFE_H = H - SAFE_TOP - SAFE_BOTTOM;        // 1370
@@ -706,31 +706,6 @@ function MiddleBand({ theme, team, members, currentPlayerIdx, playerLocalFrame, 
 
   return (
     <div style={band}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
-        opacity: enterOp * exitOp,
-      }}>
-        <TeamLogoBadge
-          team={team}
-          theme={theme}
-          size={96}
-          borderColor={theme.accentBright}
-          glow={`0 0 24px ${theme.glow}`}
-        />
-        <div style={{
-          fontSize: 30, fontWeight: 900, color: "#fff",
-          letterSpacing: 1, maxWidth: 780,
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-          wordBreak: "break-word",
-          lineHeight: 1.1,
-          textShadow: glowText(theme, 0.9),
-        }}>
-          {team.teamName}
-        </div>
-      </div>
       <div style={{
         fontSize: 22, fontWeight: 900, color: theme.accentBright,
         letterSpacing: 6, textTransform: "uppercase", marginBottom: 14,
