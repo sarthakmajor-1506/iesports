@@ -74,6 +74,11 @@ export interface VetoState {
   team2Name: string;
   team1CaptainDiscordId: string;
   team2CaptainDiscordId: string;
+  /** Every teammate's Discord ID. Any member of a team may click that
+   * team's veto/random/side buttons — not just the captain. Optional
+   * for back-compat with veto records created before this field existed. */
+  team1MemberDiscordIds?: string[];
+  team2MemberDiscordIds?: string[];
   channelId: string;
   messageId: string;
 }
@@ -113,6 +118,15 @@ function tName(state: VetoState, team: "team1" | "team2"): string {
 
 function captainId(state: VetoState, team: "team1" | "team2"): string {
   return team === "team1" ? state.team1CaptainDiscordId : state.team2CaptainDiscordId;
+}
+
+/** Any registered member of the given team may act (captain or not).
+ * Falls back to the captain ID alone on older veto records that don't
+ * carry the member arrays. */
+function isTeamMember(state: VetoState, team: "team1" | "team2", userId: string): boolean {
+  if (userId === captainId(state, team)) return true;
+  const list = team === "team1" ? state.team1MemberDiscordIds : state.team2MemberDiscordIds;
+  return !!list && list.includes(userId);
 }
 
 /** Build the ordered list of (map, sidePicker) entries that need an
@@ -355,10 +369,10 @@ export async function handleTossChoice(
     return;
   }
 
-  // Only toss-winner captain may choose
-  if (interaction.user.id !== captainId(state, state.tossWinner)) {
+  // Any member of the toss-winner team may choose (captain or teammate).
+  if (!isTeamMember(state, state.tossWinner, interaction.user.id)) {
     await interaction.followUp({
-      content: `❌ Only the **${tName(state, state.tossWinner)}** captain can choose.`,
+      content: `❌ Only **${tName(state, state.tossWinner)}** players can choose.`,
       ephemeral: true,
     });
     return;
@@ -470,9 +484,9 @@ export async function handleRandomReveal(
   }
 
   const actor = getRandomActor(state);
-  if (interaction.user.id !== captainId(state, actor)) {
+  if (!isTeamMember(state, actor, interaction.user.id)) {
     await interaction.followUp({
-      content: `❌ It's **${tName(state, actor)}**'s turn to reveal.`,
+      content: `❌ It's **${tName(state, actor)}**'s turn to reveal — any player on that team can click.`,
       ephemeral: true,
     });
     return;
@@ -535,10 +549,10 @@ export async function handleVetoMap(
     return;
   }
 
-  // Only the active captain may act
-  if (interaction.user.id !== captainId(state, step.team)) {
+  // Any member of the active team may act.
+  if (!isTeamMember(state, step.team, interaction.user.id)) {
     await interaction.followUp({
-      content: `❌ It's **${tName(state, step.team)}**'s turn.`,
+      content: `❌ It's **${tName(state, step.team)}**'s turn — any player on that team can click.`,
       ephemeral: true,
     });
     return;
@@ -607,9 +621,9 @@ export async function handleSidePick(
     return;
   }
 
-  if (interaction.user.id !== captainId(state, current.sidePicker)) {
+  if (!isTeamMember(state, current.sidePicker, interaction.user.id)) {
     await interaction.followUp({
-      content: `❌ Only **${tName(state, current.sidePicker)}** captain can pick side for **${current.map}**.`,
+      content: `❌ Only **${tName(state, current.sidePicker)}** players can pick side for **${current.map}**.`,
       ephemeral: true,
     });
     return;

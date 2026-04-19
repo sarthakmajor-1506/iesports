@@ -677,6 +677,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Both captains must have Discord linked" }, { status: 400 });
       }
 
+      // Collect every teammate's Discord ID so the veto/random buttons
+      // accept clicks from any team member — if the captain can't make it
+      // the rest of the squad can still drive the toss/veto flow.
+      const collectMemberDiscordIds = async (teamDoc: FirebaseFirestore.DocumentSnapshot): Promise<string[]> => {
+        const members: any[] = teamDoc.data()?.members || [];
+        const uids = members.map((m) => (typeof m === "string" ? m : m?.uid)).filter(Boolean) as string[];
+        if (uids.length === 0) return [];
+        const docs = await adminDb.getAll(...uids.map((uid) => adminDb.collection("users").doc(uid)));
+        return docs.map((d) => d.data()?.discordId || "").filter(Boolean);
+      };
+      const [team1MemberDiscordIds, team2MemberDiscordIds] = await Promise.all([
+        collectMemberDiscordIds(team1Doc),
+        collectMemberDiscordIds(team2Doc),
+      ]);
+
       // ── Random toss ────────────────────────────────────────────────
       const tossWinner: "team1" | "team2" = Math.random() < 0.5 ? "team1" : "team2";
       const winnerName = tossWinner === "team1" ? matchData.team1Name : matchData.team2Name;
@@ -738,6 +753,8 @@ export async function POST(req: NextRequest) {
           team2Name: matchData.team2Name,
           team1CaptainDiscordId,
           team2CaptainDiscordId,
+          team1MemberDiscordIds,
+          team2MemberDiscordIds,
           channelId: notifyChannelId,
           messageId: "",
         };
@@ -799,6 +816,8 @@ export async function POST(req: NextRequest) {
           team2Name: matchData.team2Name,
           team1CaptainDiscordId,
           team2CaptainDiscordId,
+          team1MemberDiscordIds,
+          team2MemberDiscordIds,
           channelId: notifyChannelId,
           messageId: "",
         };
