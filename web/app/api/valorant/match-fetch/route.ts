@@ -957,17 +957,20 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     let discordGameUpdate = false;
     try {
-      // MVP is chosen using the leaderboard formula: (K + 0.5A) / D, with
-      // D treated as 1 when deaths = 0 so a flawless game still scores.
-      // Substitutes and any player not on either team's roster are excluded
-      // outright — MVP can only be a rostered player from team1 or team2.
-      const mvpScore = (p: { kills: number; assists: number; deaths: number }) => {
-        const d = p.deaths > 0 ? p.deaths : 1;
-        return (p.kills + 0.5 * p.assists) / d;
-      };
+      // MVP matches the tournament-detail page formula: plain K/D
+      // (kills / max(1, deaths)), tiebroken by kills. Leaderboard uses a
+      // different (K+0.5A)/D aggregation — per-match MVP is simpler so the
+      // Discord post and the match page always agree on who won MVP.
+      // Substitutes and any player not on either team's roster are ineligible.
+      const mvpKd = (p: { kills: number; deaths: number }) => p.kills / Math.max(1, p.deaths);
       const sortedByMvp = [...enrichedPlayerStats]
         .filter(p => !excluded.has(p.puuid) && rosterPuuids.has(p.puuid))
-        .sort((a, b) => mvpScore(b) - mvpScore(a));
+        .sort((a, b) => {
+          const kdA = mvpKd(a);
+          const kdB = mvpKd(b);
+          if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA;
+          return (b.kills || 0) - (a.kills || 0);
+        });
       const mvpPlayer = sortedByMvp[0] || null;
       const mvp = mvpPlayer ? {
         name: mvpPlayer.name || "Unknown",
