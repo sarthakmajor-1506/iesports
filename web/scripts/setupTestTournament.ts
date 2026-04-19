@@ -48,8 +48,10 @@ async function setup() {
     // All match-ops Discord posts for this tournament go here and ONLY here.
     // Remove this field (or delete the tournament) to revert.
     testDiscordChannelId: TEST_CHANNEL_ID,
-    // Do not create/move/delete VCs — the test channel is for messages only.
-    skipVcOps: true,
+    // VCs behave normally — waiting room + team VCs get created, but each is
+    // permission-gated to only the two test users via per-user overwrites,
+    // so production players on the server can't see them.
+    skipVcOps: false,
     registrationDeadline: now.toISOString(),
     startDate: now.toISOString(),
     endDate: later.toISOString(),
@@ -104,7 +106,7 @@ async function setup() {
   console.log(`✓ Teams:       team-alpha (${USER_1}) vs team-beta (${USER_2})`);
   console.log(`✓ Match:       m1 (BO2)`);
   console.log(`✓ Discord:     all messages pinned to ${TEST_CHANNEL_ID}`);
-  console.log(`✓ skipVcOps:   true (no VCs created)`);
+  console.log(`✓ skipVcOps:   false (waiting room + team VCs are created, visible only to the 2 test users)`);
   console.log(`✓ Hidden from website (isTestTournament: true)`);
   console.log(``);
   console.log(`Open admin panel → pick "TEST — BO2 Discord Ops" → walk through`);
