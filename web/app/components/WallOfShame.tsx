@@ -302,7 +302,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                 {/* WANTED */}
                 <SectionHeader
                   title="Wanted"
-                  subtitle="Dead or Disconnected"
+                  subtitle="No Show"
                   accent="#ef4444"
                   count={totalWanted}
                   tomatoes={wantedTomato}
@@ -569,7 +569,7 @@ function PosterCard({
           color: inkMid, marginTop: 1, textTransform: "uppercase", fontWeight: 700,
           position: "relative",
         }}>
-          {isWanted ? "Dead or Disconnected" : "Late to the Party"}
+          {isWanted ? "No Show" : "Late to the Party"}
         </div>
 
         {/* Avatar */}

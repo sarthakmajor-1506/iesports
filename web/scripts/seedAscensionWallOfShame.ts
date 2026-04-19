@@ -28,12 +28,12 @@ const SEEDS: SeedEntry[] = [
   {
     uid: "discord_601601191893532696", // SullieD
     type: "wanted",
-    reason: "Ghosted TEAM 1 on match day. Never joined the lobby, never messaged, just vanished into the night.",
+    reason: "Ghosted ALPHAS on match day. Never joined the lobby, never messaged, just vanished into the night.",
   },
   {
     uid: "discord_784460891843461142", // CMX AryenG
     type: "warning",
-    reason: "Strolled into the Round 1 lobby 30 minutes late. Held up the whole bracket — alarms exist, buddy.",
+    reason: "Strolled into the TOOFANI CHOKERS Round 1 lobby 30 minutes late. Held up the whole bracket — alarms exist, buddy.",
   },
 ];
 
