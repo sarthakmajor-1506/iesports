@@ -231,22 +231,33 @@ export default function Navbar() {
         .ie-discord-verified { font-size: 0.62rem; color: #818cf8; font-weight: 800; background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); }
 
         @media (max-width: 900px) {
-          .ie-nav-tabs { display: flex; gap: 2px; }
+          .ie-nav-tabs { display: flex; gap: 4px; }
           .ie-nav-tab span { display: none !important; }
-          .ie-nav-tab { padding: 6px 10px !important; }
-          .ie-nav-tab img { width: 22px !important; height: 22px !important; }
-          .ie-nav-tab.active img { width: 26px !important; height: 26px !important; }
-          .ie-nav-tab.active { padding: 6px 12px !important; }
+          .ie-nav-tab { padding: 5px 8px !important; }
+          .ie-nav-tab img { width: 20px !important; height: 20px !important; }
+          .ie-nav-tab.active img { width: 22px !important; height: 22px !important; }
+          .ie-nav-tab.active { padding: 5px 10px !important; }
           .ie-nav-tab-inactive { display: none !important; }
           .ie-signin-btn { display: none !important; }
           .ie-mobile-signin-cta { display: flex !important; }
-          .ie-nav-logo .ie-logo-img { width: 28px !important; height: 28px !important; }
+          .ie-nav-logo .ie-logo-img { width: 26px !important; height: 26px !important; }
           .ie-nav-logo-name { display: none !important; }
           .ie-nav-logo-sub { display: none !important; }
-          .ie-nav-row { padding: 0 10px !important; height: 50px !important; gap: 8px !important; }
+          .ie-nav-row { padding: 0 10px !important; height: 48px !important; gap: 8px !important; }
           .ie-profile-name-text { display: none !important; }
           .ie-profile-chevron { display: none !important; }
           .ie-profile-btn { padding: 2px !important; border-radius: 50% !important; }
+          .ie-hamburger { width: 32px !important; height: 32px !important; border-radius: 8px !important; gap: 4px !important; }
+          .ie-hamburger span { width: 16px !important; }
+        }
+        @media (max-width: 420px) {
+          .ie-nav-row { padding: 0 8px !important; gap: 4px !important; }
+          .ie-nav-tabs { gap: 2px !important; }
+          .ie-nav-tab { padding: 4px 6px !important; }
+          .ie-nav-tab img { width: 18px !important; height: 18px !important; }
+          .ie-nav-tab.active { padding: 4px 8px !important; }
+          .ie-nav-tab.active img { width: 20px !important; height: 20px !important; }
+          .ie-mobile-signin-cta { padding: 6px 10px !important; font-size: 0.72rem !important; }
         }
         .ie-mobile-signin-cta { display: none !important; }
 

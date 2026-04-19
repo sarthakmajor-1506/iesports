@@ -340,7 +340,56 @@ export default function DoubleBracket({ matches, bracketSize, standings = [], br
   if (teamCount <= 2) return <Bracket2 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
   if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
   if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
-  return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  if (teamCount <= 8) return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  // >8 teams with no matches yet — render a clean "seeding TBD" placeholder.
+  return <BracketTBDPlaceholder teamCount={teamCount} ubCount={Math.min(4, Math.floor(teamCount / 2))} />;
+}
+
+function BracketTBDPlaceholder({ teamCount, ubCount }: { teamCount: number; ubCount: number }) {
+  const lbCount = teamCount - ubCount;
+  return (
+    <div style={{
+      background: C.bg,
+      borderRadius: 16,
+      border: `1px solid ${C.cardBorder}`,
+      padding: "48px 24px",
+      textAlign: "center",
+    }}>
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        padding: "6px 14px", borderRadius: 100,
+        background: "rgba(60,203,255,0.1)", border: "1px solid rgba(60,203,255,0.3)",
+        fontSize: "0.7rem", fontWeight: 900, letterSpacing: "0.15em",
+        color: C.win, textTransform: "uppercase",
+      }}>
+        ↗ Seeding TBD
+      </div>
+      <h3 style={{
+        margin: "18px 0 8px", fontSize: "1.4rem", fontWeight: 900, color: "#E6E6E6",
+      }}>
+        Play-off bracket locks after the group stage
+      </h3>
+      <p style={{ margin: 0, color: C.textMuted, fontSize: "0.9rem", lineHeight: 1.6 }}>
+        {teamCount} teams advance · Top {ubCount} seed into the Upper Bracket · Next {lbCount} start in the Lower Bracket
+      </p>
+      <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
+        <div style={{
+          padding: "10px 16px", borderRadius: 10,
+          background: "rgba(60,203,255,0.08)", border: "1px solid rgba(60,203,255,0.3)",
+          fontSize: "0.76rem", color: C.win, fontWeight: 700, letterSpacing: "0.05em",
+        }}>
+          {ubCount} · Upper Bracket
+        </div>
+        <div style={{
+          padding: "10px 16px", borderRadius: 10,
+          background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)",
+          fontSize: "0.76rem", color: "#f59e0b", fontWeight: 700, letterSpacing: "0.05em",
+        }}>
+          {lbCount} · Lower Bracket
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

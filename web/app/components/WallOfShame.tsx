@@ -192,14 +192,15 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
       <style>{INLINE_STYLES}</style>
       <button
         type="button"
+        className="wos-hero-btn"
         onClick={() => setOpen(true)}
         title="View the Wall of Shame"
         style={{
           position: "relative",
           display: "inline-flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 20px",
+          gap: 8,
+          padding: "10px 18px",
           borderRadius: 100,
           border: "1px solid rgba(239,68,68,0.45)",
           background: "linear-gradient(135deg, rgba(127,29,29,0.85) 0%, rgba(185,28,28,0.65) 55%, rgba(239,68,68,0.4) 100%)",
@@ -207,10 +208,9 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
           fontFamily: "inherit",
           fontSize: "0.86rem",
           fontWeight: 800,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
+          letterSpacing: "0.01em",
           cursor: "pointer",
-          boxShadow: "0 4px 20px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.12)",
+          boxShadow: "0 3px 14px rgba(239,68,68,0.22), inset 0 1px 0 rgba(255,255,255,0.12)",
           transition: "transform 0.15s, box-shadow 0.15s, filter 0.15s",
           animation: "wos-btn-in 0.5s cubic-bezier(0.16,1,0.3,1), wos-pulse 2.6s ease-in-out infinite",
         }}
@@ -225,7 +225,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
           e.currentTarget.style.boxShadow = "0 4px 20px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.12)";
         }}
       >
-        <Skull size={16} strokeWidth={2.4} />
+        <Skull size={15} strokeWidth={2.4} />
         <span>Wall of Shame</span>
       </button>
 
@@ -316,7 +316,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                         key={e.id}
                         entry={e}
                         variant="wanted"
-                        tilt={(i % 2 === 0 ? -1.2 : 1.2) + (i * 0.2 % 1)}
+                        tilt={0}
                         myVote={myVotes[e.id]}
                         shake={shakeId === e.id}
                         voting={votingId === e.id}
@@ -349,7 +349,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                           key={e.id}
                           entry={e}
                           variant="warning"
-                          tilt={(i % 2 === 0 ? 1.2 : -1.2) + (i * 0.2 % 1)}
+                          tilt={0}
                           myVote={myVotes[e.id]}
                           shake={shakeId === e.id}
                           voting={votingId === e.id}
@@ -522,11 +522,17 @@ function PosterCard({
   const shakeStyle = shake ? "wos-card-shake 0.45s ease-in-out" : "";
   const cardAnim = `wos-card-in 0.55s cubic-bezier(0.16,1,0.3,1) both${shakeStyle ? `, ${shakeStyle}` : ""}`;
 
+  // Torn-paper clip-path: straight top/sides, ragged bottom with deeper tears
+  // concentrated near the centre for that "ripped from the noticeboard" vibe.
+  const tornClip = "polygon(0 0, 100% 0, 100% calc(100% - 4px), 94% 100%, 86% calc(100% - 7px), 78% calc(100% - 2px), 70% calc(100% - 9px), 60% calc(100% - 4px), 54% calc(100% - 14px), 50% 100%, 46% calc(100% - 13px), 40% calc(100% - 3px), 32% calc(100% - 10px), 24% calc(100% - 6px), 16% calc(100% - 2px), 10% calc(100% - 8px), 4% 100%, 0 calc(100% - 5px))";
+
   return (
     <div style={{
       position: "relative",
       paddingTop: 14,
+      paddingBottom: 6,
       ["--wos-rot" as any]: `${tilt}deg`,
+      filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
     }}>
       {/* Pushpin */}
       <div style={{
@@ -541,14 +547,15 @@ function PosterCard({
         background: paper,
         border: `2px solid ${edge}`,
         borderRadius: 4,
-        padding: "14px 13px 12px",
-        boxShadow: "0 6px 22px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.4)",
+        padding: "14px 13px 20px",
         animation: cardAnim,
         transform: `rotate(${tilt}deg)`,
         transformOrigin: "top center",
         color: inkDark,
         fontFamily: "'Georgia', 'Times New Roman', serif",
         overflow: "hidden",
+        clipPath: tornClip,
+        WebkitClipPath: tornClip,
       }}>
         {/* Texture overlay */}
         <div aria-hidden="true" style={{

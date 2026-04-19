@@ -49,7 +49,19 @@ export default function ValorantTournaments() {
     try { const d = new Date(iso); const day = parseInt(d.toLocaleDateString("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" })); const month = d.toLocaleDateString("en-IN", { month: "short", timeZone: "Asia/Kolkata" }); const year = d.toLocaleDateString("en-IN", { year: "numeric", timeZone: "Asia/Kolkata" }); return `${ordinal(day)} ${month} ${year}`; } catch { return iso; }
   };
 
-  const isEffectivelyEnded = (t: ValorantTournament) => t.status === "ended" || (t.endDate && new Date() > new Date(t.endDate));
+  // A tournament is "ended" when explicitly marked `ended`, OR when every known
+  // future-facing date (startDate, registrationDeadline, endDate) is in the past.
+  // Guards against stale endDate left over from a reschedule.
+  const isEffectivelyEnded = (t: ValorantTournament) => {
+    if (t.status === "ended") return true;
+    if (t.status === "upcoming" || t.status === "active" || t.status === "live") return false;
+    const now = Date.now();
+    const end = t.endDate ? new Date(t.endDate).getTime() : null;
+    const start = (t as any).startDate ? new Date((t as any).startDate).getTime() : null;
+    const regClose = t.registrationDeadline ? new Date(t.registrationDeadline).getTime() : null;
+    const future = [start, regClose].some(v => v !== null && v > now);
+    return end !== null && end < now && !future;
+  };
 
   const getRegistrationState = (t: ValorantTournament): "open" | "not_yet" | "closed" => {
     const now = new Date();

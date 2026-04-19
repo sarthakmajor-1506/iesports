@@ -1017,7 +1017,10 @@ function ValorantTournamentDetailInner() {
           .vtd-tab-count { display: none; }
           .vtd-hero-title { font-size: 1.6rem; }
           .vtd-hero-desc { font-size: 0.88rem; }
-          .vtd-hero-actions { gap: 8px; }
+          .vtd-hero-actions { gap: 8px; flex-wrap: nowrap; }
+          .vtd-hero-compact-btn { padding: 8px 14px !important; font-size: 0.74rem !important; }
+          .vtd-hero-share-btn { width: 36px !important; height: 36px !important; }
+          .wos-hero-btn { padding: 8px 12px !important; font-size: 0.72rem !important; gap: 6px !important; }
           .vtd-reg-bar { padding: 14px 16px; gap: 12px; }
           .vtd-reg-btn, .vtd-reg-done { width: 100%; text-align: center; }
           .vtd-mc-center { min-width: 70px; }
@@ -1218,6 +1221,7 @@ function ValorantTournamentDetailInner() {
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
                       <button
+                        className="vtd-hero-compact-btn"
                         onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
                           padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
@@ -1609,7 +1613,10 @@ function ValorantTournamentDetailInner() {
                   <div className="vtd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No standings yet</span><span className="vtd-empty-sub">Standings will appear once matches are played.</span></div>
                 ) : (() => {
                   const bracketCount = tournament.bracketTeamCount || tournament.bracketSize || standings.length;
-                  const ubCount = Math.ceil(bracketCount / 2);
+                  const ubCount = tournament.ubTeamCount ?? Math.ceil(bracketCount / 2);
+                  // Only show the bottom-two "eliminated" styling when there are
+                  // actually eliminated teams (i.e. bracketCount < standings.length).
+                  const hasEliminations = bracketCount < standings.length;
                   const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
                   return (
                   <div style={{ overflowX: "auto" }}>
@@ -1620,7 +1627,7 @@ function ValorantTournamentDetailInner() {
                           const inUB = i < ubCount;
                           const inLB = i >= ubCount && i < bracketCount;
                           const eliminated = i >= bracketCount;
-                          const isBottomTwo = i >= standings.length - 2;
+                          const isBottomTwo = hasEliminations && i >= standings.length - 2;
                           const rowStyle: React.CSSProperties = isBottomTwo
                             ? { background: "rgba(239,68,68,0.08)" }
                             : inUB ? { background: "rgba(60,203,255,0.04)" }
