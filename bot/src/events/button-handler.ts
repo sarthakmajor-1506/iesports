@@ -21,7 +21,7 @@ import {
 } from "../services/firebase";
 import { getDotaBot } from "../services/dota-gc";
 import { cleanupVoiceChannels, createVCsAndMovePlayers } from "../services/match-orchestrator";
-import { handleTossChoice, handleVetoMap, handleRandomReveal } from "../services/map-veto";
+import { handleTossChoice, handleVetoMap, handleRandomReveal, handleSidePick } from "../services/map-veto";
 import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
 
@@ -30,7 +30,8 @@ export async function handleButton(interaction: ButtonInteraction): Promise<void
   if (
     interaction.customId.startsWith("toss_") ||
     interaction.customId.startsWith("veto_") ||
-    interaction.customId.startsWith("random_")
+    interaction.customId.startsWith("random_") ||
+    interaction.customId.startsWith("side_pick")
   ) {
     const parts = interaction.customId.split(":");
     const action = parts[0];
@@ -44,6 +45,8 @@ export async function handleButton(interaction: ButtonInteraction): Promise<void
       await handleVetoMap(interaction, tournamentId, matchId, parseInt(data));
     } else if (action === "random_reveal") {
       await handleRandomReveal(interaction, tournamentId, matchId);
+    } else if (action === "side_pick") {
+      await handleSidePick(interaction, tournamentId, matchId, data);
     } else {
       await interaction.reply({ content: "Unknown veto action.", ephemeral: true });
     }

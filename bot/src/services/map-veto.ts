@@ -50,9 +50,20 @@ export interface VetoAction {
   map: string;
 }
 
+export interface SideAction {
+  map: string;
+  sidePicker: "team1" | "team2";
+  side: "attack" | "defence" | null;
+}
+
 export interface VetoState {
-  status: "toss_choice" | "veto" | "random" | "complete";
+  status: "toss_choice" | "veto" | "random" | "side_pick" | "complete";
   bo: number;
+  /** Populated when veto/random finishes. Each entry is one map in game
+   * order, the captain who gets side pick, and their choice (null until
+   * they've clicked). */
+  sideActions?: SideAction[];
+  sideStep?: number;
   tossWinner: "team1" | "team2";
   banFirst: "team1" | "team2" | null;
   sidePickOnDecider: "team1" | "team2" | null;
@@ -104,6 +115,78 @@ function captainId(state: VetoState, team: "team1" | "team2"): string {
   return team === "team1" ? state.team1CaptainDiscordId : state.team2CaptainDiscordId;
 }
 
+/** Build the ordered list of (map, sidePicker) entries that need an
+ * attack/defence decision once veto/random has finished selecting maps.
+ * Picks use "other team picks side"; the decider (veto BO3/5) uses the
+ * team that won toss-side-pick privilege.
+ */
+function computeSideActions(state: VetoState): SideAction[] {
+  const actions: SideAction[] = [];
+  for (const a of state.actions) {
+    if (a.action !== "pick") continue;
+    actions.push({ map: a.map, sidePicker: otherTeam(a.team), side: null });
+  }
+  // Decider (veto only): one map remains in the pool after all bans+picks.
+  if (state.status !== "random" && state.remainingMaps.length === 1) {
+    const decider = state.remainingMaps[0];
+    const sidePicker = state.sidePickOnDecider || state.tossWinner;
+    actions.push({ map: decider, sidePicker, side: null });
+  }
+  return actions;
+}
+
+function buildSidePickEmbed(state: VetoState): EmbedBuilder {
+  const sideActions = state.sideActions || [];
+  const step = state.sideStep ?? 0;
+  const current = sideActions[step];
+  const lines: string[] = [
+    `**${state.team1Name}** vs **${state.team2Name}**`,
+    `🏆 Toss: **${tName(state, state.tossWinner)}**`,
+    "",
+  ];
+  sideActions.forEach((sa, i) => {
+    const label = `**Game ${i + 1}:** 🗺️ ${sa.map}`;
+    if (sa.side) {
+      lines.push(`${label}  ✅`);
+      lines.push(`   └ **${tName(state, sa.sidePicker)}** starts on **${sa.side}**`);
+    } else if (i === step) {
+      lines.push(`${label}  ◀️ **now choosing**`);
+      lines.push(`   └ **${tName(state, sa.sidePicker)}** captain — pick your starting side below`);
+    } else {
+      lines.push(label);
+      lines.push(`   └ **${tName(state, sa.sidePicker)}** will pick side`);
+    }
+  });
+
+  return new EmbedBuilder()
+    .setTitle(`🎯 SIDE SELECTION — BO${state.bo}`)
+    .setDescription(lines.join("\n"))
+    .setColor(0xff4655)
+    .setFooter({ text: current ? `Only ${tName(state, current.sidePicker)} captain can choose` : `BO${state.bo} · IEsports Tournament` });
+}
+
+function buildSidePickRow(
+  state: VetoState,
+  tournamentId: string,
+  matchId: string,
+): ActionRowBuilder<ButtonBuilder> {
+  const step = state.sideStep ?? 0;
+  const current = (state.sideActions || [])[step];
+  const teamName = current ? tName(state, current.sidePicker) : "";
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`side_pick:${tournamentId}:${matchId}:attack`)
+      .setLabel(`${teamName} — Attack`)
+      .setEmoji({ name: "⚔️" })
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`side_pick:${tournamentId}:${matchId}:defence`)
+      .setLabel(`${teamName} — Defence`)
+      .setEmoji({ name: "🛡️" })
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
 // ── Embed Builders ──────────────────────────────────────────────
 
 function buildVetoEmbed(state: VetoState): EmbedBuilder {
@@ -116,31 +199,42 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
     const bans = state.actions.filter(a => a.action === "ban");
     const mapLines: string[] = [];
     let gameNum = 1;
+    // Look up side pick (if captains have already chosen) by map name
+    const sideByMap: Record<string, SideAction | undefined> = {};
+    for (const sa of state.sideActions || []) sideByMap[sa.map] = sa;
+
+    const sideLine = (sa: SideAction | undefined, pickerTeam: "team1" | "team2" | null, fallbackSidePicker?: "team1" | "team2") => {
+      const mapPickerName = pickerTeam ? tName(state, pickerTeam) : null;
+      const sp = sa?.sidePicker || fallbackSidePicker;
+      const spName = sp ? tName(state, sp) : "";
+      if (sa?.side) {
+        const defender = sp!;
+        const attacker = otherTeam(defender);
+        const firstTeam = sa.side === "attack" ? defender : attacker;
+        const sideWord = sa.side === "attack" ? "attack" : "defence";
+        if (mapPickerName) {
+          return `   └ Picked by **${mapPickerName}** · **${tName(state, firstTeam)}** starts on **${sideWord}**`;
+        }
+        return `   └ **${tName(state, firstTeam)}** starts on **${sideWord}**`;
+      }
+      return mapPickerName
+        ? `   └ Picked by **${mapPickerName}** · **${spName}** picks attack/defence`
+        : `   └ **${spName}** picks attack/defence`;
+    };
 
     for (const pick of picks) {
-      const sidePicker = otherTeam(pick.team);
-      mapLines.push(
-        `**Game ${gameNum}:** 🗺️ ${pick.map}`,
-        `   └ Map picked by **${tName(state, pick.team)}** · **${tName(state, sidePicker)}** picks attack/defence`,
-      );
+      mapLines.push(`**Game ${gameNum}:** 🗺️ ${pick.map}`);
+      mapLines.push(sideLine(sideByMap[pick.map], pick.team));
       gameNum++;
     }
 
     // Decider (remaining map after all picks + bans are exhausted)
     if (state.remainingMaps.length === 1) {
       const decider = state.remainingMaps[0];
-      const sidePicker = state.sidePickOnDecider || state.tossWinner;
-      if (state.bo === 1) {
-        mapLines.push(
-          `**Map:** 🗺️ ${decider}`,
-          `   └ **${tName(state, sidePicker)}** picks attack/defence (last map standing)`,
-        );
-      } else {
-        mapLines.push(
-          `**Game ${gameNum}:** 🗺️ ${decider}  *(decider)*`,
-          `   └ **${tName(state, sidePicker)}** picks attack/defence`,
-        );
-      }
+      const fallback = state.sidePickOnDecider || state.tossWinner;
+      const label = state.bo === 1 ? `**Map:** 🗺️ ${decider}` : `**Game ${gameNum}:** 🗺️ ${decider}  *(decider)*`;
+      mapLines.push(label);
+      mapLines.push(sideLine(sideByMap[decider], null, fallback));
     }
 
     const banStr = bans.length > 0
@@ -401,11 +495,15 @@ export async function handleRandomReveal(
   const done = picksSoFar >= totalPicks;
 
   if (done) {
-    state.status = "complete";
+    // Random flow has no decider, so side pickers are just the other team
+    // for each revealed map. Hand off to the shared side-pick phase.
+    state.sideActions = computeSideActions(state);
+    state.sideStep = 0;
+    state.status = "side_pick";
     await setVetoState(tournamentId, matchId, state);
     await interaction.editReply({
-      embeds: [buildVetoEmbed(state)],
-      components: [],
+      embeds: [buildSidePickEmbed(state)],
+      components: [buildSidePickRow(state, tournamentId, matchId)],
     });
     return;
   }
@@ -457,20 +555,81 @@ export async function handleVetoMap(
   state.remainingMaps = state.remainingMaps.filter(m => m !== map);
   state.currentStep++;
 
-  // Check completion
+  // Check completion — when picks/bans are exhausted, transition to the
+  // side-pick phase so captains can choose attack/defence before the
+  // veto record is fully locked.
   const sequence = VETO_SEQUENCES[state.bo];
-  if (state.currentStep >= sequence.length || state.remainingMaps.length <= 1) {
-    state.status = "complete";
+  const veto_done = state.currentStep >= sequence.length || state.remainingMaps.length <= 1;
+  if (veto_done) {
+    state.sideActions = computeSideActions(state);
+    state.sideStep = 0;
+    state.status = "side_pick";
   }
 
   await setVetoState(tournamentId, matchId, state);
 
-  if (state.status === "complete") {
-    await interaction.editReply({ embeds: [buildVetoEmbed(state)], components: [] });
+  if (state.status === "side_pick") {
+    await interaction.editReply({
+      embeds: [buildSidePickEmbed(state)],
+      components: [buildSidePickRow(state, tournamentId, matchId)],
+    });
   } else {
     await interaction.editReply({
       embeds: [buildVetoEmbed(state)],
       components: buildMapButtons(state, tournamentId, matchId),
+    });
+  }
+}
+
+export async function handleSidePick(
+  interaction: ButtonInteraction,
+  tournamentId: string,
+  matchId: string,
+  side: string,
+): Promise<void> {
+  await interaction.deferUpdate();
+
+  const state = await getVetoState(tournamentId, matchId);
+  if (!state || state.status !== "side_pick") {
+    await interaction.followUp({ content: "❌ No active side-pick session.", ephemeral: true });
+    return;
+  }
+  if (side !== "attack" && side !== "defence") {
+    await interaction.followUp({ content: "❌ Invalid side.", ephemeral: true });
+    return;
+  }
+
+  const sideActions = state.sideActions || [];
+  const step = state.sideStep ?? 0;
+  const current = sideActions[step];
+  if (!current) {
+    await interaction.followUp({ content: "❌ Side selection already complete.", ephemeral: true });
+    return;
+  }
+
+  if (interaction.user.id !== captainId(state, current.sidePicker)) {
+    await interaction.followUp({
+      content: `❌ Only **${tName(state, current.sidePicker)}** captain can pick side for **${current.map}**.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  current.side = side;
+  state.sideActions = sideActions;
+  state.sideStep = step + 1;
+
+  const done = state.sideStep >= sideActions.length;
+  if (done) state.status = "complete";
+
+  await setVetoState(tournamentId, matchId, state);
+
+  if (done) {
+    await interaction.editReply({ embeds: [buildVetoEmbed(state)], components: [] });
+  } else {
+    await interaction.editReply({
+      embeds: [buildSidePickEmbed(state)],
+      components: [buildSidePickRow(state, tournamentId, matchId)],
     });
   }
 }
