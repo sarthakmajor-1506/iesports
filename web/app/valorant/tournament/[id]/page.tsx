@@ -542,14 +542,8 @@ function ValorantTournamentDetailInner() {
         if (data.standings) {
           const sorted = [...data.standings].sort((a: any, b: any) => {
             if (b.points !== a.points) return b.points - a.points;
-            // On equal points, fewer matches lost ranks higher.
-            const aL = a.losses || 0; const bL = b.losses || 0;
-            if (aL !== bL) return aL - bL;
-            if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
-            const aDiff = (a.roundsWon || 0) - (a.roundsLost || 0);
-            const bDiff = (b.roundsWon || 0) - (b.roundsLost || 0);
-            if (bDiff !== aDiff) return bDiff - aDiff;
-            return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost);
+            // Tie-break: fewer rounds lost ranks higher.
+            return (a.roundsLost || 0) - (b.roundsLost || 0);
           });
           setStandings(sorted);
         }
@@ -1616,7 +1610,7 @@ function ValorantTournamentDetailInner() {
                   return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>MW</th><th style={{ color: "#d07070" }}>ML</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GM</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
                           const inUB = i < ubCount;
