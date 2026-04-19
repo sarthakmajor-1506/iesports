@@ -2156,8 +2156,21 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
     return "";
   };
 
-  // Find MVP: highest K/D ratio
-  const kdSorted = stats.length > 0 ? [...stats].sort((a, b) => {
+  // Only rostered players are eligible for MVP / 2nd-mention — keeps subs
+  // off the Game highlight cards so they match the Discord embed.
+  const rosterPuuidSet = new Set<string>();
+  const rosterNameSet = new Set<string>();
+  for (const tid of [team1Id, team2Id]) {
+    for (const m of teamMembers[tid] || []) {
+      if (m.riotPuuid) rosterPuuidSet.add(m.riotPuuid);
+      if (m.riotGameName) rosterNameSet.add(String(m.riotGameName).toLowerCase());
+    }
+  }
+  const isOnRoster = (p: any) => rosterPuuidSet.has(p.puuid) || rosterNameSet.has(String(p.name || "").toLowerCase());
+  const rosterStats = stats.filter(isOnRoster);
+
+  // Find MVP: highest K/D ratio (rostered only)
+  const kdSorted = rosterStats.length > 0 ? [...rosterStats].sort((a, b) => {
     const kdA = (a.kills || 0) / Math.max(1, a.deaths || 1);
     const kdB = (b.kills || 0) / Math.max(1, b.deaths || 1);
     if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA;
@@ -2167,13 +2180,12 @@ function GameDetailCard({ game, gameNum, team1Name, team2Name, team1Id, team2Id,
   const mvpKd = mvp ? Math.round((mvp.kills || 0) / Math.max(1, mvp.deaths || 1) * 100) / 100 : 0;
   const mvpAvatar = mvp ? findAvatar(mvp.puuid, mvp.name) : "";
 
-  // Find 2nd mention: highest ADR excluding MVP, fallback to most kills excluding MVP
+  // Find 2nd mention: highest ADR excluding MVP and subs
   let second: any = null;
   let secondLabel = "";
   let secondMetric = "";
-  if (stats.length > 1 && mvp) {
-    const others = stats.filter(s => s.puuid !== mvp.puuid);
-    // Try highest ADR
+  if (rosterStats.length > 1 && mvp) {
+    const others = rosterStats.filter(s => s.puuid !== mvp.puuid);
     const adrSorted = [...others].sort((a, b) => {
       const adrA = rp > 0 ? (a.damageDealt || 0) / rp : 0;
       const adrB = rp > 0 ? (b.damageDealt || 0) / rp : 0;
