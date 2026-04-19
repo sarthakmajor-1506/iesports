@@ -540,7 +540,17 @@ function ValorantTournamentDetailInner() {
         if (data.players) { setPlayers(data.players); if (user) setIsRegistered(data.players.some((p: any) => p.uid === user?.uid)); }
         if (data.teams) setTeams(data.teams);
         if (data.standings) {
-          const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
+          const sorted = [...data.standings].sort((a: any, b: any) => {
+            if (b.points !== a.points) return b.points - a.points;
+            // On equal points, fewer matches lost ranks higher.
+            const aL = a.losses || 0; const bL = b.losses || 0;
+            if (aL !== bL) return aL - bL;
+            if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+            const aDiff = (a.roundsWon || 0) - (a.roundsLost || 0);
+            const bDiff = (b.roundsWon || 0) - (b.roundsLost || 0);
+            if (bDiff !== aDiff) return bDiff - aDiff;
+            return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost);
+          });
           setStandings(sorted);
         }
         if (data.matches) {
@@ -1606,7 +1616,7 @@ function ValorantTournamentDetailInner() {
                   return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>MW</th><th style={{ color: "#d07070" }}>ML</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>MW</th><th style={{ color: "#d07070" }}>ML</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
                           const inUB = i < ubCount;
@@ -1630,6 +1640,8 @@ function ValorantTournamentDetailInner() {
                               <td>{s.losses || 0}</td>
                               <td style={{ color: "#6fcf8a" }}>{s.mapsWon || 0}</td>
                               <td style={{ color: "#d07070" }}>{s.mapsLost || 0}</td>
+                              <td style={{ color: "#6fcf8a" }}>{s.roundsWon || 0}</td>
+                              <td style={{ color: "#d07070" }}>{s.roundsLost || 0}</td>
                               <td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td>
                               <td style={{ color: "#555550" }}>{s.buchholz || 0}</td>
                               {hasBrackets && (

@@ -40,20 +40,13 @@ export async function POST(req: NextRequest) {
       completedAt: new Date().toISOString(),
     });
 
-    let team1Points = 0;
-    let team2Points = 0;
+    // Points = 2 per game won (same rule as match-fetch path).
+    const team1Points = s1 * 2;
+    const team2Points = s2 * 2;
     let team1Result: "win" | "draw" | "loss" = "draw";
     let team2Result: "win" | "draw" | "loss" = "draw";
-
-    if (s1 > s2) {
-      team1Points = 2; team2Points = 0;
-      team1Result = "win"; team2Result = "loss";
-    } else if (s2 > s1) {
-      team1Points = 0; team2Points = 2;
-      team1Result = "loss"; team2Result = "win";
-    } else {
-      team1Points = 1; team2Points = 1;
-    }
+    if (s1 > s2) { team1Result = "win"; team2Result = "loss"; }
+    else if (s2 > s1) { team1Result = "loss"; team2Result = "win"; }
 
     // ── Update standings — GROUP STAGE ONLY ─────────────────────────────────
     if (!isBracketMatch) {
@@ -63,7 +56,7 @@ export async function POST(req: NextRequest) {
         const ref = standingsRef.doc(teamId);
         const doc = await ref.get();
         if (!doc.exists) {
-          await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, buchholz: 0 });
+          await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, roundsWon: 0, roundsLost: 0, buchholz: 0 });
         }
       };
 

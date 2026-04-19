@@ -570,19 +570,32 @@ export async function POST(req: NextRequest) {
     // 8b. UPDATE STANDINGS IF SERIES COMPLETE — GROUP STAGE ONLY
     // ═══════════════════════════════════════════════════════════════════════════
     if (seriesComplete && existingMatch.status !== "completed" && !isBracketMatch) {
-      let team1Points = 0;
-      let team2Points = 0;
+      // Points = 2 per game won. Wins/draws/losses still tracked at match
+      // level (for standings tiebreakers); map counts aggregate game-level
+      // results; rounds aggregate the finer-grained round-by-round tally.
+      const team1Points = team1SeriesScore * 2;
+      const team2Points = team2SeriesScore * 2;
       let team1Result: "win" | "draw" | "loss" = "draw";
       let team2Result: "win" | "draw" | "loss" = "draw";
+      if (team1SeriesScore > team2SeriesScore) { team1Result = "win"; team2Result = "loss"; }
+      else if (team2SeriesScore > team1SeriesScore) { team1Result = "loss"; team2Result = "win"; }
 
-      if (team1SeriesScore > team2SeriesScore) {
-        team1Points = 2; team2Points = 0;
-        team1Result = "win"; team2Result = "loss";
-      } else if (team2SeriesScore > team1SeriesScore) {
-        team1Points = 0; team2Points = 2;
-        team1Result = "loss"; team2Result = "win";
-      } else {
-        team1Points = 1; team2Points = 1;
+      // Sum rounds across every game in this series. The current game's
+      // rounds live in local vars; previous games are on the match doc
+      // (either flat `gameN` or under `games.gameN`).
+      let team1TotalRounds = 0;
+      let team2TotalRounds = 0;
+      for (let g = 1; g <= bo; g++) {
+        if (g === gameNumber) {
+          team1TotalRounds += team1RoundsWon;
+          team2TotalRounds += team2RoundsWon;
+        } else {
+          const gData = (existingMatch as any)[`game${g}`] || existingMatch.games?.[`game${g}`];
+          if (gData && typeof gData.team1RoundsWon === "number") {
+            team1TotalRounds += gData.team1RoundsWon;
+            team2TotalRounds += gData.team2RoundsWon;
+          }
+        }
       }
 
       const standingsRef = tournamentRef.collection("standings");
@@ -591,7 +604,7 @@ export async function POST(req: NextRequest) {
         const ref = standingsRef.doc(teamId);
         const doc = await ref.get();
         if (!doc.exists) {
-          await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, buchholz: 0 });
+          await ref.set({ teamId, teamName, played: 0, wins: 0, draws: 0, losses: 0, points: 0, mapsWon: 0, mapsLost: 0, roundsWon: 0, roundsLost: 0, buchholz: 0 });
         }
       };
 
@@ -606,6 +619,8 @@ export async function POST(req: NextRequest) {
         points: FieldValue.increment(team1Points),
         mapsWon: FieldValue.increment(team1SeriesScore),
         mapsLost: FieldValue.increment(team2SeriesScore),
+        roundsWon: FieldValue.increment(team1TotalRounds),
+        roundsLost: FieldValue.increment(team2TotalRounds),
       });
 
       await standingsRef.doc(team2Id).update({
@@ -616,6 +631,8 @@ export async function POST(req: NextRequest) {
         points: FieldValue.increment(team2Points),
         mapsWon: FieldValue.increment(team2SeriesScore),
         mapsLost: FieldValue.increment(team1SeriesScore),
+        roundsWon: FieldValue.increment(team2TotalRounds),
+        roundsLost: FieldValue.increment(team1TotalRounds),
       });
 
       // Recompute Buchholz using only group stage matches
