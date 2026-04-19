@@ -12,6 +12,7 @@ import RankReportBadge from "@/app/components/RankReportBadge";
 import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
+import WallOfShame from "@/app/components/WallOfShame";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import Link from "next/link";
 import {
@@ -1232,6 +1233,7 @@ function ValorantTournamentDetailInner() {
                 <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
                 </button>
+                <WallOfShame tournamentId={id} user={user} onRequireLogin={() => setShowLoginPrompt(true)} />
               </div>
             </div>
           </div>

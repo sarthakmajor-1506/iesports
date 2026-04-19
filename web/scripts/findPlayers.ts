@@ -51,7 +51,7 @@ async function run() {
       for (const m of matches) {
         const d = m.data();
         console.log(
-          `  ${d.riotGameName}#${d.riotTagLine}  uid=${m.id}  tier=${d.iesportsTier ?? d.riotTier ?? "?"}  rank=${d.iesportsRank || d.riotRank || "?"}`
+          `  ${d.riotGameName}#${d.riotTagLine}  uid=${m.id}  puuid=${d.riotPuuid ?? "?"}  tier=${d.iesportsTier ?? d.riotTier ?? "?"}  rank=${d.iesportsRank || d.riotRank || "?"}`
         );
       }
     }

@@ -174,3 +174,30 @@ export interface ShuffleTeam {
 //     tourneyStageStart?: string;
 //     tourneyStageEnd?: string;
 //   };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WALL OF SHAME
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type WallOfShameType = "wanted" | "warning";
+export type WallOfShameVoteKind = "tomato" | "bail";
+
+export interface WallOfShameEntry {
+  id?: string;
+  uid: string;
+  playerName: string;
+  playerAvatar?: string;
+  riotGameName?: string;
+  riotTagLine?: string;
+  type: WallOfShameType;
+  reason: string;
+  tomatoCount: number;
+  bailCount: number;
+  createdAt: string;
+  createdBy?: string;
+}
+
+export interface WallOfShameVote {
+  kind: WallOfShameVoteKind;
+  votedAt: string;
+}
