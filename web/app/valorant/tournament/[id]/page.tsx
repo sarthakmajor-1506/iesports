@@ -542,8 +542,10 @@ function ValorantTournamentDetailInner() {
         if (data.standings) {
           const sorted = [...data.standings].sort((a: any, b: any) => {
             if (b.points !== a.points) return b.points - a.points;
-            // Tie-break: fewer rounds lost ranks higher.
-            return (a.roundsLost || 0) - (b.roundsLost || 0);
+            // Tie-break: higher round differential (RW − RL) ranks above.
+            const diffA = (a.roundsWon || 0) - (a.roundsLost || 0);
+            const diffB = (b.roundsWon || 0) - (b.roundsLost || 0);
+            return diffB - diffA;
           });
           setStandings(sorted);
         }
@@ -1610,7 +1612,7 @@ function ValorantTournamentDetailInner() {
                   return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GM</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#3CCBFF" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GW</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#fbbf24" }}>Diff</th><th style={{ color: "#3CCBFF" }}>Pts</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
                           const inUB = i < ubCount;
@@ -1636,8 +1638,10 @@ function ValorantTournamentDetailInner() {
                               <td style={{ color: "#d07070" }}>{s.mapsLost || 0}</td>
                               <td style={{ color: "#6fcf8a" }}>{s.roundsWon || 0}</td>
                               <td style={{ color: "#d07070" }}>{s.roundsLost || 0}</td>
+                              {(() => { const diff = (s.roundsWon || 0) - (s.roundsLost || 0); return (
+                                <td style={{ fontWeight: 700, color: diff > 0 ? "#6fcf8a" : diff < 0 ? "#d07070" : "#8A8880" }}>{diff > 0 ? `+${diff}` : diff}</td>
+                              ); })()}
                               <td style={{ fontWeight: 800, color: "#3CCBFF" }}>{s.points || 0}</td>
-                              <td style={{ color: "#555550" }}>{s.buchholz || 0}</td>
                               {hasBrackets && (
                                 <td>
                                   {inUB ? (
