@@ -690,6 +690,12 @@ export async function POST(req: NextRequest) {
     let playersTracked = 0;
     let playersSkipped = 0;
 
+    // Per-game contributions are tracked under `processedGames[gameKey]` so
+    // re-fetching the same match replaces the old contribution rather than
+    // adding a fresh one on top. Prevents the double-counting we saw when an
+    // admin re-fetches a match multiple times.
+    const processedGameKey = `${matchDocId}__game${gameNumber}`;
+
     for (const player of enrichedPlayerStats) {
       // Skip excluded PUUIDs (substitutes)
       if (excluded.has(player.puuid)) {
@@ -708,44 +714,73 @@ export async function POST(req: NextRequest) {
       const playerRef = leaderboardRef.doc(playerId);
       const existingDoc = await playerRef.get();
 
+      // Snapshot of this game's contribution — stored verbatim so a future
+      // re-fetch can subtract it and re-apply the new stats atomically.
+      const thisGameWin = gameWinner === player.tournamentTeam ? 1 : 0;
+      const gameSnapshot = {
+        kills: player.kills,
+        deaths: player.deaths,
+        assists: player.assists,
+        score: player.score,
+        headshots: player.headshots,
+        bodyshots: player.bodyshots,
+        legshots: player.legshots,
+        damageDealt: player.damageDealt,
+        damageReceived: player.damageReceived,
+        roundsPlayed,
+        firstKills: player.firstKills || 0,
+        firstDeaths: player.firstDeaths || 0,
+        won: thisGameWin,
+        agent: player.agent,
+      };
+
       // ── Tournament leaderboard ──
       if (existingDoc.exists) {
         const ex = existingDoc.data()!;
-        const newKills = (ex.totalKills || 0) + player.kills;
-        const newDeaths = (ex.totalDeaths || 0) + player.deaths;
-        const newMatches = (ex.matchesPlayed || 0) + 1;
-        const newHS = (ex.totalHeadshots || 0) + player.headshots;
-        const newBS = (ex.totalBodyshots || 0) + player.bodyshots;
-        const newLS = (ex.totalLegshots || 0) + player.legshots;
-        const newRounds = (ex.totalRoundsPlayed || 0) + roundsPlayed;
-        const newScore = (ex.totalScore || 0) + player.score;
+        const prev = ex.processedGames?.[processedGameKey] || null;
 
-        const newFK = (ex.totalFirstKills || 0) + (player.firstKills || 0);
-        const newFD = (ex.totalFirstDeaths || 0) + (player.firstDeaths || 0);
+        // Delta = current snapshot - previous contribution (or zero if new).
+        // matchesPlayed only increments when this is the first time we
+        // aggregated this particular game.
+        const dMatches = prev ? 0 : 1;
+        const newKills = (ex.totalKills || 0) + player.kills - (prev?.kills || 0);
+        const newDeaths = (ex.totalDeaths || 0) + player.deaths - (prev?.deaths || 0);
+        const newAssists = (ex.totalAssists || 0) + player.assists - (prev?.assists || 0);
+        const newScore = (ex.totalScore || 0) + player.score - (prev?.score || 0);
+        const newHS = (ex.totalHeadshots || 0) + player.headshots - (prev?.headshots || 0);
+        const newBS = (ex.totalBodyshots || 0) + player.bodyshots - (prev?.bodyshots || 0);
+        const newLS = (ex.totalLegshots || 0) + player.legshots - (prev?.legshots || 0);
+        const newDmgD = (ex.totalDamageDealt || 0) + player.damageDealt - (prev?.damageDealt || 0);
+        const newDmgR = (ex.totalDamageReceived || 0) + player.damageReceived - (prev?.damageReceived || 0);
+        const newRounds = (ex.totalRoundsPlayed || 0) + roundsPlayed - (prev?.roundsPlayed || 0);
+        const newFK = (ex.totalFirstKills || 0) + (player.firstKills || 0) - (prev?.firstKills || 0);
+        const newFD = (ex.totalFirstDeaths || 0) + (player.firstDeaths || 0) - (prev?.firstDeaths || 0);
+        const newMatches = (ex.matchesPlayed || 0) + dMatches;
 
         lbBatch.update(playerRef, {
           totalKills: newKills,
           totalDeaths: newDeaths,
-          totalAssists: (ex.totalAssists || 0) + player.assists,
+          totalAssists: newAssists,
           totalScore: newScore,
           totalHeadshots: newHS,
           totalBodyshots: newBS,
           totalLegshots: newLS,
-          totalDamageDealt: (ex.totalDamageDealt || 0) + player.damageDealt,
-          totalDamageReceived: (ex.totalDamageReceived || 0) + player.damageReceived,
+          totalDamageDealt: newDmgD,
+          totalDamageReceived: newDmgR,
           totalFirstKills: newFK,
           totalFirstDeaths: newFD,
           matchesPlayed: newMatches,
           totalRoundsPlayed: newRounds,
           agents: [...new Set([...(ex.agents || []), player.agent])],
-          avgKills: Math.round(newKills / newMatches * 100) / 100,
-          avgDeaths: Math.round(newDeaths / newMatches * 100) / 100,
+          avgKills: newMatches > 0 ? Math.round(newKills / newMatches * 100) / 100 : 0,
+          avgDeaths: newMatches > 0 ? Math.round(newDeaths / newMatches * 100) / 100 : 0,
           kd: Math.round(newKills / Math.max(1, newDeaths) * 100) / 100,
           acs: newRounds > 0 ? Math.round(newScore / newRounds) : 0,
           hsPercent: Math.round(newHS / Math.max(1, newHS + newBS + newLS) * 100),
           lastUpdated: new Date().toISOString(),
           uid: puuidToUid[player.puuid] || ex.uid || null,
           teamId: player.teamId,
+          [`processedGames.${processedGameKey}`]: gameSnapshot,
         });
       } else {
         lbBatch.set(playerRef, {
@@ -774,6 +809,7 @@ export async function POST(req: NextRequest) {
           acs: roundsPlayed > 0 ? Math.round(player.score / roundsPlayed) : 0,
           hsPercent: Math.round(player.headshots / Math.max(1, player.headshots + player.bodyshots + player.legshots) * 100),
           lastUpdated: new Date().toISOString(),
+          processedGames: { [processedGameKey]: gameSnapshot },
         });
       }
 
@@ -783,18 +819,21 @@ export async function POST(req: NextRequest) {
 
       if (glDoc.exists) {
         const gl = glDoc.data()!;
-        const glKills = (gl.valorant?.totalKills || 0) + player.kills;
-        const glDeaths = (gl.valorant?.totalDeaths || 0) + player.deaths;
-        const glMatches = (gl.valorant?.matchesPlayed || 0) + 1;
-        const glHS = (gl.valorant?.totalHeadshots || 0) + player.headshots;
-        const glBS = (gl.valorant?.totalBodyshots || 0) + player.bodyshots;
-        const glLS = (gl.valorant?.totalLegshots || 0) + player.legshots;
-        const glRounds = (gl.valorant?.totalRoundsPlayed || 0) + roundsPlayed;
-        const glScore = (gl.valorant?.totalScore || 0) + player.score;
+        const prev = gl.valorant?.processedGames?.[processedGameKey] || null;
+        const dMatches = prev ? 0 : 1;
 
-        // Determine if this is a win for this player's team in this game
-        const playerIsTeam1 = player.tournamentTeam === "team1";
-        const thisGameWin = gameWinner === player.tournamentTeam ? 1 : 0;
+        const glKills = (gl.valorant?.totalKills || 0) + player.kills - (prev?.kills || 0);
+        const glDeaths = (gl.valorant?.totalDeaths || 0) + player.deaths - (prev?.deaths || 0);
+        const glAssists = (gl.valorant?.totalAssists || 0) + player.assists - (prev?.assists || 0);
+        const glScore = (gl.valorant?.totalScore || 0) + player.score - (prev?.score || 0);
+        const glHS = (gl.valorant?.totalHeadshots || 0) + player.headshots - (prev?.headshots || 0);
+        const glBS = (gl.valorant?.totalBodyshots || 0) + player.bodyshots - (prev?.bodyshots || 0);
+        const glLS = (gl.valorant?.totalLegshots || 0) + player.legshots - (prev?.legshots || 0);
+        const glDmgD = (gl.valorant?.totalDamageDealt || 0) + player.damageDealt - (prev?.damageDealt || 0);
+        const glDmgR = (gl.valorant?.totalDamageReceived || 0) + player.damageReceived - (prev?.damageReceived || 0);
+        const glRounds = (gl.valorant?.totalRoundsPlayed || 0) + roundsPlayed - (prev?.roundsPlayed || 0);
+        const glMatches = (gl.valorant?.matchesPlayed || 0) + dMatches;
+        const glWins = (gl.valorant?.gamesWon || 0) + thisGameWin - (prev?.won || 0);
 
         glBatch.update(glRef, {
           uid: puuidToUid[player.puuid] || gl.uid || null,
@@ -803,24 +842,24 @@ export async function POST(req: NextRequest) {
           lastUpdated: new Date().toISOString(),
           "valorant.totalKills": glKills,
           "valorant.totalDeaths": glDeaths,
-          "valorant.totalAssists": (gl.valorant?.totalAssists || 0) + player.assists,
+          "valorant.totalAssists": glAssists,
           "valorant.totalScore": glScore,
           "valorant.totalHeadshots": glHS,
           "valorant.totalBodyshots": glBS,
           "valorant.totalLegshots": glLS,
-          "valorant.totalDamageDealt": (gl.valorant?.totalDamageDealt || 0) + player.damageDealt,
-          "valorant.totalDamageReceived": (gl.valorant?.totalDamageReceived || 0) + player.damageReceived,
+          "valorant.totalDamageDealt": glDmgD,
+          "valorant.totalDamageReceived": glDmgR,
           "valorant.matchesPlayed": glMatches,
           "valorant.totalRoundsPlayed": glRounds,
-          "valorant.gamesWon": (gl.valorant?.gamesWon || 0) + thisGameWin,
+          "valorant.gamesWon": glWins,
           "valorant.kd": Math.round(glKills / Math.max(1, glDeaths) * 100) / 100,
           "valorant.acs": glRounds > 0 ? Math.round(glScore / glRounds) : 0,
           "valorant.hsPercent": Math.round(glHS / Math.max(1, glHS + glBS + glLS) * 100),
           "valorant.agents": [...new Set([...(gl.valorant?.agents || []), player.agent])],
           "valorant.tournaments": [...new Set([...(gl.valorant?.tournaments || []), tournamentId])],
+          [`valorant.processedGames.${processedGameKey}`]: gameSnapshot,
         });
       } else {
-        const thisGameWin = gameWinner === player.tournamentTeam ? 1 : 0;
         glBatch.set(glRef, {
           puuid: player.puuid,
           uid: puuidToUid[player.puuid] || null,
@@ -845,6 +884,7 @@ export async function POST(req: NextRequest) {
             hsPercent: Math.round(player.headshots / Math.max(1, player.headshots + player.bodyshots + player.legshots) * 100),
             agents: [player.agent],
             tournaments: [tournamentId],
+            processedGames: { [processedGameKey]: gameSnapshot },
           },
           dota: null, // placeholder for future
         });
