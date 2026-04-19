@@ -411,7 +411,16 @@ export default function AdminPanel() {
     mvp: { name: string; tag: string; acs: number; kills: number; deaths: number; assists: number; rosterTeam: string } | null;
     players: { puuid: string; name: string; tag: string; side: string; agent: string; kills: number; deaths: number; assists: number; acs: number; rosterTeam: string }[];
   };
-  type FindState = { loading: boolean; candidates: FindPreview[]; index: number; error: string | null; debug: any };
+  type FindState = {
+    loading: boolean;
+    candidates: FindPreview[];
+    index: number;
+    error: string | null;
+    debug: any;
+    /** PUUIDs the admin has ticked as substitutes for the currently shown
+     * candidate. Reset whenever a new candidate is loaded or Older is hit. */
+    subPuuids: string[];
+  };
   const [findState, setFindState] = useState<Record<number, FindState>>({});
 
   // ─── Delete Game Data ───────────────────────────────────────────────────────
@@ -557,7 +566,7 @@ export default function AdminPanel() {
   // /api/valorant/match-find. Stash candidates in findState so the UI can
   // render a preview card without the admin having to paste a match UUID.
   const findLatestMatch = useCallback(async (gameIdx: number, matchDocId: string, opts?: { beforeTimestamp?: string | null }) => {
-    setFindState(prev => ({ ...prev, [gameIdx]: { loading: true, candidates: [], index: 0, error: null, debug: null } }));
+    setFindState(prev => ({ ...prev, [gameIdx]: { loading: true, candidates: [], index: 0, error: null, debug: null, subPuuids: [] } }));
     try {
       const res = await fetch("/api/valorant/match-find", {
         method: "POST",
@@ -571,14 +580,14 @@ export default function AdminPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.found) {
-        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: data.candidates || [], index: 0, error: null, debug: null } }));
+        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: data.candidates || [], index: 0, error: null, debug: null, subPuuids: [] } }));
         addLog(`🔍 match-find G${gameIdx + 1}: ${data.candidateCount} candidates (scanned ${data.historyScanned}, ${data.historySource})`);
       } else {
-        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: data.reason || "No match found", debug: data.debug } }));
+        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: data.reason || "No match found", debug: data.debug, subPuuids: [] } }));
         addLog(`🔍 match-find G${gameIdx + 1}: no candidates — ${data.reason}`);
       }
     } catch (e: any) {
-      setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: e.message || "Lookup failed", debug: null } }));
+      setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: e.message || "Lookup failed", debug: null, subPuuids: [] } }));
       addLog(`❌ match-find G${gameIdx + 1}: ${e.message}`);
     }
   }, [adminKey, tournamentId, fetchRegion]);
@@ -2312,39 +2321,64 @@ export default function AdminPanel() {
                                         <div style={{ fontSize: "0.56rem", color: "#666", marginBottom: 8 }}>
                                           {preview.team1PlayersFound} team1 · {preview.team2PlayersFound} team2 · {preview.players.filter(p => p.rosterTeam === "sub").length} subs
                                         </div>
-                                        <details style={{ marginBottom: 8 }}>
-                                          <summary style={{ fontSize: "0.56rem", color: "#888", cursor: "pointer" }}>Show scoreboard</summary>
-                                          <div style={{ marginTop: 6, fontSize: "0.58rem" }}>
-                                            {preview.players.slice().sort((a, b) => b.acs - a.acs).map((p) => (
-                                              <div key={p.puuid} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: p.rosterTeam === "sub" ? "#666" : p.rosterTeam === "team1" ? "#60A5FA" : "#f87171" }}>
-                                                <span>{p.name}#{p.tag} · {p.agent}</span>
-                                                <span>{p.acs} · {p.kills}/{p.deaths}/{p.assists}</span>
-                                              </div>
-                                            ))}
+                                        <div style={{ marginTop: 6, marginBottom: 8, padding: "8px 10px", background: "#141416", border: "1px solid #2a2a2e", borderRadius: 6, fontSize: "0.58rem" }}>
+                                          <div style={{ fontSize: "0.56rem", color: "#aaa", marginBottom: 6, fontWeight: 700, letterSpacing: "0.05em" }}>
+                                            CONFIRM SUBSTITUTES — tick anyone playing who is NOT officially on the roster. Their stats will be excluded from leaderboard + MVP.
                                           </div>
-                                        </details>
+                                          {preview.players.slice().sort((a, b) => b.acs - a.acs).map((p) => {
+                                            const isChecked = fs?.subPuuids?.includes(p.puuid) ?? false;
+                                            const color = p.rosterTeam === "sub" ? "#fbbf24" : p.rosterTeam === "team1" ? "#60A5FA" : "#f87171";
+                                            return (
+                                              <label key={p.puuid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", color, cursor: "pointer" }}>
+                                                <input type="checkbox" checked={isChecked}
+                                                  onChange={e => {
+                                                    setFindState(prev => {
+                                                      const cur = prev[i]; if (!cur) return prev;
+                                                      const next = e.target.checked
+                                                        ? [...cur.subPuuids, p.puuid]
+                                                        : cur.subPuuids.filter(x => x !== p.puuid);
+                                                      return { ...prev, [i]: { ...cur, subPuuids: next } };
+                                                    });
+                                                  }}
+                                                  style={{ cursor: "pointer" }} />
+                                                <span style={{ flex: 1 }}>{p.name}#{p.tag} · {p.agent} · {p.rosterTeam === "sub" ? "off-roster" : p.rosterTeam === "team1" ? preview.team1Side === "Red" ? "team1 (red)" : "team1 (blue)" : "team2"}</span>
+                                                <span style={{ color: "#888" }}>{p.acs} · {p.kills}/{p.deaths}/{p.assists}</span>
+                                              </label>
+                                            );
+                                          })}
+                                          {(fs?.subPuuids?.length || 0) > 0 && (
+                                            <div style={{ marginTop: 6, fontSize: "0.56rem", color: "#fbbf24" }}>
+                                              {fs!.subPuuids.length} player{fs!.subPuuids.length > 1 ? "s" : ""} marked as substitutes — will be excluded from this match's leaderboard + MVP.
+                                            </div>
+                                          )}
+                                        </div>
                                         <div style={{ display: "flex", gap: 6 }}>
                                           <button disabled={loading} style={{ ...btnSuccess, flex: 1, fontSize: "0.7rem" }}
                                             onClick={async () => {
                                               const arr = [...gameMatchIds]; arr[i] = preview.matchId; setGameMatchIds(arr);
+                                              // Merge checkbox subs with anything typed in the manual Sub PUUIDs
+                                              // input (admin can still add PUUIDs by hand if they want).
+                                              const checkedSubs = fs?.subPuuids || [];
+                                              const typedSubs = parsePuuids(gameExcludedPuuids[i] || "");
+                                              const combined = Array.from(new Set([...checkedSubs, ...typedSubs]));
                                               try {
                                                 await apiCall("/api/valorant/match-fetch", {
                                                   tournamentId, matchDocId: opsMatchId, valorantMatchId: preview.matchId,
-                                                  gameNumber: i + 1, region: fetchRegion, excludedPuuids: parsePuuids(gameExcludedPuuids[i] || ""),
+                                                  gameNumber: i + 1, region: fetchRegion, excludedPuuids: combined,
                                                 });
-                                                setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null } }));
+                                                setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null, subPuuids: [] } }));
                                               } catch {/* apiCall already logged */}
                                             }}>
-                                            ✓ Confirm & Post
+                                            ✓ Confirm & Post{(fs?.subPuuids?.length || 0) > 0 ? ` (${fs!.subPuuids.length} sub${fs!.subPuuids.length > 1 ? "s" : ""})` : ""}
                                           </button>
                                           {fs && fs.candidates.length > 1 && fs.index < fs.candidates.length - 1 && (
                                             <button disabled={loading} style={{ ...btnStyle, fontSize: "0.62rem", padding: "6px 10px" }}
-                                              onClick={() => setFindState(prev => ({ ...prev, [i]: { ...fs, index: fs.index + 1 } }))}>
+                                              onClick={() => setFindState(prev => ({ ...prev, [i]: { ...fs, index: fs.index + 1, subPuuids: [] } }))}>
                                               Older ({fs.candidates.length - 1 - fs.index} left)
                                             </button>
                                           )}
                                           <button disabled={loading} style={{ ...btnStyle, fontSize: "0.62rem", padding: "6px 10px", background: "#2a2a2e" }}
-                                            onClick={() => setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null } }))}>
+                                            onClick={() => setFindState(prev => ({ ...prev, [i]: { loading: false, candidates: [], index: 0, error: null, debug: null, subPuuids: [] } }))}>
                                             Discard
                                           </button>
                                         </div>

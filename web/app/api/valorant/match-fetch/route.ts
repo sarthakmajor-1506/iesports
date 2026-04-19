@@ -696,6 +696,139 @@ export async function POST(req: NextRequest) {
     // admin re-fetches a match multiple times.
     const processedGameKey = `${matchDocId}__game${gameNumber}`;
 
+    // ─── Pre-pass: wipe stale contributions ──────────────────────────────
+    // A player who was aggregated in a PREVIOUS fetch of this same (match,
+    // game) but who is NOT in the current fetch — typically because they
+    // were added to `excludedPuuids` this time, or because the admin
+    // re-fetched with a different match UUID — needs their old snapshot
+    // reversed out of the leaderboard before we apply the new fetch.
+    const currentPuuidsInFetch = new Set<string>(enrichedPlayerStats.map((p: any) => p.puuid));
+    const staleCandidates: string[] = [];
+    for (const puuid of rosterPuuids) {
+      if (currentPuuidsInFetch.has(puuid)) continue; // they'll be handled by the delta below
+      staleCandidates.push(puuid);
+    }
+    for (const puuid of staleCandidates) {
+      const lbSnap = await leaderboardRef.doc(puuid).get();
+      const prev = lbSnap.data()?.processedGames?.[processedGameKey];
+      if (!prev) continue;
+      const ex = lbSnap.data()!;
+      const newMatches = Math.max(0, (ex.matchesPlayed || 0) - 1);
+      const newKills = Math.max(0, (ex.totalKills || 0) - (prev.kills || 0));
+      const newDeaths = Math.max(0, (ex.totalDeaths || 0) - (prev.deaths || 0));
+      const newAssists = Math.max(0, (ex.totalAssists || 0) - (prev.assists || 0));
+      const newScore = Math.max(0, (ex.totalScore || 0) - (prev.score || 0));
+      const newHS = Math.max(0, (ex.totalHeadshots || 0) - (prev.headshots || 0));
+      const newBS = Math.max(0, (ex.totalBodyshots || 0) - (prev.bodyshots || 0));
+      const newLS = Math.max(0, (ex.totalLegshots || 0) - (prev.legshots || 0));
+      const newDmgD = Math.max(0, (ex.totalDamageDealt || 0) - (prev.damageDealt || 0));
+      const newDmgR = Math.max(0, (ex.totalDamageReceived || 0) - (prev.damageReceived || 0));
+      const newRounds = Math.max(0, (ex.totalRoundsPlayed || 0) - (prev.roundsPlayed || 0));
+      const newFK = Math.max(0, (ex.totalFirstKills || 0) - (prev.firstKills || 0));
+      const newFD = Math.max(0, (ex.totalFirstDeaths || 0) - (prev.firstDeaths || 0));
+      lbBatch.update(leaderboardRef.doc(puuid), {
+        totalKills: newKills, totalDeaths: newDeaths, totalAssists: newAssists, totalScore: newScore,
+        totalHeadshots: newHS, totalBodyshots: newBS, totalLegshots: newLS,
+        totalDamageDealt: newDmgD, totalDamageReceived: newDmgR,
+        totalFirstKills: newFK, totalFirstDeaths: newFD,
+        matchesPlayed: newMatches, totalRoundsPlayed: newRounds,
+        avgKills: newMatches > 0 ? Math.round((newKills / newMatches) * 100) / 100 : 0,
+        avgDeaths: newMatches > 0 ? Math.round((newDeaths / newMatches) * 100) / 100 : 0,
+        kd: Math.round((newKills / Math.max(1, newDeaths)) * 100) / 100,
+        acs: newRounds > 0 ? Math.round(newScore / newRounds) : 0,
+        hsPercent: Math.round((newHS / Math.max(1, newHS + newBS + newLS)) * 100),
+        lastUpdated: new Date().toISOString(),
+        [`processedGames.${processedGameKey}`]: FieldValue.delete(),
+      });
+      // Same cleanup for globalLeaderboard
+      const glSnap = await globalLeaderboardRef.doc(puuid).get();
+      const glPrev = glSnap.data()?.valorant?.processedGames?.[processedGameKey];
+      if (glPrev) {
+        const gl = glSnap.data()!.valorant || {};
+        const g_newMatches = Math.max(0, (gl.matchesPlayed || 0) - 1);
+        const g_newKills = Math.max(0, (gl.totalKills || 0) - (glPrev.kills || 0));
+        const g_newDeaths = Math.max(0, (gl.totalDeaths || 0) - (glPrev.deaths || 0));
+        const g_newAssists = Math.max(0, (gl.totalAssists || 0) - (glPrev.assists || 0));
+        const g_newScore = Math.max(0, (gl.totalScore || 0) - (glPrev.score || 0));
+        const g_newHS = Math.max(0, (gl.totalHeadshots || 0) - (glPrev.headshots || 0));
+        const g_newBS = Math.max(0, (gl.totalBodyshots || 0) - (glPrev.bodyshots || 0));
+        const g_newLS = Math.max(0, (gl.totalLegshots || 0) - (glPrev.legshots || 0));
+        const g_newDmgD = Math.max(0, (gl.totalDamageDealt || 0) - (glPrev.damageDealt || 0));
+        const g_newDmgR = Math.max(0, (gl.totalDamageReceived || 0) - (glPrev.damageReceived || 0));
+        const g_newRounds = Math.max(0, (gl.totalRoundsPlayed || 0) - (glPrev.roundsPlayed || 0));
+        const g_newWins = Math.max(0, (gl.gamesWon || 0) - (glPrev.won || 0));
+        glBatch.update(globalLeaderboardRef.doc(puuid), {
+          lastUpdated: new Date().toISOString(),
+          "valorant.totalKills": g_newKills,
+          "valorant.totalDeaths": g_newDeaths,
+          "valorant.totalAssists": g_newAssists,
+          "valorant.totalScore": g_newScore,
+          "valorant.totalHeadshots": g_newHS,
+          "valorant.totalBodyshots": g_newBS,
+          "valorant.totalLegshots": g_newLS,
+          "valorant.totalDamageDealt": g_newDmgD,
+          "valorant.totalDamageReceived": g_newDmgR,
+          "valorant.totalRoundsPlayed": g_newRounds,
+          "valorant.matchesPlayed": g_newMatches,
+          "valorant.gamesWon": g_newWins,
+          "valorant.kd": Math.round((g_newKills / Math.max(1, g_newDeaths)) * 100) / 100,
+          "valorant.acs": g_newRounds > 0 ? Math.round(g_newScore / g_newRounds) : 0,
+          "valorant.hsPercent": Math.round((g_newHS / Math.max(1, g_newHS + g_newBS + g_newLS)) * 100),
+          [`valorant.processedGames.${processedGameKey}`]: FieldValue.delete(),
+        });
+      }
+    }
+
+    // ─── Pre-pass: excluded-this-time players who were previously counted ─
+    // Admin may have re-fetched with a substitute's PUUID now in excludedPuuids.
+    // If that PUUID was aggregated in a previous fetch of this same game, wipe
+    // its contribution too (delete-then-don't-re-add).
+    for (const puuid of excluded) {
+      if (typeof puuid !== "string") continue;
+      const lbSnap = await leaderboardRef.doc(puuid).get();
+      const prev = lbSnap.data()?.processedGames?.[processedGameKey];
+      if (!prev) continue;
+      const ex = lbSnap.data()!;
+      lbBatch.update(leaderboardRef.doc(puuid), {
+        totalKills: Math.max(0, (ex.totalKills || 0) - (prev.kills || 0)),
+        totalDeaths: Math.max(0, (ex.totalDeaths || 0) - (prev.deaths || 0)),
+        totalAssists: Math.max(0, (ex.totalAssists || 0) - (prev.assists || 0)),
+        totalScore: Math.max(0, (ex.totalScore || 0) - (prev.score || 0)),
+        totalHeadshots: Math.max(0, (ex.totalHeadshots || 0) - (prev.headshots || 0)),
+        totalBodyshots: Math.max(0, (ex.totalBodyshots || 0) - (prev.bodyshots || 0)),
+        totalLegshots: Math.max(0, (ex.totalLegshots || 0) - (prev.legshots || 0)),
+        totalDamageDealt: Math.max(0, (ex.totalDamageDealt || 0) - (prev.damageDealt || 0)),
+        totalDamageReceived: Math.max(0, (ex.totalDamageReceived || 0) - (prev.damageReceived || 0)),
+        totalFirstKills: Math.max(0, (ex.totalFirstKills || 0) - (prev.firstKills || 0)),
+        totalFirstDeaths: Math.max(0, (ex.totalFirstDeaths || 0) - (prev.firstDeaths || 0)),
+        totalRoundsPlayed: Math.max(0, (ex.totalRoundsPlayed || 0) - (prev.roundsPlayed || 0)),
+        matchesPlayed: Math.max(0, (ex.matchesPlayed || 0) - 1),
+        lastUpdated: new Date().toISOString(),
+        [`processedGames.${processedGameKey}`]: FieldValue.delete(),
+      });
+      const glSnap = await globalLeaderboardRef.doc(puuid).get();
+      const glPrev = glSnap.data()?.valorant?.processedGames?.[processedGameKey];
+      if (glPrev) {
+        const gl = glSnap.data()!.valorant || {};
+        glBatch.update(globalLeaderboardRef.doc(puuid), {
+          lastUpdated: new Date().toISOString(),
+          "valorant.totalKills": Math.max(0, (gl.totalKills || 0) - (glPrev.kills || 0)),
+          "valorant.totalDeaths": Math.max(0, (gl.totalDeaths || 0) - (glPrev.deaths || 0)),
+          "valorant.totalAssists": Math.max(0, (gl.totalAssists || 0) - (glPrev.assists || 0)),
+          "valorant.totalScore": Math.max(0, (gl.totalScore || 0) - (glPrev.score || 0)),
+          "valorant.totalHeadshots": Math.max(0, (gl.totalHeadshots || 0) - (glPrev.headshots || 0)),
+          "valorant.totalBodyshots": Math.max(0, (gl.totalBodyshots || 0) - (glPrev.bodyshots || 0)),
+          "valorant.totalLegshots": Math.max(0, (gl.totalLegshots || 0) - (glPrev.legshots || 0)),
+          "valorant.totalDamageDealt": Math.max(0, (gl.totalDamageDealt || 0) - (glPrev.damageDealt || 0)),
+          "valorant.totalDamageReceived": Math.max(0, (gl.totalDamageReceived || 0) - (glPrev.damageReceived || 0)),
+          "valorant.totalRoundsPlayed": Math.max(0, (gl.totalRoundsPlayed || 0) - (glPrev.roundsPlayed || 0)),
+          "valorant.matchesPlayed": Math.max(0, (gl.matchesPlayed || 0) - 1),
+          "valorant.gamesWon": Math.max(0, (gl.gamesWon || 0) - (glPrev.won || 0)),
+          [`valorant.processedGames.${processedGameKey}`]: FieldValue.delete(),
+        });
+      }
+    }
+
     for (const player of enrichedPlayerStats) {
       // Skip excluded PUUIDs (substitutes)
       if (excluded.has(player.puuid)) {
