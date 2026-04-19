@@ -565,7 +565,7 @@ export default function AdminPanel() {
   // Auto-discover the Valorant match for a given game slot by hitting
   // /api/valorant/match-find. Stash candidates in findState so the UI can
   // render a preview card without the admin having to paste a match UUID.
-  const findLatestMatch = useCallback(async (gameIdx: number, matchDocId: string, opts?: { beforeTimestamp?: string | null }) => {
+  const findLatestMatch = useCallback(async (gameIdx: number, matchDocId: string, opts?: { beforeTimestamp?: string | null; afterTimestamp?: string | null }) => {
     setFindState(prev => ({ ...prev, [gameIdx]: { loading: true, candidates: [], index: 0, error: null, debug: null, subPuuids: [] } }));
     try {
       const res = await fetch("/api/valorant/match-find", {
@@ -575,6 +575,7 @@ export default function AdminPanel() {
           adminKey, tournamentId, matchDocId,
           region: fetchRegion,
           beforeTimestamp: opts?.beforeTimestamp || null,
+          afterTimestamp: opts?.afterTimestamp || null,
         }),
       });
       const data = await res.json();
@@ -2271,8 +2272,11 @@ export default function AdminPanel() {
                                 ) : null;
                                 // Use the preceding game's startedAt as the "before" cutoff so
                                 // Find on game 1 doesn't return game 2 when both are already played.
+                                // When fetching Game 2+, pass the previous game's startedAt as
+                                // afterTimestamp so match-find skips that game and returns the
+                                // one played AFTER it (the game we actually want to commit).
                                 const prevGameData = i > 0 ? (m.games?.[`game${i}`] || (m as any)?.[`game${i}`]) : null;
-                                const beforeTs = prevGameData?.startedAt || null;
+                                const afterTs = prevGameData?.startedAt || null;
                                 const fs = findState[i];
                                 const preview = fs?.candidates[fs?.index ?? 0] || null;
                                 return (
@@ -2286,7 +2290,7 @@ export default function AdminPanel() {
                                     )}
                                     {!fetched && (
                                       <button disabled={fs?.loading || loading} style={{ ...btnStyle, width: "100%", fontSize: "0.7rem", background: "#1e3a5f", border: "1px solid #3CCBFF44", marginBottom: 6 }}
-                                        onClick={() => findLatestMatch(i, opsMatchId, { beforeTimestamp: beforeTs })}>
+                                        onClick={() => findLatestMatch(i, opsMatchId, { afterTimestamp: afterTs })}>
                                         {fs?.loading ? "Searching…" : preview ? "🔄 Search again" : "🔍 Find latest match"}
                                       </button>
                                     )}

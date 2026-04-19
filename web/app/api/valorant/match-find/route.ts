@@ -12,9 +12,14 @@ import { adminDb } from "@/lib/firebaseAdmin";
  *
  * Writes nothing. Read-only discovery.
  *
- * Input: { tournamentId, adminKey, matchDocId, region?, beforeTimestamp?, size? }
- *   beforeTimestamp: ISO string — skip any match started after this time.
- *     Useful for finding Game 1 when Game 2 has already been played.
+ * Input: { tournamentId, adminKey, matchDocId, region?, beforeTimestamp?,
+ *          afterTimestamp?, size? }
+ *   beforeTimestamp: ISO string — only consider matches started strictly
+ *     before this time. Useful when fetching Game 1 but Game 2 has
+ *     already been played (pass Game 2's startedAt).
+ *   afterTimestamp:  ISO string — only consider matches started strictly
+ *     after this time. Useful when fetching Game 2+ in a series — pass
+ *     the previous game's startedAt so the previous game isn't re-picked.
  *
  * Output (success): { found: true, candidates: [{ matchId, map, mode, startedAt,
  *     team1RoundsWon, team2RoundsWon, team1Side, mvp, players[] }], historySource }
@@ -22,7 +27,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { tournamentId, adminKey, matchDocId, region, beforeTimestamp, size } = await req.json();
+    const { tournamentId, adminKey, matchDocId, region, beforeTimestamp, afterTimestamp, size } = await req.json();
 
     if (!tournamentId || !adminKey || !matchDocId) {
       return NextResponse.json(
@@ -138,6 +143,7 @@ export async function POST(req: NextRequest) {
 
     // ─── Filter: matches where ≥4 players from each team played ────────
     const beforeMs = beforeTimestamp ? new Date(beforeTimestamp).getTime() : 0;
+    const afterMs = afterTimestamp ? new Date(afterTimestamp).getTime() : 0;
     const extractRoundsWon = (t: any) =>
       t?.rounds_won ?? t?.roundsWon ?? t?.rounds?.won ?? 0;
 
@@ -157,6 +163,7 @@ export async function POST(req: NextRequest) {
       .filter((c): c is NonNullable<typeof c> => !!c)
       .filter((c) => c.t1Count >= 4 && c.t2Count >= 4)
       .filter((c) => !beforeMs || !c.startedAtMs || c.startedAtMs < beforeMs)
+      .filter((c) => !afterMs || !c.startedAtMs || c.startedAtMs > afterMs)
       .sort((a, b) => b.startedAtMs - a.startedAtMs);
 
     if (candidates.length === 0) {
@@ -169,6 +176,7 @@ export async function POST(req: NextRequest) {
           team1PuuidCount: team1Puuids.size,
           team2PuuidCount: team2Puuids.size,
           beforeMs: beforeMs || null,
+          afterMs: afterMs || null,
           // Surface counts per history entry so admin can see why none matched
           matches: historyData.slice(0, 5).map((md: any) => {
             const players: any[] = md?.players?.all_players || md?.players || [];
