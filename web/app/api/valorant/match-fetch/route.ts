@@ -957,15 +957,18 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     let discordGameUpdate = false;
     try {
-      // Find MVP: highest ACS (score / rounds) from enriched player stats
-      const sortedByAcs = [...enrichedPlayerStats]
-        .filter(p => !excluded.has(p.puuid))
-        .sort((a, b) => {
-          const aAcs = roundsPlayed > 0 ? Math.round(a.score / roundsPlayed) : 0;
-          const bAcs = roundsPlayed > 0 ? Math.round(b.score / roundsPlayed) : 0;
-          return bAcs - aAcs;
-        });
-      const mvpPlayer = sortedByAcs[0] || null;
+      // MVP is chosen using the leaderboard formula: (K + 0.5A) / D, with
+      // D treated as 1 when deaths = 0 so a flawless game still scores.
+      // Substitutes and any player not on either team's roster are excluded
+      // outright — MVP can only be a rostered player from team1 or team2.
+      const mvpScore = (p: { kills: number; assists: number; deaths: number }) => {
+        const d = p.deaths > 0 ? p.deaths : 1;
+        return (p.kills + 0.5 * p.assists) / d;
+      };
+      const sortedByMvp = [...enrichedPlayerStats]
+        .filter(p => !excluded.has(p.puuid) && rosterPuuids.has(p.puuid))
+        .sort((a, b) => mvpScore(b) - mvpScore(a));
+      const mvpPlayer = sortedByMvp[0] || null;
       const mvp = mvpPlayer ? {
         name: mvpPlayer.name || "Unknown",
         kills: mvpPlayer.kills,
@@ -974,7 +977,7 @@ export async function POST(req: NextRequest) {
         acs: roundsPlayed > 0 ? Math.round(mvpPlayer.score / roundsPlayed) : 0,
       } : null;
 
-      const topPerformers = sortedByAcs.slice(1, 3).map(p => ({
+      const topPerformers = sortedByMvp.slice(1, 3).map(p => ({
         name: p.name || "Unknown",
         kills: p.kills,
         deaths: p.deaths,
