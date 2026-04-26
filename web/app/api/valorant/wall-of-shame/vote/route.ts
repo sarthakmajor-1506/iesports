@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
     await adminDb.runTransaction(async tx => {
       const entrySnap = await tx.get(entryRef);
       if (!entrySnap.exists) throw new Error("Entry not found");
+      // Archived entries are kept for audit but should reject new votes.
+      if (entrySnap.data()?.archived === true) throw new Error("Entry archived");
       const existingVote = await tx.get(voteRef);
       if (existingVote.exists) {
         throw new Error("Already voted on this entry");
@@ -65,6 +67,9 @@ export async function POST(req: NextRequest) {
     }
     if (msg === "Entry not found") {
       return NextResponse.json({ error: msg }, { status: 404 });
+    }
+    if (msg === "Entry archived") {
+      return NextResponse.json({ error: msg }, { status: 410 });
     }
     return NextResponse.json({ error: msg }, { status: 500 });
   }

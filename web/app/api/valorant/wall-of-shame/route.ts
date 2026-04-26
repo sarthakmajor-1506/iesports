@@ -20,7 +20,11 @@ export async function GET(req: NextRequest) {
       .doc(tournamentId)
       .collection("wallOfShame");
     const snap = await shameCol.get();
-    const entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // archived === true → kept for audit / future reference but hidden from
+    // the public Wall (e.g. last week's entries after a refresh).
+    const entries = snap.docs
+      .map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }))
+      .filter((e: any) => e.archived !== true);
 
     // Resolve caller uid (optional).
     let callerUid: string | null = null;

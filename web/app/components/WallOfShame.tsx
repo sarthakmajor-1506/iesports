@@ -100,6 +100,22 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
   const [bumpKey, setBumpKey] = useState<Record<string, number>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ── Unseen-entries notification badge ──────────────────────────────────
+  // Stores the IDs of entries the user has already opened the modal on.
+  // When operators refresh the wall (script wipes + recreates entries),
+  // every new entry has a fresh ID, so the badge reappears with the new
+  // count for every visitor. Per-tournament so cross-tournament browsing
+  // doesn't reset progress.
+  const seenStorageKey = `wos_seen_${tournamentId}`;
+  const [seenIds, setSeenIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !tournamentId) return;
+    try {
+      const raw = window.localStorage.getItem(seenStorageKey);
+      if (raw) setSeenIds(JSON.parse(raw));
+    } catch { /* corrupt JSON — ignore */ }
+  }, [tournamentId, seenStorageKey]);
+
   const load = useCallback(async () => {
     if (!tournamentId) return;
     setLoading(true);
@@ -122,6 +138,27 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
   }, [tournamentId, user]);
 
   useEffect(() => { if (open) load(); }, [open, load]);
+
+  // Fetch on mount too so the unseen-count badge can render before the
+  // user opens the modal. This is a single GET per page load and the
+  // payload is tiny (a few entries).
+  useEffect(() => { load(); }, [load]);
+
+  const unseenCount = useMemo(() => {
+    const seen = new Set(seenIds);
+    return entries.filter(e => !seen.has(e.id)).length;
+  }, [entries, seenIds]);
+
+  const handleOpen = () => {
+    setOpen(true);
+    // Mark every currently-loaded entry as seen so the badge clears.
+    if (typeof window !== "undefined" && entries.length > 0) {
+      const ids = entries.map(e => e.id);
+      setSeenIds(ids);
+      try { window.localStorage.setItem(seenStorageKey, JSON.stringify(ids)); }
+      catch { /* storage full / disabled — badge will keep showing, no-op */ }
+    }
+  };
 
   // Lock page scroll while the modal is open.
   useEffect(() => {
@@ -193,7 +230,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
       <button
         type="button"
         className="wos-hero-btn"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         title="View the Wall of Shame"
         style={{
           position: "relative",
@@ -227,6 +264,33 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
       >
         <Skull size={15} strokeWidth={2.4} />
         <span>Wall of Shame</span>
+        {unseenCount > 0 && (
+          <span
+            aria-label={`${unseenCount} new entries`}
+            style={{
+              position: "absolute",
+              top: -6,
+              right: -6,
+              minWidth: 22,
+              height: 22,
+              padding: "0 6px",
+              borderRadius: 999,
+              background: "#fff",
+              color: "#b91c1c",
+              fontSize: "0.72rem",
+              fontWeight: 900,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "2px solid #7f1d1d",
+              boxShadow: "0 2px 8px rgba(239,68,68,0.55), 0 0 0 2px rgba(255,255,255,0.15)",
+              animation: "wos-pulse 1.6s ease-in-out infinite",
+              lineHeight: 1,
+            }}
+          >
+            {unseenCount}
+          </span>
+        )}
       </button>
 
       {open && mounted && createPortal((
@@ -565,18 +629,35 @@ function PosterCard({
           pointerEvents: "none", mixBlendMode: "multiply",
         }} />
 
+        {/* Eyebrow — small WANTED/WARNING above the loud banner */}
         <div style={{
-          textAlign: "center", fontWeight: 900, fontSize: "1.3rem",
-          letterSpacing: "0.12em", color: inkDark, position: "relative",
-        }}>
-          {isWanted ? "WANTED" : "WARNING"}
-        </div>
-        <div style={{
-          textAlign: "center", fontSize: "0.56rem", letterSpacing: "0.35em",
-          color: inkMid, marginTop: 1, textTransform: "uppercase", fontWeight: 700,
+          textAlign: "center", fontWeight: 800, fontSize: "0.62rem",
+          letterSpacing: "0.34em", color: inkMid, textTransform: "uppercase",
           position: "relative",
         }}>
-          {isWanted ? "No Show" : "Late to the Party"}
+          {isWanted ? "Wanted" : "Warning"}
+        </div>
+        {/* LOUD banner — the actual offense, bleeding to card edges */}
+        <div style={{
+          textAlign: "center",
+          background: accent,
+          color: "#fff",
+          fontWeight: 900,
+          fontSize: isWanted ? "1.5rem" : "1.05rem",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          padding: isWanted ? "8px 6px" : "9px 6px",
+          margin: "8px -13px 2px -13px",
+          border: `2px solid ${edge}`,
+          borderLeft: 0,
+          borderRight: 0,
+          textShadow: "0 1px 2px rgba(0,0,0,0.5), 0 0 14px rgba(0,0,0,0.25)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -3px 6px rgba(0,0,0,0.22)",
+          position: "relative",
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          lineHeight: 1.05,
+        }}>
+          {isWanted ? "NO SHOW" : "LATE TO THE PARTY"}
         </div>
 
         {/* Avatar */}
