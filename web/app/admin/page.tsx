@@ -1968,7 +1968,7 @@ export default function AdminPanel() {
                     <div style={{ padding: 16, background: "#1a1508", borderRadius: 10, border: "1px solid #5c3a14" }}>
                       <span style={{ ...smallLabel, color: "#f59e0b" }}>Generate Brackets (Post Group)</span>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <div><label style={smallLabel}>Teams</label><select value={bracketTopTeams} onChange={e => setBracketTopTeams(e.target.value)} style={selectStyle}><option value="2">Top 2</option><option value="4">Top 4</option><option value="8">Top 8</option></select></div>
+                        <div><label style={smallLabel}>Teams</label><select value={bracketTopTeams} onChange={e => setBracketTopTeams(e.target.value)} style={selectStyle}><option value="2">Top 2</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="10">Top 10 (6 UB / 4 LB)</option></select></div>
                         <div><label style={smallLabel}>Date</label><input value={bracketStartDate} onChange={e => setBracketStartDate(e.target.value)} style={inputStyle} type="date" /></div>
                       </div>
                       <label style={smallLabel}>Start Time</label>

@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
     let bracketMatches: any[] = [];
     let matchNum = 1;
     let bracketSize = 2;
+    let ubCount = 0; // # of teams that start in the upper bracket (rest start in LB)
 
     const makeMatchData = (
       id: string,
@@ -183,6 +184,7 @@ export async function POST(req: NextRequest) {
       // 2 TEAMS: Grand Final only
       // ══════════════════════════════════════════════════════════════════════
       bracketSize = 2;
+      ubCount = 2;
       bracketMatches.push(makeMatchData(
         "grand-final", "Grand Final", "grand_final", 1, nextDay, 0,
         seededTeams[0], seededTeams[1], grandFinalBO,
@@ -194,6 +196,7 @@ export async function POST(req: NextRequest) {
       // #1 and #2 in Upper Bracket, #3 starts in Lower Bracket with bye
       // ══════════════════════════════════════════════════════════════════════
       bracketSize = 4;
+      ubCount = 2;
 
       // Day 1: Upper Bracket Final
       bracketMatches.push(makeMatchData(
@@ -230,6 +233,7 @@ export async function POST(req: NextRequest) {
       //   LB Final winner → Grand Final (lower slot)
       // ══════════════════════════════════════════════════════════════════════
       bracketSize = 4;
+      ubCount = 2;
 
       // Day 1: UB Semi (#1 vs #2) + LB R1 (#3 vs #4)
       bracketMatches.push(makeMatchData(
@@ -259,6 +263,113 @@ export async function POST(req: NextRequest) {
       bracketMatches[1].data.winnerGoesTo = "lb-final";       // LB R1 winner → LB Final
       bracketMatches[2].data.winnerGoesTo = "grand-final";    // LB Final winner → GF
 
+    } else if (numAdvancing >= 9) {
+      // ══════════════════════════════════════════════════════════════════════
+      // 9-10 TEAMS: 6 UB / 4 LB Double Elimination (clamped to 10 teams)
+      //
+      // Upper Bracket (top 6, with #1 / #2 byes through to UB Semis):
+      //   UB R1: #3 vs #6, #4 vs #5  → winners → UB Semis, losers drop to LB R2
+      //   UB Semis: #1 vs winner(UB R1 M2), #2 vs winner(UB R1 M1)
+      //               → winners → UB Final, losers drop to LB R3
+      //   UB Final → winner to GF, loser to LB Final
+      //
+      // Lower Bracket (bottom 4 + drops from UB):
+      //   LB R1: #7 vs #10, #8 vs #9
+      //   LB R2: LB R1 winners crossed with UB R1 losers
+      //          (M1-winner vs M2-loser, M2-winner vs M1-loser)
+      //   LB R3: LB R2 winners crossed with UB Semi losers
+      //   LB Semi: 2 LB R3 winners → 1 winner → LB Final
+      //   LB Final: LB Semi winner vs UB Final loser → GF
+      //
+      // Grand Final: UB Final winner vs LB Final winner
+      //
+      // 14 matches total. If only 9 teams advance, #10 is BYE (LB R1 M2
+      // becomes #8 vs BYE → #8 walks; the rest of the bracket is unchanged).
+      // ══════════════════════════════════════════════════════════════════════
+      bracketSize = 10;
+      ubCount = 6;
+
+      const ubTeam = (i: number): TeamSeed => (i < Math.min(6, seededTeams.length)) ? seededTeams[i] : BYE;
+      const lbTeam = (i: number): TeamSeed => {
+        const idx = 6 + i;
+        return (idx < seededTeams.length) ? seededTeams[idx] : BYE;
+      };
+
+      // Day 1: UB R1 (#3v#6, #4v#5) + LB R1 (#7v#10, #8v#9) — 4 matches simultaneously
+      bracketMatches.push(makeMatchData("wb-r1-m1", "UB R1 M1", "winners", 1, nextDay, 0, ubTeam(2), ubTeam(5))); // [0] #3 vs #6
+      bracketMatches.push(makeMatchData("wb-r1-m2", "UB R1 M2", "winners", 1, nextDay, 1, ubTeam(3), ubTeam(4))); // [1] #4 vs #5
+      bracketMatches.push(makeMatchData("lb-r1-m1", "LB R1 M1", "losers",  1, nextDay, 2, lbTeam(0), lbTeam(3))); // [2] #7 vs #10
+      bracketMatches.push(makeMatchData("lb-r1-m2", "LB R1 M2", "losers",  1, nextDay, 3, lbTeam(1), lbTeam(2))); // [3] #8 vs #9
+
+      // Day 2: UB Semis (#1 vs UB R1 M2 winner, #2 vs UB R1 M1 winner) + LB R2 (crossed)
+      bracketMatches.push(makeMatchData("wb-semi-m1", "UB Semi M1", "winners", 2, nextDay + 1, 0, ubTeam(0), TBD)); // [4] #1 vs winner(UB R1 M2)
+      bracketMatches.push(makeMatchData("wb-semi-m2", "UB Semi M2", "winners", 2, nextDay + 1, 1, ubTeam(1), TBD)); // [5] #2 vs winner(UB R1 M1)
+      bracketMatches.push(makeMatchData("lb-r2-m1",   "LB R2 M1",   "losers",  2, nextDay + 1, 2, TBD, TBD));         // [6]
+      bracketMatches.push(makeMatchData("lb-r2-m2",   "LB R2 M2",   "losers",  2, nextDay + 1, 3, TBD, TBD));         // [7]
+
+      // Day 3: UB Final + LB R3 (crossed)
+      bracketMatches.push(makeMatchData("wb-final", "Upper Bracket Final", "winners", 3, nextDay + 2, 0, TBD, TBD));    // [8]
+      bracketMatches.push(makeMatchData("lb-r3-m1", "LB R3 M1",            "losers",  3, nextDay + 2, 1, TBD, TBD));    // [9]
+      bracketMatches.push(makeMatchData("lb-r3-m2", "LB R3 M2",            "losers",  3, nextDay + 2, 2, TBD, TBD));    // [10]
+
+      // Day 4: LB Semi
+      bracketMatches.push(makeMatchData("lb-semi", "Lower Bracket Semi", "losers", 4, nextDay + 3, 0, TBD, TBD));       // [11]
+
+      // Day 5: LB Final
+      bracketMatches.push(makeMatchData("lb-final", "Lower Bracket Final", "losers", 5, nextDay + 4, 0, TBD, TBD, lbFinalBO)); // [12]
+
+      // Day 6: Grand Final
+      bracketMatches.push(makeMatchData("grand-final", "Grand Final", "grand_final", 1, nextDay + 5, 0, TBD, TBD, grandFinalBO)); // [13]
+
+      // ── Routing ─────────────────────────────────────────────────────────
+      // UB R1 winners → UB Semis (paired opposite — M1 winner vs #2, M2 winner vs #1)
+      bracketMatches[0].data.winnerGoesTo = "wb-semi-m2";  // UB R1 M1 winner → UB Semi M2 (faces #2)
+      bracketMatches[1].data.winnerGoesTo = "wb-semi-m1";  // UB R1 M2 winner → UB Semi M1 (faces #1)
+      // UB R1 losers → LB R2 (crossed with LB R1 winners)
+      bracketMatches[0].data.loserGoesTo  = "lb-r2-m2";    // UB R1 M1 loser → LB R2 M2
+      bracketMatches[1].data.loserGoesTo  = "lb-r2-m1";    // UB R1 M2 loser → LB R2 M1
+
+      // LB R1 winners → LB R2
+      bracketMatches[2].data.winnerGoesTo = "lb-r2-m1";    // LB R1 M1 winner
+      bracketMatches[3].data.winnerGoesTo = "lb-r2-m2";    // LB R1 M2 winner
+
+      // UB Semis → UB Final / LB R3 (crossed)
+      bracketMatches[4].data.winnerGoesTo = "wb-final";    // UB Semi M1 winner
+      bracketMatches[5].data.winnerGoesTo = "wb-final";    // UB Semi M2 winner
+      bracketMatches[4].data.loserGoesTo  = "lb-r3-m2";    // UB Semi M1 loser → LB R3 M2 (crossed)
+      bracketMatches[5].data.loserGoesTo  = "lb-r3-m1";    // UB Semi M2 loser → LB R3 M1
+
+      // LB R2 winners → LB R3
+      bracketMatches[6].data.winnerGoesTo = "lb-r3-m1";    // LB R2 M1 winner
+      bracketMatches[7].data.winnerGoesTo = "lb-r3-m2";    // LB R2 M2 winner
+
+      // UB Final → GF / LB Final
+      bracketMatches[8].data.winnerGoesTo = "grand-final"; // UB Final winner
+      bracketMatches[8].data.loserGoesTo  = "lb-final";    // UB Final loser
+
+      // LB R3 winners → LB Semi
+      bracketMatches[9].data.winnerGoesTo  = "lb-semi";    // LB R3 M1 winner
+      bracketMatches[10].data.winnerGoesTo = "lb-semi";    // LB R3 M2 winner
+
+      // LB Semi winner → LB Final
+      bracketMatches[11].data.winnerGoesTo = "lb-final";
+
+      // LB Final winner → GF
+      bracketMatches[12].data.winnerGoesTo = "grand-final";
+
+      // ── Auto-advance BYE matches ──────────────────────────────────────────
+      for (const bm of bracketMatches) {
+        if (bm.data.team1Id === "BYE" && bm.data.team2Id !== "BYE" && bm.data.team2Id !== "TBD") {
+          bm.data.status = "completed";
+          bm.data.team2Score = 1;
+          bm.data.team1Score = 0;
+        } else if (bm.data.team2Id === "BYE" && bm.data.team1Id !== "BYE" && bm.data.team1Id !== "TBD") {
+          bm.data.status = "completed";
+          bm.data.team1Score = 1;
+          bm.data.team2Score = 0;
+        }
+      }
+
     } else {
       // ══════════════════════════════════════════════════════════════════════
       // 5-8 TEAMS: 50/50 Split Double Elimination
@@ -276,6 +387,7 @@ export async function POST(req: NextRequest) {
       //   LB Final winner → Grand Final (lower slot)
       // ══════════════════════════════════════════════════════════════════════
       bracketSize = 8;
+      ubCount = 4;
 
       const ubTeam = (i: number): TeamSeed => (i < Math.min(4, seededTeams.length)) ? seededTeams[i] : BYE;
       const lbTeam = (i: number): TeamSeed => {
@@ -362,6 +474,8 @@ export async function POST(req: NextRequest) {
       bracketSize,
       bracketGenerated: true,
       bracketTeams: numAdvancing,
+      bracketTeamCount: numAdvancing,
+      ubTeamCount: ubCount,
     });
 
     return NextResponse.json({
@@ -375,7 +489,9 @@ export async function POST(req: NextRequest) {
           ? "UB Final → LB Final (with bye) → Grand Final"
           : numAdvancing <= 4
             ? "4-team double elim (50/50 split: #1v#2 UB, #3v#4 LB)"
-            : `8-team double elim (50/50 split: top 4 UB, bottom ${numAdvancing - 4} LB${numAdvancing < 8 ? `, ${8 - numAdvancing} byes` : ""})`,
+            : numAdvancing >= 9
+              ? `10-team double elim (6 UB / 4 LB${numAdvancing < 10 ? `, ${10 - numAdvancing} byes` : ""})`
+              : `8-team double elim (50/50 split: top 4 UB, bottom ${numAdvancing - 4} LB${numAdvancing < 8 ? `, ${8 - numAdvancing} byes` : ""})`,
       matches: bracketMatches.map(bm => ({
         id: bm.id,
         label: bm.data.bracketLabel,
