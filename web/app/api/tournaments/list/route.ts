@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       const ended = visible
         .filter((t: any) => isEnded(t))
         .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
-        .slice(0, 1);
+        .slice(0, 20);
       const upcoming = visible
         .filter((t: any) => !isEnded(t))
         .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       const now = new Date();
       const visible = all.filter((t: any) => !t.isTestTournament);
       const isEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
-      const ended = visible.filter((t: any) => isEnded(t)).sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 1);
+      const ended = visible.filter((t: any) => isEnded(t)).sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 20);
       const upcoming = visible.filter((t: any) => !isEnded(t)).sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3);
       return NextResponse.json({ tournaments: [...ended, ...upcoming] });
     }

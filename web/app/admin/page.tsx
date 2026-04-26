@@ -18,7 +18,8 @@ const ShuffleVideoPlayer = dynamic(() => import("@/app/components/ShuffleVideoPl
 interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface VcMember { discordId: string; name: string; selfMute: boolean; selfDeaf: boolean; serverMute: boolean; serverDeaf: boolean; }
-interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; waitingRoomVcId?: string; team1VcId?: string; team2VcId?: string; vcStatus?: { inVc: string[]; notInVc: string[]; checkedAt: string }; vcLiveStatus?: { team1: VcMember[]; team2: VcMember[]; waitingRoom: VcMember[]; updatedAt: string }; vetoState?: { status: string; bo: number; tossWinner: string; actions: { team: string; action: string; map: string }[]; remainingMaps: string[]; sidePickOnDecider?: string; team1Name: string; team2Name: string }; }
+interface MatchSub { uid: string; discordId: string; name: string; riotPuuid: string }
+interface MatchData { id: string; matchDay: number; matchIndex: number; team1Id: string; team2Id: string; team1Name: string; team2Name: string; team1Score: number; team2Score: number; status: string; games?: Record<string, any>; scheduledTime?: string; lobbyName?: string; lobbyPassword?: string; isBracket?: boolean; bracketLabel?: string; bracketType?: string; waitingRoomVcId?: string; team1VcId?: string; team2VcId?: string; team1Subs?: MatchSub[]; team2Subs?: MatchSub[]; vcStatus?: { inVc: string[]; notInVc: string[]; checkedAt: string }; vcLiveStatus?: { team1: VcMember[]; team2: VcMember[]; waitingRoom: VcMember[]; updatedAt: string }; vetoState?: { status: string; bo: number; tossWinner: string; actions: { team: string; action: string; map: string }[]; remainingMaps: string[]; sidePickOnDecider?: string; team1Name: string; team2Name: string }; }
 interface DiscordConnection { type: string; name: string; id: string; verified: boolean; }
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
@@ -368,6 +369,13 @@ export default function AdminPanel() {
   const [selectedGameForLobby, setSelectedGameForLobby] = useState("1");
   const [lobbyName, setLobbyName] = useState("");
   const [lobbyPassword, setLobbyPassword] = useState("");
+  // Per-match substitutes — admin picks at lobby time so the sub gets VC
+  // perms + a Discord ping alongside starters. Stored on the match doc by
+  // the API and reused at start / next-game / fetch.
+  const [team1SubUids, setTeam1SubUids] = useState<string[]>([]);
+  const [team2SubUids, setTeam2SubUids] = useState<string[]>([]);
+  const [team1SubSearch, setTeam1SubSearch] = useState("");
+  const [team2SubSearch, setTeam2SubSearch] = useState("");
   // When true, the Set-Lobby edit form is forced open for a tournament that
   // already has a lobby set — so the Redo button reliably opens it even when
   // the prefilled inputs happen to equal the committed lobby values.
@@ -581,8 +589,19 @@ export default function AdminPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.found) {
-        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: data.candidates || [], index: 0, error: null, debug: null, subPuuids: [] } }));
-        addLog(`🔍 match-find G${gameIdx + 1}: ${data.candidateCount} candidates (scanned ${data.historyScanned}, ${data.historySource})`);
+        const candidates = data.candidates || [];
+        // Pre-tick saved subs (from set-lobby) that actually played in this
+        // candidate. Saves the admin from re-marking subs at fetch time
+        // and prevents the "forgot to mark sub" leaderboard mistake.
+        const m = matches.find(mm => mm.id === matchDocId);
+        const savedSubPuuids = [
+          ...(m?.team1Subs || []).map(s => s.riotPuuid),
+          ...(m?.team2Subs || []).map(s => s.riotPuuid),
+        ].filter(Boolean);
+        const candPuuids = new Set((candidates[0]?.players || []).map((p: any) => p.puuid));
+        const prefill = savedSubPuuids.filter(puuid => candPuuids.has(puuid));
+        setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates, index: 0, error: null, debug: null, subPuuids: prefill } }));
+        addLog(`🔍 match-find G${gameIdx + 1}: ${data.candidateCount} candidates (scanned ${data.historyScanned}, ${data.historySource})${prefill.length ? ` — ${prefill.length} sub${prefill.length > 1 ? "s" : ""} pre-selected` : ""}`);
       } else {
         setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: data.reason || "No match found", debug: data.debug, subPuuids: [] } }));
         addLog(`🔍 match-find G${gameIdx + 1}: no candidates — ${data.reason}`);
@@ -591,7 +610,7 @@ export default function AdminPanel() {
       setFindState(prev => ({ ...prev, [gameIdx]: { loading: false, candidates: [], index: 0, error: e.message || "Lookup failed", debug: null, subPuuids: [] } }));
       addLog(`❌ match-find G${gameIdx + 1}: ${e.message}`);
     }
-  }, [adminKey, tournamentId, fetchRegion]);
+  }, [adminKey, tournamentId, fetchRegion, matches]);
 
   // ─── Fetch registered players for selected tournament ─────────────────────
   const fetchRegPlayers = useCallback(async () => {
@@ -763,9 +782,25 @@ export default function AdminPanel() {
     return () => { unsub1(); unsub2(); };
   }, [tournamentId, authenticated]);
 
-  // ─── Fetch players ──────────────────────────────────────────────────────────
+  // ─── Hydrate sub picker when admin switches between matches ─────────────
+  // Reads any previously-saved subs from the match doc into the picker so
+  // a redo shows current state instead of a blank picker. Only re-runs on
+  // opsMatchId change to avoid clobbering an in-flight edit when the
+  // matches snapshot updates after a successful submit.
   useEffect(() => {
-    if (!authenticated || activeTab !== "players") return;
+    setTeam1SubSearch(""); setTeam2SubSearch("");
+    if (!opsMatchId) { setTeam1SubUids([]); setTeam2SubUids([]); return; }
+    const m = matches.find(mm => mm.id === opsMatchId);
+    setTeam1SubUids((m?.team1Subs || []).map(s => s.uid).filter(Boolean));
+    setTeam2SubUids((m?.team2Subs || []).map(s => s.uid).filter(Boolean));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opsMatchId]);
+
+  // ─── Fetch players ──────────────────────────────────────────────────────────
+  // Loaded for the Player Registry tab AND Tournament Ops (sub picker needs
+  // the user list to render Discord/Riot-linked candidates).
+  useEffect(() => {
+    if (!authenticated || (activeTab !== "players" && activeTab !== "tournament")) return;
     let cancelled = false;
     const fetchPlayers = async () => {
       try {
@@ -2007,6 +2042,105 @@ export default function AdminPanel() {
                   const stepTitle = { fontSize: "0.78rem", fontWeight: 700, color: "#e0e0e0" };
                   const stepHint = (color: string) => ({ fontSize: "0.66rem", color, marginTop: 4, lineHeight: 1.5 });
 
+                  // ─── Sub picker (per-match substitutes for the lobby) ────────
+                  // Candidates = ANY user with Discord linked (subs can be
+                  // brought in from outside the tournament). Existing
+                  // starters on either team are excluded — they're already
+                  // auto-included by the lobby pipeline.
+                  const team1Roster = teams.find(t => t.id === m.team1Id);
+                  const team2Roster = teams.find(t => t.id === m.team2Id);
+                  const rosterUids = new Set<string>([
+                    ...((team1Roster?.members || []) as any[]).map(mm => mm.uid),
+                    ...((team2Roster?.members || []) as any[]).map(mm => mm.uid),
+                  ]);
+                  const subCandidates = allPlayers
+                    .filter(p => p.discordId && !rosterUids.has(p.uid))
+                    .sort((a, b) => (a.riotGameName || a.fullName || "").localeCompare(b.riotGameName || b.fullName || ""));
+                  const playerLabel = (uid: string): string => {
+                    const p = allPlayers.find(pp => pp.uid === uid);
+                    if (!p) return uid.slice(0, 8);
+                    const name = p.riotGameName || p.fullName || uid.slice(0, 8);
+                    return p.riotTagLine ? `${name}#${p.riotTagLine}` : name;
+                  };
+                  const matchesSearch = (p: PlayerData, q: string) => {
+                    if (!q.trim()) return true;
+                    const needle = q.trim().toLowerCase();
+                    return [
+                      p.riotGameName, p.riotTagLine, p.fullName,
+                      p.discordUsername, p.steamName, p.uid,
+                    ].some(v => (v || "").toLowerCase().includes(needle));
+                  };
+                  const renderSubColumn = (
+                    label: string,
+                    color: string,
+                    picked: string[],
+                    setPicked: (next: string[]) => void,
+                    search: string,
+                    setSearch: (q: string) => void,
+                  ) => {
+                    const hasQuery = search.trim().length > 0;
+                    const matches = hasQuery
+                      ? subCandidates.filter(p => !picked.includes(p.uid) && matchesSearch(p, search))
+                      : [];
+                    const cap = 30;
+                    return (
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.6rem", color, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 4 }}>{label} subs</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, minHeight: 22 }}>
+                          {picked.length === 0 && <span style={{ fontSize: "0.6rem", color: "#555", fontStyle: "italic" }}>none</span>}
+                          {picked.map(uid => (
+                            <span key={uid} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 6px", background: "#1a1500", border: "1px solid #fbbf2466", borderRadius: 4, fontSize: "0.62rem", color: "#fbbf24" }}>
+                              {playerLabel(uid)}
+                              <button onClick={() => setPicked(picked.filter(u => u !== uid))} style={{ background: "transparent", border: "none", color: "#fbbf2488", cursor: "pointer", padding: 0, fontSize: "0.7rem", lineHeight: 1, fontFamily: "inherit" }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                          placeholder="Search by name, Riot ID, Discord…"
+                          style={{ ...inputStyle, fontSize: "0.66rem", padding: "4px 6px", marginBottom: 0 }} />
+                        {hasQuery && (
+                          <div style={{ marginTop: 4, maxHeight: 180, overflowY: "auto", background: "#0a0a0d", border: "1px solid #22232b", borderRadius: 4 }}>
+                            {matches.length === 0 ? (
+                              <div style={{ padding: "8px 10px", fontSize: "0.62rem", color: "#666", fontStyle: "italic" }}>No users match “{search.trim()}”.</div>
+                            ) : (
+                              <>
+                                {matches.slice(0, cap).map(p => (
+                                  <button key={p.uid}
+                                    onClick={() => { setPicked([...picked, p.uid]); setSearch(""); }}
+                                    style={{ display: "block", width: "100%", textAlign: "left" as const, padding: "5px 8px", background: "transparent", border: "none", borderBottom: "1px solid #1a1a1e", color: "#e0e0e0", fontSize: "0.64rem", cursor: "pointer", fontFamily: "inherit" }}>
+                                    <span style={{ fontWeight: 600 }}>{p.riotGameName || p.fullName || p.uid.slice(0, 8)}</span>
+                                    {p.riotTagLine ? <span style={{ color: "#888" }}>#{p.riotTagLine}</span> : null}
+                                    {p.discordUsername ? <span style={{ color: "#818cf8", marginLeft: 6 }}>@{p.discordUsername}</span> : null}
+                                    {p.riotRank ? <span style={{ color: "#fbbf24", marginLeft: 6 }}>· {p.riotRank}</span> : null}
+                                  </button>
+                                ))}
+                                {matches.length > cap && (
+                                  <div style={{ padding: "5px 8px", fontSize: "0.58rem", color: "#666", fontStyle: "italic", borderTop: "1px solid #1a1a1e" }}>
+                                    … {matches.length - cap} more — refine search
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  const subPickerJsx = (
+                    <div style={{ marginTop: 8, padding: "8px 10px", background: "#0e0e12", border: "1px dashed #2a2a2e", borderRadius: 6 }}>
+                      <div style={{ fontSize: "0.6rem", color: "#888", marginBottom: 6 }}>
+                        Substitutes (optional) — picked subs get VC permissions, an @ ping, and auto-move to the team VC. Anyone with Discord linked can be added.
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        {renderSubColumn(m.team1Name, "#60A5FA", team1SubUids, setTeam1SubUids, team1SubSearch, setTeam1SubSearch)}
+                        {renderSubColumn(m.team2Name, "#f87171", team2SubUids, setTeam2SubUids, team2SubSearch, setTeam2SubSearch)}
+                      </div>
+                      {allPlayers.length === 0 && (
+                        <div style={{ fontSize: "0.58rem", color: "#666", marginTop: 4, fontStyle: "italic" }}>Loading users…</div>
+                      )}
+                    </div>
+                  );
+
                   return (
                     <>
                       {/* Match header */}
@@ -2042,7 +2176,8 @@ export default function AdminPanel() {
                               </select>
                             </div>
                             <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-                            <div style={{ display: "flex", gap: 6 }}>
+                            {subPickerJsx}
+                            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                               <button disabled={loading || !lobbyName} style={{ ...btnStyle, flex: 1, background: "#1e3a5f", border: "1px solid #3CCBFF66" }}
                                 title="Post new lobby credentials to Discord — keep everyone in the existing team VCs. Use this for Game 2+ in a series."
                                 onClick={async () => {
@@ -2061,6 +2196,7 @@ export default function AdminPanel() {
                                     await apiCall("/api/valorant/match-update", {
                                       tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
                                       action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                                      team1Subs: team1SubUids, team2Subs: team2SubUids,
                                     });
                                     setLobbyRedoing(false);
                                   } catch {/* apiCall logged */}
@@ -2081,10 +2217,17 @@ export default function AdminPanel() {
                               </select>
                             </div>
                             <input value={lobbyPassword} onChange={e => setLobbyPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-                            <button disabled={loading || !lobbyName} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
+                            {subPickerJsx}
+                            <button disabled={loading || !lobbyName} style={{ ...btnStyle, marginTop: 8 }} onClick={() => apiCall("/api/valorant/match-update", {
                               tournamentId, matchId: opsMatchId, gameNumber: parseInt(selectedGameForLobby),
                               action: "set-lobby", lobbyName, lobbyPassword, notifyDiscord: true,
+                              team1Subs: team1SubUids, team2Subs: team2SubUids,
                             })}>Set Lobby & Notify</button>
+                          </div>
+                        )}
+                        {hasLobby && !lobbyRedoing && ((m.team1Subs?.length || 0) + (m.team2Subs?.length || 0) > 0) && (
+                          <div style={{ marginTop: 6, fontSize: "0.62rem", color: "#fbbf24" }}>
+                            🔄 Subs: {[...(m.team1Subs || []).map(s => `${m.team1Name}: ${s.name}`), ...(m.team2Subs || []).map(s => `${m.team2Name}: ${s.name}`)].join(" · ")}
                           </div>
                         )}
                       </div>
@@ -2377,7 +2520,17 @@ export default function AdminPanel() {
                                           </button>
                                           {fs && fs.candidates.length > 1 && fs.index < fs.candidates.length - 1 && (
                                             <button disabled={loading} style={{ ...btnStyle, fontSize: "0.62rem", padding: "6px 10px" }}
-                                              onClick={() => setFindState(prev => ({ ...prev, [i]: { ...fs, index: fs.index + 1, subPuuids: [] } }))}>
+                                              onClick={() => {
+                                                const nextIdx = fs.index + 1;
+                                                const opsMatch = matches.find(mm => mm.id === opsMatchId);
+                                                const savedSubPuuids = [
+                                                  ...(opsMatch?.team1Subs || []).map(s => s.riotPuuid),
+                                                  ...(opsMatch?.team2Subs || []).map(s => s.riotPuuid),
+                                                ].filter(Boolean);
+                                                const candPuuids = new Set((fs.candidates[nextIdx]?.players || []).map((p: any) => p.puuid));
+                                                const prefill = savedSubPuuids.filter(puuid => candPuuids.has(puuid));
+                                                setFindState(prev => ({ ...prev, [i]: { ...fs, index: nextIdx, subPuuids: prefill } }));
+                                              }}>
                                               Older ({fs.candidates.length - 1 - fs.index} left)
                                             </button>
                                           )}

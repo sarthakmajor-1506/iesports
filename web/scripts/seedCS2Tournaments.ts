@@ -35,9 +35,9 @@ async function seed() {
     format: "shuffle",
     status: "upcoming",
     bracketsComputed: false,
-    registrationDeadline: "2026-04-17T23:59:00+05:30",
-    startDate: "2026-04-18T18:00:00+05:30",
-    endDate: "2026-04-18T23:00:00+05:30",
+    registrationDeadline: "2026-05-22T23:59:00+05:30",
+    startDate: "2026-05-23T18:00:00+05:30",
+    endDate: "2026-05-23T23:00:00+05:30",
     totalSlots: 20,
     slotsBooked: 0,
     entryFee: 0,
@@ -51,13 +51,13 @@ async function seed() {
     ],
     desc: "CS2 Prelims — Free entry shuffle tournament with ₹3,000 prize pool. Register solo, get drafted into balanced teams.",
     schedule: {
-      registrationOpens: "2026-04-11T00:00:00+05:30",
-      registrationCloses: "2026-04-17T23:59:00+05:30",
-      squadCreation: "2026-04-18T16:00:00+05:30",
-      groupStageStart: "2026-04-18T18:00:00+05:30",
-      groupStageEnd: "2026-04-18T21:00:00+05:30",
-      tourneyStageStart: "2026-04-18T21:00:00+05:30",
-      tourneyStageEnd: "2026-04-18T23:00:00+05:30",
+      registrationOpens: "2026-05-16T00:00:00+05:30",
+      registrationCloses: "2026-05-22T23:59:00+05:30",
+      squadCreation: "2026-05-23T16:00:00+05:30",
+      groupStageStart: "2026-05-23T18:00:00+05:30",
+      groupStageEnd: "2026-05-23T21:00:00+05:30",
+      tourneyStageStart: "2026-05-23T21:00:00+05:30",
+      tourneyStageEnd: "2026-05-23T23:00:00+05:30",
     },
     playersPerTeam: 5,
     bracketFormat: "double_elimination",
@@ -67,8 +67,8 @@ async function seed() {
   }, { merge: true });
 
   console.log(`✅ Seeded: ${prelimsId}`);
-  console.log(`   📅 Registration deadline: 17th Apr 2026`);
-  console.log(`   🎮 Start: 18th Apr 2026, 6 PM IST`);
+  console.log(`   📅 Registration deadline: 22nd May 2026`);
+  console.log(`   🎮 Start: 23rd May 2026, 6 PM IST`);
   console.log(`   🎯 Format: Shuffle | Slots: 50 | Entry: Free | Prize: ₹3,000`);
 
   console.log("\n✅ Done — CS2 tournament seeded into 'cs2Tournaments' collection");

@@ -71,6 +71,34 @@ async function getTeamDiscordData(
 }
 
 /**
+ * Resolves a list of user UIDs into the Discord/Riot fields used by the
+ * lobby pipeline. Used for per-match substitutes — these are picked at
+ * lobby time by the admin and stored on the match doc, separate from the
+ * team's official roster.
+ */
+async function resolveUserDiscordData(uids: string[]) {
+  const out: { uid: string; discordId: string; name: string; riotPuuid: string }[] = [];
+  for (const uid of uids) {
+    if (!uid || typeof uid !== "string") continue;
+    try {
+      const userDoc = await adminDb.collection("users").doc(uid).get();
+      const d = userDoc.data() || {};
+      out.push({
+        uid,
+        discordId: d.discordId || "",
+        name: d.riotGameName || d.fullName || uid,
+        riotPuuid: d.riotPuuid || "",
+      });
+    } catch {
+      out.push({ uid, discordId: "", name: uid, riotPuuid: "" });
+    }
+  }
+  return out;
+}
+
+type ResolvedSub = { uid: string; discordId: string; name: string; riotPuuid: string };
+
+/**
  * Creates a Discord voice channel via REST API.
  * Returns the channel ID or null on failure.
  */
@@ -193,6 +221,7 @@ export async function POST(req: NextRequest) {
       tournamentId, adminKey, matchId, action,
       gameNumber, lobbyName, lobbyPassword,
       notifyDiscord, scheduledTime, bo: bodyBo, vetoMode: bodyVetoMode,
+      team1Subs: bodyTeam1Subs, team2Subs: bodyTeam2Subs,
     } = await req.json();
 
     if (!tournamentId || !adminKey || !matchId || !action) {
@@ -260,6 +289,16 @@ export async function POST(req: NextRequest) {
         lobbySetAt: new Date().toISOString(),
       };
 
+      // ── Resolve per-match substitutes (admin-picked at lobby time) ─────
+      // The admin always sends both arrays from the picker, so this also
+      // overwrites previously-saved subs on a redo. An empty array clears.
+      const team1SubUids: string[] = Array.isArray(bodyTeam1Subs) ? bodyTeam1Subs : [];
+      const team2SubUids: string[] = Array.isArray(bodyTeam2Subs) ? bodyTeam2Subs : [];
+      const team1Subs: ResolvedSub[] = await resolveUserDiscordData(team1SubUids);
+      const team2Subs: ResolvedSub[] = await resolveUserDiscordData(team2SubUids);
+      updateData.team1Subs = team1Subs;
+      updateData.team2Subs = team2Subs;
+
       if (matchData.games) {
         updateData[`games.${gameKey}.lobbyName`] = lobbyName || "";
         updateData[`games.${gameKey}.lobbyPassword`] = lobbyPassword || "";
@@ -284,7 +323,7 @@ export async function POST(req: NextRequest) {
         try {
           // ── Fetch team discord data ──────────────────────────────────────
           const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
-          const allDiscordIds = [...team1Players, ...team2Players]
+          const allDiscordIds = [...team1Players, ...team2Players, ...team1Subs, ...team2Subs]
             .map(p => p.discordId)
             .filter(Boolean);
           const allMentions = allDiscordIds.map(id => `<@${id}>`);
@@ -317,6 +356,10 @@ export async function POST(req: NextRequest) {
             ? `\n\n🎙️ **Waiting Room:** <#${waitingRoomVcId}>\nJoin the voice channel and hang tight!`
             : "";
 
+          const subsBlock: string[] = [];
+          if (team1Subs.length) subsBlock.push(`🔄 **${matchData.team1Name} subs:** ${team1Subs.map(s => s.name).join(", ")}`);
+          if (team2Subs.length) subsBlock.push(`🔄 **${matchData.team2Name} subs:** ${team2Subs.map(s => s.name).join(", ")}`);
+
           const messagePayload = {
             content: allMentions.length > 0 ? allMentions.join(" ") : undefined,
             embeds: [{
@@ -330,6 +373,7 @@ export async function POST(req: NextRequest) {
                 "",
                 `**${matchData.team1Name}:** ${team1Players.map(p => p.name).join(", ")}`,
                 `**${matchData.team2Name}:** ${team2Players.map(p => p.name).join(", ")}`,
+                ...(subsBlock.length ? ["", ...subsBlock] : []),
                 "",
                 `Please join the custom game lobby in Valorant.${vcLine}`,
               ].join("\n"),
@@ -345,7 +389,7 @@ export async function POST(req: NextRequest) {
           if (waitingRoomVcId) {
             const inVc: string[] = [];
             const notInVc: string[] = [];
-            for (const p of [...team1Players, ...team2Players]) {
+            for (const p of [...team1Players, ...team2Players, ...team1Subs, ...team2Subs]) {
               if (!p.discordId) { notInVc.push(p.name); continue; }
               const moved = await maybeMoveToVoice(guildId, p.discordId, waitingRoomVcId);
               if (moved) inVc.push(p.name);
@@ -397,8 +441,19 @@ export async function POST(req: NextRequest) {
           // ── Fetch team discord data ──────────────────────────────────────
           const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
 
-          const team1DiscordIds = team1Players.map(p => p.discordId).filter(Boolean);
-          const team2DiscordIds = team2Players.map(p => p.discordId).filter(Boolean);
+          // Per-match subs were saved by set-lobby on the match doc.
+          // Add their Discord IDs to their team's VC permissions and moves.
+          const team1Subs: ResolvedSub[] = (matchData.team1Subs || []) as ResolvedSub[];
+          const team2Subs: ResolvedSub[] = (matchData.team2Subs || []) as ResolvedSub[];
+
+          const team1DiscordIds = [
+            ...team1Players.map(p => p.discordId),
+            ...team1Subs.map(s => s.discordId),
+          ].filter(Boolean);
+          const team2DiscordIds = [
+            ...team2Players.map(p => p.discordId),
+            ...team2Subs.map(s => s.discordId),
+          ].filter(Boolean);
           const allDiscordIds = [...team1DiscordIds, ...team2DiscordIds];
 
           // ── Create Team 1 VC ────────────────────────────────────────────
@@ -447,6 +502,9 @@ export async function POST(req: NextRequest) {
             const team2VcMention = team2VcId ? `<#${team2VcId}>` : "—";
             const team1Mentions = team1DiscordIds.map(id => `<@${id}>`).join(", ") || "—";
             const team2Mentions = team2DiscordIds.map(id => `<@${id}>`).join(", ") || "—";
+            const subLines: string[] = [];
+            if (team1Subs.length) subLines.push(`🔄 **${matchData.team1Name} subs:** ${team1Subs.map(s => s.name).join(", ")}`);
+            if (team2Subs.length) subLines.push(`🔄 **${matchData.team2Name} subs:** ${team2Subs.map(s => s.name).join(", ")}`);
 
             await sendMessage(notifyChannelId, {
               embeds: [{
@@ -459,6 +517,7 @@ export async function POST(req: NextRequest) {
                   "",
                   `🔵 **${matchData.team2Name}:** ${team2Mentions}`,
                   `🔊 Voice: ${team2VcMention}`,
+                  ...(subLines.length ? ["", ...subLines] : []),
                   "",
                   `Get into your voice channels and good luck! 🎯`,
                 ].join("\n"),
@@ -545,7 +604,9 @@ export async function POST(req: NextRequest) {
       if (notifyDiscord && botToken && guildId && notifyChannelId) {
         try {
           const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
-          const allMentions = [...team1Players, ...team2Players]
+          const team1Subs: ResolvedSub[] = (matchData.team1Subs || []) as ResolvedSub[];
+          const team2Subs: ResolvedSub[] = (matchData.team2Subs || []) as ResolvedSub[];
+          const allMentions = [...team1Players, ...team2Players, ...team1Subs, ...team2Subs]
             .map(p => p.discordId).filter(Boolean)
             .map(id => `<@${id}>`);
 
@@ -555,6 +616,10 @@ export async function POST(req: NextRequest) {
             ? ["", `🔊 Stay in your team VCs: ${team1Vc || "—"} · ${team2Vc || "—"}`].join("\n")
             : "";
 
+          const subsBlock: string[] = [];
+          if (team1Subs.length) subsBlock.push(`🔄 **${matchData.team1Name} subs:** ${team1Subs.map(s => s.name).join(", ")}`);
+          if (team2Subs.length) subsBlock.push(`🔄 **${matchData.team2Name} subs:** ${team2Subs.map(s => s.name).join(", ")}`);
+
           const messagePayload = {
             content: allMentions.length > 0 ? allMentions.join(" ") : undefined,
             embeds: [{
@@ -562,6 +627,7 @@ export async function POST(req: NextRequest) {
               description: [
                 `**New Lobby Name:** \`${lobbyName}\``,
                 `**Password:** \`${lobbyPassword}\``,
+                ...(subsBlock.length ? ["", ...subsBlock] : []),
                 "",
                 `Create the new custom game in Valorant — teams stay in the same Discord VCs.`,
                 vcLines,
@@ -605,14 +671,19 @@ export async function POST(req: NextRequest) {
       }
 
       const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
+      const team1Subs: ResolvedSub[] = (matchData.team1Subs || []) as ResolvedSub[];
+      const team2Subs: ResolvedSub[] = (matchData.team2Subs || []) as ResolvedSub[];
+      const team1All = [...team1Players, ...team1Subs];
+      const team2All = [...team2Players, ...team2Subs];
       const inVc: string[] = [];
       const notInVc: string[] = [];
 
-      for (const p of [...team1Players, ...team2Players]) {
+      for (const p of [...team1All, ...team2All]) {
         if (!p.discordId) { notInVc.push(p.name); continue; }
-        // If waiting room exists, try to move there; otherwise just check via team VCs
+        // If waiting room exists, try to move there; otherwise route to the
+        // player's own team VC so subs land in the right channel.
         const vc = matchData.waitingRoomVcId || (
-          team1Players.some(t => t.uid === p.uid) ? matchData.team1VcId : matchData.team2VcId
+          team1All.some(t => t.uid === p.uid) ? matchData.team1VcId : matchData.team2VcId
         );
         if (!vc) { notInVc.push(p.name); continue; }
         const moved = await maybeMoveToVoice(guildId, p.discordId, vc);
