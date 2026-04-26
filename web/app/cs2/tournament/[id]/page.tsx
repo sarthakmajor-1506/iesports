@@ -878,12 +878,28 @@ function CS2TournamentDetailInner() {
         .csd-team-edit-cancel { padding: 6px 16px; background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 
         /* ── Tables ── */
-        .csd-standings-table { width: 100%; border-collapse: collapse; }
-        .csd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        /* Sticky header row + first column. border-separate so sticky borders
+           render reliably; sticky cells use an opaque bg so scrolling content
+           can't bleed through (row tints on the first column are sacrificed). */
+        .csd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .csd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; }
         .csd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
         .csd-standings-table tr:last-child td { border-bottom: none; }
         .csd-standings-table tbody tr { transition: background 0.15s; }
         .csd-standings-table tbody tr:hover { background: rgba(240,165,0,0.04); }
+        .csd-standings-table thead th { position: sticky; top: 0; z-index: 2; }
+        .csd-standings-table tbody td:first-child,
+        .csd-standings-table thead th:first-child { position: sticky; left: 0; background: #14141a; }
+        .csd-standings-table tbody td:first-child { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .csd-standings-table thead th:first-child { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        /* Modifier: also freeze the second column (Team) on standings only. */
+        .csd-standings-table.csd-freeze-team { --first-col-w: 44px; }
+        .csd-standings-table.csd-freeze-team thead th:first-child,
+        .csd-standings-table.csd-freeze-team tbody td:first-child { min-width: var(--first-col-w); width: var(--first-col-w); }
+        .csd-standings-table.csd-freeze-team thead th:nth-child(2),
+        .csd-standings-table.csd-freeze-team tbody td:nth-child(2) { position: sticky; left: var(--first-col-w); background: #14141a; }
+        .csd-standings-table.csd-freeze-team tbody td:nth-child(2) { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .csd-standings-table.csd-freeze-team thead th:nth-child(2) { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
 
         /* ── Match headers ── */
         .csd-section-header { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid; }
@@ -1539,7 +1555,7 @@ function CS2TournamentDetailInner() {
                   const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
                   return (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="csd-standings-table">
+                    <table className="csd-standings-table csd-freeze-team">
                       <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>MW</th><th style={{ color: "#d07070" }}>ML</th><th style={{ color: "#f0a500" }}>Pts</th><th>BH</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {

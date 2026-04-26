@@ -744,12 +744,28 @@ function DotaTournamentDetailInner() {
         .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.74rem; color: #555550; }
 
         /* ── Tables ── */
-        .dtd-standings-table { width: 100%; border-collapse: collapse; }
-        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        /* Sticky header row + first column. border-separate so sticky borders
+           render reliably; sticky cells use an opaque bg so scrolling content
+           can't bleed through (row tints on the first column are sacrificed). */
+        .dtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; }
         .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
         .dtd-standings-table tr:last-child td { border-bottom: none; }
         .dtd-standings-table tbody tr { transition: background 0.15s; }
         .dtd-standings-table tbody tr:hover { background: rgba(161,43,31,0.04); }
+        .dtd-standings-table thead th { position: sticky; top: 0; z-index: 2; }
+        .dtd-standings-table tbody td:first-child,
+        .dtd-standings-table thead th:first-child { position: sticky; left: 0; background: #14141a; }
+        .dtd-standings-table tbody td:first-child { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .dtd-standings-table thead th:first-child { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        /* Modifier: also freeze the second column (Team) on standings only. */
+        .dtd-standings-table.dtd-freeze-team { --first-col-w: 44px; }
+        .dtd-standings-table.dtd-freeze-team thead th:first-child,
+        .dtd-standings-table.dtd-freeze-team tbody td:first-child { min-width: var(--first-col-w); width: var(--first-col-w); }
+        .dtd-standings-table.dtd-freeze-team thead th:nth-child(2),
+        .dtd-standings-table.dtd-freeze-team tbody td:nth-child(2) { position: sticky; left: var(--first-col-w); background: #14141a; }
+        .dtd-standings-table.dtd-freeze-team tbody td:nth-child(2) { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .dtd-standings-table.dtd-freeze-team thead th:nth-child(2) { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
 
         /* ── Match headers ── */
         .dtd-section-header { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid; }
@@ -1304,7 +1320,7 @@ function DotaTournamentDetailInner() {
                   <div className="dtd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="dtd-empty-title">No standings yet</span><span className="dtd-empty-sub">Standings will appear once matches are played.</span></div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="dtd-standings-table">
+                    <table className="dtd-standings-table dtd-freeze-team">
                       <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#A12B1F" }}>Pts</th><th>BH</th></tr></thead>
                       <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#A12B1F" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#A12B1F" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
                     </table>

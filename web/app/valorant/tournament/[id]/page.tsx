@@ -897,12 +897,35 @@ function ValorantTournamentDetailInner() {
         .vtd-team-edit-cancel { padding: 6px 16px; background: rgba(255,255,255,0.05); color: #8A8880; border: 1px solid rgba(255,255,255,0.08); border-radius: 100px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 
         /* ── Tables ── */
-        .vtd-standings-table { width: 100%; border-collapse: collapse; }
-        .vtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        /* The table uses border-separate so position: sticky on th/td works
+           reliably (border-collapse interferes with sticky borders). The
+           sticky cells get an opaque bg so scrolling content can't bleed
+           through; the row tints (UB blue / LB amber / etc.) on the first
+           column are sacrificed for that opacity. */
+        .vtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .vtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; }
         .vtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
         .vtd-standings-table tr:last-child td { border-bottom: none; }
         .vtd-standings-table tbody tr { transition: background 0.15s; }
         .vtd-standings-table tbody tr:hover { background: rgba(60,203,255,0.04); }
+        /* Sticky header row */
+        .vtd-standings-table thead th { position: sticky; top: 0; z-index: 2; }
+        /* Sticky first column (rank) */
+        .vtd-standings-table tbody td:first-child,
+        .vtd-standings-table thead th:first-child { position: sticky; left: 0; background: #14141a; }
+        .vtd-standings-table tbody td:first-child { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .vtd-standings-table thead th:first-child { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        /* Modifier: also freeze the second column (Team). Applied to the
+           standings table only — leaderboards skip this so player names
+           keep variable width. The first col gets a fixed width so the
+           Team column's left offset is predictable. */
+        .vtd-standings-table.vtd-freeze-team { --first-col-w: 44px; }
+        .vtd-standings-table.vtd-freeze-team thead th:first-child,
+        .vtd-standings-table.vtd-freeze-team tbody td:first-child { min-width: var(--first-col-w); width: var(--first-col-w); }
+        .vtd-standings-table.vtd-freeze-team thead th:nth-child(2),
+        .vtd-standings-table.vtd-freeze-team tbody td:nth-child(2) { position: sticky; left: var(--first-col-w); background: #14141a; }
+        .vtd-standings-table.vtd-freeze-team tbody td:nth-child(2) { z-index: 1; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
+        .vtd-standings-table.vtd-freeze-team thead th:nth-child(2) { z-index: 3; box-shadow: 1px 0 0 rgba(255,255,255,0.05); }
 
         /* ── Match headers ── */
         .vtd-section-header { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid; }
@@ -1620,7 +1643,7 @@ function ValorantTournamentDetailInner() {
                   const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
                   return (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="vtd-standings-table">
+                    <table className="vtd-standings-table vtd-freeze-team">
                       <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GW</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#fbbf24" }}>Diff</th><th style={{ color: "#3CCBFF" }}>Pts</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
