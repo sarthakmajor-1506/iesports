@@ -120,6 +120,25 @@ function captainId(state: VetoState, team: "team1" | "team2"): string {
   return team === "team1" ? state.team1CaptainDiscordId : state.team2CaptainDiscordId;
 }
 
+/** Best-effort follow-up ping in-channel so the active team's captain
+ * gets notified on every step transition. Edited messages don't re-ping
+ * users in Discord, so we post a small new message instead. Failures are
+ * swallowed — the embed update is the source of truth, the ping is a
+ * convenience nudge. */
+async function pingActiveTeam(
+  interaction: ButtonInteraction,
+  state: VetoState,
+  team: "team1" | "team2",
+  cue: string,
+): Promise<void> {
+  try {
+    await interaction.followUp({
+      content: `<@${captainId(state, team)}> ⤵️ **${tName(state, team)}** — ${cue}`,
+      allowedMentions: { users: [captainId(state, team)] },
+    });
+  } catch { /* ping is best-effort */ }
+}
+
 /** Any registered member of the given team may act (captain or not).
  * Falls back to the captain ID alone on older veto records that don't
  * carry the member arrays. */
@@ -153,30 +172,58 @@ function buildSidePickEmbed(state: VetoState): EmbedBuilder {
   const sideActions = state.sideActions || [];
   const step = state.sideStep ?? 0;
   const current = sideActions[step];
-  const lines: string[] = [
-    `**${state.team1Name}** vs **${state.team2Name}**`,
-    `🏆 Toss: **${tName(state, state.tossWinner)}**`,
-    "",
-  ];
+  const total = sideActions.length;
+  const isDecider = (sa: SideAction, i: number) =>
+    state.bo > 1 && i === total - 1 && state.status !== "random" && state.remainingMaps.length === 1;
+
+  // Find which team picked each map (for the "picked by" annotation).
+  // Decider doesn't have a picker — the sidePicker comes from toss choice.
+  const pickerByMap: Record<string, "team1" | "team2"> = {};
+  for (const a of state.actions) {
+    if (a.action === "pick") pickerByMap[a.map] = a.team;
+  }
+
+  const headline = current
+    ? `**${tName(state, current.sidePicker)}**, choose Attack or Defence for **${current.map}**.`
+    : `All sides chosen.`;
+
+  const reason = current
+    ? (pickerByMap[current.map]
+        ? `*The other team picked this map, so you choose the side.*`
+        : `*This is the decider — you earned side choice from the toss.*`)
+    : "";
+
+  const ladder: string[] = ["**Side picks:**"];
   sideActions.forEach((sa, i) => {
-    const label = `**Game ${i + 1}:** 🗺️ ${sa.map}`;
+    const decider = isDecider(sa, i) ? " *(decider)*" : "";
     if (sa.side) {
-      lines.push(`${label}  ✅`);
-      lines.push(`   └ **${tName(state, sa.sidePicker)}** starts on **${sa.side}**`);
+      ladder.push(`✓ Game ${i + 1} — ${sa.map}${decider} · **${tName(state, sa.sidePicker)}** chose **${sa.side}**`);
     } else if (i === step) {
-      lines.push(`${label}  ◀️ **now choosing**`);
-      lines.push(`   └ **${tName(state, sa.sidePicker)}** captain — pick your starting side below`);
+      ladder.push(`➡️ Game ${i + 1} — ${sa.map}${decider} · **${tName(state, sa.sidePicker)}** picking now ← you are here`);
     } else {
-      lines.push(label);
-      lines.push(`   └ **${tName(state, sa.sidePicker)}** will pick side`);
+      ladder.push(`   Game ${i + 1} — ${sa.map}${decider} · ${tName(state, sa.sidePicker)} will pick`);
     }
   });
 
+  const desc = [
+    `**${state.team1Name}** vs **${state.team2Name}** · BO${state.bo}`,
+    "",
+    headline,
+    reason,
+    "",
+    ...ladder,
+  ].filter(Boolean).join("\n");
+
+  const titleStep = current ? `  (${step + 1} / ${total})` : "";
+  const title = current
+    ? `⚔️ ${tName(state, current.sidePicker)} — pick your side on ${current.map}${titleStep}`
+    : `✅ Sides locked in`;
+
   return new EmbedBuilder()
-    .setTitle(`🎯 SIDE SELECTION — BO${state.bo}`)
-    .setDescription(lines.join("\n"))
+    .setTitle(title)
+    .setDescription(desc)
     .setColor(0xff4655)
-    .setFooter({ text: current ? `Only ${tName(state, current.sidePicker)} captain can choose` : `BO${state.bo} · IEsports Tournament` });
+    .setFooter({ text: current ? `Any player on ${tName(state, current.sidePicker)} can click` : `BO${state.bo} · IEsports Tournament` });
 }
 
 function buildSidePickRow(
@@ -204,16 +251,12 @@ function buildSidePickRow(
 // ── Embed Builders ──────────────────────────────────────────────
 
 function buildVetoEmbed(state: VetoState): EmbedBuilder {
-  const tossLine = `🏆 Toss: **${tName(state, state.tossWinner)}**`;
-  const matchLine = `**${state.team1Name}** vs **${state.team2Name}**`;
+  const matchLine = `**${state.team1Name}** vs **${state.team2Name}** · BO${state.bo}`;
 
   // ── Complete ──
   if (state.status === "complete") {
     const picks = state.actions.filter(a => a.action === "pick");
     const bans = state.actions.filter(a => a.action === "ban");
-    const mapLines: string[] = [];
-    let gameNum = 1;
-    // Look up side pick (if captains have already chosen) by map name
     const sideByMap: Record<string, SideAction | undefined> = {};
     for (const sa of state.sideActions || []) sideByMap[sa.map] = sa;
 
@@ -236,13 +279,13 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
         : `   └ **${spName}** picks attack/defence`;
     };
 
+    const mapLines: string[] = [];
+    let gameNum = 1;
     for (const pick of picks) {
       mapLines.push(`**Game ${gameNum}:** 🗺️ ${pick.map}`);
       mapLines.push(sideLine(sideByMap[pick.map], pick.team));
       gameNum++;
     }
-
-    // Decider (remaining map after all picks + bans are exhausted)
     if (state.remainingMaps.length === 1) {
       const decider = state.remainingMaps[0];
       const fallback = state.sidePickOnDecider || state.tossWinner;
@@ -252,16 +295,14 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
     }
 
     const banStr = bans.length > 0
-      ? `\n\n**Bans in order:** ${bans.map(b => `~~${b.map}~~ *(${tName(state, b.team)})*`).join(" · ")}`
+      ? `\n\n**Bans:** ${bans.map(b => `~~${b.map}~~ *(${tName(state, b.team)})*`).join(" · ")}`
       : "";
 
-    const advantageNote = state.banFirst
-      ? `\n\n🎯 **${tName(state, state.banFirst)}** banned first · **${tName(state, state.sidePickOnDecider || otherTeam(state.banFirst))}** had side pick on decider`
-      : "";
+    const captainsPing = `\n\n<@${state.team1CaptainDiscordId}> <@${state.team2CaptainDiscordId}> — head into your team VCs and start the lobby. GLHF! 🎯`;
 
     return new EmbedBuilder()
-      .setTitle("✅ MAP VETO COMPLETE")
-      .setDescription([matchLine, tossLine, "", mapLines.join("\n") + banStr + advantageNote].join("\n"))
+      .setTitle(`✅ Veto complete — ready to start`)
+      .setDescription([matchLine, "", mapLines.join("\n") + banStr + captainsPing].join("\n"))
       .setColor(0x16a34a)
       .setFooter({ text: `BO${state.bo} · IEsports Tournament` });
   }
@@ -269,41 +310,58 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
   // ── In progress ──
   const step = getCurrentStep(state);
   const currentName = step ? tName(state, step.team) : "";
-  const actionVerb = step?.action === "ban" ? "ban a map" : "pick a map";
+  const actionWord = step?.action === "ban" ? "ban" : "pick";
   const actionEmoji = step?.action === "ban" ? "❌" : "✅";
-
   const sequence = VETO_SEQUENCES[state.bo] || [];
-  const stepOf = sequence.length > 0 ? `Step ${state.currentStep + 1} of ${sequence.length}` : "";
-  const banFirstLine = state.banFirst
-    ? `🎯 Banning first: **${tName(state, state.banFirst)}**${state.sidePickOnDecider ? ` · Side pick on decider: **${tName(state, state.sidePickOnDecider)}**` : ""}`
-    : "";
+  const totalSteps = sequence.length;
 
-  const historyLines = state.actions.map(a => {
-    const emoji = a.action === "ban" ? "❌" : "✅";
-    return `${emoji} ${tName(state, a.team)} ${a.action === "ban" ? "banned" : "picked"} **${a.map}**`;
+  // ── Sequence ladder: shows past (✓), current (➡️), and upcoming steps,
+  // plus a final "remaining = decider" line if the format leaves one.
+  const ladder: string[] = ["**Sequence:**"];
+  sequence.forEach((s, i) => {
+    const team = s.actor === "first" ? state.banFirst! : otherTeam(state.banFirst!);
+    const teamName = tName(state, team);
+    const emoji = s.action === "ban" ? "❌" : "✅";
+    if (i < state.currentStep) {
+      const past = state.actions[i];
+      ladder.push(`✓ ${emoji} ${teamName} ${s.action} — **${past?.map ?? "?"}**`);
+    } else if (i === state.currentStep) {
+      ladder.push(`➡️ ${emoji} **${teamName} ${s.action}**  ← you are here`);
+    } else {
+      ladder.push(`   ${emoji} ${teamName} ${s.action}`);
+    }
   });
+  // Decider trailer (only formats that leave one map)
+  if (state.bo !== 2) {
+    const dLabel = state.bo === 1 ? "the map you'll play" : "the decider";
+    ladder.push(`   🗺️ remaining map = ${dLabel}`);
+  }
 
   const remainingLine = state.remainingMaps.length > 0
-    ? `\n**Maps still available:** ${state.remainingMaps.join(" · ")}`
+    ? `**Available:** ${state.remainingMaps.join(" · ")}`
+    : "";
+  const bans = state.actions.filter(a => a.action === "ban");
+  const banSummary = bans.length > 0
+    ? `**Banned:** ${bans.map(b => `~~${b.map}~~ (${tName(state, b.team)})`).join(" · ")}`
     : "";
 
   const desc = [
     matchLine,
-    tossLine,
-    banFirstLine,
-    stepOf ? `📍 ${stepOf}` : "",
+    `🏆 Toss: **${tName(state, state.tossWinner)}** · 🎯 Banning first: **${tName(state, state.banFirst!)}**${state.sidePickOnDecider ? ` · Side on decider: **${tName(state, state.sidePickOnDecider)}**` : ""}`,
     "",
-    `▶️ **${currentName}**, it's your turn to ${actionEmoji} **${actionVerb}**.`,
-    historyLines.length > 0 ? "\n**History:**" : "",
-    ...historyLines,
+    `**${currentName}**, click any map below to ${actionWord} it.`,
+    "",
+    ...ladder,
+    "",
     remainingLine,
+    banSummary,
   ].filter(Boolean).join("\n");
 
   return new EmbedBuilder()
-    .setTitle(`🗺️ MAP VETO — BO${state.bo}`)
+    .setTitle(`${actionEmoji} ${currentName} — ${actionWord} a map  (Step ${state.currentStep + 1} / ${totalSteps})`)
     .setDescription(desc)
     .setColor(0xff4655)
-    .setFooter({ text: `Only ${currentName} captain can ${step?.action || "act"}` });
+    .setFooter({ text: `Any player on ${currentName} can click` });
 }
 
 function buildMapButtons(
@@ -411,6 +469,11 @@ export async function handleTossChoice(
     embeds: [buildVetoEmbed(state)],
     components: buildMapButtons(state, tournamentId, matchId),
   });
+
+  const firstStep = getCurrentStep(state);
+  if (firstStep) {
+    await pingActiveTeam(interaction, state, firstStep.team, `your turn — ${firstStep.action} a map.`);
+  }
 }
 
 // ── Random map flow ────────────────────────────────────────────────
@@ -422,37 +485,47 @@ function getRandomActor(state: VetoState): "team1" | "team2" {
 function buildRandomEmbed(state: VetoState): EmbedBuilder {
   const picks = state.actions.filter((a) => a.action === "pick");
   const totalPicks = state.bo;
+  const revealNum = picks.length + 1;
   const remainingReveals = totalPicks - picks.length;
   const actor = getRandomActor(state);
-  const tossLine = `🏆 Toss: **${tName(state, state.tossWinner)}**`;
-  const matchLine = `**${state.team1Name}** vs **${state.team2Name}**`;
+  const matchLine = `**${state.team1Name}** vs **${state.team2Name}** · BO${state.bo}`;
 
-  const mapLines: string[] = picks.map((p, i) => {
-    const sidePicker = otherTeam(p.team);
-    return [
-      `**Game ${i + 1}:** 🗺️ ${p.map}`,
-      `   └ Revealed by **${tName(state, p.team)}** · **${tName(state, sidePicker)}** picks attack/defence`,
-    ].join("\n");
-  });
+  // ── Reveal-order ladder so both teams know what's still coming ──
+  const ladder: string[] = ["**Reveal order:**"];
+  for (let i = 0; i < totalPicks; i++) {
+    if (i < picks.length) {
+      const p = picks[i];
+      ladder.push(`✓ Game ${i + 1} — **${p.map}** (revealed by ${tName(state, p.team)})`);
+    } else {
+      const team = i % 2 === 0 ? state.tossWinner : otherTeam(state.tossWinner);
+      const marker = i === picks.length ? "➡️" : "  ";
+      const tag = i === picks.length ? "  ← you are here" : "";
+      ladder.push(`${marker} Game ${i + 1} — ${tName(state, team)} reveals${tag}`);
+    }
+  }
+
+  const headline = remainingReveals > 0
+    ? `**${tName(state, actor)}**, click the button below to reveal a random map for **Game ${revealNum}**.`
+    : `✅ All ${totalPicks} maps revealed.`;
 
   const desc = [
     matchLine,
-    tossLine,
-    `🎲 Mode: **Random Maps** · ${totalPicks} total`,
+    `🏆 Toss: **${tName(state, state.tossWinner)}** · 🎲 **Random Maps** mode (no bans)`,
     "",
-    picks.length === 0 ? "*No maps revealed yet.*" : "**Revealed maps:**",
-    ...mapLines,
+    headline,
     "",
-    remainingReveals > 0
-      ? `▶️ **${tName(state, actor)}** captain — click below to reveal the next map (${remainingReveals} remaining).`
-      : `✅ All ${totalPicks} maps revealed. Good luck!`,
+    ...ladder,
   ].filter(Boolean).join("\n");
 
+  const title = remainingReveals > 0
+    ? `🎲 ${tName(state, actor)} — reveal a map  (${revealNum} / ${totalPicks})`
+    : `✅ All maps revealed`;
+
   return new EmbedBuilder()
-    .setTitle(`🎲 RANDOM MAPS — BO${state.bo}`)
+    .setTitle(title)
     .setDescription(desc)
     .setColor(0x22c55e)
-    .setFooter({ text: remainingReveals > 0 ? `Only ${tName(state, actor)} captain can click next` : `BO${state.bo} · IEsports Tournament` });
+    .setFooter({ text: remainingReveals > 0 ? `Any player on ${tName(state, actor)} can click` : `BO${state.bo} · IEsports Tournament` });
 }
 
 function buildRandomRevealRow(
@@ -519,6 +592,10 @@ export async function handleRandomReveal(
       embeds: [buildSidePickEmbed(state)],
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
+    const firstSide = state.sideActions[0];
+    if (firstSide) {
+      await pingActiveTeam(interaction, state, firstSide.sidePicker, `pick your side on **${firstSide.map}**.`);
+    }
     return;
   }
 
@@ -527,6 +604,7 @@ export async function handleRandomReveal(
     embeds: [buildRandomEmbed(state)],
     components: [buildRandomRevealRow(state, tournamentId, matchId)],
   });
+  await pingActiveTeam(interaction, state, getRandomActor(state), `your turn — reveal a map.`);
 }
 
 export async function handleVetoMap(
@@ -587,11 +665,19 @@ export async function handleVetoMap(
       embeds: [buildSidePickEmbed(state)],
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
+    const firstSide = (state.sideActions || [])[0];
+    if (firstSide) {
+      await pingActiveTeam(interaction, state, firstSide.sidePicker, `pick your side on **${firstSide.map}**.`);
+    }
   } else {
     await interaction.editReply({
       embeds: [buildVetoEmbed(state)],
       components: buildMapButtons(state, tournamentId, matchId),
     });
+    const next = getCurrentStep(state);
+    if (next) {
+      await pingActiveTeam(interaction, state, next.team, `your turn — ${next.action} a map.`);
+    }
   }
 }
 
@@ -645,5 +731,9 @@ export async function handleSidePick(
       embeds: [buildSidePickEmbed(state)],
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
+    const nextSide = (state.sideActions || [])[state.sideStep ?? 0];
+    if (nextSide) {
+      await pingActiveTeam(interaction, state, nextSide.sidePicker, `pick your side on **${nextSide.map}**.`);
+    }
   }
 }

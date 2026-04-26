@@ -781,21 +781,22 @@ export async function POST(req: NextRequest) {
         tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
           content: `<@${winnerCaptainTag}>`,
           embeds: [{
-            title: "🎲 COIN TOSS — Random Maps",
+            title: `🎲 ${winnerName} — reveal a map  (1 / ${bo})`,
             description: [
-              `**${matchData.team1Name}** vs **${matchData.team2Name}**`,
+              `**${matchData.team1Name}** vs **${matchData.team2Name}** · BO${bo}`,
+              `🏆 Toss: **${winnerName}** · 🎲 **Random Maps** mode (no bans)`,
               ``,
-              `🏆 Toss winner: **${winnerName}**`,
-              `🎲 Mode: **Random Maps** (no bans, no side advantage — pure RNG)`,
+              `**${winnerName}**, click the button below to reveal a random map for **Game 1**.`,
+              ``,
+              `**How this works:**`,
+              `• Teams take turns clicking — toss winner first, then alternate.`,
+              `• Each click picks one map at random from the pool.`,
+              `• After all ${bo} map${bo > 1 ? "s are" : " is"} revealed, the **opposing team** picks Attack or Defence on each map.`,
               ``,
               mapPoolLine,
-              ``,
-              `▶️ **${winnerName}** captain, click below to reveal your map first.`,
-              `Once you pick, **${tossWinner === "team1" ? matchData.team2Name : matchData.team1Name}** gets their reveal button.`,
-              `Total maps to reveal: **${bo}**`,
             ].join("\n"),
             color: 0x22c55e,
-            footer: { text: `BO${bo} · Only ${winnerName} captain can click next` },
+            footer: { text: `Any player on ${winnerName} can click` },
           }],
           components: [{
             type: 1,
@@ -832,26 +833,49 @@ export async function POST(req: NextRequest) {
       } else {
         // Traditional veto mode: captain chooses between banning first or
         // letting the other side ban first in exchange for side choice on
-        // the decider.
+        // the decider (or, for BO1, side choice on the only map).
         const otherName = tossWinner === "team1" ? matchData.team2Name : matchData.team1Name;
+        const isBo1 = bo === 1;
+        const sideTargetMap = isBo1 ? "the only map" : "the decider";
+        const sideTargetExplain = isBo1
+          ? "*the single map you'll play*"
+          : "*the final map of the series, played if it's tied*";
+
+        const choiceExplainLines = isBo1
+          ? [
+              `**🎯 Ban First**`,
+              `   You take the first ban. **${otherName}** picks Attack/Defence on the map.`,
+              ``,
+              `**🗺️ Pick Side**`,
+              `   **${otherName}** bans first. You pick Attack/Defence on the map.`,
+            ]
+          : [
+              `**🎯 Ban First**`,
+              `   You ban first. The trade-off: **${otherName}** picks the side (Attack/Defence) on the **decider** ${sideTargetExplain}.`,
+              ``,
+              `**🗺️ Take Side on Decider**`,
+              `   **${otherName}** bans first. You pick the side on the decider.`,
+            ];
+
         tossRes = await discordFetch(`/channels/${notifyChannelId}/messages`, "POST", {
           content: `<@${winnerCaptainTag}>`,
           embeds: [{
-            title: "🎲 COIN TOSS — Traditional Veto",
+            title: `🎲 ${winnerName} won the toss — choose your advantage`,
             description: [
-              `**${matchData.team1Name}** vs **${matchData.team2Name}**`,
+              `**${matchData.team1Name}** vs **${matchData.team2Name}** · BO${bo} · Traditional Veto`,
               ``,
-              `🏆 Toss winner: **${winnerName}**`,
-              `🎯 Mode: **Traditional Veto** (alternating bans + picks)`,
+              `🏆 **${winnerName}** won the toss.`,
+              ``,
+              `**${winnerName}**, click one of the buttons below:`,
+              ``,
+              ...choiceExplainLines,
+              ``,
+              isBo1 ? "" : `*After the choice, both teams alternate bans + picks. The map nobody picked becomes the decider.*`,
               ``,
               mapPoolLine,
-              ``,
-              `**${winnerName}**, pick your advantage:`,
-              `• **🎯 Ban First** — you take the first ban. Side pick on the decider goes to **${otherName}**.`,
-              `• **🗺️ Pick Side on Decider** — **${otherName}** bans first. You get the side of your choice on the decider.`,
-            ].join("\n"),
+            ].filter(Boolean).join("\n"),
             color: 0xff4655,
-            footer: { text: `BO${bo} · Only ${winnerName} captain can choose` },
+            footer: { text: `Any player on ${winnerName} can click` },
           }],
           components: [{
             type: 1,
@@ -866,7 +890,7 @@ export async function POST(req: NextRequest) {
               {
                 type: 2,
                 style: 2,
-                label: "Pick Side on Decider",
+                label: isBo1 ? "Pick Side" : "Take Side on Decider",
                 emoji: { name: "🗺️" },
                 custom_id: `toss_choice:${tournamentId}:${matchId}:side_first`,
               },
