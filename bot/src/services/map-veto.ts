@@ -120,23 +120,61 @@ function captainId(state: VetoState, team: "team1" | "team2"): string {
   return team === "team1" ? state.team1CaptainDiscordId : state.team2CaptainDiscordId;
 }
 
-/** Best-effort follow-up ping in-channel so the active team's captain
- * gets notified on every step transition. Edited messages don't re-ping
- * users in Discord, so we post a small new message instead. Failures are
- * swallowed — the embed update is the source of truth, the ping is a
- * convenience nudge. */
-async function pingActiveTeam(
+/** Delete the previous live veto message (if any) and post the next one
+ * fresh at the bottom of the channel. Discord doesn't re-ping on edits,
+ * and stacking step-by-step embeds buries the live one. So instead we
+ * collapse "ping + embed + buttons" into a single message that gets
+ * replaced on every transition. The captain mention in `content` makes
+ * Discord ping naturally because it's a brand-new message.
+ *
+ * Returns the new message ID so the caller can persist it on the match
+ * doc. Returns null only if the send failed; in that case the caller
+ * should keep the previous messageId so cleanup can still find it.
+ */
+async function repostActive(
   interaction: ButtonInteraction,
   state: VetoState,
-  team: "team1" | "team2",
-  cue: string,
-): Promise<void> {
+  payload: {
+    activeTeam: "team1" | "team2" | null;
+    cue: string;
+    embed: EmbedBuilder;
+    components: ActionRowBuilder<ButtonBuilder>[];
+    /** Optional extra users to ping (used by veto-complete to ping both
+     * captains). When provided, replaces the activeTeam captain ping. */
+    extraMentions?: string[];
+  },
+): Promise<string | null> {
+  const channel = interaction.channel;
+  // Delete the previous live message so the channel only ever holds the
+  // current step. Best-effort — a failed delete just leaves a stale
+  // embed visible until the cleanup-vcs sweep at the end of the match.
+  if (state.messageId && channel && "messages" in channel) {
+    try {
+      await (channel as any).messages.delete(state.messageId);
+    } catch { /* already gone or no permission */ }
+  }
+
+  if (!channel || !("send" in channel)) return null;
+  const captain = payload.activeTeam ? captainId(state, payload.activeTeam) : null;
+  const teamName = payload.activeTeam ? tName(state, payload.activeTeam) : "";
+  const mentions = payload.extraMentions && payload.extraMentions.length > 0
+    ? payload.extraMentions
+    : (captain ? [captain] : []);
+  const mentionPrefix = mentions.length > 0 ? mentions.map(id => `<@${id}>`).join(" ") + " " : "";
+  const teamPrefix = !payload.extraMentions && captain ? `⤵️ **${teamName}** — ` : "";
+  const content = `${mentionPrefix}${teamPrefix}${payload.cue}`;
   try {
-    await interaction.followUp({
-      content: `<@${captainId(state, team)}> ⤵️ **${tName(state, team)}** — ${cue}`,
-      allowedMentions: { users: [captainId(state, team)] },
+    const msg = await (channel as any).send({
+      content,
+      embeds: [payload.embed],
+      components: payload.components,
+      allowedMentions: mentions.length > 0 ? { users: mentions } : { parse: [] },
     });
-  } catch { /* ping is best-effort */ }
+    return msg?.id ?? null;
+  } catch (e) {
+    console.error("[map-veto] repostActive send failed:", e);
+    return null;
+  }
 }
 
 /** Any registered member of the given team may act (captain or not).
@@ -298,11 +336,13 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
       ? `\n\n**Bans:** ${bans.map(b => `~~${b.map}~~ *(${tName(state, b.team)})*`).join(" · ")}`
       : "";
 
-    const captainsPing = `\n\n<@${state.team1CaptainDiscordId}> <@${state.team2CaptainDiscordId}> — head into your team VCs and start the lobby. GLHF! 🎯`;
+    // Captain pings live in the message content (set by repostActive), not
+    // inside the embed — keeps the embed body clean and avoids duplicate
+    // mentions when Discord renders.
 
     return new EmbedBuilder()
       .setTitle(`✅ Veto complete — ready to start`)
-      .setDescription([matchLine, "", mapLines.join("\n") + banStr + captainsPing].join("\n"))
+      .setDescription([matchLine, "", mapLines.join("\n") + banStr].join("\n"))
       .setColor(0x16a34a)
       .setFooter({ text: `BO${state.bo} · IEsports Tournament` });
   }
@@ -442,13 +482,16 @@ export async function handleTossChoice(
     state.status = "random";
     state.currentStep = 0;
     state.banFirst = null;
-    state.sidePickOnDecider = state.tossWinner; // first reveal = toss winner
-    await setVetoState(tournamentId, matchId, state);
-
-    await interaction.editReply({
-      embeds: [buildRandomEmbed(state)],
+    state.sidePickOnDecider = state.tossWinner;
+    const actor = getRandomActor(state);
+    const newId = await repostActive(interaction, state, {
+      activeTeam: actor,
+      cue: `your turn — reveal a map.`,
+      embed: buildRandomEmbed(state),
       components: [buildRandomRevealRow(state, tournamentId, matchId)],
     });
+    if (newId) state.messageId = newId;
+    await setVetoState(tournamentId, matchId, state);
     return;
   }
 
@@ -456,24 +499,21 @@ export async function handleTossChoice(
     state.banFirst = state.tossWinner;
     state.sidePickOnDecider = otherTeam(state.tossWinner);
   } else {
-    // side_first: other team bans first, toss winner picks side on decider
     state.banFirst = otherTeam(state.tossWinner);
     state.sidePickOnDecider = state.tossWinner;
   }
 
   state.status = "veto";
   state.currentStep = 0;
-  await setVetoState(tournamentId, matchId, state);
-
-  await interaction.editReply({
-    embeds: [buildVetoEmbed(state)],
+  const firstStep = getCurrentStep(state);
+  const newId = await repostActive(interaction, state, {
+    activeTeam: firstStep?.team ?? null,
+    cue: firstStep ? `your turn — ${firstStep.action} a map.` : "veto starting…",
+    embed: buildVetoEmbed(state),
     components: buildMapButtons(state, tournamentId, matchId),
   });
-
-  const firstStep = getCurrentStep(state);
-  if (firstStep) {
-    await pingActiveTeam(interaction, state, firstStep.team, `your turn — ${firstStep.action} a map.`);
-  }
+  if (newId) state.messageId = newId;
+  await setVetoState(tournamentId, matchId, state);
 }
 
 // ── Random map flow ────────────────────────────────────────────────
@@ -587,24 +627,27 @@ export async function handleRandomReveal(
     state.sideActions = computeSideActions(state);
     state.sideStep = 0;
     state.status = "side_pick";
-    await setVetoState(tournamentId, matchId, state);
-    await interaction.editReply({
-      embeds: [buildSidePickEmbed(state)],
+    const firstSide = state.sideActions[0];
+    const newId = await repostActive(interaction, state, {
+      activeTeam: firstSide?.sidePicker ?? null,
+      cue: firstSide ? `pick your side on **${firstSide.map}**.` : "side selection",
+      embed: buildSidePickEmbed(state),
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
-    const firstSide = state.sideActions[0];
-    if (firstSide) {
-      await pingActiveTeam(interaction, state, firstSide.sidePicker, `pick your side on **${firstSide.map}**.`);
-    }
+    if (newId) state.messageId = newId;
+    await setVetoState(tournamentId, matchId, state);
     return;
   }
 
-  await setVetoState(tournamentId, matchId, state);
-  await interaction.editReply({
-    embeds: [buildRandomEmbed(state)],
+  const nextActor = getRandomActor(state);
+  const newId = await repostActive(interaction, state, {
+    activeTeam: nextActor,
+    cue: `your turn — reveal a map.`,
+    embed: buildRandomEmbed(state),
     components: [buildRandomRevealRow(state, tournamentId, matchId)],
   });
-  await pingActiveTeam(interaction, state, getRandomActor(state), `your turn — reveal a map.`);
+  if (newId) state.messageId = newId;
+  await setVetoState(tournamentId, matchId, state);
 }
 
 export async function handleVetoMap(
@@ -658,27 +701,26 @@ export async function handleVetoMap(
     state.status = "side_pick";
   }
 
-  await setVetoState(tournamentId, matchId, state);
-
   if (state.status === "side_pick") {
-    await interaction.editReply({
-      embeds: [buildSidePickEmbed(state)],
+    const firstSide = (state.sideActions || [])[0];
+    const newId = await repostActive(interaction, state, {
+      activeTeam: firstSide?.sidePicker ?? null,
+      cue: firstSide ? `pick your side on **${firstSide.map}**.` : "side selection",
+      embed: buildSidePickEmbed(state),
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
-    const firstSide = (state.sideActions || [])[0];
-    if (firstSide) {
-      await pingActiveTeam(interaction, state, firstSide.sidePicker, `pick your side on **${firstSide.map}**.`);
-    }
+    if (newId) state.messageId = newId;
   } else {
-    await interaction.editReply({
-      embeds: [buildVetoEmbed(state)],
+    const next = getCurrentStep(state);
+    const newId = await repostActive(interaction, state, {
+      activeTeam: next?.team ?? null,
+      cue: next ? `your turn — ${next.action} a map.` : "veto step",
+      embed: buildVetoEmbed(state),
       components: buildMapButtons(state, tournamentId, matchId),
     });
-    const next = getCurrentStep(state);
-    if (next) {
-      await pingActiveTeam(interaction, state, next.team, `your turn — ${next.action} a map.`);
-    }
+    if (newId) state.messageId = newId;
   }
+  await setVetoState(tournamentId, matchId, state);
 }
 
 export async function handleSidePick(
@@ -722,18 +764,28 @@ export async function handleSidePick(
   const done = state.sideStep >= sideActions.length;
   if (done) state.status = "complete";
 
-  await setVetoState(tournamentId, matchId, state);
-
   if (done) {
-    await interaction.editReply({ embeds: [buildVetoEmbed(state)], components: [] });
+    // Final message — keep it in the channel as the lobby-start nudge.
+    // No more transitions, so this becomes the "live" message that
+    // cleanup-vcs will sweep at the end of the match alongside the
+    // lobby/start chatter.
+    const newId = await repostActive(interaction, state, {
+      activeTeam: null,
+      extraMentions: [state.team1CaptainDiscordId, state.team2CaptainDiscordId],
+      cue: "veto complete — head into your team VCs and start the lobby. GLHF! 🎯",
+      embed: buildVetoEmbed(state),
+      components: [],
+    });
+    if (newId) state.messageId = newId;
   } else {
-    await interaction.editReply({
-      embeds: [buildSidePickEmbed(state)],
+    const nextSide = (state.sideActions || [])[state.sideStep ?? 0];
+    const newId = await repostActive(interaction, state, {
+      activeTeam: nextSide?.sidePicker ?? null,
+      cue: nextSide ? `pick your side on **${nextSide.map}**.` : "side selection",
+      embed: buildSidePickEmbed(state),
       components: [buildSidePickRow(state, tournamentId, matchId)],
     });
-    const nextSide = (state.sideActions || [])[state.sideStep ?? 0];
-    if (nextSide) {
-      await pingActiveTeam(interaction, state, nextSide.sidePicker, `pick your side on **${nextSide.map}**.`);
-    }
+    if (newId) state.messageId = newId;
   }
+  await setVetoState(tournamentId, matchId, state);
 }

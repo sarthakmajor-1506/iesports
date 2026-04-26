@@ -189,17 +189,41 @@ async function moveToVoice(guildId: string, userId: string, channelId: string): 
 }
 
 /**
- * Sends a message to a Discord channel.
+ * Sends a message to a Discord channel and returns its ID (or null on
+ * failure). Caller persists the ID on the match doc so cleanup-vcs can
+ * sweep operational chatter at the end of a match without touching the
+ * match-result post.
  */
-async function sendMessage(channelId: string, payload: any): Promise<boolean> {
+async function sendMessage(channelId: string, payload: any): Promise<string | null> {
   const res = await discordFetch(`/channels/${channelId}/messages`, "POST", payload);
   if (res.ok) {
-    console.log(`[Discord] ✅ Message sent to channel ${channelId}`);
-    return true;
+    const data = await res.json();
+    console.log(`[Discord] ✅ Message sent to channel ${channelId} (${data.id})`);
+    return data.id || null;
   } else {
     const errBody = await res.text();
     console.error(`[Discord] ❌ Send message failed: ${res.status} — ${errBody}`);
-    return false;
+    return null;
+  }
+}
+
+/**
+ * Deletes a single Discord message. Used by cleanup-vcs to remove
+ * lobby/toss/veto/start chatter after a match wraps. Best-effort —
+ * 404s and 403s are swallowed so a half-cleaned channel state doesn't
+ * block the rest of the cleanup.
+ */
+async function deleteMessage(channelId: string, messageId: string): Promise<void> {
+  try {
+    const res = await discordFetch(`/channels/${channelId}/messages/${messageId}`, "DELETE");
+    if (res.ok || res.status === 404) {
+      console.log(`[Discord] 🗑️ Deleted message ${messageId}`);
+    } else {
+      const errBody = await res.text();
+      console.error(`[Discord] Failed to delete message ${messageId}: ${res.status} — ${errBody}`);
+    }
+  } catch (e: any) {
+    console.error(`[Discord] Delete message error: ${e.message}`);
   }
 }
 
@@ -308,6 +332,9 @@ export async function POST(req: NextRequest) {
       let discordSent = false;
       let discordSkipReason = "";
       let waitingRoomVcId: string | null = null;
+      const opsMessageIds: string[] = Array.isArray(matchData.discordOpsMessageIds)
+        ? [...matchData.discordOpsMessageIds]
+        : [];
 
       if (!notifyDiscord) {
         discordSkipReason = "notifyDiscord flag is false";
@@ -383,7 +410,9 @@ export async function POST(req: NextRequest) {
             }],
           };
 
-          discordSent = await sendMessage(notifyChannelId, messagePayload);
+          const sentId = await sendMessage(notifyChannelId, messagePayload);
+          discordSent = !!sentId;
+          if (sentId) opsMessageIds.push(sentId);
 
           // ── Auto-move players already in a VC to waiting room ──────────
           if (waitingRoomVcId) {
@@ -404,6 +433,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      updateData.discordOpsMessageIds = opsMessageIds;
       await matchRef.update(updateData);
 
       return NextResponse.json({
@@ -432,6 +462,9 @@ export async function POST(req: NextRequest) {
         status: "live",
         startedAt: new Date().toISOString(),
       };
+      const startOpsMessageIds: string[] = Array.isArray(matchData.discordOpsMessageIds)
+        ? [...matchData.discordOpsMessageIds]
+        : [];
 
       let team1VcId: string | null = null;
       let team2VcId: string | null = null;
@@ -506,7 +539,7 @@ export async function POST(req: NextRequest) {
             if (team1Subs.length) subLines.push(`🔄 **${matchData.team1Name} subs:** ${team1Subs.map(s => s.name).join(", ")}`);
             if (team2Subs.length) subLines.push(`🔄 **${matchData.team2Name} subs:** ${team2Subs.map(s => s.name).join(", ")}`);
 
-            await sendMessage(notifyChannelId, {
+            const startMsgId = await sendMessage(notifyChannelId, {
               embeds: [{
                 title: `🏟️ Match Started — ${matchData.team1Name} vs ${matchData.team2Name}`,
                 description: [
@@ -526,6 +559,7 @@ export async function POST(req: NextRequest) {
                 timestamp: new Date().toISOString(),
               }],
             });
+            if (startMsgId) startOpsMessageIds.push(startMsgId);
           }
 
         } catch (discordErr: any) {
@@ -533,6 +567,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      startUpdateData.discordOpsMessageIds = startOpsMessageIds;
       await matchRef.update(startUpdateData);
 
       return NextResponse.json({
@@ -560,10 +595,26 @@ export async function POST(req: NextRequest) {
         await maybeDeleteChannel(vcId);
       }
 
+      // Also sweep the tournament-ops chatter: lobby/start/next-game embeds
+      // we tracked, plus the latest active toss/veto/side-pick message. The
+      // match-result post is sent from /api/valorant/match-fetch and is NOT
+      // in this set, so it stays in the channel.
+      const opsIds: string[] = Array.isArray(matchData.discordOpsMessageIds) ? matchData.discordOpsMessageIds : [];
+      const liveVetoMsgId: string | null = matchData.vetoState?.messageId || null;
+      const allMsgIds = Array.from(new Set([...opsIds, ...(liveVetoMsgId ? [liveVetoMsgId] : [])])).filter(Boolean);
+      let deletedMessages = 0;
+      if (notifyChannelId && allMsgIds.length > 0) {
+        for (const mid of allMsgIds) {
+          await deleteMessage(notifyChannelId, mid);
+          deletedMessages++;
+        }
+      }
+
       await matchRef.update({
         waitingRoomVcId: null,
         team1VcId: null,
         team2VcId: null,
+        discordOpsMessageIds: [],
       });
 
       return NextResponse.json({
@@ -571,6 +622,7 @@ export async function POST(req: NextRequest) {
         matchId,
         action: "cleanup-vcs",
         deletedChannels: vcsToDelete.length,
+        deletedMessages,
       });
 
     } else if (action === "next-game") {
@@ -595,6 +647,9 @@ export async function POST(req: NextRequest) {
 
       let discordSent = false;
       let discordSkipReason = "";
+      const nextOpsMessageIds: string[] = Array.isArray(matchData.discordOpsMessageIds)
+        ? [...matchData.discordOpsMessageIds]
+        : [];
 
       if (!notifyDiscord) discordSkipReason = "notifyDiscord flag is false";
       else if (!botToken) discordSkipReason = "DISCORD_BOT_TOKEN env var missing";
@@ -638,13 +693,16 @@ export async function POST(req: NextRequest) {
             }],
           };
 
-          discordSent = await sendMessage(notifyChannelId, messagePayload);
+          const nextMsgId = await sendMessage(notifyChannelId, messagePayload);
+          discordSent = !!nextMsgId;
+          if (nextMsgId) nextOpsMessageIds.push(nextMsgId);
         } catch (discordErr: any) {
           discordSkipReason = `Discord error: ${discordErr.message}`;
           console.error("[Discord] next-game error:", discordErr.message);
         }
       }
 
+      nextUpdateData.discordOpsMessageIds = nextOpsMessageIds;
       await matchRef.update(nextUpdateData);
 
       return NextResponse.json({
