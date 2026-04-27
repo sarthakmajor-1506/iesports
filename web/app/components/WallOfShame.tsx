@@ -67,6 +67,15 @@ const INLINE_STYLES = `
     60%      { transform: translateX(-2px) rotate(calc(var(--wos-rot, 0deg) - 0.5deg)); }
     80%      { transform: translateX(2px)  rotate(var(--wos-rot, 0deg)); }
   }
+  /* Section header layout — flex spreads title + offense pill on the left
+     and the count cluster on the right at desktop. On phones the row
+     wraps and we center everything (the spacer pseudo-flex collapses so
+     the count moves underneath instead of getting jammed at the right). */
+  @media (max-width: 600px) {
+    .wos-section-header { justify-content: center !important; text-align: center; }
+    .wos-section-header .wos-section-spacer { display: none !important; }
+    .wos-section-header .wos-section-count { width: 100%; justify-content: center; }
+  }
 `;
 
 function initials(name: string): string {
@@ -513,47 +522,47 @@ function SectionHeader({ title, subtitle, accent, count, tomatoes }: {
   title: string; subtitle: string; accent: string; count: number; tomatoes: number;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+    <div className="wos-section-header" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
       <div style={{
-        width: 14, height: 14, borderRadius: 3, background: accent,
-        boxShadow: `0 0 16px ${accent}`, flexShrink: 0,
+        width: 12, height: 12, borderRadius: 3, background: accent,
+        boxShadow: `0 0 14px ${accent}`, flexShrink: 0,
       }} />
       <div style={{
-        fontFamily: "'Georgia', serif", fontSize: "1.6rem", fontWeight: 900,
+        fontFamily: "'Georgia', serif", fontSize: "1.4rem", fontWeight: 900,
         color: accent, textTransform: "uppercase", letterSpacing: "0.15em",
       }}>
         {title}
       </div>
-      {/* The offense label — was a tiny faded subtitle, now the loudest
-          element in the row: accent fill, white text, big serif caps. */}
+      {/* The offense label — accent-filled pill that mirrors the card
+          banners. Sized down a touch from the previous pass. */}
       <div style={{
         fontFamily: "'Georgia', 'Times New Roman', serif",
-        fontSize: "clamp(1.1rem, 2.4vw, 1.5rem)",
+        fontSize: "clamp(0.85rem, 1.9vw, 1.1rem)",
         fontWeight: 900,
         textTransform: "uppercase",
         letterSpacing: "0.08em",
         color: "#fff",
         background: accent,
-        padding: "6px 16px",
+        padding: "5px 13px",
         borderRadius: 6,
-        boxShadow: `0 4px 18px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.2)`,
+        boxShadow: `0 4px 14px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.2)`,
         textShadow: "0 1px 2px rgba(0,0,0,0.4)",
         lineHeight: 1.05,
       }}>
         {subtitle}
       </div>
-      <div style={{ flex: 1 }} />
-      {/* Convict count + tomato tally — bumped from 0.76rem grey to a
-          big accent number + brighter label so it actually reads. */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, color: "#e2e8f0" }}>
+      <div className="wos-section-spacer" style={{ flex: 1 }} />
+      {/* Convict count + tomato tally — big accent number + brighter
+          uppercase label. Centers under the title row on mobile. */}
+      <div className="wos-section-count" style={{ display: "flex", alignItems: "baseline", gap: 12, color: "#e2e8f0" }}>
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontSize: "1.6rem", fontWeight: 900, color: accent, lineHeight: 1, fontFamily: "'Georgia', serif" }}>{count}</span>
-          <span style={{ fontSize: "0.92rem", fontWeight: 700, color: "rgba(226,232,240,0.85)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          <span style={{ fontSize: "1.35rem", fontWeight: 900, color: accent, lineHeight: 1, fontFamily: "'Georgia', serif" }}>{count}</span>
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "rgba(226,232,240,0.85)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {count === 1 ? "convict" : "convicts"}
           </span>
         </span>
         <span style={{ opacity: 0.35, fontSize: "1rem" }}>·</span>
-        <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "rgba(226,232,240,0.8)" }}>
+        <span style={{ fontSize: "0.98rem", fontWeight: 800, color: "rgba(226,232,240,0.8)" }}>
           🍅 <span style={{ color: accent }}>{tomatoes}</span>
         </span>
       </div>
