@@ -513,10 +513,10 @@ function SectionHeader({ title, subtitle, accent, count, tomatoes }: {
   title: string; subtitle: string; accent: string; count: number; tomatoes: number;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
       <div style={{
-        width: 12, height: 12, borderRadius: 3, background: accent,
-        boxShadow: `0 0 12px ${accent}`, flexShrink: 0,
+        width: 14, height: 14, borderRadius: 3, background: accent,
+        boxShadow: `0 0 16px ${accent}`, flexShrink: 0,
       }} />
       <div style={{
         fontFamily: "'Georgia', serif", fontSize: "1.6rem", fontWeight: 900,
@@ -524,14 +524,38 @@ function SectionHeader({ title, subtitle, accent, count, tomatoes }: {
       }}>
         {title}
       </div>
-      <div style={{ color: "rgba(226,232,240,0.45)", fontSize: "0.86rem", letterSpacing: "0.05em", fontStyle: "italic" }}>
+      {/* The offense label — was a tiny faded subtitle, now the loudest
+          element in the row: accent fill, white text, big serif caps. */}
+      <div style={{
+        fontFamily: "'Georgia', 'Times New Roman', serif",
+        fontSize: "clamp(1.1rem, 2.4vw, 1.5rem)",
+        fontWeight: 900,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "#fff",
+        background: accent,
+        padding: "6px 16px",
+        borderRadius: 6,
+        boxShadow: `0 4px 18px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.2)`,
+        textShadow: "0 1px 2px rgba(0,0,0,0.4)",
+        lineHeight: 1.05,
+      }}>
         {subtitle}
       </div>
       <div style={{ flex: 1 }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.76rem", color: "rgba(226,232,240,0.5)" }}>
-        <span>{count} {count === 1 ? "convict" : "convicts"}</span>
-        <span style={{ opacity: 0.4 }}>·</span>
-        <span>🍅 {tomatoes}</span>
+      {/* Convict count + tomato tally — bumped from 0.76rem grey to a
+          big accent number + brighter label so it actually reads. */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, color: "#e2e8f0" }}>
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: "1.6rem", fontWeight: 900, color: accent, lineHeight: 1, fontFamily: "'Georgia', serif" }}>{count}</span>
+          <span style={{ fontSize: "0.92rem", fontWeight: 700, color: "rgba(226,232,240,0.85)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+            {count === 1 ? "convict" : "convicts"}
+          </span>
+        </span>
+        <span style={{ opacity: 0.35, fontSize: "1rem" }}>·</span>
+        <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "rgba(226,232,240,0.8)" }}>
+          🍅 <span style={{ color: accent }}>{tomatoes}</span>
+        </span>
       </div>
     </div>
   );
