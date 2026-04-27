@@ -375,7 +375,6 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                 {/* WANTED */}
                 <SectionHeader
                   title="Wanted"
-                  subtitle="No Show"
                   accent="#ef4444"
                   count={totalWanted}
                   tomatoes={wantedTomato}
@@ -408,7 +407,6 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                 <div style={{ marginTop: 56 }}>
                   <SectionHeader
                     title="Warning"
-                    subtitle="Late to the Party"
                     accent="#f59e0b"
                     count={totalWarning}
                     tomatoes={warningTomato}
@@ -518,9 +516,11 @@ const gridStyle: React.CSSProperties = {
   padding: "8px 4px 4px",
 };
 
-function SectionHeader({ title, subtitle, accent, count, tomatoes }: {
-  title: string; subtitle: string; accent: string; count: number; tomatoes: number;
+function SectionHeader({ title, accent, count, tomatoes }: {
+  title: string; accent: string; count: number; tomatoes: number;
 }) {
+  // Offense label (NO SHOW / LATE TO THE PARTY) lives on the card banners
+  // now — duplicating it here was visually noisy. Title + count only.
   return (
     <div className="wos-section-header" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
       <div style={{
@@ -532,24 +532,6 @@ function SectionHeader({ title, subtitle, accent, count, tomatoes }: {
         color: accent, textTransform: "uppercase", letterSpacing: "0.15em",
       }}>
         {title}
-      </div>
-      {/* The offense label — accent-filled pill that mirrors the card
-          banners. Sized down a touch from the previous pass. */}
-      <div style={{
-        fontFamily: "'Georgia', 'Times New Roman', serif",
-        fontSize: "clamp(0.85rem, 1.9vw, 1.1rem)",
-        fontWeight: 900,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        color: "#fff",
-        background: accent,
-        padding: "5px 13px",
-        borderRadius: 6,
-        boxShadow: `0 4px 14px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.2)`,
-        textShadow: "0 1px 2px rgba(0,0,0,0.4)",
-        lineHeight: 1.05,
-      }}>
-        {subtitle}
       </div>
       <div className="wos-section-spacer" style={{ flex: 1 }} />
       {/* Convict count + tomato tally — big accent number + brighter
