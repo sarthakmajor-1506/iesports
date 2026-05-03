@@ -225,7 +225,7 @@ export default function AdminPanel() {
 
       // KDA score — same formula the leaderboard page uses.
       const kdaScore = (lb: any) =>
-        ((lb.totalKills || 0) + 0.5 * (lb.totalAssists || 0)) / Math.max(1, lb.totalDeaths || 1);
+        ((lb.totalKills || 0) + 0.2 * (lb.totalAssists || 0)) / Math.max(1, lb.totalDeaths || 1);
 
       // Group leaderboard entries by base rank.
       const grouped: Record<string, any[]> = {};

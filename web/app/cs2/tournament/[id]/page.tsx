@@ -1679,10 +1679,10 @@ function CS2TournamentDetailInner() {
             const teamNameMap: Record<string, string> = {};
             for (const t of teams) teamNameMap[(t as any).id] = (t as any).teamName || "—";
 
-            // Sort helper — "kd" uses KDA = (K + 0.5*A) / D
+            // Sort helper — "kd" uses KDA = (K + 0.2*A) / D
             const getSortVal = (p: any, key: typeof lbSort): number => {
               switch (key) {
-                case "kd": return ((p.totalKills || 0) + 0.5 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
+                case "kd": return ((p.totalKills || 0) + 0.2 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
                 case "kills": return p.totalKills || 0;
                 case "deaths": return p.totalDeaths || 0;
                 case "assists": return p.totalAssists || 0;
@@ -1746,8 +1746,8 @@ function CS2TournamentDetailInner() {
                       // Lookup helper: try uid first, then fall back to puuid-based id
                       const getPlayerRank = (p: any) => playerRankByUid[p.uid] || playerRankByUid[p.id] || null;
 
-                      // KDA score: (K + 0.5*A) / D
-                      const kdaScore = (p: any) => ((p.totalKills || 0) + 0.5 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
+                      // KDA score: (K + 0.2*A) / D
+                      const kdaScore = (p: any) => ((p.totalKills || 0) + 0.2 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
 
                       // Group sorted leaderboard by base rank
                       const grouped: Record<string, any[]> = {};
@@ -1782,7 +1782,7 @@ function CS2TournamentDetailInner() {
                       <div style={{ textAlign: "center", marginBottom: 16 }}>
                         <div style={{ fontSize: "1.4rem", marginBottom: 4 }}>{"\u{1F451}"}</div>
                         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#8A8880" }}>Bracket MVPs</span>
-                        <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.5 &times; A) / D</div>
+                        <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.2 &times; A) / D</div>
                       </div>
                       <div className="csd-tier-columns" style={{ justifyContent: "center" }}>
                         {bracketMvpData.map(({ rankKey, player }) => {
@@ -1814,7 +1814,7 @@ function CS2TournamentDetailInner() {
                       </div>
                     </div>
 
-                    <div style={{ fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. Each rank bracket has its own MVP by KDA = (K + 0.5 &times; A) / D.</div>
+                    <div style={{ fontSize: "0.68rem", color: "#555550" }}>Click any column header to sort. Each rank bracket has its own MVP by KDA = (K + 0.2 &times; A) / D.</div>
                     {activeRanks.map((rankKey) => {
                       const gColors = rankGroupColors[rankKey];
                       const entries = grouped[rankKey];
@@ -1881,7 +1881,7 @@ function CS2TournamentDetailInner() {
                       );
                     })}
                     <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.5 &times; A) / D. Click any column to re-sort within each rank group. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.
+                      <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.2 &times; A) / D. Click any column to re-sort within each rank group. ACS = Avg Combat Score, ADR = Avg Damage/Round, FK = First Kills, FD = First Deaths.
                     </div>
                   </div>
                       );

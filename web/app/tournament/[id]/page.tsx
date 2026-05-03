@@ -1420,7 +1420,7 @@ function DotaTournamentDetailInner() {
                     if (p.uid) playerBracketMap[p.uid] = p.dotaRankTier ? computeBracketLb(p.dotaRankTier) : (p.dotaBracket || "herald_guardian");
                     if (p.uid && p.steamAvatar) playerAvatarMap[p.uid] = p.steamAvatar;
                   });
-                  const kdaScore = (p: any) => ((p.totalKills || 0) + 0.5 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
+                  const kdaScore = (p: any) => ((p.totalKills || 0) + 0.2 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
                   const grouped: Record<string, any[]> = {};
                   leaderboard.forEach((p: any) => {
                     const bracket = playerBracketMap[p.uid || p.id] || "herald_guardian";
@@ -1453,7 +1453,7 @@ function DotaTournamentDetailInner() {
                         <div style={{ textAlign: "center", marginBottom: 16 }}>
                           <div style={{ fontSize: "1.4rem", marginBottom: 4 }}>{"\u{1F451}"}</div>
                           <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#8A8880" }}>Bracket MVPs</span>
-                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.5 &times; A) / D</div>
+                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.2 &times; A) / D</div>
                         </div>
                         <div className="dtd-tier-columns" style={{ justifyContent: "center" }}>
                           {bracketMvpData.map(({ bracket: bk, player: pl }) => {
@@ -1524,7 +1524,7 @@ function DotaTournamentDetailInner() {
                         );
                       })}
                       <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                        <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.5 &times; A) / D.
+                        <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.2 &times; A) / D.
                       </div>
                     </div>
                   );
