@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       riotAvatar: newUserData.riotAvatar || "",
       riotRank: newUserData.riotRank || "",
       riotTier: newUserData.riotTier || 0,
+      riotPuuid: newUserData.riotPuuid || "",
       skillLevel: skillLevels[baseTier] ?? 1,
     };
 

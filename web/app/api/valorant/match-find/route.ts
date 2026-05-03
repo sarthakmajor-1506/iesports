@@ -105,39 +105,74 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Query Henrik match history for one team1 player ───────────────
-    // Any single PUUID from team1 will surface the match in their history;
-    // then we verify both rosters are on the scoreboard.
-    const seedPuuid = Array.from(team1Puuids)[0];
+    // ─── Query Henrik match history, rotating seed players if needed ───
+    // Any single PUUID will surface the joint match in their history; we
+    // verify both rosters are on the scoreboard further down. We rotate
+    // through every roster puuid in BOTH teams so one player's absence
+    // (no-show, account swap, etc.) can't kill the whole discovery. We
+    // also de-dupe matches across seeds, because the joint match may not
+    // appear in the first seed's history but will in another's.
     const platform = "pc";
-    let historyData: any[] = [];
-    let historySource = "v4";
-    try {
-      const v4Url = `https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/${matchRegion}/${platform}/${seedPuuid}?size=${historySize}`;
-      const v4Res = await fetch(v4Url, { headers: { Authorization: henrikKey } });
-      if (v4Res.ok) {
-        historyData = (await v4Res.json()).data || [];
-      } else {
+    const seedCandidates = [...Array.from(team1Puuids), ...Array.from(team2Puuids)];
+    const seedAttempts: { puuid: string; source: string; size: number; error?: string }[] = [];
+    const matchById: Record<string, any> = {};
+    let historySource: string | null = null;
+    let seedPuuid: string | null = null;
+
+    const fetchSeed = async (candidate: string): Promise<{ data: any[]; source: string; error?: string }> => {
+      try {
+        const v4Url = `https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/${matchRegion}/${platform}/${candidate}?size=${historySize}`;
+        const v4Res = await fetch(v4Url, { headers: { Authorization: henrikKey } });
+        if (v4Res.ok) return { data: (await v4Res.json()).data || [], source: "v4" };
         throw new Error(`v4 status ${v4Res.status}`);
+      } catch {
+        try {
+          const v3Url = `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${matchRegion}/${candidate}?size=${historySize}`;
+          const v3Res = await fetch(v3Url, { headers: { Authorization: henrikKey } });
+          if (v3Res.ok) return { data: (await v3Res.json()).data || [], source: "v3" };
+          return { data: [], source: "v3", error: `v3 status ${v3Res.status}` };
+        } catch (e: any) {
+          return { data: [], source: "v3", error: e?.message || "fetch failed" };
+        }
       }
-    } catch {
-      historySource = "v3";
-      const v3Url = `https://api.henrikdev.xyz/valorant/v3/by-puuid/matches/${matchRegion}/${seedPuuid}?size=${historySize}`;
-      const v3Res = await fetch(v3Url, { headers: { Authorization: henrikKey } });
-      if (!v3Res.ok) {
-        return NextResponse.json(
-          { error: `Match history fetch failed: ${v3Res.status}. Retry in a few seconds.` },
-          { status: 400 }
-        );
+    };
+
+    // Walk seeds in order; merge unique matches (by id) so a joint match
+    // that's missing from one seed's history but present in another's
+    // still gets found. Stop early if we've already accumulated enough
+    // candidates with both rosters represented.
+    for (const candidate of seedCandidates) {
+      const { data, source, error } = await fetchSeed(candidate);
+      seedAttempts.push({ puuid: candidate, source, size: data.length, error });
+      if (data.length > 0 && historySource === null) {
+        historySource = source;
+        seedPuuid = candidate;
       }
-      historyData = (await v3Res.json()).data || [];
+      for (const md of data) {
+        const id = md?.metadata?.matchid || md?.metadata?.match_id;
+        if (id && !matchById[id]) matchById[id] = md;
+      }
+      // Early-exit once we already see a candidate that satisfies the
+      // ≥4-each rule, to keep API calls bounded.
+      const enough = Object.values(matchById).some((md: any) => {
+        const players: any[] = md?.players?.all_players || md?.players || [];
+        let t1 = 0, t2 = 0;
+        for (const p of players) {
+          if (team1Puuids.has(p?.puuid)) t1++;
+          if (team2Puuids.has(p?.puuid)) t2++;
+        }
+        return t1 >= 4 && t2 >= 4;
+      });
+      if (enough) break;
     }
+
+    const historyData: any[] = Object.values(matchById);
 
     if (!historyData.length) {
       return NextResponse.json({
         found: false,
-        reason: "No recent matches found for team 1's seed player",
-        debug: { seedPuuid, team1PuuidCount: team1Puuids.size, team2PuuidCount: team2Puuids.size },
+        reason: "No recent matches found for any roster player — every seed returned an empty history",
+        debug: { team1PuuidCount: team1Puuids.size, team2PuuidCount: team2Puuids.size, seedAttempts },
       });
     }
 
