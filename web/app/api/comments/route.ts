@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 
+const COLLECTIONS = {
+  dota2: "tournaments",
+  valorant: "valorantTournaments",
+  cs2: "cs2Tournaments",
+} as const;
+
 const getCollection = (game?: string | null) =>
-  game === "dota2" ? "tournaments" : "valorantTournaments";
+  COLLECTIONS[(game ?? "valorant") as keyof typeof COLLECTIONS] ?? "valorantTournaments";
 
 export async function GET(req: NextRequest) {
   try {
