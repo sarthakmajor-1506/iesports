@@ -303,14 +303,13 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
       const sp = sa?.sidePicker || fallbackSidePicker;
       const spName = sp ? tName(state, sp) : "";
       if (sa?.side) {
-        const defender = sp!;
-        const attacker = otherTeam(defender);
-        const firstTeam = sa.side === "attack" ? defender : attacker;
-        const sideWord = sa.side === "attack" ? "attack" : "defence";
-        if (mapPickerName) {
-          return `   └ Picked by **${mapPickerName}** · **${tName(state, firstTeam)}** starts on **${sideWord}**`;
-        }
-        return `   └ **${tName(state, firstTeam)}** starts on **${sideWord}**`;
+        // The sidePicker chooses their OWN starting side — see the side-pick
+        // button labels in buildSideButtons and the in-progress ladder at
+        // line ~238 ("**[sidePicker]** chose **[side]**"). So whoever picked
+        // the side IS the team that starts on that side.
+        return mapPickerName
+          ? `   └ Picked by **${mapPickerName}** · **${spName}** starts on **${sa.side}**`
+          : `   └ **${spName}** starts on **${sa.side}**`;
       }
       return mapPickerName
         ? `   └ Picked by **${mapPickerName}** · **${spName}** picks attack/defence`
