@@ -121,7 +121,13 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
   // every new entry has a fresh ID, so the badge reappears with the new
   // count for every visitor. Per-tournament so cross-tournament browsing
   // doesn't reset progress.
-  const seenStorageKey = `wos_seen_${tournamentId}`;
+  //
+  // Bump the version suffix to force every visitor's notification badge to
+  // re-light when we make a wall-of-shame announcement they need to see
+  // again (e.g. the new agent-ban punishment feature). Old keys become
+  // orphan localStorage entries, the empty seenIds means every entry is
+  // freshly "unseen" → badge shows full count.
+  const seenStorageKey = `wos_seen_v2_${tournamentId}`;
   const [seenIds, setSeenIds] = useState<string[]>([]);
   useEffect(() => {
     if (typeof window === "undefined" || !tournamentId) return;
@@ -912,29 +918,19 @@ function PunishmentBlock({ topAgents, totalGames, edge, inkDark, inkMid, accent,
           <div style={{
             display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6,
           }}>
-            {topAgents.map((agent, i) => (
+            {topAgents.map((agent) => (
               <div key={agent} style={{
                 position: "relative",
                 background: "rgba(255,255,255,0.55)",
                 border: `1.5px solid ${edge}`,
                 borderRadius: 4,
-                padding: "4px 10px 4px 8px",
+                padding: "4px 10px",
                 fontSize: "0.74rem",
                 fontWeight: 800,
                 color: inkDark,
                 fontFamily: "'Georgia', serif",
                 boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
-                display: "flex", alignItems: "center", gap: 5,
               }}>
-                <span style={{
-                  display: "inline-flex",
-                  alignItems: "center", justifyContent: "center",
-                  width: 16, height: 16, borderRadius: "50%",
-                  background: i === 0 ? "#991b1b" : "rgba(67,38,12,0.55)",
-                  color: "#fff",
-                  fontSize: "0.52rem",
-                  fontWeight: 900,
-                }}>{i + 1}</span>
                 {agent}
               </div>
             ))}
