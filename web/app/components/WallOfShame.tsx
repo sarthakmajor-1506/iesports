@@ -20,6 +20,12 @@ interface Entry {
   tomatoCount: number;
   bailCount: number;
   createdAt: string;
+  /** Top agents this player has used in the tournament (most-played first,
+   * up to 3). Surfaced so the front-end can highlight the agent-ban punishment
+   * — opposing team gets to ban one of these. Server-enriched in
+   * /api/valorant/wall-of-shame. */
+  topAgents?: string[];
+  totalGames?: number;
 }
 
 interface Props {
@@ -727,6 +733,19 @@ function PosterCard({
           &ldquo;{entry.reason}&rdquo;
         </div>
 
+        {/* PUNISHMENT — opposing team bans one of the player's top agents.
+            Highlighted with a red stamp/banner so it's unmissable as the
+            consequence of being on the Wall of Shame. */}
+        <PunishmentBlock
+          topAgents={entry.topAgents || []}
+          totalGames={entry.totalGames || 0}
+          edge={edge}
+          inkDark={inkDark}
+          inkMid={inkMid}
+          accent={accent}
+          isWanted={isWanted}
+        />
+
         <div style={{
           marginTop: 10, border: `1px solid ${edge}`, borderRadius: 3,
           padding: "6px 8px", background: "rgba(67,38,12,0.05)",
@@ -812,6 +831,129 @@ function PosterCard({
             zIndex: 3,
           }}>
             Vote Cast
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The agent-ban punishment block. Renders a high-contrast red "PUNISHMENT"
+ * banner + the player's top tournament agents. Sells the visual idea that
+ * being on the Wall of Shame has a real consequence (opposing team gets to
+ * ban one of these on their next match).
+ */
+function PunishmentBlock({ topAgents, totalGames, edge, inkDark, inkMid, accent, isWanted }: {
+  topAgents: string[];
+  totalGames: number;
+  edge: string;
+  inkDark: string;
+  inkMid: string;
+  accent: string;
+  isWanted: boolean;
+}) {
+  // Trust the data even if there are no agents — show a placeholder so the
+  // block always renders (the *threat* of an agent ban is part of the
+  // intended narrative; an empty card would dilute that).
+  const hasAgents = topAgents.length > 0;
+
+  return (
+    <div style={{
+      marginTop: 12,
+      position: "relative",
+      // Bleed the banner to the card's torn edges by negative-margining sideways.
+      marginLeft: -13,
+      marginRight: -13,
+    }}>
+      {/* Banner header — red, alarm-bell loud */}
+      <div style={{
+        background: "linear-gradient(180deg, #dc2626 0%, #991b1b 100%)",
+        color: "#fff",
+        textAlign: "center",
+        padding: "5px 10px",
+        fontWeight: 900,
+        fontSize: "0.62rem",
+        letterSpacing: "0.18em",
+        textTransform: "uppercase",
+        textShadow: "0 1px 1px rgba(0,0,0,0.4)",
+        borderTop: `2px solid ${edge}`,
+        borderBottom: `1px solid ${edge}`,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.25)",
+        position: "relative",
+        // Pulsing red glow draws the eye to the punishment.
+        animation: "wos-pulse 2.4s ease-in-out infinite",
+      }}>
+        ⚠ Punishment · Agent Ban
+      </div>
+
+      {/* Agent strip */}
+      <div style={{
+        background: isWanted
+          ? "linear-gradient(180deg, rgba(239,68,68,0.16), rgba(239,68,68,0.06))"
+          : "linear-gradient(180deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))",
+        padding: "9px 13px 11px 13px",
+        position: "relative",
+      }}>
+        <div style={{
+          fontSize: "0.55rem",
+          fontWeight: 800,
+          color: inkMid,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          textAlign: "center",
+          marginBottom: 6,
+          lineHeight: 1.3,
+        }}>
+          Opposing team gets to ban <strong style={{ color: "#991b1b" }}>1 agent</strong> from this player&apos;s pool
+        </div>
+
+        {hasAgents ? (
+          <div style={{
+            display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6,
+          }}>
+            {topAgents.map((agent, i) => (
+              <div key={agent} style={{
+                position: "relative",
+                background: "rgba(255,255,255,0.55)",
+                border: `1.5px solid ${edge}`,
+                borderRadius: 4,
+                padding: "4px 10px 4px 8px",
+                fontSize: "0.74rem",
+                fontWeight: 800,
+                color: inkDark,
+                fontFamily: "'Georgia', serif",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center", justifyContent: "center",
+                  width: 16, height: 16, borderRadius: "50%",
+                  background: i === 0 ? "#991b1b" : "rgba(67,38,12,0.55)",
+                  color: "#fff",
+                  fontSize: "0.52rem",
+                  fontWeight: 900,
+                }}>{i + 1}</span>
+                {agent}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            fontSize: "0.66rem", color: inkMid, fontStyle: "italic",
+            textAlign: "center", padding: "4px 0",
+          }}>
+            (No tournament games on record yet — no agent pool to ban from.)
+          </div>
+        )}
+
+        {totalGames > 0 && (
+          <div style={{
+            marginTop: 6, fontSize: "0.5rem", color: inkMid, textAlign: "center",
+            letterSpacing: "0.08em", textTransform: "uppercase",
+          }}>
+            From {totalGames} tournament games
           </div>
         )}
       </div>

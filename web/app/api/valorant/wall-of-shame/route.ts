@@ -15,16 +15,55 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "tournamentId required" }, { status: 400 });
     }
 
-    const shameCol = adminDb
-      .collection("valorantTournaments")
-      .doc(tournamentId)
-      .collection("wallOfShame");
+    const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
+    const shameCol = tournamentRef.collection("wallOfShame");
     const snap = await shameCol.get();
     // archived === true → kept for audit / future reference but hidden from
     // the public Wall (e.g. last week's entries after a refresh).
     const entries = snap.docs
       .map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }))
       .filter((e: any) => e.archived !== true);
+
+    // Enrich each entry with the player's top tournament agents (used by the
+    // "agent ban" punishment block on the front-end). Leaderboard docs key on
+    // puuid; we also need a uid-based fallback because some shamed players
+    // may not have a riotPuuid yet — for those we look up via uid → users
+    // doc → riotPuuid → leaderboard.
+    const lbSnap = await tournamentRef.collection("leaderboard").get();
+    const lbByPuuid: Record<string, any> = {};
+    const lbByUid: Record<string, any> = {};
+    for (const d of lbSnap.docs) {
+      const data = d.data() as any;
+      if (data.puuid) lbByPuuid[data.puuid] = data;
+      if (data.uid) lbByUid[data.uid] = data;
+    }
+    // Build top-3 agents per shamed player by counting agent occurrences in
+    // processedGames (most-played first). Falls back to the raw `agents` list
+    // (which is order-of-first-use, not frequency) if processedGames absent.
+    const topAgentsFor = (lb: any): string[] => {
+      if (!lb) return [];
+      const counts: Record<string, number> = {};
+      const pg = lb.processedGames || {};
+      for (const g of Object.values<any>(pg)) {
+        if (g?.agent) counts[g.agent] = (counts[g.agent] || 0) + 1;
+      }
+      let ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (ranked.length === 0 && Array.isArray(lb.agents)) {
+        ranked = lb.agents.map((a: string) => [a, 1] as [string, number]);
+      }
+      return ranked.slice(0, 3).map(([a]) => a);
+    };
+
+    for (const e of entries as any[]) {
+      let lb = e.uid ? lbByUid[e.uid] : null;
+      if (!lb && e.uid) {
+        const userDoc = await adminDb.collection("users").doc(e.uid).get();
+        const puuid = userDoc.data()?.riotPuuid;
+        if (puuid) lb = lbByPuuid[puuid];
+      }
+      e.topAgents = topAgentsFor(lb);
+      e.totalGames = lb?.matchesPlayed ?? 0;
+    }
 
     // Resolve caller uid (optional).
     let callerUid: string | null = null;
