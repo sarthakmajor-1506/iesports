@@ -341,8 +341,13 @@ export default function DoubleBracket({ matches, bracketSize, standings = [], br
   if (teamCount === 3) return <Bracket3 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
   if (teamCount <= 4) return <Bracket4 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
   if (teamCount <= 8) return <Bracket8 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
-  // >8 teams with no matches yet — render a clean "seeding TBD" placeholder.
-  return <BracketTBDPlaceholder teamCount={teamCount} ubCount={Math.min(4, Math.floor(teamCount / 2))} />;
+  if (teamCount <= 10) return <Bracket10 matchMap={matchMap} teams={seededTeams} hasMatches={matches.length > 0} bracketBestOf={bracketBestOf} lbFinalBestOf={lbFinalBO} grandFinalBestOf={grandFinalBestOf} tournamentId={tId} />;
+  // >10 teams with no matches yet — render a clean "seeding TBD" placeholder.
+  // ubCount comes from the tournament's ubTeamCount setting (passed by parent
+  // via standings.ubCount-style hint isn't available here, so we follow the
+  // generator's rule: 6 UB / 4 LB at exactly 10, otherwise standard 50/50).
+  const defaultUbCount = teamCount >= 9 && teamCount <= 10 ? 6 : Math.floor(teamCount / 2);
+  return <BracketTBDPlaceholder teamCount={teamCount} ubCount={defaultUbCount} />;
 }
 
 function BracketTBDPlaceholder({ teamCount, ubCount }: { teamCount: number; ubCount: number }) {
@@ -674,6 +679,197 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <text x={lbR1[1].x + MATCH_W + 10} y={lbR1[1].y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
         Bottom 4 from group stage
+      </text>
+    </BracketWrapper>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10-TEAM: Top 6 → UB (with #1/#2 byes through to UB Semis), Bottom 4 → LB
+// Match IDs match what the generate-brackets route writes:
+//   wb-r1-m1, wb-r1-m2 — UB R1 (#3v#6, #4v#5)
+//   wb-semi-m1, wb-semi-m2 — UB Semis (#1 vs winner R1M2 / #2 vs winner R1M1)
+//   wb-final
+//   lb-r1-m1, lb-r1-m2 — LB R1 (#7v#10, #8v#9)
+//   lb-r2-m1, lb-r2-m2 — LB R2 (LB R1 winners crossed with UB R1 losers)
+//   lb-r3-m1, lb-r3-m2 — LB R3 (LB R2 winners crossed with UB Semi losers)
+//   lb-semi
+//   lb-final
+//   grand-final
+// ═══════════════════════════════════════════════════════════════════════════════
+function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, grandFinalBestOf, tournamentId }: { matchMap: Record<string, BracketMatch>; teams: TeamSlot[]; hasMatches: boolean; bracketBestOf: number; lbFinalBestOf: number; grandFinalBestOf: number; tournamentId?: string }) {
+  const colX = (col: number) => PAD + col * (MATCH_W + COL_GAP);
+
+  // ── Upper bracket geometry ─────────────────────────────────────────────────
+  // UB R1: 2 matches (rows 0,1).  UB Semis: 2 matches positioned to "look like"
+  // they're fed by R1 winners + the bye seeds — slightly offset vertically so
+  // the connecting lines from R1 winners flow naturally into them.
+  const ubR1Y = (i: number) => PAD + 30 + i * (MATCH_H + ROW_GAP);
+  const ubR1 = [0, 1].map(i => ({ x: colX(0), y: ubR1Y(i) }));
+  // UB Semis sit between R1 rows + extend down so the bye-seed (#1, #2)
+  // labels have room.
+  const ubSemiY = (i: number) => ubR1Y(0) + (MATCH_H + ROW_GAP) / 2 + i * (MATCH_H + ROW_GAP);
+  const ubSemi = [0, 1].map(i => ({ x: colX(1), y: ubSemiY(i) }));
+  const ubFinalY = ubSemi[0].y + (MATCH_H + ROW_GAP) / 2;
+  const ubFinal = { x: colX(2), y: ubFinalY };
+
+  // ── Lower bracket geometry — 4 columns (R1, R2, R3, Semi) + LB Final ────
+  const losersBaseY = ubSemi[1].y + MATCH_H + SECTION_GAP + 30;
+  const lbR1 = [0, 1].map(i => ({ x: colX(0), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
+  const lbR2 = [0, 1].map(i => ({ x: colX(1), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
+  const lbR3 = [0, 1].map(i => ({ x: colX(2), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
+  const lbSemi = { x: colX(3), y: losersBaseY + (MATCH_H + ROW_GAP) / 2 };
+  const lbFinal = { x: colX(4), y: lbSemi.y };
+
+  // GF sits in its own column past UB Final + LB Final.
+  const gfY = ubFinal.y + (lbFinal.y - ubFinal.y) / 2;
+  const gf = { x: colX(4) + MATCH_W / 2, y: gfY };
+
+  const totalW = gf.x + MATCH_W + PAD;
+  const totalH = lbR1[1].y + MATCH_H + PAD + 20;
+
+  const ubTeam = (i: number) => (i < Math.min(6, teams.length)) ? teams[i] : BYE_TEAM;
+  const lbTeam = (i: number) => {
+    const idx = 6 + i;
+    return (idx < teams.length) ? teams[idx] : BYE_TEAM;
+  };
+
+  const getM = (id: string, num: number, a: TeamSlot, b: TeamSlot) =>
+    hasMatches ? (matchMap[id] || makePlaceholder(id, num, a, b)) : makePlaceholder(id, num, a, b);
+
+  // UB R1 — rank 3-6 fight for the right to face the bye seeds
+  const mUBR1 = [
+    getM("wb-r1-m1", 1, ubTeam(2), ubTeam(5)),
+    getM("wb-r1-m2", 2, ubTeam(3), ubTeam(4)),
+  ];
+  let mNum = 3;
+  // UB Semis — bye seeds wait here
+  const mUBSemi = [
+    getM("wb-semi-m1", mNum++, ubTeam(0), TBD_TEAM),  // #1 vs winner(R1 M2)
+    getM("wb-semi-m2", mNum++, ubTeam(1), TBD_TEAM),  // #2 vs winner(R1 M1)
+  ];
+  const mUBF = getM("wb-final", mNum++, TBD_TEAM, TBD_TEAM);
+
+  // Lower bracket
+  const mLBR1 = [
+    getM("lb-r1-m1", mNum++, lbTeam(0), lbTeam(3)),  // #7 v #10
+    getM("lb-r1-m2", mNum++, lbTeam(1), lbTeam(2)),  // #8 v #9
+  ];
+  const mLBR2 = [
+    getM("lb-r2-m1", mNum++, TBD_TEAM, TBD_TEAM),
+    getM("lb-r2-m2", mNum++, TBD_TEAM, TBD_TEAM),
+  ];
+  const mLBR3 = [
+    getM("lb-r3-m1", mNum++, TBD_TEAM, TBD_TEAM),
+    getM("lb-r3-m2", mNum++, TBD_TEAM, TBD_TEAM),
+  ];
+  const mLBS = getM("lb-semi", mNum++, TBD_TEAM, TBD_TEAM);
+  const mLBF = getM("lb-final", mNum++, TBD_TEAM, TBD_TEAM);
+  const mGF = getM("grand-final", mNum++, TBD_TEAM, TBD_TEAM);
+
+  return (
+    <BracketWrapper width={totalW} height={totalH} teamCount={teams.length || 10}>
+      {/* Upper bracket column headers */}
+      <ColHeader x={colX(0) + MATCH_W / 2} y={PAD} text="UPPER R1" />
+      <ColHeader x={colX(1) + MATCH_W / 2} y={PAD} text="UPPER SEMIS" />
+      <ColHeader x={colX(2) + MATCH_W / 2} y={PAD} text="UPPER FINAL" />
+      <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
+
+      {/* UB R1 → UB Semis (crossed: R1 M1 winner → Semi M2, R1 M2 winner → Semi M1) */}
+      <Connector x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2} x2={ubSemi[0].x} y2={ubSemi[0].y + 3 * MATCH_H / 4} />
+      <Connector x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2} x2={ubSemi[1].x} y2={ubSemi[1].y + MATCH_H / 4} />
+      <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
+      <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
+
+      {/* UB Semis → UB Final */}
+      <Connector x1={ubSemi[0].x + MATCH_W} y1={ubSemi[0].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + MATCH_H / 4} />
+      <Connector x1={ubSemi[1].x + MATCH_W} y1={ubSemi[1].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + 3 * MATCH_H / 4} />
+      <CDot x={ubSemi[0].x + MATCH_W} y={ubSemi[0].y + MATCH_H / 2} />
+      <CDot x={ubSemi[1].x + MATCH_W} y={ubSemi[1].y + MATCH_H / 2} />
+
+      {/* UB Final → GF */}
+      <Connector x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
+      <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
+
+      {/* UB R1 losers → LB R2 (crossed: R1 M1 loser → LB R2 M2, R1 M2 loser → LB R2 M1) */}
+      <Connector x1={ubR1[0].x + MATCH_W / 2} y1={ubR1[0].y + MATCH_H} x2={lbR2[1].x + MATCH_W / 4} y2={lbR2[1].y} />
+      <CDot x={ubR1[0].x + MATCH_W / 2} y={ubR1[0].y + MATCH_H} lower />
+      <Connector x1={ubR1[1].x + MATCH_W / 2} y1={ubR1[1].y + MATCH_H} x2={lbR2[0].x + MATCH_W / 4} y2={lbR2[0].y} />
+      <CDot x={ubR1[1].x + MATCH_W / 2} y={ubR1[1].y + MATCH_H} lower />
+
+      {/* UB Semi losers → LB R3 (crossed) */}
+      <Connector x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H} x2={lbR3[1].x + MATCH_W / 4} y2={lbR3[1].y} />
+      <CDot x={ubSemi[0].x + MATCH_W / 2} y={ubSemi[0].y + MATCH_H} lower />
+      <Connector x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H} x2={lbR3[0].x + MATCH_W / 4} y2={lbR3[0].y} />
+      <CDot x={ubSemi[1].x + MATCH_W / 2} y={ubSemi[1].y + MATCH_H} lower />
+
+      {/* UB Final loser → LB Final */}
+      <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
+      <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
+
+      <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
+
+      <ColHeader x={colX(0) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R1" />
+      <ColHeader x={colX(1) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R2" />
+      <ColHeader x={colX(2) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R3" />
+      <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER SEMI" />
+      <ColHeader x={colX(4) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER FINAL" />
+
+      {/* LB R1 → LB R2 */}
+      {[0, 1].map(i => (
+        <g key={`lbr1-lbr2-${i}`}>
+          <Connector x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + 3 * MATCH_H / 4} />
+          <CDot x={lbR1[i].x + MATCH_W} y={lbR1[i].y + MATCH_H / 2} lower />
+        </g>
+      ))}
+
+      {/* LB R2 → LB R3 */}
+      {[0, 1].map(i => (
+        <g key={`lbr2-lbr3-${i}`}>
+          <Connector x1={lbR2[i].x + MATCH_W} y1={lbR2[i].y + MATCH_H / 2} x2={lbR3[i].x} y2={lbR3[i].y + MATCH_H / 4} />
+          <CDot x={lbR2[i].x + MATCH_W} y={lbR2[i].y + MATCH_H / 2} lower />
+        </g>
+      ))}
+
+      {/* LB R3 → LB Semi */}
+      <Connector x1={lbR3[0].x + MATCH_W} y1={lbR3[0].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + MATCH_H / 4} />
+      <Connector x1={lbR3[1].x + MATCH_W} y1={lbR3[1].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + 3 * MATCH_H / 4} />
+      <CDot x={lbR3[0].x + MATCH_W} y={lbR3[0].y + MATCH_H / 2} lower />
+      <CDot x={lbR3[1].x + MATCH_W} y={lbR3[1].y + MATCH_H / 2} lower />
+
+      {/* LB Semi → LB Final */}
+      <Connector x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={lbFinal.y + MATCH_H / 4} />
+      <CDot x={lbSemi.x + MATCH_W} y={lbSemi.y + MATCH_H / 2} lower />
+
+      {/* LB Final → GF */}
+      <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
+      <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
+
+      {/* Match cards */}
+      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      {mUBSemi.map((m, i) => <MatchCard key={m.id} match={m} x={ubSemi[i].x} y={ubSemi[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+
+      {mLBR1.map((m, i) => <MatchCard key={m.id} match={m} x={lbR1[i].x} y={lbR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      {mLBR2.map((m, i) => <MatchCard key={m.id} match={m} x={lbR2[i].x} y={lbR2[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      {mLBR3.map((m, i) => <MatchCard key={m.id} match={m} x={lbR3[i].x} y={lbR3[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
+      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
+
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+
+      {/* Annotations */}
+      <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
+        fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
+        Seeds 3-6 from group stage
+      </text>
+      <text x={ubSemi[1].x - 100} y={ubSemi[0].y - 6}
+        fill={C.live} fontSize={8.5} fontFamily="system-ui" fontStyle="italic" fontWeight={700}>
+        ↑ #1 / #2 seeds get a bye to the Semis
+      </text>
+      <text x={lbR1[1].x + MATCH_W + 10} y={lbR1[1].y + MATCH_H / 2 + 4}
+        fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
+        Seeds 7-10 from group stage
       </text>
     </BracketWrapper>
   );
