@@ -948,14 +948,6 @@ function PunishmentBlock({ topAgents, totalGames, edge, inkDark, inkMid, accent,
           </div>
         )}
 
-        {totalGames > 0 && (
-          <div style={{
-            marginTop: 6, fontSize: "0.5rem", color: inkMid, textAlign: "center",
-            letterSpacing: "0.08em", textTransform: "uppercase",
-          }}>
-            From {totalGames} tournament games
-          </div>
-        )}
       </div>
     </div>
   );
