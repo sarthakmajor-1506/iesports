@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { Skull, X } from "lucide-react";
 
@@ -112,6 +113,7 @@ function formatDate(iso: string): string {
 }
 
 export default function WallOfShame({ tournamentId, user, onRequireLogin, forceOpen }: Props) {
+  const router = useRouter();
   const [open, setOpen] = useState(!!forceOpen);
   const [mounted, setMounted] = useState(false);
   const [loginPrompt, setLoginPrompt] = useState(false);
@@ -187,7 +189,6 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
   }, [entries, seenIds]);
 
   const handleOpen = () => {
-    setOpen(true);
     // Mark every currently-loaded entry as seen so the badge clears.
     if (typeof window !== "undefined" && entries.length > 0) {
       const ids = entries.map(e => e.id);
@@ -195,6 +196,9 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
       try { window.localStorage.setItem(seenStorageKey, JSON.stringify(ids)); }
       catch { /* storage full / disabled — badge will keep showing, no-op */ }
     }
+    // Navigate to the dedicated wall-of-shame URL so the link is shareable
+    // and the browser back button takes the user back to the tournament page.
+    router.push(`/valorant/tournament/${encodeURIComponent(tournamentId)}/wall-of-shame`);
   };
 
   // Lock page scroll while the modal is open.
