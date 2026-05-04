@@ -97,6 +97,7 @@ async function main() {
   const agg = new Map<string, Agg>();
   let gamesProcessed = 0;
 
+  let subsExcluded = 0;
   for (const mDoc of matchesSnap.docs) {
     const md = mDoc.data();
     const games = md.games || {};
@@ -108,6 +109,14 @@ async function main() {
     const team1Roster = puuidsByTeamId.get(md.team1Id) || new Set<string>();
     const team2Roster = puuidsByTeamId.get(md.team2Id) || new Set<string>();
     const matchRoster = new Set<string>([...team1Roster, ...team2Roster]);
+
+    // Per-match substitutes (admin-confirmed at lobby time on the match doc).
+    // These PUUIDs played but are NOT on the official roster for this match,
+    // so their stats must be excluded from leaderboard + MVP.
+    const subPuuids = new Set<string>([
+      ...((md.team1Subs || []) as any[]).map((s) => s?.riotPuuid).filter(Boolean),
+      ...((md.team2Subs || []) as any[]).map((s) => s?.riotPuuid).filter(Boolean),
+    ]);
 
     for (const gk of gameKeys) {
       const g = games[gk] || (md as any)[gk];
@@ -121,6 +130,7 @@ async function main() {
 
       for (const p of g.playerStats as any[]) {
         if (!p?.puuid || !matchRoster.has(p.puuid)) continue;
+        if (subPuuids.has(p.puuid)) { subsExcluded++; continue; }
 
         const won = gameWinner && p.tournamentTeam === gameWinner ? 1 : 0;
         const snap: GameSnap = {
@@ -158,7 +168,7 @@ async function main() {
     }
   }
 
-  console.log(`Games processed: ${gamesProcessed} · Players aggregated: ${agg.size}\n`);
+  console.log(`Games processed: ${gamesProcessed} · Players aggregated: ${agg.size} · Sub-game rows excluded: ${subsExcluded}\n`);
 
   // Read current stored leaderboard for diff report
   const currentSnap = await tref.collection("leaderboard").get();

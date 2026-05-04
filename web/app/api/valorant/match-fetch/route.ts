@@ -192,7 +192,16 @@ export async function POST(req: NextRequest) {
     const valorantWinnerSide = redWon ? "Red" : "Blue"; // which Valorant side won
 
     // ── Extract round-by-round data, first bloods, kill matrix ──
-    let roundResults: { round: number; winTeam: string; endType: string }[] = [];
+    type RoundPlayerStat = {
+      puuid: string;
+      kills: number;
+      damage: number;
+      score: number;
+      headshots: number;
+      firstKill: boolean;
+      firstDeath: boolean;
+    };
+    let roundResults: { round: number; winTeam: string; endType: string; playerStats?: RoundPlayerStat[] }[] = [];
     const playerFirstKills: Record<string, number> = {};
     const playerFirstDeaths: Record<string, number> = {};
     const killMatrix: Record<string, Record<string, number>> = {}; // killer puuid -> victim puuid -> count
@@ -206,7 +215,46 @@ export async function POST(req: NextRequest) {
           : "";
         const endType = round.end_type || round.endType || "";
 
-        roundResults.push({ round: ri + 1, winTeam: normalizedWin, endType });
+        // Per-round per-player summary — additive field, existing consumers keep working.
+        // Henrik v4 shape: round.player_stats[] = { player:{puuid}, stats:{kills,score,headshots},
+        // damage_events:[{damage}], was_afk }. v2 shape may differ — fall back to flat paths.
+        const rps = round.player_stats || round.playerStats || round.stats || [];
+        const perRoundPlayerStats: RoundPlayerStat[] = Array.isArray(rps)
+          ? rps.map((ps: any) => {
+              const puuid = ps.player?.puuid || ps.puuid || ps.player_puuid || "";
+              const killsCount =
+                typeof ps.stats?.kills === "number"
+                  ? ps.stats.kills
+                  : Array.isArray(ps.kills)
+                    ? ps.kills.length
+                    : typeof ps.kills === "number"
+                      ? ps.kills
+                      : Array.isArray(ps.kill_events)
+                        ? ps.kill_events.length
+                        : 0;
+              let damage =
+                ps.damage?.dealt ??
+                ps.damage?.made ??
+                (typeof ps.damage === "number" ? ps.damage : null);
+              if (damage == null && Array.isArray(ps.damage_events)) {
+                damage = ps.damage_events.reduce(
+                  (s: number, d: any) => s + (d.damage || 0),
+                  0,
+                );
+              }
+              return {
+                puuid,
+                kills: killsCount,
+                damage: damage || 0,
+                score: ps.stats?.score ?? ps.score ?? 0,
+                headshots: ps.stats?.headshots ?? ps.damage?.headshots ?? ps.headshots ?? 0,
+                firstKill: !!(ps.was_first_kill || ps.first_kill),
+                firstDeath: !!(ps.was_first_death || ps.first_death),
+              };
+            }).filter((p: RoundPlayerStat) => p.puuid)
+          : [];
+
+        roundResults.push({ round: ri + 1, winTeam: normalizedWin, endType, playerStats: perRoundPlayerStats });
 
         // Extract kill events from round
         const kills: { killer: string; victim: string; round_time?: number }[] = [];
@@ -308,6 +356,17 @@ export async function POST(req: NextRequest) {
     const existingMatch = matchDoc.data()!;
     const team1Id = existingMatch.team1Id;
     const team2Id = existingMatch.team2Id;
+
+    // Safety net: always exclude PUUIDs stored on the match doc as substitutes,
+    // even if the admin forgot to tick them in the match-find UI. team1Subs and
+    // team2Subs are confirmed at lobby time and are the source of truth for
+    // "this player played but should not count toward leaderboard + MVP".
+    for (const s of (existingMatch.team1Subs || []) as any[]) {
+      if (s?.riotPuuid) excluded.add(s.riotPuuid);
+    }
+    for (const s of (existingMatch.team2Subs || []) as any[]) {
+      if (s?.riotPuuid) excluded.add(s.riotPuuid);
+    }
 
     // Test tournaments can pin Discord traffic to a single isolated channel.
     const tournamentDocForOverride = await tournamentRef.get();

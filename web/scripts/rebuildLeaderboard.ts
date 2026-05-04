@@ -110,11 +110,18 @@ async function main() {
   const players: Record<string, PlayerAgg> = {};
   let gamesProcessed = 0;
 
+  let subsExcluded = 0;
   for (const doc of matchesSnap.docs) {
     const match = doc.data();
     const bo = match.isBracket
       ? (match.bracketType === "grand_final" ? (tData.grandFinalBestOf || 3) : (tData.bracketBestOf || 2))
       : (tData.matchesPerRound || 2);
+
+    // Per-match substitutes — exclude from leaderboard + MVP.
+    const subPuuids = new Set<string>([
+      ...((match.team1Subs || []) as any[]).map((s: any) => s?.riotPuuid).filter(Boolean),
+      ...((match.team2Subs || []) as any[]).map((s: any) => s?.riotPuuid).filter(Boolean),
+    ]);
 
     for (let g = 1; g <= bo; g++) {
       const game = match[`game${g}`] || match.games?.[`game${g}`] || null;
@@ -126,6 +133,7 @@ async function main() {
       for (const ps of game.playerStats) {
         const puuid = ps.puuid;
         if (!puuid) continue;
+        if (subPuuids.has(puuid)) { subsExcluded++; continue; }
 
         // Determine teamId
         let teamId = ps.teamId || null;
@@ -187,6 +195,7 @@ async function main() {
   }
 
   console.log(`🎮 Processed ${gamesProcessed} games across ${matchesSnap.size} matches`);
+  console.log(`🔄 Excluded ${subsExcluded} sub-game rows (per-match team1Subs/team2Subs)`);
   console.log(`👥 Found ${Object.keys(players).length} unique players\n`);
 
   // Build team name map for display
