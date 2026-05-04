@@ -32,6 +32,10 @@ interface Props {
   tournamentId: string;
   user: User | null;
   onRequireLogin?: () => void;
+  /** When true, opens the modal on mount and hides the close button —
+   * used by the dedicated /wall-of-shame permalink page so the URL is a
+   * direct link to the wall instead of the parent tournament page. */
+  forceOpen?: boolean;
 }
 
 const INLINE_STYLES = `
@@ -98,11 +102,15 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function WallOfShame({ tournamentId, user, onRequireLogin }: Props) {
-  const [open, setOpen] = useState(false);
+export default function WallOfShame({ tournamentId, user, onRequireLogin, forceOpen }: Props) {
+  const [open, setOpen] = useState(!!forceOpen);
   const [mounted, setMounted] = useState(false);
   const [loginPrompt, setLoginPrompt] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  // If parent flips forceOpen on later (e.g. after auth resolves on the
+  // permalink page), make sure the modal state follows.
+  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
 
   // If the user signs in after being prompted, close the prompt automatically.
   useEffect(() => { if (user) setLoginPrompt(false); }, [user]);
@@ -318,7 +326,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
         <div
           role="dialog"
           aria-modal="true"
-          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
+          onClick={e => { if (e.target === e.currentTarget && !forceOpen) setOpen(false); }}
           style={{
             position: "fixed", inset: 0, zIndex: 200,
             background: "radial-gradient(ellipse at center, rgba(20,10,10,0.92) 0%, rgba(0,0,0,0.97) 70%)",
@@ -348,22 +356,59 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin }: Prop
                   Where outlaws rest. Vote anonymously — one shot per entry.
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                style={{
-                  width: 40, height: 40, borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.04)", color: "#e2e8f0",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-              >
-                <X size={18} />
-              </button>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (typeof window === "undefined") return;
+                    const url = `${window.location.origin}/valorant/tournament/${encodeURIComponent(tournamentId)}/wall-of-shame`;
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 1800);
+                    } catch {
+                      // Clipboard API may be blocked (insecure context, no
+                      // user activation). Fall back to a prompt so the user
+                      // can manually copy.
+                      window.prompt("Copy this link", url);
+                    }
+                  }}
+                  aria-label={linkCopied ? "Link copied" : "Copy share link"}
+                  title={linkCopied ? "Link copied!" : "Copy share link"}
+                  style={{
+                    height: 40, padding: "0 14px", borderRadius: 999,
+                    border: linkCopied ? "1px solid rgba(34,197,94,0.5)" : "1px solid rgba(255,255,255,0.12)",
+                    background: linkCopied ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.04)",
+                    color: linkCopied ? "#86efac" : "#e2e8f0",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    cursor: "pointer", transition: "all 0.15s",
+                    fontSize: "0.78rem", fontWeight: 700,
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={e => { if (!linkCopied) { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; } }}
+                  onMouseLeave={e => { if (!linkCopied) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; } }}
+                >
+                  {linkCopied ? "✓ Copied!" : "🔗 Share"}
+                </button>
+                {!forceOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    aria-label="Close"
+                    style={{
+                      width: 40, height: 40, borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.04)", color: "#e2e8f0",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {loading && (
