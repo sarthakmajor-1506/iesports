@@ -86,6 +86,15 @@ const INLINE_STYLES = `
     .wos-section-header .wos-section-spacer { display: none !important; }
     .wos-section-header .wos-section-count { width: 100%; justify-content: center; }
   }
+  /* Mobile hardening — keep everything inside its container so the wall
+     never produces horizontal scroll. The poster cards have a few inner
+     elements that bleed past the card edges (loud banner uses negative
+     side-margins, the punishment block does the same); they're visually
+     clipped via the card's overflow:hidden + clipPath but the layout
+     can still over-flow on very narrow screens unless the modal root
+     has overflow-x: hidden as well. */
+  .wos-poster, .wos-poster * { max-width: 100%; }
+  .wos-poster { box-sizing: border-box; }
 `;
 
 function initials(name: string): string {
@@ -106,7 +115,6 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
   const [open, setOpen] = useState(!!forceOpen);
   const [mounted, setMounted] = useState(false);
   const [loginPrompt, setLoginPrompt] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   // If parent flips forceOpen on later (e.g. after auth resolves on the
   // permalink page), make sure the modal state follows.
@@ -333,11 +341,13 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
             backdropFilter: "blur(6px)",
             display: "flex", alignItems: "flex-start", justifyContent: "center",
             overflowY: "auto",
+            overflowX: "hidden",                 // prevent rotated/torn cards from causing horizontal scroll on mobile
             padding: "40px 16px 60px",
+            boxSizing: "border-box",
             animation: "wos-modal-in 0.25s ease-out",
           }}
         >
-          <div style={{ width: "100%", maxWidth: 1180 }}>
+          <div style={{ width: "100%", maxWidth: 1180, minWidth: 0, boxSizing: "border-box" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
               <div>
                 <div style={{
@@ -356,59 +366,32 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
                   Where outlaws rest. Vote anonymously — one shot per entry.
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (typeof window === "undefined") return;
-                    const url = `${window.location.origin}/valorant/tournament/${encodeURIComponent(tournamentId)}/wall-of-shame`;
-                    try {
-                      await navigator.clipboard.writeText(url);
-                      setLinkCopied(true);
-                      setTimeout(() => setLinkCopied(false), 1800);
-                    } catch {
-                      // Clipboard API may be blocked (insecure context, no
-                      // user activation). Fall back to a prompt so the user
-                      // can manually copy.
-                      window.prompt("Copy this link", url);
-                    }
-                  }}
-                  aria-label={linkCopied ? "Link copied" : "Copy share link"}
-                  title={linkCopied ? "Link copied!" : "Copy share link"}
-                  style={{
-                    height: 40, padding: "0 14px", borderRadius: 999,
-                    border: linkCopied ? "1px solid rgba(34,197,94,0.5)" : "1px solid rgba(255,255,255,0.12)",
-                    background: linkCopied ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.04)",
-                    color: linkCopied ? "#86efac" : "#e2e8f0",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    cursor: "pointer", transition: "all 0.15s",
-                    fontSize: "0.78rem", fontWeight: 700,
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={e => { if (!linkCopied) { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; } }}
-                  onMouseLeave={e => { if (!linkCopied) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; } }}
-                >
-                  {linkCopied ? "✓ Copied!" : "🔗 Share"}
-                </button>
-                {!forceOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    aria-label="Close"
-                    style={{
-                      width: 40, height: 40, borderRadius: 999,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(255,255,255,0.04)", color: "#e2e8f0",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (forceOpen && typeof window !== "undefined") {
+                    // On the permalink page, X navigates back to the
+                    // parent tournament page (or browser back if no history).
+                    const target = `/valorant/tournament/${encodeURIComponent(tournamentId)}`;
+                    if (window.history.length > 1) window.history.back();
+                    else window.location.href = target;
+                  } else {
+                    setOpen(false);
+                  }
+                }}
+                aria-label="Close"
+                style={{
+                  width: 40, height: 40, borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.04)", color: "#e2e8f0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {loading && (
@@ -663,10 +646,11 @@ function PosterCard({
   const tornClip = "polygon(0 0, 100% 0, 100% calc(100% - 4px), 94% 100%, 86% calc(100% - 7px), 78% calc(100% - 2px), 70% calc(100% - 9px), 60% calc(100% - 4px), 54% calc(100% - 14px), 50% 100%, 46% calc(100% - 13px), 40% calc(100% - 3px), 32% calc(100% - 10px), 24% calc(100% - 6px), 16% calc(100% - 2px), 10% calc(100% - 8px), 4% 100%, 0 calc(100% - 5px))";
 
   return (
-    <div style={{
+    <div className="wos-poster" style={{
       position: "relative",
       paddingTop: 14,
       paddingBottom: 6,
+      minWidth: 0,
       ["--wos-rot" as any]: `${tilt}deg`,
       filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
     }}>
