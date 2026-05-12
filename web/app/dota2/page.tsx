@@ -173,15 +173,30 @@ export default function Dota2() {
           box-shadow: 0 0 20px rgba(161,43,31,0.35);
         }
         .d2-tab.active:hover { background: #7A1F15; }
+        .d2-tab svg { flex-shrink: 0; }
+        .d2-tab-short { display: none; }
 
         @media (max-width: 700px) {
           .d2-hero { height: 260px; }
           .d2-hero-title { font-size: 1.7rem; }
           .d2-hero-content { padding: 0 16px 22px; }
           .d2-hero-logo { width: 42px; height: 42px; }
-          .d2-tabs-wrap { padding: 18px 16px 0; }
-          .d2-tabs { width: 100%; }
-          .d2-tab { padding: 9px 0; font-size: 0.82rem; flex: 1; justify-content: center; gap: 6px; white-space: nowrap; }
+          .d2-tabs-wrap { padding: 16px 14px 0; }
+          .d2-tabs { width: 100%; gap: 3px; padding: 4px; border-radius: 12px; }
+          .d2-tab {
+            padding: 8px 4px;
+            font-size: 0.74rem;
+            letter-spacing: -0.01em;
+            flex: 1;
+            justify-content: center;
+            gap: 5px;
+            white-space: nowrap;
+            border-radius: 9px;
+          }
+          .d2-tab svg { width: 13px; height: 13px; }
+          .d2-tab.active { box-shadow: 0 0 14px rgba(161,43,31,0.28); }
+          .d2-tab-long { display: none; }
+          .d2-tab-short { display: inline; }
         }
       `}</style>
 
@@ -236,7 +251,7 @@ export default function Dota2() {
                 className={`d2-tab${dotaTab === "daily" ? " active" : ""}`}
                 onClick={() => setDotaTab("daily")}
               >
-                <Gamepad2 size={16} /> Daily Matches
+                <Gamepad2 size={16} /> <span className="d2-tab-long">Daily Matches</span><span className="d2-tab-short">Daily</span>
               </button>
             </div>
           </div>
