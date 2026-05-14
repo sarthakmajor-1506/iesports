@@ -21,21 +21,36 @@ import {
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
   MessageCircle, Camera,
   Coins, Target, Info, Zap, X, UserCog,
+  Crosshair, Sparkles, HandHeart,
 } from "lucide-react";
 import { DOTA_ROLES, type DotaRole } from "@/lib/types";
 
-/** Inline pill row showing a player's Dota 2 role preferences (sorted by
- *  position number, with a hover tooltip listing the full role names). */
-function RoleIcons({ roles, size = "sm" }: { roles?: DotaRole[]; size?: "sm" | "md" }) {
+const ROLE_ICON_MAP: Record<DotaRole, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  safe_lane:    Swords,
+  mid:          Crosshair,
+  off_lane:     Shield,
+  soft_support: Sparkles,
+  hard_support: HandHeart,
+};
+
+/** Role-preference pill row — uses the same icons as the picker modal,
+ *  color-coded per position, with a hover tooltip listing the full role
+ *  names. Rendered on its own line (block-level) below the rank/MMR. */
+function RoleIcons({ roles }: { roles?: DotaRole[] }) {
   if (!roles || roles.length === 0) return null;
   const sorted = DOTA_ROLES.filter(r => roles.includes(r.slug));
   const tip = sorted.map(r => `${r.short} ${r.label}`).join(" · ");
   return (
-    <span className={`dtd-role-pills ${size}`} title={`Plays: ${tip}`} aria-label={`Plays: ${tip}`}>
-      {sorted.map(r => (
-        <span key={r.slug} className="dtd-role-pill" data-pos={r.position}>{r.position}</span>
-      ))}
-    </span>
+    <div className="dtd-role-pills" title={`Plays: ${tip}`} aria-label={`Plays: ${tip}`}>
+      {sorted.map(r => {
+        const Icon = ROLE_ICON_MAP[r.slug];
+        return (
+          <span key={r.slug} className="dtd-role-pill" data-pos={r.position} aria-label={r.label}>
+            <Icon size={11} strokeWidth={2.5} />
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -733,26 +748,22 @@ function DotaTournamentDetailInner() {
           margin-left: 2px;
         }
 
-        /* Role pills — used in Players + Teams tabs */
-        .dtd-role-pills { display: inline-flex; gap: 3px; align-items: center; vertical-align: middle; cursor: help; }
-        .dtd-role-pills.sm { gap: 2px; }
+        /* Role pills — used in Players + Teams tabs.
+         * Block-level so the row sits on its own line below the rank/MMR. */
+        .dtd-role-pills {
+          display: flex; flex-wrap: wrap; gap: 4px;
+          margin-top: 4px;
+          cursor: help;
+        }
         .dtd-role-pill {
           display: inline-flex; align-items: center; justify-content: center;
-          font-weight: 800; font-feature-settings: "tnum";
+          width: 22px; height: 22px;
+          border-radius: 6px;
           background: rgba(161,43,31,0.18);
           border: 1px solid rgba(161,43,31,0.4);
           color: #ffae9d;
           transition: all 0.15s;
-        }
-        .dtd-role-pills.sm .dtd-role-pill {
-          width: 15px; height: 15px;
-          border-radius: 4px;
-          font-size: 0.58rem;
-        }
-        .dtd-role-pills.md .dtd-role-pill {
-          width: 19px; height: 19px;
-          border-radius: 5px;
-          font-size: 0.66rem;
+          flex-shrink: 0;
         }
         .dtd-role-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
         .dtd-role-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
@@ -1373,11 +1384,11 @@ function DotaTournamentDetailInner() {
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span className="dtd-tier-player-rank">{rankLabel}</span>
                                       <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
-                                      <RoleIcons roles={p.rolePreferences} />
                                     </div>
+                                    <RoleIcons roles={p.rolePreferences} />
                                   </div>
                                 </div>
                               </Link>
@@ -1430,10 +1441,8 @@ function DotaTournamentDetailInner() {
                               </PlayerAvatarBadge>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
-                                <div className="dtd-team-box-member-rank" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                                  {m.dotaMMR ? <span>{m.dotaMMR} MMR</span> : null}
-                                  <RoleIcons roles={m.rolePreferences} />
-                                </div>
+                                <div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div>
+                                <RoleIcons roles={m.rolePreferences} />
                               </div>
                             </div>
                           </Link>

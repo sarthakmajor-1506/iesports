@@ -371,10 +371,22 @@ export default function RolePreferenceModal({
 
           <div className="rpm-blurb">
             {(() => {
-              // Show blurb of most-recently-considered role (last in selection, or first role)
-              const last = Array.from(selected).pop();
-              const focus = last || ("safe_lane" as DotaRole);
-              return ROLE_BLURB[focus];
+              if (count === 0) {
+                return "Tap a role to begin — you need at least 2 picks.";
+              }
+              if (count === 1) {
+                const only = DOTA_ROLES.find(r => selected.has(r.slug))!;
+                return `Just ${only.label}? Pick one more — shuffle needs a backup.`;
+              }
+              const picked = DOTA_ROLES.filter(r => selected.has(r.slug));
+              const labels = picked.map(r => r.label);
+              const list = labels.length === 2
+                ? `${labels[0]} + ${labels[1]}`
+                : `${labels.slice(0, -1).join(", ")} + ${labels.slice(-1)}`;
+              if (count === 5) return `${list} — true flex pick! Fastest matchmaking. 💪`;
+              if (count === 4) return `${list} — high flex. You'll fit almost any team.`;
+              if (count === 3) return `${list} — solid range.`;
+              return `${list} — minimum picked. More roles = faster match.`;
             })()}
           </div>
 
