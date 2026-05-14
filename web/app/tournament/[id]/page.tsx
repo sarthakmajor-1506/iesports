@@ -21,7 +21,7 @@ import {
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
   MessageCircle, Camera,
   Coins, Target, Info, Zap, X, UserCog,
-  Crosshair, Sparkles, HandHeart,
+  Crosshair, Sparkles, HandHeart, Crown,
 } from "lucide-react";
 import { DOTA_ROLES, type DotaRole } from "@/lib/types";
 
@@ -32,6 +32,48 @@ const ROLE_ICON_MAP: Record<DotaRole, React.ComponentType<{ size?: number; strok
   soft_support: Sparkles,
   hard_support: HandHeart,
 };
+
+/** Single position pill shown on each team-member row (assigned role). */
+function AssignedRolePill({ role }: { role?: string }) {
+  if (!role) return null;
+  const meta: Record<string, { abbr: string; pos: number; label: string }> = {
+    safe_lane:    { abbr: "SL", pos: 1, label: "Safe Lane" },
+    mid:          { abbr: "M",  pos: 2, label: "Mid" },
+    off_lane:     { abbr: "OF", pos: 3, label: "Off Lane" },
+    soft_support: { abbr: "SS", pos: 4, label: "Support" },
+    hard_support: { abbr: "HS", pos: 5, label: "Hard Support" },
+    flex:         { abbr: "FX", pos: 0, label: "Flex" },
+  };
+  const m = meta[role];
+  if (!m) return null;
+  return (
+    <div className="dtd-team-pos-pill" data-pos={m.pos} title={`Pos ${m.pos || "?"} — ${m.label}`}>
+      <span className="dtd-team-pos-pill-pos">{m.pos > 0 ? m.pos : "F"}</span>
+      <span className="dtd-team-pos-pill-abbr">{m.abbr}</span>
+    </div>
+  );
+}
+
+/** Footer strip: 5 colored squares, dimmed when the team is missing a position. */
+function CoverageStrip({ coverage }: { coverage?: Record<string, boolean> }) {
+  const cov = coverage || {};
+  const positions = [
+    { slug: "safe_lane",    abbr: "1", pos: 1 },
+    { slug: "mid",          abbr: "2", pos: 2 },
+    { slug: "off_lane",     abbr: "3", pos: 3 },
+    { slug: "soft_support", abbr: "4", pos: 4 },
+    { slug: "hard_support", abbr: "5", pos: 5 },
+  ];
+  return (
+    <div className="dtd-team-coverage" title="Position coverage 1–5">
+      {positions.map(p => (
+        <div key={p.slug} className={`dtd-team-coverage-dot${cov[p.slug] ? " on" : ""}`} data-pos={p.pos}>
+          {p.abbr}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Role-preference pill row — uses the same icons as the picker modal,
  *  color-coded per position, with the role abbreviation (SL/M/OF/SS/HS)
@@ -876,22 +918,44 @@ function DotaTournamentDetailInner() {
 
         /* ── Teams grid ── */
         .dtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .dtd-team-box { background: rgba(18,18,21,0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 26px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; }
-        .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); border-color: rgba(161,43,31,0.2); }
-        .dtd-team-box-num { position: absolute; top: 14px; right: 16px; font-size: 0.62rem; font-weight: 800; color: #A12B1F; background: rgba(161,43,31,0.1); border: 1px solid rgba(161,43,31,0.25); padding: 3px 10px; border-radius: 100px; }
-        .dtd-team-box-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-        .dtd-team-logo { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, #A12B1F 0%, #7A1F15 100%); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 0.05em; flex-shrink: 0; overflow: hidden; }
+        .dtd-team-box { background: linear-gradient(180deg, rgba(20,20,24,0.9) 0%, rgba(14,14,18,0.95) 100%); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 22px 22px 18px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; overflow: hidden; }
+        .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.55); }
+        .dtd-team-box-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; opacity: 0.85; }
+        .dtd-team-box-num { position: absolute; top: 12px; right: 14px; font-size: 0.6rem; font-weight: 800; padding: 3px 9px; border-radius: 100px; border: 1px solid; letter-spacing: 0.04em; }
+        .dtd-team-box-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-right: 38px; }
+        .dtd-team-logo { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; letter-spacing: 0.04em; flex-shrink: 0; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12); }
         .dtd-team-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .dtd-team-box-name { font-size: 1.05rem; font-weight: 900; color: #E6E6E6; }
-        .dtd-team-box-avg { font-size: 0.7rem; color: #555550; margin-top: 2px; }
-        .dtd-team-box-members { display: flex; flex-direction: column; gap: 10px; }
-        .dtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; }
-        .dtd-team-box-member:hover { background: rgba(161,43,31,0.06); transform: translateX(2px); }
+        .dtd-team-box-name { font-size: 1rem; font-weight: 900; color: #f0f0e8; letter-spacing: -0.01em; }
+        .dtd-team-box-meta { font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+        .dtd-team-box-members { display: flex; flex-direction: column; gap: 6px; }
+        .dtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; border: 1px solid transparent; }
+        .dtd-team-box-member:hover { background: rgba(161,43,31,0.07); border-color: rgba(161,43,31,0.18); transform: translateX(2px); }
         .dtd-team-box-member-avatar { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
         .dtd-team-box-member-init { width: 34px; height: 34px; border-radius: 8px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555550; flex-shrink: 0; }
-        .dtd-team-box-member-name { font-size: 0.86rem; font-weight: 600; color: #e0e0da; }
-        .dtd-team-box-member-rank { font-size: 0.72rem; color: #8A8880; }
-        .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.74rem; color: #555550; }
+        .dtd-team-box-member-name { font-size: 0.86rem; font-weight: 700; color: #e8e8de; line-height: 1.15; }
+        .dtd-team-box-member-rank { font-size: 0.7rem; color: #8A8880; margin-top: 2px; line-height: 1.1; }
+        .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.74rem; color: #555550; }
+
+        /* Single position pill on each team-member row */
+        .dtd-team-pos-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 30px; padding: 4px 4px 3px; border-radius: 7px; flex-shrink: 0; line-height: 1; background: rgba(161,43,31,0.18); border: 1px solid rgba(161,43,31,0.4); color: #ffae9d; transition: transform 0.15s; }
+        .dtd-team-box-member:hover .dtd-team-pos-pill { transform: scale(1.06); }
+        .dtd-team-pos-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+        .dtd-team-pos-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
+        .dtd-team-pos-pill[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
+        .dtd-team-pos-pill[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
+        .dtd-team-pos-pill[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
+        .dtd-team-pos-pill-pos { font-size: 0.78rem; font-weight: 800; }
+        .dtd-team-pos-pill-abbr { font-size: 0.48rem; font-weight: 800; opacity: 0.85; margin-top: 1px; letter-spacing: 0.04em; }
+
+        /* Footer coverage strip (1–5 squares) */
+        .dtd-team-coverage { display: flex; gap: 4px; }
+        .dtd-team-coverage-dot { width: 18px; height: 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #3a3a3a; opacity: 0.45; }
+        .dtd-team-coverage-dot.on { opacity: 1; }
+        .dtd-team-coverage-dot.on[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+        .dtd-team-coverage-dot.on[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
+        .dtd-team-coverage-dot.on[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
+        .dtd-team-coverage-dot.on[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
+        .dtd-team-coverage-dot.on[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
 
         /* ── Tables ── */
         /* Sticky header row + first column. border-separate so sticky borders
@@ -1443,43 +1507,70 @@ function DotaTournamentDetailInner() {
                   <TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
                 <div className="dtd-teams-grid">
-                  {teams.map((team: any) => (
-                    <div key={team.id} className="dtd-team-box">
-                      <span className="dtd-team-box-num">#{team.teamIndex}</span>
-                      <div className="dtd-team-box-header">
-                        <div className="dtd-team-logo">
-                          {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="dtd-team-box-name">{team.teamName}</div>
-                          {team.avgSkillLevel && <div className="dtd-team-box-avg">Avg MMR: {team.avgSkillLevel}</div>}
-                        </div>
-                      </div>
-                      <div className="dtd-team-box-members">
-                        {[...(team.members || [])]
-                          .sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0))
-                          .map((m: any, i: number) => {
-                          const isMeMember = user?.uid === m.uid;
-                          return (
-                          <Link key={m.uid || i} href={`/player/${m.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-                            <div className="dtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
-                              <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
-                                {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
-                              </PlayerAvatarBadge>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
-                                <div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div>
-                                <RoleIcons roles={m.rolePreferences} />
-                              </div>
+                  {teams.map((team: any) => {
+                    // Bracket theming for header + accents
+                    const bracketColors: Record<string, { bg: string; border: string; text: string; label: string; gStart: string; gEnd: string }> = {
+                      divine_immortal: { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)", text: "#f59e0b", label: "Divine – Immortal", gStart: "#f59e0b", gEnd: "#b45309" },
+                      legend_ancient:  { bg: "rgba(168,85,247,0.10)", border: "rgba(168,85,247,0.30)", text: "#a855f7", label: "Legend – Ancient", gStart: "#a855f7", gEnd: "#6b21a8" },
+                      crusader_archon: { bg: "rgba(161,43,31,0.10)", border: "rgba(161,43,31,0.30)", text: "#A12B1F", label: "Crusader – Archon", gStart: "#A12B1F", gEnd: "#7A1F15" },
+                      herald_guardian: { bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.32)", text: "#9ca3af", label: "Herald – Guardian", gStart: "#6b7280", gEnd: "#374151" },
+                    };
+                    const bColors = bracketColors[team.bracket || "herald_guardian"] || bracketColors.herald_guardian;
+                    // Position-ordered roster (Pos 1 → Pos 5)
+                    const POS_ORDER = ["safe_lane", "mid", "off_lane", "soft_support", "hard_support"];
+                    const orderedMembers = [...(team.members || [])].sort((a: any, b: any) => {
+                      const ai = POS_ORDER.indexOf(a.assignedRole);
+                      const bi = POS_ORDER.indexOf(b.assignedRole);
+                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                    });
+                    const avgTier = team.avgRankTier ?? team.avgSkillLevel ?? 0;
+                    return (
+                      <div key={team.id} className="dtd-team-box" style={{ borderColor: bColors.border }}>
+                        <div className="dtd-team-box-accent" style={{ background: `linear-gradient(90deg, ${bColors.gStart} 0%, ${bColors.gEnd} 100%)` }} />
+                        <span className="dtd-team-box-num" style={{ color: bColors.text, background: bColors.bg, borderColor: bColors.border }}>#{team.teamIndex}</span>
+                        <div className="dtd-team-box-header">
+                          <div className="dtd-team-logo" style={{ background: `linear-gradient(135deg, ${bColors.gStart} 0%, ${bColors.gEnd} 100%)` }}>
+                            {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="dtd-team-box-name">{team.teamName}</div>
+                            <div className="dtd-team-box-meta">
+                              <span style={{ color: bColors.text }}>{bColors.label}</span>
+                              {avgTier > 0 && <><span style={{ color: "#3f3f3f" }}>·</span><span style={{ color: "#8A8880" }}>Avg T{avgTier}</span></>}
                             </div>
-                          </Link>
-                        );})}
+                          </div>
+                        </div>
+                        <div className="dtd-team-box-members">
+                          {orderedMembers.map((m: any, i: number) => {
+                            const isMeMember = user?.uid === m.uid;
+                            const isCaptain = team.captainUid && team.captainUid === m.uid;
+                            const rankLabel = m.iesportsRank || m.riotRank || "Unranked";
+                            return (
+                            <Link key={m.uid || i} href={`/player/${m.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                              <div className="dtd-team-box-member" style={isMeMember ? { background: "rgba(60,203,255,0.10)", boxShadow: "inset 2px 0 0 #3CCBFF", borderRadius: 8 } : {}}>
+                                <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
+                                  {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
+                                </PlayerAvatarBadge>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div className="dtd-team-box-member-name">
+                                    {isCaptain && <Crown size={11} strokeWidth={2.5} style={{ verticalAlign: "middle", marginRight: 4, color: "#fbbf24" }} />}
+                                    {m.steamName || "Player"}
+                                    {isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}
+                                  </div>
+                                  <div className="dtd-team-box-member-rank">{rankLabel}{m.dotaMMR ? ` · ${m.dotaMMR} MMR` : ""}</div>
+                                </div>
+                                <AssignedRolePill role={m.assignedRole} />
+                              </div>
+                            </Link>
+                          );})}
+                        </div>
+                        <div className="dtd-team-box-footer">
+                          <CoverageStrip coverage={team.roleCoverage} />
+                          <span style={{ fontWeight: 800, color: "#8A8880" }}>{(team.members?.length || 0)}/5</span>
+                        </div>
                       </div>
-                      <div className="dtd-team-box-footer">
-                        <span>{team.members?.length || 0} players</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 </div>
               )}
