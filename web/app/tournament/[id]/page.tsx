@@ -33,25 +33,19 @@ const ROLE_ICON_MAP: Record<DotaRole, React.ComponentType<{ size?: number; strok
   hard_support: HandHeart,
 };
 
-/** Small icon-only badge on the right of a team-member row showing the
- *  position the player is assigned (Swords/Crosshair/Shield/Sparkles/HandHeart,
- *  color-coded per position). Hover tooltip shows the full role name. */
+/** Stacked icon+abbrev pill on the right of each team-member row showing
+ *  the player's assigned position. Same visual language as the Players-tab
+ *  role pills (.dtd-role-pill) for consistency across the page. */
 function AssignedRoleIcon({ role }: { role?: string }) {
   if (!role) return null;
-  const META: Record<string, { Icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; pos: number; label: string }> = {
-    safe_lane:    { Icon: Swords,    pos: 1, label: "Safe Lane"    },
-    mid:          { Icon: Crosshair, pos: 2, label: "Mid"          },
-    off_lane:     { Icon: Shield,    pos: 3, label: "Off Lane"     },
-    soft_support: { Icon: Sparkles,  pos: 4, label: "Support"      },
-    hard_support: { Icon: HandHeart, pos: 5, label: "Hard Support" },
-  };
-  const m = META[role];
-  if (!m) return null;
-  const { Icon } = m;
+  const r = DOTA_ROLES.find(x => x.slug === role);
+  if (!r) return null;
+  const Icon = ROLE_ICON_MAP[r.slug];
   return (
-    <div className="dtd-team-role-icon" data-pos={m.pos} title={`Pos ${m.pos} — ${m.label}`} aria-label={m.label}>
-      <Icon size={13} strokeWidth={2.5} />
-    </div>
+    <span className="dtd-role-pill" data-pos={r.position} aria-label={r.label} title={r.label}>
+      <Icon size={10} strokeWidth={2.5} />
+      <span className="dtd-role-pill-abbr">{r.abbrev}</span>
+    </span>
   );
 }
 
@@ -916,14 +910,8 @@ function DotaTournamentDetailInner() {
         .dtd-team-box-member-rank { font-size: 0.62rem; color: #8A8880; margin-top: 1px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.66rem; color: #555550; }
 
-        /* Per-member assigned-role icon badge (right side of each row) */
-        .dtd-team-role-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; background: rgba(161,43,31,0.18); border: 1px solid rgba(161,43,31,0.4); color: #ffae9d; transition: transform 0.15s; }
-        .dtd-team-box-member:hover .dtd-team-role-icon { transform: scale(1.1); }
-        .dtd-team-role-icon[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
-        .dtd-team-role-icon[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
-        .dtd-team-role-icon[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
-        .dtd-team-role-icon[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
-        .dtd-team-role-icon[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
+        /* Team-row assigned role pill reuses .dtd-role-pill styling from
+         * the Players-tab role-prefs rendering for visual consistency. */
 
         /* ── Tables ── */
         /* Sticky header row + first column. border-separate so sticky borders
