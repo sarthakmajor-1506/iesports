@@ -22,7 +22,22 @@ import {
   MessageCircle, Camera,
   Coins, Target, Info, Zap, X, UserCog,
 } from "lucide-react";
-import type { DotaRole } from "@/lib/types";
+import { DOTA_ROLES, type DotaRole } from "@/lib/types";
+
+/** Inline pill row showing a player's Dota 2 role preferences (sorted by
+ *  position number, with a hover tooltip listing the full role names). */
+function RoleIcons({ roles, size = "sm" }: { roles?: DotaRole[]; size?: "sm" | "md" }) {
+  if (!roles || roles.length === 0) return null;
+  const sorted = DOTA_ROLES.filter(r => roles.includes(r.slug));
+  const tip = sorted.map(r => `${r.short} ${r.label}`).join(" · ");
+  return (
+    <span className={`dtd-role-pills ${size}`} title={`Plays: ${tip}`} aria-label={`Plays: ${tip}`}>
+      {sorted.map(r => (
+        <span key={r.slug} className="dtd-role-pill" data-pos={r.position}>{r.position}</span>
+      ))}
+    </span>
+  );
+}
 
 type Tab = "overview" | "players" | "teams" | "standings" | "matches" | "brackets" | "leaderboard";
 
@@ -717,6 +732,34 @@ function DotaTournamentDetailInner() {
           box-shadow: 0 0 8px rgba(255,90,74,0.7);
           margin-left: 2px;
         }
+
+        /* Role pills — used in Players + Teams tabs */
+        .dtd-role-pills { display: inline-flex; gap: 3px; align-items: center; vertical-align: middle; cursor: help; }
+        .dtd-role-pills.sm { gap: 2px; }
+        .dtd-role-pill {
+          display: inline-flex; align-items: center; justify-content: center;
+          font-weight: 800; font-feature-settings: "tnum";
+          background: rgba(161,43,31,0.18);
+          border: 1px solid rgba(161,43,31,0.4);
+          color: #ffae9d;
+          transition: all 0.15s;
+        }
+        .dtd-role-pills.sm .dtd-role-pill {
+          width: 15px; height: 15px;
+          border-radius: 4px;
+          font-size: 0.58rem;
+        }
+        .dtd-role-pills.md .dtd-role-pill {
+          width: 19px; height: 19px;
+          border-radius: 5px;
+          font-size: 0.66rem;
+        }
+        .dtd-role-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+        .dtd-role-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
+        .dtd-role-pill[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
+        .dtd-role-pill[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
+        .dtd-role-pill[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
+        .dtd-role-pills:hover .dtd-role-pill { transform: translateY(-1px); filter: brightness(1.15); }
         @keyframes dtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         .dtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
@@ -1053,20 +1096,6 @@ function DotaTournamentDetailInner() {
                     }}
                   >Register Now →</button>
                 )}
-                {canRegister && (
-                  <button
-                    className="dtd-roles-btn"
-                    onClick={() => {
-                      if (!user) { setShowLoginPrompt(true); return; }
-                      setRolesAutoPrompt(false);
-                      setShowRoles(true);
-                    }}
-                    title="Pick your Dota 2 positions"
-                  >
-                    <UserCog size={15} strokeWidth={2.2} />
-                    <span>Pick Roles</span>
-                  </button>
-                )}
                 {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                   <>
                     <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>Slots Full</button>
@@ -1344,9 +1373,10 @@ function DotaTournamentDetailInner() {
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                                       <span className="dtd-tier-player-rank">{rankLabel}</span>
                                       <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
+                                      <RoleIcons roles={p.rolePreferences} />
                                     </div>
                                   </div>
                                 </div>
@@ -1398,7 +1428,13 @@ function DotaTournamentDetailInner() {
                               <PlayerAvatarBadge mvpBracket={m.mvpBracket} isChampion={m.isChampion} size={36} inset>
                                 {m.steamAvatar ? <img src={m.steamAvatar} alt={m.steamName} className="dtd-team-box-member-avatar" /> : <div className="dtd-team-box-member-init">{(m.steamName || "?")[0]}</div>}
                               </PlayerAvatarBadge>
-                              <div style={{ flex: 1, minWidth: 0 }}><div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div><div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div></div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
+                                <div className="dtd-team-box-member-rank" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                  {m.dotaMMR ? <span>{m.dotaMMR} MMR</span> : null}
+                                  <RoleIcons roles={m.rolePreferences} />
+                                </div>
+                              </div>
                             </div>
                           </Link>
                         );})}

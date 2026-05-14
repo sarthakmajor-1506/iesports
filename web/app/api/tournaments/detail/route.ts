@@ -90,6 +90,28 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Enrich team members with rolePreferences from the players subcollection ──
+    // Teams are denormalized at shuffle time; if a member's `rolePreferences` wasn't
+    // copied (or the player picked roles after shuffle), pull it from `players[]`
+    // which is the source of truth.
+    if (game === "dota2" && teams.length > 0 && players.length > 0) {
+      const rolesByUid: Record<string, string[]> = {};
+      for (const p of players as any[]) {
+        const uid = p.uid || p.id;
+        if (uid && Array.isArray(p.rolePreferences)) rolesByUid[uid] = p.rolePreferences;
+      }
+      for (const t of teams as any[]) {
+        const tm = (t as any).members || [];
+        (t as any).members = tm.map((m: any) => {
+          if (!m?.uid) return m;
+          const rp = rolesByUid[m.uid];
+          // Member's own field wins if present; otherwise patch from players map.
+          if (Array.isArray(m.rolePreferences) && m.rolePreferences.length > 0) return m;
+          return rp ? { ...m, rolePreferences: rp } : m;
+        });
+      }
+    }
+
     // ── Enrich team members + leaderboard + players with honor fields ──
     // Honors (mvpBracket / isChampion) live on the user doc and are stamped /
     // cleared by scripts/markTournamentHonors.ts at the end of every
