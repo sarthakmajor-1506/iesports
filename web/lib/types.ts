@@ -50,6 +50,35 @@ export type Team = {
   createdAt: Date;
 };
 
+// Dota 2 lane / position preferences (used by shuffle to balance teams).
+// Stored on the per-tournament player doc: `tournaments/{id}/players/{uid}.rolePreferences`.
+// Players pick min 2, max 5 of these.
+export type DotaRole = "safe_lane" | "mid" | "off_lane" | "soft_support" | "hard_support";
+
+export const DOTA_ROLES: { slug: DotaRole; label: string; short: string; position: number }[] = [
+  { slug: "safe_lane",    label: "Safe Lane",    short: "Pos 1", position: 1 },
+  { slug: "mid",          label: "Mid",          short: "Pos 2", position: 2 },
+  { slug: "off_lane",     label: "Off Lane",     short: "Pos 3", position: 3 },
+  { slug: "soft_support", label: "Support",      short: "Pos 4", position: 4 },
+  { slug: "hard_support", label: "Hard Support", short: "Pos 5", position: 5 },
+];
+
+// Shape of `tournaments/{id}/players/{uid}` doc (Dota 2 5v5).
+export type TournamentPlayer = {
+  uid: string;
+  fullName: string;
+  steamName: string;
+  steamAvatar: string;
+  dotaBracket: Bracket;
+  dotaRankTier: number;
+  dotaMMR: number;
+  discordId: string;
+  discordUsername?: string;
+  registeredAt: string;
+  rolePreferences?: DotaRole[];          // present after the player selects roles
+  rolePreferencesUpdatedAt?: string;
+};
+
 export type AdminRole = "super_admin" | "cafe_admin";
 
 export type UserProfile = {

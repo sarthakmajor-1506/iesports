@@ -8,6 +8,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Navbar } from "@/app/components/Navbar";
 import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import RegisterModal from "@/app/components/RegisterModal";
+import RolePreferenceModal from "@/app/components/RolePreferenceModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
@@ -19,8 +20,9 @@ import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
   Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
   MessageCircle, Camera,
-  Coins, Target, Info, Zap, X,
+  Coins, Target, Info, Zap, X, UserCog,
 } from "lucide-react";
+import type { DotaRole } from "@/lib/types";
 
 type Tab = "overview" | "players" | "teams" | "standings" | "matches" | "brackets" | "leaderboard";
 
@@ -529,6 +531,39 @@ function DotaTournamentDetailInner() {
     window.addEventListener("focus", checkReg);
     return () => window.removeEventListener("focus", checkReg);
   }, [user, id]);
+
+  // ─── Role preferences ─────────────────────────────────────────────────────
+  // Fetch the registered player's saved role prefs and, the first time we land
+  // on the page while registered without any picks, pop the modal automatically.
+  const [showRoles, setShowRoles] = useState(false);
+  const [rolesAutoPrompt, setRolesAutoPrompt] = useState(false);
+  const [currentRoles, setCurrentRoles] = useState<DotaRole[] | null>(null);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+  const autoPromptedRef = useRef(false);
+  useEffect(() => {
+    if (!user || !id || !isRegistered) {
+      setCurrentRoles(null);
+      setRolesLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/dota/role-preferences?tournamentId=${id}&uid=${user.uid}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        const roles = (data?.roles as DotaRole[] | null) ?? null;
+        setCurrentRoles(roles);
+        setRolesLoaded(true);
+        // Auto-popup once per page mount if registered but no roles saved
+        if (!autoPromptedRef.current && (!roles || roles.length === 0)) {
+          autoPromptedRef.current = true;
+          setRolesAutoPrompt(true);
+          setShowRoles(true);
+        }
+      })
+      .catch(() => { if (!cancelled) setRolesLoaded(true); });
+    return () => { cancelled = true; };
+  }, [user, id, isRegistered]);
   useEffect(() => {
     if (!user || !id) return;
     user.getIdToken().then(token =>
@@ -638,6 +673,50 @@ function DotaTournamentDetailInner() {
         .dtd-hero-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; animation: dtd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.16s both; flex-wrap: wrap; }
         .dtd-hero-share-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(161,43,31,0.12); border: 1px solid rgba(161,43,31,0.3); color: #A12B1F; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); transition: all 0.2s; flex-shrink: 0; }
         .dtd-hero-share-btn:hover { background: rgba(161,43,31,0.25); border-color: rgba(161,43,31,0.5); transform: scale(1.05); }
+
+        /* Role-preference button — secondary action next to Register */
+        .dtd-roles-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 11px 20px;
+          background: rgba(161,43,31,0.10);
+          border: 1px solid rgba(161,43,31,0.35);
+          color: #ff8a78;
+          border-radius: 100px;
+          font-size: 0.86rem; font-weight: 800;
+          font-family: inherit; cursor: pointer;
+          transition: all 0.18s;
+          position: relative;
+        }
+        .dtd-roles-btn:hover {
+          background: rgba(161,43,31,0.20);
+          border-color: rgba(161,43,31,0.6);
+          color: #fff;
+          transform: translateY(-1px);
+        }
+        .dtd-roles-btn.set {
+          background: rgba(34,197,94,0.10);
+          border-color: rgba(34,197,94,0.35);
+          color: #86efac;
+        }
+        .dtd-roles-btn.set:hover {
+          background: rgba(34,197,94,0.18);
+          border-color: rgba(34,197,94,0.55);
+          color: #fff;
+        }
+        .dtd-roles-btn.unset {
+          /* Subtle attention pulse when the player hasn't picked yet */
+          animation: dtd-roles-pulse 2.4s ease-out infinite;
+        }
+        @keyframes dtd-roles-pulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(161,43,31,0.0); }
+          50%     { box-shadow: 0 0 0 8px rgba(161,43,31,0.18); }
+        }
+        .dtd-roles-dot {
+          width: 7px; height: 7px; border-radius: 50%;
+          background: #ff5a4a;
+          box-shadow: 0 0 8px rgba(255,90,74,0.7);
+          margin-left: 2px;
+        }
         @keyframes dtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         .dtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
@@ -876,6 +955,8 @@ function DotaTournamentDetailInner() {
           .dtd-hero-title { font-size: 1.6rem; }
           .dtd-hero-desc { font-size: 0.88rem; }
           .dtd-hero-actions { gap: 8px; }
+          .dtd-roles-btn { padding: 10px 14px; font-size: 0.78rem; }
+          .dtd-registered-cluster > div:first-child { padding: 10px 18px !important; font-size: 0.82rem !important; }
           .dtd-mc-center { min-width: 70px; }
           .dtd-mc-index { width: 36px; }
           .dtd-mc-score-box { font-size: 1rem; }
@@ -972,6 +1053,20 @@ function DotaTournamentDetailInner() {
                     }}
                   >Register Now →</button>
                 )}
+                {canRegister && (
+                  <button
+                    className="dtd-roles-btn"
+                    onClick={() => {
+                      if (!user) { setShowLoginPrompt(true); return; }
+                      setRolesAutoPrompt(false);
+                      setShowRoles(true);
+                    }}
+                    title="Pick your Dota 2 positions"
+                  >
+                    <UserCog size={15} strokeWidth={2.2} />
+                    <span>Pick Roles</span>
+                  </button>
+                )}
                 {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                   <>
                     <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>Slots Full</button>
@@ -990,8 +1085,19 @@ function DotaTournamentDetailInner() {
                   </>
                 )}
                 {isRegistered && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="dtd-registered-cluster" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ padding: "12px 28px", background: "rgba(22,163,74,0.12)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 100, fontSize: "0.9rem", fontWeight: 700 }}>✓ Registered</div>
+                    <button
+                      className={`dtd-roles-btn${currentRoles && currentRoles.length > 0 ? " set" : " unset"}`}
+                      onClick={() => { setRolesAutoPrompt(false); setShowRoles(true); }}
+                      title={currentRoles && currentRoles.length > 0 ? "Edit your role preferences" : "Pick your roles"}
+                    >
+                      <UserCog size={15} strokeWidth={2.2} />
+                      <span>{currentRoles && currentRoles.length > 0 ? `Roles · ${currentRoles.length}` : "Pick Roles"}</span>
+                      {rolesLoaded && (!currentRoles || currentRoles.length === 0) && (
+                        <span className="dtd-roles-dot" aria-hidden />
+                      )}
+                    </button>
                     {tournament.status === "upcoming" && !tournament.bracketsComputed && (
                       <button
                         onClick={handleUnregister}
@@ -1545,6 +1651,17 @@ function DotaTournamentDetailInner() {
           dotaProfile={dotaProfile}
           onClose={() => setShowRegister(false)}
           onSuccess={() => { setIsRegistered(true); refetchData(); }}
+        />
+      )}
+
+      {showRoles && user && id && (
+        <RolePreferenceModal
+          tournamentId={id}
+          uid={user.uid}
+          initialRoles={currentRoles || undefined}
+          autoPrompt={rolesAutoPrompt}
+          onClose={() => { setShowRoles(false); setRolesAutoPrompt(false); }}
+          onSaved={(roles) => { setCurrentRoles(roles); }}
         />
       )}
 
