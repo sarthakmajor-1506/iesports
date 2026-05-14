@@ -84,12 +84,44 @@ function teamAvgTier(t: TeamSlot): number {
   return t.members.reduce((a, m) => a + (m.dotaRankTier || 0), 0) / t.members.length;
 }
 
-// We optimise for spread of avg rank tier (what the admin actually sees
-// in the preview). Smaller = more balanced.
+// How many of the 5 canonical positions are missing across all teams
+// (summed). Smaller = better role coverage.
+function totalMissingRoles(teams: TeamSlot[]): number {
+  let sum = 0;
+  for (const t of teams) {
+    for (const r of POSITIONS) if (!t.coverage[r]) sum++;
+  }
+  return sum;
+}
+
+// Cost of one team having a missing role, expressed in tier-points so it
+// composes with the tier-spread metric. A swap that fills a position is
+// worth roughly 6 tier points of imbalance — strong enough that the
+// refiner prefers full coverage but doesn't go nuts if some role is
+// genuinely unfillable (e.g. only 2 players prefer Hard Support).
+const COVERAGE_PENALTY = 6;
+
+// Combined "badness" metric — what the algorithm minimises. Tier spread
+// + a heavy multiplier on missing roles. Used by the refinement step to
+// decide whether a swap is an improvement.
 function spread(teams: TeamSlot[]): number {
   if (teams.length === 0) return 0;
   const avgs = teams.map(teamAvgTier);
-  return Math.max(...avgs) - Math.min(...avgs);
+  const tierSpread = Math.max(...avgs) - Math.min(...avgs);
+  return tierSpread + COVERAGE_PENALTY * totalMissingRoles(teams);
+}
+
+// Seeded PRNG (mulberry32) so the algorithm is deterministic per seed
+// but produces different layouts when the caller supplies a new seed.
+function makeRng(seed: number) {
+  let s = seed >>> 0;
+  return function rng(): number {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function stdDev(nums: number[]): number {
@@ -108,25 +140,24 @@ function canSwap(pa: AssignedMember, pb: AssignedMember): boolean {
   return paOk && pbOk;
 }
 
-function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[] {
+function shuffleByRolesAndRating(players: Player[], numTeams: number, seed: number): TeamSlot[] {
+  const rng = makeRng(seed);
   const teams: TeamSlot[] = Array.from({ length: numTeams }, () => ({ members: [], coverage: {} }));
   const assigned = new Set<string>();
 
   // PHASE 1 — Greedy "strongest → weakest team" assignment.
   //
-  // Sort all players by skill desc, then walk the list. For each player
-  // we prefer the team where they fill an *uncovered* preferred role AND
-  // has the lowest cumulative score. If no team needs one of their
-  // preferred roles, they fall onto the lowest-score team as flex.
-  //
-  // This is the same approach Valorant uses, generalised with role
-  // coverage as a tier-A filter. It naturally spreads top players —
-  // the Immortal goes to team 1, the next Divine goes to team 2 (which
-  // is now weakest), and so on, instead of clumping by snake position.
+  // Sort all players by skill desc. Ties broken by seeded RNG so two
+  // runs with different seeds reshuffle the order of equal-tier players,
+  // producing a different (but still well-balanced) layout each time.
+  // For each player we prefer the team where they fill an *uncovered*
+  // preferred role AND has the lowest cumulative score. If no team
+  // needs one of their preferred roles, they fall onto the lowest-score
+  // team as flex.
   const sorted = [...players].sort((a, b) => {
     const s = memberScore(b) - memberScore(a);
     if (s !== 0) return s;
-    return String(a.uid || "").localeCompare(String(b.uid || ""));
+    return rng() - 0.5;
   });
 
   for (const p of sorted) {
@@ -146,14 +177,24 @@ function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[
 
     let chosen: Candidate;
     if (tierA.length > 0) {
-      tierA.sort((a, b) => teamTotalScore(a.team) - teamTotalScore(b.team));
+      // Lowest score wins; equal scores broken by RNG so equally-weak
+      // teams get a fair shake at grabbing the next player.
+      tierA.sort((a, b) => {
+        const s = teamTotalScore(a.team) - teamTotalScore(b.team);
+        if (s !== 0) return s;
+        return rng() - 0.5;
+      });
       chosen = tierA[0];
     } else {
       // No team needs one of this player's roles — place on weakest team
       // as flex (or in their first preferred role if any).
-      const fallback = [...openTeams].sort((a, b) => teamTotalScore(a) - teamTotalScore(b))[0];
+      const openSorted = [...openTeams].sort((a, b) => {
+        const s = teamTotalScore(a) - teamTotalScore(b);
+        if (s !== 0) return s;
+        return rng() - 0.5;
+      });
       const role: DotaRole | "flex" = (playerRoles[0] as DotaRole) || "flex";
-      chosen = { team: fallback, role };
+      chosen = { team: openSorted[0], role };
     }
 
     chosen.team.members.push({ ...p, assignedRole: chosen.role });
@@ -165,10 +206,12 @@ function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[
 
   // PHASE 2 — Steepest-descent swap refinement.
   //
-  // Repeatedly scan every legal pair-swap across teams. Compute spread
-  // for the swap; track the swap that REDUCES spread the MOST; apply
-  // that one and loop. Stops when no swap improves spread. Bounded at
-  // 300 iters so a degenerate input can never burn the route's budget.
+  // Scan every legal pair-swap. Pick the swap that REDUCES the combined
+  // spread metric (tier spread + coverage-penalty × missing roles) the
+  // most. Apply it; loop. Stops when no swap improves. Coverage-aware
+  // because the metric heavily penalises missing roles, so swaps that
+  // happen to fill an uncovered position are favoured even if they
+  // slightly worsen tier spread.
   for (let iter = 0; iter < 300; iter++) {
     const before = spread(teams);
     let bestSwap: { i: number; j: number; a: number; b: number; after: number } | null = null;
@@ -181,7 +224,8 @@ function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[
             const pb = teams[j].members[b];
             if (!canSwap(pa, pb)) continue;
 
-            // Simulate swap
+            // Simulate swap (assignedRole stays with the slot, not the
+            // player, so coverage flags are unchanged across swap).
             teams[i].members[a] = { ...pb, assignedRole: pa.assignedRole };
             teams[j].members[b] = { ...pa, assignedRole: pb.assignedRole };
             const after = spread(teams);
@@ -199,7 +243,7 @@ function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[
       }
     }
 
-    if (!bestSwap) break; // converged
+    if (!bestSwap) break;
 
     const { i, j, a, b } = bestSwap;
     const pa = teams[i].members[a];
@@ -220,13 +264,23 @@ export async function POST(req: NextRequest) {
       teamCount,
       dryRun = true,
       deleteExisting = false,
+      seed: seedInput,
     } = body as {
       adminKey?: string;
       tournamentId?: string;
       teamCount?: number;
       dryRun?: boolean;
       deleteExisting?: boolean;
+      seed?: number;
     };
+
+    // If caller supplies a seed (e.g. the admin re-publishing a preview),
+    // use it verbatim so the published teams match the preview byte-for-byte.
+    // Otherwise generate a fresh 32-bit seed so each preview click gives
+    // a different (but well-balanced) shuffle.
+    const seed = (typeof seedInput === "number" && Number.isFinite(seedInput))
+      ? Math.floor(seedInput) >>> 0
+      : (Math.floor(Math.random() * 0x100000000) >>> 0);
 
     if (!adminKey) return NextResponse.json({ error: "Missing admin key" }, { status: 400 });
     if (await isNotAdmin(adminKey)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -257,7 +311,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Run the algorithm.
-    const teamSlots = shuffleByRolesAndRating(players, numTeams);
+    const teamSlots = shuffleByRolesAndRating(players, numTeams, seed);
 
     // 5. Build the response in the shape the admin UI already consumes.
     //    Admin renders Valorant-style fields (riotTier/riotRank/riotAvatar/
@@ -353,6 +407,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         dryRun: true,
+        seed,
         totalPlayers: players.length,
         teamCount: numTeams,
         teams: responseTeams,
@@ -391,6 +446,7 @@ export async function POST(req: NextRequest) {
       teamsGenerated: true,
       teamCount: numTeams,
       teamsGeneratedAt: new Date().toISOString(),
+      teamsShuffleSeed: seed,
     });
     void tournamentData;
     await writeBatch.commit();
@@ -398,6 +454,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       dryRun: false,
+      seed,
       totalPlayers: players.length,
       teamCount: numTeams,
       teams: responseTeams,

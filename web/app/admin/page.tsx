@@ -169,6 +169,7 @@ export default function AdminPanel() {
   // present, the team list + video player render from the draft instead of
   // the live `teams` state (which still reflects what's on the public site).
   const [draftTeams, setDraftTeams] = useState<TeamData[] | null>(null);
+  const [draftSeed, setDraftSeed] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
 
@@ -763,6 +764,7 @@ export default function AdminPanel() {
   useEffect(() => {
     // Any tournament switch invalidates an in-memory shuffle preview.
     setDraftTeams(null);
+    setDraftSeed(null);
     setShuffleVideoTeams(null);
     if (!tournamentId || !authenticated) { setTeams([]); setMatches([]); return; }
     const col = getSelectedCollection();
@@ -1694,12 +1696,16 @@ export default function AdminPanel() {
                                 tournamentId,
                                 teamCount: parseInt(teamCount),
                                 dryRun: true,
+                                // No seed sent → the Dota endpoint generates a
+                                // fresh one each click so every preview is a
+                                // genuine reshuffle (not the same layout twice).
                               }),
                               fetchPlayerHistory(tournamentId),
                             ]);
                             const fresh = (data.teams || []) as TeamData[];
                             setPlayerHistoryByUid(history);
                             setDraftTeams(fresh);
+                            setDraftSeed(typeof data.seed === "number" ? data.seed : null);
                             setShuffleVideoTeams(buildShuffleVideoData(fresh, history));
                           } catch (e) {
                             console.error("[ShuffleVideo] preview failed:", e);
@@ -1737,6 +1743,10 @@ export default function AdminPanel() {
                                     teamCount: parseInt(teamCount),
                                     dryRun: false,
                                     deleteExisting: true,
+                                    // Replay the SAME seed used by the
+                                    // preview so the published teams are
+                                    // byte-identical to what the admin saw.
+                                    ...(draftSeed !== null ? { seed: draftSeed } : {}),
                                   });
                                 } else {
                                   await apiCall("/api/valorant/publish-teams", {
@@ -1745,6 +1755,7 @@ export default function AdminPanel() {
                                   });
                                 }
                                 setDraftTeams(null);
+                                setDraftSeed(null);
                               } catch (e) {
                                 console.error("[ShuffleVideo] publish failed:", e);
                               } finally {
@@ -1769,6 +1780,7 @@ export default function AdminPanel() {
                             }}
                             onClick={() => {
                               setDraftTeams(null);
+                              setDraftSeed(null);
                               setShuffleVideoTeams(null);
                             }}
                           >
