@@ -917,24 +917,24 @@ function DotaTournamentDetailInner() {
         .dtd-tier-player-rank { font-size: 0.72rem; color: #8A8880; white-space: nowrap; }
 
         /* ── Teams grid ── */
-        .dtd-teams-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .dtd-team-box { background: linear-gradient(180deg, rgba(20,20,24,0.9) 0%, rgba(14,14,18,0.95) 100%); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 22px 22px 18px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; overflow: hidden; }
-        .dtd-team-box:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.55); }
-        .dtd-team-box-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; opacity: 0.85; }
-        .dtd-team-box-num { position: absolute; top: 12px; right: 14px; font-size: 0.6rem; font-weight: 800; padding: 3px 9px; border-radius: 100px; border: 1px solid; letter-spacing: 0.04em; }
-        .dtd-team-box-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-right: 38px; }
-        .dtd-team-logo { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; letter-spacing: 0.04em; flex-shrink: 0; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12); }
+        .dtd-teams-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .dtd-team-box { background: linear-gradient(180deg, rgba(20,20,24,0.9) 0%, rgba(14,14,18,0.95) 100%); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 14px 14px 12px; position: relative; transition: all 0.25s ease; animation: dtd-fadeSlideIn 0.4s ease both; overflow: hidden; }
+        .dtd-team-box:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .dtd-team-box-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.85; }
+        .dtd-team-box-num { position: absolute; top: 10px; right: 10px; font-size: 0.55rem; font-weight: 800; padding: 2px 7px; border-radius: 100px; border: 1px solid; letter-spacing: 0.04em; }
+        .dtd-team-box-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-right: 34px; }
+        .dtd-team-logo { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #fff; letter-spacing: 0.04em; flex-shrink: 0; overflow: hidden; box-shadow: 0 3px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12); }
         .dtd-team-logo img { width: 100%; height: 100%; object-fit: cover; }
-        .dtd-team-box-name { font-size: 1rem; font-weight: 900; color: #f0f0e8; letter-spacing: -0.01em; }
-        .dtd-team-box-meta { font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-top: 3px; }
-        .dtd-team-box-members { display: flex; flex-direction: column; gap: 6px; }
-        .dtd-team-box-member { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; transition: all 0.15s ease; cursor: pointer; border: 1px solid transparent; }
+        .dtd-team-box-name { font-size: 0.88rem; font-weight: 900; color: #f0f0e8; letter-spacing: -0.01em; line-height: 1.15; }
+        .dtd-team-box-meta { font-size: 0.66rem; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+        .dtd-team-box-members { display: flex; flex-direction: column; gap: 3px; }
+        .dtd-team-box-member { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; transition: all 0.15s ease; cursor: pointer; border: 1px solid transparent; }
         .dtd-team-box-member:hover { background: rgba(161,43,31,0.07); border-color: rgba(161,43,31,0.18); transform: translateX(2px); }
-        .dtd-team-box-member-avatar { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-        .dtd-team-box-member-init { width: 34px; height: 34px; border-radius: 8px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555550; flex-shrink: 0; }
-        .dtd-team-box-member-name { font-size: 0.86rem; font-weight: 700; color: #e8e8de; line-height: 1.15; }
-        .dtd-team-box-member-rank { font-size: 0.7rem; color: #8A8880; margin-top: 2px; line-height: 1.1; }
-        .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.74rem; color: #555550; }
+        .dtd-team-box-member-avatar { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+        .dtd-team-box-member-init { width: 28px; height: 28px; border-radius: 6px; background: #1a1a1f; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #555550; flex-shrink: 0; }
+        .dtd-team-box-member-name { font-size: 0.78rem; font-weight: 700; color: #e8e8de; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dtd-team-box-member-rank { font-size: 0.62rem; color: #8A8880; margin-top: 1px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.66rem; color: #555550; }
 
         /* Single position pill on each team-member row */
         .dtd-team-pos-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 30px; padding: 4px 4px 3px; border-radius: 7px; flex-shrink: 0; line-height: 1; background: rgba(161,43,31,0.18); border: 1px solid rgba(161,43,31,0.4); color: #ffae9d; transition: transform 0.15s; }
@@ -948,8 +948,8 @@ function DotaTournamentDetailInner() {
         .dtd-team-pos-pill-abbr { font-size: 0.48rem; font-weight: 800; opacity: 0.85; margin-top: 1px; letter-spacing: 0.04em; }
 
         /* Footer coverage strip (1–5 squares) */
-        .dtd-team-coverage { display: flex; gap: 4px; }
-        .dtd-team-coverage-dot { width: 18px; height: 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #3a3a3a; opacity: 0.45; }
+        .dtd-team-coverage { display: flex; gap: 3px; }
+        .dtd-team-coverage-dot { width: 15px; height: 15px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #3a3a3a; opacity: 0.45; }
         .dtd-team-coverage-dot.on { opacity: 1; }
         .dtd-team-coverage-dot.on[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
         .dtd-team-coverage-dot.on[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
@@ -1516,12 +1516,15 @@ function DotaTournamentDetailInner() {
                       herald_guardian: { bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.32)", text: "#9ca3af", label: "Herald – Guardian", gStart: "#6b7280", gEnd: "#374151" },
                     };
                     const bColors = bracketColors[team.bracket || "herald_guardian"] || bracketColors.herald_guardian;
-                    // Position-ordered roster (Pos 1 → Pos 5)
-                    const POS_ORDER = ["safe_lane", "mid", "off_lane", "soft_support", "hard_support"];
+                    // Rank-desc roster (highest-rank hero first). Deterministic
+                    // tiebreak by uid so the order doesn't reshuffle between
+                    // polls when several members share a tier.
                     const orderedMembers = [...(team.members || [])].sort((a: any, b: any) => {
-                      const ai = POS_ORDER.indexOf(a.assignedRole);
-                      const bi = POS_ORDER.indexOf(b.assignedRole);
-                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                      const r = (b.dotaRankTier || 0) - (a.dotaRankTier || 0);
+                      if (r !== 0) return r;
+                      const m = (b.dotaMMR || 0) - (a.dotaMMR || 0);
+                      if (m !== 0) return m;
+                      return String(a.uid || "").localeCompare(String(b.uid || ""));
                     });
                     const avgTier = team.avgRankTier ?? team.avgSkillLevel ?? 0;
                     return (
@@ -1534,10 +1537,11 @@ function DotaTournamentDetailInner() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="dtd-team-box-name">{team.teamName}</div>
-                            <div className="dtd-team-box-meta">
-                              <span style={{ color: bColors.text }}>{bColors.label}</span>
-                              {avgTier > 0 && <><span style={{ color: "#3f3f3f" }}>·</span><span style={{ color: "#8A8880" }}>Avg T{avgTier}</span></>}
-                            </div>
+                            {avgTier > 0 && (
+                              <div className="dtd-team-box-meta">
+                                <span style={{ color: "#8A8880" }}>Avg T{avgTier}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="dtd-team-box-members">
@@ -1559,7 +1563,6 @@ function DotaTournamentDetailInner() {
                                   </div>
                                   <div className="dtd-team-box-member-rank">{rankLabel}{m.dotaMMR ? ` · ${m.dotaMMR} MMR` : ""}</div>
                                 </div>
-                                <AssignedRolePill role={m.assignedRole} />
                               </div>
                             </Link>
                           );})}
