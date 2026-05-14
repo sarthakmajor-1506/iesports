@@ -143,65 +143,91 @@ function canSwap(pa: AssignedMember, pb: AssignedMember): boolean {
 function shuffleByRolesAndRating(players: Player[], numTeams: number, seed: number): TeamSlot[] {
   const rng = makeRng(seed);
   const teams: TeamSlot[] = Array.from({ length: numTeams }, () => ({ members: [], coverage: {} }));
-  const assigned = new Set<string>();
 
-  // PHASE 1 — Greedy "strongest → weakest team" assignment.
+  // PHASE 1 — Bipartite matching for HARD role coverage.
   //
-  // Sort all players by skill desc. Ties broken by seeded RNG so two
-  // runs with different seeds reshuffle the order of equal-tier players,
-  // producing a different (but still well-balanced) layout each time.
-  // For each player we prefer the team where they fill an *uncovered*
-  // preferred role AND has the lowest cumulative score. If no team
-  // needs one of their preferred roles, they fall onto the lowest-score
-  // team as flex.
-  const sorted = [...players].sort((a, b) => {
-    const s = memberScore(b) - memberScore(a);
+  // Treat (team, role) as 20 slots (4 teams × 5 roles). Each player has
+  // edges to the slots they can fill (role ∈ rolePreferences). Find the
+  // maximum matching via DFS augmenting paths — if a perfect matching
+  // exists in the bipartite graph (i.e. Hall's condition holds), every
+  // team gets exactly one player at every position.
+  //
+  // Why this is necessary: a position-first or player-first greedy can
+  // consume multi-role players for early positions and leave a later
+  // position without enough candidates (e.g. all the off-laners got
+  // grabbed for safe/mid first). Matching considers all assignments
+  // simultaneously and uses augmenting paths to repair conflicts.
+  //
+  // Players are processed in tier desc (with seeded RNG tiebreaks) so
+  // the top players hit augmenting first, biasing the matching toward
+  // giving them their natural slot. Tier BALANCE is then optimised in
+  // phase 2 by swaps that preserve coverage.
+  const slots: { team: number; role: DotaRole }[] = [];
+  for (let t = 0; t < numTeams; t++) {
+    for (const r of POSITIONS) slots.push({ team: t, role: r });
+  }
+  const edges: number[][] = players.map(p => {
+    const prefs = (p.rolePreferences || []) as DotaRole[];
+    const list: number[] = [];
+    for (let s = 0; s < slots.length; s++) if (prefs.includes(slots[s].role)) list.push(s);
+    // Randomise edge order so each seed explores a different matching
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  });
+  const slotToPlayer = new Array<number>(slots.length).fill(-1);
+  const playerToSlot = new Array<number>(players.length).fill(-1);
+
+  function tryAugment(pIdx: number, visited: boolean[]): boolean {
+    for (const sIdx of edges[pIdx]) {
+      if (visited[sIdx]) continue;
+      visited[sIdx] = true;
+      if (slotToPlayer[sIdx] === -1 || tryAugment(slotToPlayer[sIdx], visited)) {
+        slotToPlayer[sIdx] = pIdx;
+        playerToSlot[pIdx] = sIdx;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const order = players.map((_, i) => i).sort((a, b) => {
+    const s = memberScore(players[b]) - memberScore(players[a]);
     if (s !== 0) return s;
     return rng() - 0.5;
   });
+  for (const pIdx of order) {
+    tryAugment(pIdx, new Array<boolean>(slots.length).fill(false));
+  }
 
-  for (const p of sorted) {
-    if (assigned.has(p.uid)) continue;
+  // Materialise teams from the matching
+  for (let pIdx = 0; pIdx < players.length; pIdx++) {
+    const sIdx = playerToSlot[pIdx];
+    if (sIdx < 0) continue;
+    const slot = slots[sIdx];
+    teams[slot.team].members.push({ ...players[pIdx], assignedRole: slot.role });
+    teams[slot.team].coverage[slot.role] = true;
+  }
+
+  // Unmatched players (no role they prefer is unfilled) fall in as flex
+  // on the weakest team that still has an open seat. This only triggers
+  // when the bipartite matching can't perfect — usually one position is
+  // grossly oversubscribed so a player with that single pref has no
+  // free slot.
+  for (let pIdx = 0; pIdx < players.length; pIdx++) {
+    if (playerToSlot[pIdx] !== -1) continue;
     const openTeams = teams.filter(t => t.members.length < 5);
     if (openTeams.length === 0) break;
-
-    const playerRoles = (p.rolePreferences || []) as DotaRole[];
-
-    // Tier A: teams where this player fills an uncovered preferred role.
-    type Candidate = { team: TeamSlot; role: DotaRole | "flex" };
-    const tierA: Candidate[] = [];
-    for (const t of openTeams) {
-      const fillRole = playerRoles.find(r => !t.coverage[r]);
-      if (fillRole) tierA.push({ team: t, role: fillRole });
-    }
-
-    let chosen: Candidate;
-    if (tierA.length > 0) {
-      // Lowest score wins; equal scores broken by RNG so equally-weak
-      // teams get a fair shake at grabbing the next player.
-      tierA.sort((a, b) => {
-        const s = teamTotalScore(a.team) - teamTotalScore(b.team);
-        if (s !== 0) return s;
-        return rng() - 0.5;
-      });
-      chosen = tierA[0];
-    } else {
-      // No team needs one of this player's roles — place on weakest team
-      // as flex (or in their first preferred role if any).
-      const openSorted = [...openTeams].sort((a, b) => {
-        const s = teamTotalScore(a) - teamTotalScore(b);
-        if (s !== 0) return s;
-        return rng() - 0.5;
-      });
-      const role: DotaRole | "flex" = (playerRoles[0] as DotaRole) || "flex";
-      chosen = { team: openSorted[0], role };
-    }
-
-    chosen.team.members.push({ ...p, assignedRole: chosen.role });
-    if (POSITIONS.includes(chosen.role as DotaRole)) {
-      chosen.team.coverage[chosen.role as DotaRole] = true;
-    }
-    assigned.add(p.uid);
+    const openSorted = openTeams.sort((a, b) => {
+      const s = teamTotalScore(a) - teamTotalScore(b);
+      if (s !== 0) return s;
+      return rng() - 0.5;
+    });
+    const prefs = (players[pIdx].rolePreferences || []) as DotaRole[];
+    const role: DotaRole | "flex" = (prefs[0] as DotaRole) || "flex";
+    openSorted[0].members.push({ ...players[pIdx], assignedRole: role });
   }
 
   // PHASE 2 — Steepest-descent swap refinement.
