@@ -15,7 +15,7 @@ const ShuffleVideoPlayer = dynamic(() => import("@/app/components/ShuffleVideoPl
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface TournamentOption { id: string; name: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
+interface TournamentOption { id: string; name: string; game?: string; status: string; teamCount?: number; slotsBooked?: number; totalSlots?: number; matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number; lbFinalBestOf?: number; bracketFormat?: string; bracketTeamCount?: number; groupStageRounds?: number; }
 interface TeamData { id: string; teamName: string; teamIndex: number; members: any[]; avgSkillLevel: number; }
 interface VcMember { discordId: string; name: string; selfMute: boolean; selfDeaf: boolean; serverMute: boolean; serverDeaf: boolean; }
 interface MatchSub { uid: string; discordId: string; name: string; riotPuuid: string }
@@ -673,9 +673,10 @@ export default function AdminPanel() {
     if (!authenticated) return;
     const cafeUid = adminRole === "cafe_admin" && user ? user.uid : null;
 
-    const mapTournament = (d: any, prefix: string) => ({
+    const mapTournament = (d: any, prefix: string, game: string) => ({
       id: d.id,
       name: `${prefix} ${d.data?.().name || d.name || d.id}`,
+      game,
       status: d.data?.().status || d.status || "upcoming",
       teamCount: d.data?.().teamCount || d.teamCount,
       slotsBooked: d.data?.().slotsBooked || d.slotsBooked,
@@ -695,7 +696,7 @@ export default function AdminPanel() {
       snapshotWorked = true;
       const valAll = snap.docs
         .filter(d => !cafeUid || d.data().ownerId === cafeUid)
-        .map(d => mapTournament(d, "[VAL]"));
+        .map(d => mapTournament(d, "[VAL]", "valorant"));
       setTournaments(prev => {
         const rest = prev.filter(t => !t.name.startsWith("[VAL]"));
         return [...valAll, ...rest].sort((a, b) => a.name.localeCompare(b.name));
@@ -710,7 +711,7 @@ export default function AdminPanel() {
           if (data.tournaments) {
             const gameLabel: Record<string, string> = { dota2: "DOTA2", valorant: "VAL", cs2: "CS2" };
             const mapped = data.tournaments.map((t: any) => ({
-              id: t.id, name: `[${gameLabel[t.game] || t.game}] ${t.name}`,
+              id: t.id, name: `[${gameLabel[t.game] || t.game}] ${t.name}`, game: t.game,
               status: t.status, slotsBooked: t.slotsBooked, totalSlots: t.totalSlots,
             }));
             setTournaments(mapped);
@@ -721,7 +722,7 @@ export default function AdminPanel() {
     const unsub2 = onSnapshot(collection(db, "tournaments"), (snap) => {
       const dotaAll = snap.docs
         .filter(d => !cafeUid || d.data().ownerId === cafeUid)
-        .map(d => mapTournament(d, "[DOTA2]"));
+        .map(d => mapTournament(d, "[DOTA2]", "dota2"));
       setTournaments(prev => {
         const rest = prev.filter(t => !t.name.startsWith("[DOTA2]"));
         return [...rest, ...dotaAll].sort((a, b) => a.name.localeCompare(b.name));
@@ -736,7 +737,7 @@ export default function AdminPanel() {
       }).then(r => r.json()).then(data => {
         if (data.tournaments) {
           const mapped = data.tournaments.map((t: any) => ({
-            id: t.id, name: `[CS2] ${t.name}`,
+            id: t.id, name: `[CS2] ${t.name}`, game: "cs2",
             status: t.status, slotsBooked: t.slotsBooked, totalSlots: t.totalSlots,
           }));
           setTournaments(prev => {
@@ -1679,8 +1680,17 @@ export default function AdminPanel() {
                           if (draftTeams && !confirm("Discard current preview and generate a new one?")) return;
                           setPreviewLoading(true);
                           try {
+                            // Route to the game-appropriate shuffle endpoint.
+                            // Dota uses role-aware shuffling (each team
+                            // tries to cover all 5 positions); Valorant uses
+                            // rating-only balancing. CS2 has no shuffle yet
+                            // and falls back to valorant for now.
+                            const shuffleEndpoint =
+                              selectedTournament?.game === "dota2"
+                                ? "/api/dota/shuffle-teams"
+                                : "/api/valorant/shuffle-teams";
                             const [data, history] = await Promise.all([
-                              apiCall("/api/valorant/shuffle-teams", {
+                              apiCall(shuffleEndpoint, {
                                 tournamentId,
                                 teamCount: parseInt(teamCount),
                                 dryRun: true,
@@ -1716,10 +1726,24 @@ export default function AdminPanel() {
                               if (!confirm(`Publish this preview to the live site? ${teams.length > 0 ? "This replaces the current live teams." : ""}`)) return;
                               setPublishLoading(true);
                               try {
-                                await apiCall("/api/valorant/publish-teams", {
-                                  tournamentId,
-                                  teams: draftTeams,
-                                });
+                                // Dota: re-run shuffle with dryRun=false on
+                                // the same inputs (algorithm is deterministic,
+                                // so the committed teams match the preview).
+                                // It also wipes any prior teams + matches +
+                                // standings for a clean shuffle reset.
+                                if (selectedTournament?.game === "dota2") {
+                                  await apiCall("/api/dota/shuffle-teams", {
+                                    tournamentId,
+                                    teamCount: parseInt(teamCount),
+                                    dryRun: false,
+                                    deleteExisting: true,
+                                  });
+                                } else {
+                                  await apiCall("/api/valorant/publish-teams", {
+                                    tournamentId,
+                                    teams: draftTeams,
+                                  });
+                                }
                                 setDraftTeams(null);
                               } catch (e) {
                                 console.error("[ShuffleVideo] publish failed:", e);
