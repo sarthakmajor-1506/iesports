@@ -750,31 +750,33 @@ function DotaTournamentDetailInner() {
         }
 
         /* Role pills — used in Players + Teams tabs.
-         * Block-level so the row sits on its own line below the rank/MMR. */
+         * Sit inline on the right of the rank/MMR row. */
         .dtd-role-pills {
-          display: flex; flex-wrap: wrap; gap: 4px;
-          margin-top: 5px;
+          display: flex; gap: 3px;
           cursor: help;
+          flex-shrink: 0;
+          margin-left: auto;
         }
         .dtd-role-pill {
           display: flex; flex-direction: column;
           align-items: center; justify-content: center;
-          width: 30px; min-height: 36px;
-          padding: 4px 2px 3px;
-          border-radius: 6px;
+          width: 26px; min-height: 30px;
+          padding: 3px 1px 2px;
+          border-radius: 5px;
           background: rgba(161,43,31,0.16);
           border: 1px solid rgba(161,43,31,0.4);
           color: #ffae9d;
           transition: all 0.15s;
           flex-shrink: 0;
-          gap: 1px;
+          gap: 0px;
           line-height: 1;
         }
         .dtd-role-pill-abbr {
-          font-size: 0.56rem;
+          font-size: 0.5rem;
           font-weight: 800;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.04em;
           opacity: 0.95;
+          margin-top: 1px;
         }
         .dtd-role-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
         .dtd-role-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
@@ -1395,11 +1397,13 @@ function DotaTournamentDetailInner() {
                                   {p.steamAvatar ? <img className="dtd-tier-player-avatar" src={p.steamAvatar} alt={displayName} /> : <div className="dtd-tier-player-avatar-init">{displayName[0].toUpperCase()}</div>}
                                   <div className="dtd-tier-player-info">
                                     <span className="dtd-tier-player-name">{displayName}{isMe && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</span>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                      <span className="dtd-tier-player-rank">{rankLabel}</span>
-                                      <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                        <span className="dtd-tier-player-rank">{rankLabel}</span>
+                                        <RankReportBadge playerUid={p.uid || p.id} playerName={displayName} tournamentId={id} game="dota2" user={user} userName={userProfile?.steamName || userProfile?.discordUsername || userProfile?.fullName || "Anonymous"} reports={rankReports} onReportSubmitted={fetchRankReports} nameMap={Object.fromEntries(players.map((pl: any) => [pl.uid || pl.id, pl.steamName || pl.fullName || "Player"]))} />
+                                      </div>
+                                      <RoleIcons roles={p.rolePreferences} />
                                     </div>
-                                    <RoleIcons roles={p.rolePreferences} />
                                   </div>
                                 </div>
                               </Link>
@@ -1452,8 +1456,10 @@ function DotaTournamentDetailInner() {
                               </PlayerAvatarBadge>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div className="dtd-team-box-member-name">{m.steamName || "Player"}{isMeMember && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 5px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
-                                <div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div>
-                                <RoleIcons roles={m.rolePreferences} />
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                                  <div className="dtd-team-box-member-rank">{m.dotaMMR ? `${m.dotaMMR} MMR` : ""}</div>
+                                  <RoleIcons roles={m.rolePreferences} />
+                                </div>
                               </div>
                             </div>
                           </Link>
