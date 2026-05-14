@@ -37,6 +37,15 @@ const ROLE_LABEL: Record<DotaRole, string> = Object.fromEntries(
   DOTA_ROLES.map(r => [r.slug, r.label])
 ) as Record<DotaRole, string>;
 
+const DOTA_MEDALS = ["Unranked", "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+function dotaRankName(tier: number): string {
+  if (!tier || tier <= 0) return "Unranked";
+  const medal = Math.floor(tier / 10);
+  const stars = tier % 10;
+  if (medal < 1 || medal > 8) return "Unranked";
+  return `${DOTA_MEDALS[medal]}${stars > 0 ? ` ${stars}` : ""}`;
+}
+
 type Player = {
   id: string;
   uid: string;
@@ -252,16 +261,27 @@ export async function POST(req: NextRequest) {
     const teamSlots = shuffleByRolesAndMMR(players, numTeams);
 
     // 5. Build the response in the shape the admin UI already consumes.
+    //    Admin renders Valorant-style fields (riotTier/riotRank/riotAvatar/
+    //    iesportsRating/avgSkillLevel), so we surface Dota equivalents under
+    //    those same names. Each member is duplicated under both name sets so
+    //    the tournament-detail UI (which reads dota*) and the admin Preview
+    //    UI (which reads riot*) both work without conditionals.
     const responseTeams = teamSlots.map((t, i) => {
-      const avgs = t.members.reduce((a, m) => a + (m.dotaMMR || 0), 0);
-      // Sort members by canonical position order (Pos 1 → Pos 5) for readable preview.
+      const totalMMR = t.members.reduce((a, m) => a + (m.dotaMMR || 0), 0);
+      const avgMMR = t.members.length > 0 ? Math.round(totalMMR / t.members.length) : 0;
+      const totalTier = t.members.reduce((a, m) => a + (m.dotaRankTier || 0), 0);
+      const avgTier = t.members.length > 0 ? Math.round((totalTier / t.members.length) * 10) / 10 : 0;
+      // Sort members by MMR desc (per spec) — tiebreak by rank-tier desc,
+      // then by name so the order is deterministic across previews.
       const sorted = [...t.members].sort((a, b) => {
-        const ai = POSITIONS.indexOf(a.assignedRole as DotaRole);
-        const bi = POSITIONS.indexOf(b.assignedRole as DotaRole);
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        const m = (b.dotaMMR || 0) - (a.dotaMMR || 0);
+        if (m !== 0) return m;
+        const r = (b.dotaRankTier || 0) - (a.dotaRankTier || 0);
+        if (r !== 0) return r;
+        return String(a.steamName || "").localeCompare(String(b.steamName || ""));
       });
       // Captain: highest-MMR member of the team.
-      const captainMember = [...t.members].sort((a, b) => (b.dotaMMR || 0) - (a.dotaMMR || 0))[0];
+      const captainMember = sorted[0];
       // Bracket: most common bracket among members.
       const bracketCounts: Record<string, number> = {};
       for (const m of t.members) {
@@ -277,9 +297,10 @@ export async function POST(req: NextRequest) {
         teamName: `TEAM ${i + 1}`,
         captainUid: captainMember?.uid || "",
         bracket: topBracket,
-        avgMMR: t.members.length > 0 ? Math.round(avgs / t.members.length) : 0,
-        totalMMR: avgs,
-        avgSkillLevel: t.members.length > 0 ? Math.round(avgs / t.members.length) : 0,  // UI compat key
+        avgMMR,
+        totalMMR,
+        avgRankTier: avgTier,
+        avgSkillLevel: avgMMR,        // admin UI compat (reads avgSkillLevel)
         roleCoverage: {
           safe_lane:    !!t.coverage.safe_lane,
           mid:          !!t.coverage.mid,
@@ -287,22 +308,36 @@ export async function POST(req: NextRequest) {
           soft_support: !!t.coverage.soft_support,
           hard_support: !!t.coverage.hard_support,
         },
-        members: sorted.map(m => ({
-          uid: m.uid,
-          fullName: m.fullName || "",
-          steamName: m.steamName || "",
-          steamAvatar: m.steamAvatar || "",
-          dotaMMR: m.dotaMMR || 0,
-          dotaRankTier: m.dotaRankTier || 0,
-          dotaBracket: m.dotaBracket || "herald_guardian",
-          rolePreferences: m.rolePreferences || [],
-          assignedRole: m.assignedRole,
-          assignedRoleLabel: POSITIONS.includes(m.assignedRole as DotaRole)
-            ? ROLE_LABEL[m.assignedRole as DotaRole]
-            : "Flex",
-          discordId: m.discordId || "",
-          discordUsername: m.discordUsername || "",
-        })),
+        members: sorted.map(m => {
+          const rankName = dotaRankName(m.dotaRankTier || 0);
+          return {
+            uid: m.uid,
+            fullName: m.fullName || "",
+            steamName: m.steamName || "",
+            steamAvatar: m.steamAvatar || "",
+            dotaMMR: m.dotaMMR || 0,
+            dotaRankTier: m.dotaRankTier || 0,
+            dotaBracket: m.dotaBracket || "herald_guardian",
+            rolePreferences: m.rolePreferences || [],
+            assignedRole: m.assignedRole,
+            assignedRoleLabel: POSITIONS.includes(m.assignedRole as DotaRole)
+              ? ROLE_LABEL[m.assignedRole as DotaRole]
+              : "Flex",
+            discordId: m.discordId || "",
+            discordUsername: m.discordUsername || "",
+            // ── Valorant-compat aliases so the admin Preview UI shows ranks
+            //    + MMR without any game branching.
+            riotGameName: m.steamName || m.fullName || "Player",  // primary display name
+            riotTagLine: "",
+            riotAvatar: m.steamAvatar || "",
+            riotRank: rankName,
+            riotTier: m.dotaRankTier || 0,
+            iesportsRank: rankName,
+            iesportsTier: m.dotaRankTier || 0,
+            iesportsRating: m.dotaMMR || 0,
+            skillLevel: m.dotaMMR || 0,
+          };
+        }),
       };
     });
 

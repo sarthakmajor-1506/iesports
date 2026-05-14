@@ -1876,8 +1876,28 @@ export default function AdminPanel() {
                                             </div>
                                             <div style={{ fontSize: "0.56rem", color: "#777", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                               {rank}
+                                              {m.dotaMMR ? <span style={{ color: "#555", marginLeft: 6 }}>· {m.dotaMMR} MMR</span> : null}
                                             </div>
                                           </div>
+                                          {m.assignedRole && (() => {
+                                            // Dota role pill in the admin preview — same color codes
+                                            // as the public tournament-detail page.
+                                            const roleMap: Record<string, { abbr: string; color: string; bg: string; border: string; pos: number }> = {
+                                              safe_lane:    { abbr: "SL", color: "#fbbf24", bg: "rgba(245,158,11,0.18)", border: "rgba(245,158,11,0.4)", pos: 1 },
+                                              mid:          { abbr: "M",  color: "#c084fc", bg: "rgba(168,85,247,0.18)", border: "rgba(168,85,247,0.4)", pos: 2 },
+                                              off_lane:     { abbr: "OF", color: "#ffae9d", bg: "rgba(190,58,37,0.20)", border: "rgba(190,58,37,0.45)", pos: 3 },
+                                              soft_support: { abbr: "SS", color: "#86efac", bg: "rgba(34,197,94,0.18)",  border: "rgba(34,197,94,0.4)",  pos: 4 },
+                                              hard_support: { abbr: "HS", color: "#7dd3fc", bg: "rgba(60,203,255,0.18)", border: "rgba(60,203,255,0.4)", pos: 5 },
+                                              flex:         { abbr: "FX", color: "#aaa",    bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.15)", pos: 0 },
+                                            };
+                                            const meta = roleMap[m.assignedRole as string];
+                                            if (!meta) return null;
+                                            return (
+                                              <div title={m.assignedRoleLabel || m.assignedRole} style={{ minWidth: 30, padding: "2px 6px", borderRadius: 5, background: meta.bg, border: `1px solid ${meta.border}`, color: meta.color, fontSize: "0.54rem", fontWeight: 800, textAlign: "center", letterSpacing: 0.5 }}>
+                                                {meta.abbr}
+                                              </div>
+                                            );
+                                          })()}
                                           <div style={{ fontSize: "0.58rem", fontWeight: 800, color: "#3CCBFF", minWidth: 24, textAlign: "right" }}>
                                             T{tier}
                                           </div>
