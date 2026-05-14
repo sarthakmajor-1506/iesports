@@ -537,7 +537,13 @@ function DotaTournamentDetailInner() {
   // returns. This replaces the old 30s always-on polling that was burning
   // Firestore reads when users left tabs open in the background.
   useEffect(() => {
-    refetchData(true); fetchRankReports(); // initial fetch refreshes rank from user docs
+    // Always use the stored per-tournament player rank (set at registration
+    // time). Previously the mount fetch passed refreshRank=true which merged
+    // fresh ranks from user docs, but every subsequent poll used the stored
+    // rank — so player rank flipped between mount and the first poll,
+    // reshuffling positions every 60s. Stay consistent: never refresh from
+    // the page. Admins can re-sync ranks via a script when needed.
+    refetchData(false); fetchRankReports();
     const tick = () => { if (!document.hidden) refetchData(false); };
     const interval = setInterval(tick, 60_000);
     const onVis = () => { if (!document.hidden) refetchData(false); };
@@ -1373,7 +1379,17 @@ function DotaTournamentDetailInner() {
                     <div className="dtd-tier-columns">
                       {sortedBrackets.map((bracket) => {
                         const colors = bracketColors[bracket] || bracketColors.herald_guardian;
-                        const bracketPlayers = grouped[bracket].sort((a: any, b: any) => (b.dotaRankTier || 0) - (a.dotaRankTier || 0));
+                        const bracketPlayers = grouped[bracket].sort((a: any, b: any) => {
+                          // Primary: higher rank first
+                          const r = (b.dotaRankTier || 0) - (a.dotaRankTier || 0);
+                          if (r !== 0) return r;
+                          // Tiebreaker: higher MMR first
+                          const m = (b.dotaMMR || 0) - (a.dotaMMR || 0);
+                          if (m !== 0) return m;
+                          // Final: deterministic uid order so the list never
+                          // reshuffles equal-rank players between polls.
+                          return String(a.uid || a.id || "").localeCompare(String(b.uid || b.id || ""));
+                        });
                         return (
                           <div key={bracket} className="dtd-tier-col">
                             <div className="dtd-tier-header" style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
