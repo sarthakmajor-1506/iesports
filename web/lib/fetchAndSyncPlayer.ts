@@ -8,6 +8,10 @@ import axios from "axios";
 import { getRankBracket } from "./opendota";
 import { calculatePlayerScore } from "./soloScoring";
 
+// Match the cap used by fetchAndStoreRank — OpenDota stalls are the #1 cause
+// of 522s on the registration path.
+const OPENDOTA_TIMEOUT_MS = 8000;
+
 type SyncOptions = {
   uid: string;
   steamId: string;
@@ -27,27 +31,56 @@ export async function fetchAndSyncPlayer({
 }: SyncOptions) {
   const steam32 = (BigInt(steamId) - BigInt("76561197960265728")).toString();
 
-  // Fetch profile + recent matches in parallel
-  const [profileRes, matchesRes] = await Promise.all([
-    axios.get(`https://api.opendota.com/api/players/${steam32}`),
-    axios.get(`https://api.opendota.com/api/players/${steam32}/recentMatches`),
+  // Settled-not-all: OpenDota failure (timeout, 429, 5xx) must not abort
+  // registration. We fall back to whatever's already on the user doc.
+  const [profileRes, matchesRes] = await Promise.allSettled([
+    axios.get(`https://api.opendota.com/api/players/${steam32}`,           { timeout: OPENDOTA_TIMEOUT_MS }),
+    axios.get(`https://api.opendota.com/api/players/${steam32}/recentMatches`, { timeout: OPENDOTA_TIMEOUT_MS }),
   ]);
 
-  const profile = profileRes.data;
-  const matches = matchesRes.data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let profile: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let matches: any[] = [];
+  let openDotaOk = false;
+  if (profileRes.status === "fulfilled") {
+    profile = profileRes.value.data;
+    openDotaOk = true;
+  }
+  if (matchesRes.status === "fulfilled") {
+    matches = matchesRes.value.data || [];
+  }
 
   // ── 1. Update rank on user doc ────────────────────────────────────────
-  const rankTier = profile.rank_tier || 0;
-  const mmr = profile.mmr_estimate?.estimate || 0;
+  let rankTier: number;
+  let mmr: number;
+  if (profile) {
+    rankTier = profile.rank_tier || 0;
+    mmr = profile.mmr_estimate?.estimate || 0;
+  } else {
+    // Fall back to whatever's already on the user doc so we still have a
+    // bracket to assign.
+    const userSnap = await db.collection("users").doc(uid).get();
+    const stored = userSnap.data() || {};
+    rankTier = stored.dotaRankTier || 0;
+    mmr = stored.dotaMMR || 0;
+  }
   const bracket = getRankBracket(rankTier);
 
-  await db.collection("users").doc(uid).update({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userUpdate: Record<string, any> = {
     dotaRankTier: rankTier,
     dotaBracket: bracket,
     dotaMMR: mmr,
-    recentMatches: (matches || []).slice(0, 20),
     rankFetchedAt: new Date(),
-  });
+  };
+  if (openDotaOk) {
+    userUpdate.recentMatches = matches.slice(0, 20);
+    userUpdate.rankSource = "opendota";
+  } else {
+    userUpdate.rankSource = "stored_fallback";
+  }
+  await db.collection("users").doc(uid).update(userUpdate);
 
   // ── 2. Append new matches to matchHistory subcollection ───────────────
   if (matches && matches.length > 0) {
