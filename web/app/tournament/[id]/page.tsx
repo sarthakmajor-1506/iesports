@@ -33,44 +33,24 @@ const ROLE_ICON_MAP: Record<DotaRole, React.ComponentType<{ size?: number; strok
   hard_support: HandHeart,
 };
 
-/** Single position pill shown on each team-member row (assigned role). */
-function AssignedRolePill({ role }: { role?: string }) {
+/** Small icon-only badge on the right of a team-member row showing the
+ *  position the player is assigned (Swords/Crosshair/Shield/Sparkles/HandHeart,
+ *  color-coded per position). Hover tooltip shows the full role name. */
+function AssignedRoleIcon({ role }: { role?: string }) {
   if (!role) return null;
-  const meta: Record<string, { abbr: string; pos: number; label: string }> = {
-    safe_lane:    { abbr: "SL", pos: 1, label: "Safe Lane" },
-    mid:          { abbr: "M",  pos: 2, label: "Mid" },
-    off_lane:     { abbr: "OF", pos: 3, label: "Off Lane" },
-    soft_support: { abbr: "SS", pos: 4, label: "Support" },
-    hard_support: { abbr: "HS", pos: 5, label: "Hard Support" },
-    flex:         { abbr: "FX", pos: 0, label: "Flex" },
+  const META: Record<string, { Icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; pos: number; label: string }> = {
+    safe_lane:    { Icon: Swords,    pos: 1, label: "Safe Lane"    },
+    mid:          { Icon: Crosshair, pos: 2, label: "Mid"          },
+    off_lane:     { Icon: Shield,    pos: 3, label: "Off Lane"     },
+    soft_support: { Icon: Sparkles,  pos: 4, label: "Support"      },
+    hard_support: { Icon: HandHeart, pos: 5, label: "Hard Support" },
   };
-  const m = meta[role];
+  const m = META[role];
   if (!m) return null;
+  const { Icon } = m;
   return (
-    <div className="dtd-team-pos-pill" data-pos={m.pos} title={`Pos ${m.pos || "?"} — ${m.label}`}>
-      <span className="dtd-team-pos-pill-pos">{m.pos > 0 ? m.pos : "F"}</span>
-      <span className="dtd-team-pos-pill-abbr">{m.abbr}</span>
-    </div>
-  );
-}
-
-/** Footer strip: 5 colored squares, dimmed when the team is missing a position. */
-function CoverageStrip({ coverage }: { coverage?: Record<string, boolean> }) {
-  const cov = coverage || {};
-  const positions = [
-    { slug: "safe_lane",    abbr: "1", pos: 1 },
-    { slug: "mid",          abbr: "2", pos: 2 },
-    { slug: "off_lane",     abbr: "3", pos: 3 },
-    { slug: "soft_support", abbr: "4", pos: 4 },
-    { slug: "hard_support", abbr: "5", pos: 5 },
-  ];
-  return (
-    <div className="dtd-team-coverage" title="Position coverage 1–5">
-      {positions.map(p => (
-        <div key={p.slug} className={`dtd-team-coverage-dot${cov[p.slug] ? " on" : ""}`} data-pos={p.pos}>
-          {p.abbr}
-        </div>
-      ))}
+    <div className="dtd-team-role-icon" data-pos={m.pos} title={`Pos ${m.pos} — ${m.label}`} aria-label={m.label}>
+      <Icon size={13} strokeWidth={2.5} />
     </div>
   );
 }
@@ -936,26 +916,14 @@ function DotaTournamentDetailInner() {
         .dtd-team-box-member-rank { font-size: 0.62rem; color: #8A8880; margin-top: 1px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dtd-team-box-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.66rem; color: #555550; }
 
-        /* Single position pill on each team-member row */
-        .dtd-team-pos-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 30px; padding: 4px 4px 3px; border-radius: 7px; flex-shrink: 0; line-height: 1; background: rgba(161,43,31,0.18); border: 1px solid rgba(161,43,31,0.4); color: #ffae9d; transition: transform 0.15s; }
-        .dtd-team-box-member:hover .dtd-team-pos-pill { transform: scale(1.06); }
-        .dtd-team-pos-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
-        .dtd-team-pos-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
-        .dtd-team-pos-pill[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
-        .dtd-team-pos-pill[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
-        .dtd-team-pos-pill[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
-        .dtd-team-pos-pill-pos { font-size: 0.78rem; font-weight: 800; }
-        .dtd-team-pos-pill-abbr { font-size: 0.48rem; font-weight: 800; opacity: 0.85; margin-top: 1px; letter-spacing: 0.04em; }
-
-        /* Footer coverage strip (1–5 squares) */
-        .dtd-team-coverage { display: flex; gap: 3px; }
-        .dtd-team-coverage-dot { width: 15px; height: 15px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #3a3a3a; opacity: 0.45; }
-        .dtd-team-coverage-dot.on { opacity: 1; }
-        .dtd-team-coverage-dot.on[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
-        .dtd-team-coverage-dot.on[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
-        .dtd-team-coverage-dot.on[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
-        .dtd-team-coverage-dot.on[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
-        .dtd-team-coverage-dot.on[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
+        /* Per-member assigned-role icon badge (right side of each row) */
+        .dtd-team-role-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; background: rgba(161,43,31,0.18); border: 1px solid rgba(161,43,31,0.4); color: #ffae9d; transition: transform 0.15s; }
+        .dtd-team-box-member:hover .dtd-team-role-icon { transform: scale(1.1); }
+        .dtd-team-role-icon[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+        .dtd-team-role-icon[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }
+        .dtd-team-role-icon[data-pos="3"] { background: rgba(190,58,37,0.20); border-color: rgba(190,58,37,0.45); color: #ffae9d; }
+        .dtd-team-role-icon[data-pos="4"] { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
+        .dtd-team-role-icon[data-pos="5"] { background: rgba(60,203,255,0.18); border-color: rgba(60,203,255,0.4); color: #7dd3fc; }
 
         /* ── Tables ── */
         /* Sticky header row + first column. border-separate so sticky borders
@@ -1563,13 +1531,13 @@ function DotaTournamentDetailInner() {
                                   </div>
                                   <div className="dtd-team-box-member-rank">{rankLabel}{m.dotaMMR ? ` · ${m.dotaMMR} MMR` : ""}</div>
                                 </div>
+                                <AssignedRoleIcon role={m.assignedRole} />
                               </div>
                             </Link>
                           );})}
                         </div>
                         <div className="dtd-team-box-footer">
-                          <CoverageStrip coverage={team.roleCoverage} />
-                          <span style={{ fontWeight: 800, color: "#8A8880" }}>{(team.members?.length || 0)}/5</span>
+                          <span style={{ fontWeight: 800, color: "#8A8880" }}>{(team.members?.length || 0)}/5 players</span>
                         </div>
                       </div>
                     );
