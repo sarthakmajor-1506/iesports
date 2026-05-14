@@ -34,19 +34,20 @@ const ROLE_ICON_MAP: Record<DotaRole, React.ComponentType<{ size?: number; strok
 };
 
 /** Role-preference pill row — uses the same icons as the picker modal,
- *  color-coded per position, with a hover tooltip listing the full role
- *  names. Rendered on its own line (block-level) below the rank/MMR. */
+ *  color-coded per position, with the role abbreviation (SL/M/OF/SS/HS)
+ *  below the icon. Hover tooltip lists the full role names selected. */
 function RoleIcons({ roles }: { roles?: DotaRole[] }) {
   if (!roles || roles.length === 0) return null;
   const sorted = DOTA_ROLES.filter(r => roles.includes(r.slug));
-  const tip = sorted.map(r => `${r.short} ${r.label}`).join(" · ");
+  const tip = `Plays: ${sorted.map(r => r.label).join(", ")}`;
   return (
-    <div className="dtd-role-pills" title={`Plays: ${tip}`} aria-label={`Plays: ${tip}`}>
+    <div className="dtd-role-pills" title={tip} aria-label={tip}>
       {sorted.map(r => {
         const Icon = ROLE_ICON_MAP[r.slug];
         return (
-          <span key={r.slug} className="dtd-role-pill" data-pos={r.position} aria-label={r.label}>
-            <Icon size={11} strokeWidth={2.5} />
+          <span key={r.slug} className="dtd-role-pill" data-pos={r.position} aria-label={r.label} title={r.label}>
+            <Icon size={13} strokeWidth={2.5} />
+            <span className="dtd-role-pill-abbr">{r.abbrev}</span>
           </span>
         );
       })}
@@ -752,18 +753,28 @@ function DotaTournamentDetailInner() {
          * Block-level so the row sits on its own line below the rank/MMR. */
         .dtd-role-pills {
           display: flex; flex-wrap: wrap; gap: 4px;
-          margin-top: 4px;
+          margin-top: 5px;
           cursor: help;
         }
         .dtd-role-pill {
-          display: inline-flex; align-items: center; justify-content: center;
-          width: 22px; height: 22px;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          width: 30px; min-height: 36px;
+          padding: 4px 2px 3px;
           border-radius: 6px;
-          background: rgba(161,43,31,0.18);
+          background: rgba(161,43,31,0.16);
           border: 1px solid rgba(161,43,31,0.4);
           color: #ffae9d;
           transition: all 0.15s;
           flex-shrink: 0;
+          gap: 1px;
+          line-height: 1;
+        }
+        .dtd-role-pill-abbr {
+          font-size: 0.56rem;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          opacity: 0.95;
         }
         .dtd-role-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
         .dtd-role-pill[data-pos="2"] { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); color: #c084fc; }

@@ -55,12 +55,12 @@ export type Team = {
 // Players pick min 2, max 5 of these.
 export type DotaRole = "safe_lane" | "mid" | "off_lane" | "soft_support" | "hard_support";
 
-export const DOTA_ROLES: { slug: DotaRole; label: string; short: string; position: number }[] = [
-  { slug: "safe_lane",    label: "Safe Lane",    short: "Pos 1", position: 1 },
-  { slug: "mid",          label: "Mid",          short: "Pos 2", position: 2 },
-  { slug: "off_lane",     label: "Off Lane",     short: "Pos 3", position: 3 },
-  { slug: "soft_support", label: "Support",      short: "Pos 4", position: 4 },
-  { slug: "hard_support", label: "Hard Support", short: "Pos 5", position: 5 },
+export const DOTA_ROLES: { slug: DotaRole; label: string; short: string; abbrev: string; position: number }[] = [
+  { slug: "safe_lane",    label: "Safe Lane",    short: "Pos 1", abbrev: "SL", position: 1 },
+  { slug: "mid",          label: "Mid",          short: "Pos 2", abbrev: "M",  position: 2 },
+  { slug: "off_lane",     label: "Off Lane",     short: "Pos 3", abbrev: "OF", position: 3 },
+  { slug: "soft_support", label: "Support",      short: "Pos 4", abbrev: "SS", position: 4 },
+  { slug: "hard_support", label: "Hard Support", short: "Pos 5", abbrev: "HS", position: 5 },
 ];
 
 // Shape of `tournaments/{id}/players/{uid}` doc (Dota 2 5v5).
