@@ -68,32 +68,27 @@ type TeamSlot = {
   coverage: Partial<Record<DotaRole, boolean>>;
 };
 
-// Snake-draft picking order, e.g. for M=4: 0,1,2,3,3,2,1,0,0,1,2,3,...
-function snakeOrder(M: number, length: number): number[] {
-  const out: number[] = [];
-  let dir = 1;
-  let pos = 0;
-  while (out.length < length) {
-    out.push(pos);
-    if (dir === 1 && pos === M - 1) {
-      dir = -1;
-    } else if (dir === -1 && pos === 0) {
-      dir = 1;
-    } else {
-      pos += dir;
-    }
-  }
-  return out;
+// Player skill score. Rank tier is the primary signal (0-80, where each
+// medal step is 10: Herald 1 = 11, Divine 4 = 74, Immortal = 80). MMR
+// (when OpenDota actually returns it — rare) is a small tiebreaker.
+function memberScore(m: { dotaRankTier?: number; dotaMMR?: number }): number {
+  return (m.dotaRankTier || 0) * 100 + Math.min(m.dotaMMR || 0, 99);
 }
 
-function avgMMR(t: TeamSlot): number {
+function teamTotalScore(t: TeamSlot): number {
+  return t.members.reduce((a, m) => a + memberScore(m), 0);
+}
+
+function teamAvgTier(t: TeamSlot): number {
   if (t.members.length === 0) return 0;
-  return t.members.reduce((a, m) => a + (m.dotaMMR || 0), 0) / t.members.length;
+  return t.members.reduce((a, m) => a + (m.dotaRankTier || 0), 0) / t.members.length;
 }
 
+// We optimise for spread of avg rank tier (what the admin actually sees
+// in the preview). Smaller = more balanced.
 function spread(teams: TeamSlot[]): number {
   if (teams.length === 0) return 0;
-  const avgs = teams.map(avgMMR);
+  const avgs = teams.map(teamAvgTier);
   return Math.max(...avgs) - Math.min(...avgs);
 }
 
@@ -104,109 +99,113 @@ function stdDev(nums: number[]): number {
   return Math.sqrt(variance);
 }
 
-function shuffleByRolesAndMMR(players: Player[], numTeams: number): TeamSlot[] {
+// Can two players swap teams while preserving role coverage? Each needs
+// to be able to play the other's currently-assigned role (or that role
+// is "flex" which anyone can fill).
+function canSwap(pa: AssignedMember, pb: AssignedMember): boolean {
+  const paOk = pb.assignedRole === "flex" || (pa.rolePreferences || []).includes(pb.assignedRole as DotaRole);
+  const pbOk = pa.assignedRole === "flex" || (pb.rolePreferences || []).includes(pa.assignedRole as DotaRole);
+  return paOk && pbOk;
+}
+
+function shuffleByRolesAndRating(players: Player[], numTeams: number): TeamSlot[] {
   const teams: TeamSlot[] = Array.from({ length: numTeams }, () => ({ members: [], coverage: {} }));
   const assigned = new Set<string>();
 
-  // 1. Count role interest
-  const roleCount: Record<DotaRole, number> = {
-    safe_lane: 0, mid: 0, off_lane: 0, soft_support: 0, hard_support: 0,
-  };
-  for (const p of players) {
-    for (const r of (p.rolePreferences || [])) {
-      if (POSITIONS.includes(r as DotaRole)) roleCount[r as DotaRole]++;
-    }
-  }
+  // PHASE 1 — Greedy "strongest → weakest team" assignment.
+  //
+  // Sort all players by skill desc, then walk the list. For each player
+  // we prefer the team where they fill an *uncovered* preferred role AND
+  // has the lowest cumulative score. If no team needs one of their
+  // preferred roles, they fall onto the lowest-score team as flex.
+  //
+  // This is the same approach Valorant uses, generalised with role
+  // coverage as a tier-A filter. It naturally spreads top players —
+  // the Immortal goes to team 1, the next Divine goes to team 2 (which
+  // is now weakest), and so on, instead of clumping by snake position.
+  const sorted = [...players].sort((a, b) => {
+    const s = memberScore(b) - memberScore(a);
+    if (s !== 0) return s;
+    return String(a.uid || "").localeCompare(String(b.uid || ""));
+  });
 
-  // 2. Sort positions by rarity ascending (rarest first)
-  const orderedRoles: DotaRole[] = [...POSITIONS].sort((a, b) => roleCount[a] - roleCount[b]);
-
-  // 3. For each role, snake-draft the top eligible players to teams.
-  for (const role of orderedRoles) {
-    const candidates = players
-      .filter(p => !assigned.has(p.uid) && (p.rolePreferences || []).includes(role))
-      .sort((a, b) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
-
-    if (candidates.length === 0) continue;
-
-    // Snake-draft order, skipping teams that already have this role filled
-    const order = snakeOrder(numTeams, Math.max(numTeams * 3, candidates.length));
-    let oi = 0;
-    for (const p of candidates) {
-      while (oi < order.length && (teams[order[oi]].coverage[role] || teams[order[oi]].members.length >= 5)) {
-        oi++;
-      }
-      if (oi >= order.length) break; // can't place; remaining candidates fall to phase 4
-      const ti = order[oi];
-      teams[ti].members.push({ ...p, assignedRole: role });
-      teams[ti].coverage[role] = true;
-      assigned.add(p.uid);
-      oi++;
-    }
-  }
-
-  // 4. Fill leftover slots: pick teams with open seats, preferring those
-  //    that still need one of the player's preferred roles.
-  const remaining = players
-    .filter(p => !assigned.has(p.uid))
-    .sort((a, b) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
-
-  for (const p of remaining) {
-    const openTeams = teams
-      .map((t, i) => ({ i, t }))
-      .filter(x => x.t.members.length < 5);
+  for (const p of sorted) {
+    if (assigned.has(p.uid)) continue;
+    const openTeams = teams.filter(t => t.members.length < 5);
     if (openTeams.length === 0) break;
 
     const playerRoles = (p.rolePreferences || []) as DotaRole[];
-    // Prefer a team where they fill an uncovered preferred role
-    let best = openTeams.find(x => playerRoles.some(r => !x.t.coverage[r]));
-    // Otherwise prefer the smallest team (least filled)
-    if (!best) best = openTeams.sort((a, b) => a.t.members.length - b.t.members.length)[0];
 
-    const fillRole: DotaRole | "flex" =
-      (playerRoles.find(r => !best!.t.coverage[r]) as DotaRole | undefined) ||
-      (playerRoles[0] as DotaRole | undefined) ||
-      "flex";
-    best.t.members.push({ ...p, assignedRole: fillRole });
-    if (POSITIONS.includes(fillRole as DotaRole)) best.t.coverage[fillRole as DotaRole] = true;
+    // Tier A: teams where this player fills an uncovered preferred role.
+    type Candidate = { team: TeamSlot; role: DotaRole | "flex" };
+    const tierA: Candidate[] = [];
+    for (const t of openTeams) {
+      const fillRole = playerRoles.find(r => !t.coverage[r]);
+      if (fillRole) tierA.push({ team: t, role: fillRole });
+    }
+
+    let chosen: Candidate;
+    if (tierA.length > 0) {
+      tierA.sort((a, b) => teamTotalScore(a.team) - teamTotalScore(b.team));
+      chosen = tierA[0];
+    } else {
+      // No team needs one of this player's roles — place on weakest team
+      // as flex (or in their first preferred role if any).
+      const fallback = [...openTeams].sort((a, b) => teamTotalScore(a) - teamTotalScore(b))[0];
+      const role: DotaRole | "flex" = (playerRoles[0] as DotaRole) || "flex";
+      chosen = { team: fallback, role };
+    }
+
+    chosen.team.members.push({ ...p, assignedRole: chosen.role });
+    if (POSITIONS.includes(chosen.role as DotaRole)) {
+      chosen.team.coverage[chosen.role as DotaRole] = true;
+    }
     assigned.add(p.uid);
   }
 
-  // 5. Balance pass: try 1-for-1 swaps that preserve role coverage and
-  //    reduce the team-avg MMR spread. Bounded iterations so we never
-  //    burn time on degenerate inputs.
-  for (let iter = 0; iter < 200; iter++) {
-    let improved = false;
+  // PHASE 2 — Steepest-descent swap refinement.
+  //
+  // Repeatedly scan every legal pair-swap across teams. Compute spread
+  // for the swap; track the swap that REDUCES spread the MOST; apply
+  // that one and loop. Stops when no swap improves spread. Bounded at
+  // 300 iters so a degenerate input can never burn the route's budget.
+  for (let iter = 0; iter < 300; iter++) {
     const before = spread(teams);
-    outer:
+    let bestSwap: { i: number; j: number; a: number; b: number; after: number } | null = null;
+
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
         for (let a = 0; a < teams[i].members.length; a++) {
           for (let b = 0; b < teams[j].members.length; b++) {
             const pa = teams[i].members[a];
             const pb = teams[j].members[b];
-            const paRole = pa.assignedRole;
-            const pbRole = pb.assignedRole;
-            // Can each play the other's assigned role? (or "flex" — anything goes)
-            const paOk = pbRole === "flex" || (pa.rolePreferences || []).includes(pbRole as DotaRole);
-            const pbOk = paRole === "flex" || (pb.rolePreferences || []).includes(paRole as DotaRole);
-            if (!paOk || !pbOk) continue;
+            if (!canSwap(pa, pb)) continue;
 
-            teams[i].members[a] = { ...pb, assignedRole: paRole };
-            teams[j].members[b] = { ...pa, assignedRole: pbRole };
+            // Simulate swap
+            teams[i].members[a] = { ...pb, assignedRole: pa.assignedRole };
+            teams[j].members[b] = { ...pa, assignedRole: pb.assignedRole };
             const after = spread(teams);
-            if (after < before - 1) {
-              improved = true;
-              break outer;
-            }
             // Revert
             teams[i].members[a] = pa;
             teams[j].members[b] = pb;
+
+            if (after < before - 0.01) {
+              if (!bestSwap || after < bestSwap.after) {
+                bestSwap = { i, j, a, b, after };
+              }
+            }
           }
         }
       }
     }
-    if (!improved) break;
+
+    if (!bestSwap) break; // converged
+
+    const { i, j, a, b } = bestSwap;
+    const pa = teams[i].members[a];
+    const pb = teams[j].members[b];
+    teams[i].members[a] = { ...pb, assignedRole: pa.assignedRole };
+    teams[j].members[b] = { ...pa, assignedRole: pb.assignedRole };
   }
 
   return teams;
@@ -258,7 +257,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Run the algorithm.
-    const teamSlots = shuffleByRolesAndMMR(players, numTeams);
+    const teamSlots = shuffleByRolesAndRating(players, numTeams);
 
     // 5. Build the response in the shape the admin UI already consumes.
     //    Admin renders Valorant-style fields (riotTier/riotRank/riotAvatar/
@@ -341,12 +340,13 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Balance metrics.
-    const avgs = teamSlots.map(avgMMR);
+    // Balance metrics (based on rank-tier averages — what admins see in the
+    // preview, and what the algorithm itself optimises).
+    const tierAvgs = teamSlots.map(teamAvgTier);
     const balance = {
-      spread: Math.max(...avgs) - Math.min(...avgs),
-      stdDev: stdDev(avgs),
-      mean: avgs.reduce((a, b) => a + b, 0) / avgs.length,
+      spread: Math.round((Math.max(...tierAvgs) - Math.min(...tierAvgs)) * 10) / 10,
+      stdDev: Math.round(stdDev(tierAvgs) * 10) / 10,
+      mean: Math.round((tierAvgs.reduce((a, b) => a + b, 0) / tierAvgs.length) * 10) / 10,
     };
 
     if (dryRun) {
