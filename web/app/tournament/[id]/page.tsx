@@ -46,7 +46,7 @@ function RoleIcons({ roles }: { roles?: DotaRole[] }) {
         const Icon = ROLE_ICON_MAP[r.slug];
         return (
           <span key={r.slug} className="dtd-role-pill" data-pos={r.position} aria-label={r.label} title={r.label}>
-            <Icon size={13} strokeWidth={2.5} />
+            <Icon size={10} strokeWidth={2.5} />
             <span className="dtd-role-pill-abbr">{r.abbrev}</span>
           </span>
         );
@@ -759,21 +759,21 @@ function DotaTournamentDetailInner() {
         .dtd-role-pill {
           display: flex; flex-direction: column;
           align-items: center; justify-content: center;
-          width: 30px; min-height: 36px;
-          padding: 4px 2px 3px;
-          border-radius: 6px;
+          width: 22px; min-height: 27px;
+          padding: 2px 1px 1px;
+          border-radius: 5px;
           background: rgba(161,43,31,0.16);
           border: 1px solid rgba(161,43,31,0.4);
           color: #ffae9d;
           transition: all 0.15s;
           flex-shrink: 0;
-          gap: 1px;
+          gap: 0px;
           line-height: 1;
         }
         .dtd-role-pill-abbr {
-          font-size: 0.56rem;
+          font-size: 0.48rem;
           font-weight: 800;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.03em;
           opacity: 0.95;
         }
         .dtd-role-pill[data-pos="1"] { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
