@@ -216,6 +216,7 @@ export const DISCORD_PERMS = {
 };
 
 const FULL_ACCESS_ALLOW = (DISCORD_PERMS.VIEW_CHANNEL | DISCORD_PERMS.CONNECT | DISCORD_PERMS.SPEAK).toString();
+const ACCESS_NO_SPEAK_ALLOW = (DISCORD_PERMS.VIEW_CHANNEL | DISCORD_PERMS.CONNECT).toString();
 
 interface PermOverwrite { id: string; type: 0 | 1; allow: string; deny: string }
 
@@ -278,17 +279,33 @@ export async function deleteChannel(channelId: string): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
-/** Grant a user full access (View+Connect+Speak) to a voice channel. */
-export async function grantVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+/** Set a user's voice-channel overwrite with a specific allow mask.
+ *  Helper used by grant (no speak), unmute (with speak), and mute (no speak). */
+async function putVoiceOverwrite(channelId: string, userId: string, allow: string): Promise<{ ok: boolean; error?: string }> {
   const botToken = getBotToken();
   if (!botToken) return { ok: false, error: "Missing bot token" };
   const res = await fetch(`${DISCORD_API}/channels/${channelId}/permissions/${userId}`, {
     method: "PUT",
     headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ type: 1, allow: FULL_ACCESS_ALLOW, deny: "0" }),
+    body: JSON.stringify({ type: 1, allow, deny: "0" }),
   });
   if (!res.ok) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
   return { ok: true };
+}
+
+/** Grant a user View+Connect (no Speak — muted by default). */
+export async function grantVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  return putVoiceOverwrite(channelId, userId, ACCESS_NO_SPEAK_ALLOW);
+}
+
+/** Add SPEAK to a user's existing overwrite (gives mic). */
+export async function unmuteVoiceUser(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  return putVoiceOverwrite(channelId, userId, FULL_ACCESS_ALLOW);
+}
+
+/** Drop SPEAK from a user's overwrite (takes away mic, keeps them in channel). */
+export async function muteVoiceUser(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  return putVoiceOverwrite(channelId, userId, ACCESS_NO_SPEAK_ALLOW);
 }
 
 /** Revoke a user's permission overwrite — back to @everyone defaults (no access). */

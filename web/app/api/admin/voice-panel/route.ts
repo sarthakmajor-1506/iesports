@@ -7,6 +7,8 @@ import {
   deleteChannel,
   grantVoiceAccess,
   revokeVoiceAccess,
+  muteVoiceUser,
+  unmuteVoiceUser,
 } from "@/lib/discord";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
         tournamentId: body.tournamentId || null,
         ownerDiscordIds: VOICE_PANEL_OWNER_IDS,
         allowedDiscordIds: [],
+        speakers: [],  // who currently has SPEAK perm (besides owners, who always do)
         members: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -127,8 +130,54 @@ export async function POST(req: NextRequest) {
       const r = await revokeVoiceAccess(data.channelId, userId);
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
 
+      // Drop from both arrays — losing access also implies losing speak
       await docRef.update({
         allowedDiscordIds: FieldValue.arrayRemove(userId),
+        speakers: FieldValue.arrayRemove(userId),
+        updatedAt: new Date().toISOString(),
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    case "unmute": {
+      const snap = await docRef.get();
+      const data = snap.data();
+      if (!snap.exists || !data?.channelId) return NextResponse.json({ error: "No channel" }, { status: 404 });
+      const userId = String(body.userId || "").trim();
+      if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+      if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
+        return NextResponse.json({ error: "Owners are always unmuted" }, { status: 400 });
+      }
+      const allowed: string[] = data.allowedDiscordIds || [];
+      if (!allowed.includes(userId)) {
+        return NextResponse.json({ error: "User must be granted access first" }, { status: 400 });
+      }
+
+      const r = await unmuteVoiceUser(data.channelId, userId);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
+
+      await docRef.update({
+        speakers: FieldValue.arrayUnion(userId),
+        updatedAt: new Date().toISOString(),
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    case "mute": {
+      const snap = await docRef.get();
+      const data = snap.data();
+      if (!snap.exists || !data?.channelId) return NextResponse.json({ error: "No channel" }, { status: 404 });
+      const userId = String(body.userId || "").trim();
+      if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+      if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
+        return NextResponse.json({ error: "Cannot mute an owner" }, { status: 400 });
+      }
+
+      const r = await muteVoiceUser(data.channelId, userId);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
+
+      await docRef.update({
+        speakers: FieldValue.arrayRemove(userId),
         updatedAt: new Date().toISOString(),
       });
       return NextResponse.json({ ok: true });

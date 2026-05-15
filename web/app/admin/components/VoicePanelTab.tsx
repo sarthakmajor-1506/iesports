@@ -22,6 +22,7 @@ interface PanelDoc {
   tournamentId?: string | null;
   ownerDiscordIds?: string[];
   allowedDiscordIds?: string[];
+  speakers?: string[];  // who has SPEAK perm besides owners — admin-toggled
   members?: { discordId: string; name: string; selfMute: boolean; selfDeaf: boolean; serverMute: boolean }[];
   updatedAt?: string;
 }
@@ -142,10 +143,13 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
   };
   const onGrant = async (discordId: string) => callApi("grant", { userId: discordId });
   const onRevoke = async (discordId: string) => callApi("revoke", { userId: discordId });
+  const onUnmute = async (discordId: string) => callApi("unmute", { userId: discordId });
+  const onMute = async (discordId: string) => callApi("mute", { userId: discordId });
 
   // ─── Derived: who's allowed, who's in the channel right now ──────────────
   const allowedSet = useMemo(() => new Set(panel?.allowedDiscordIds || []), [panel?.allowedDiscordIds]);
   const ownerSet = useMemo(() => new Set(panel?.ownerDiscordIds || []), [panel?.ownerDiscordIds]);
+  const speakersSet = useMemo(() => new Set(panel?.speakers || []), [panel?.speakers]);
   const liveMembers = panel?.members || [];
 
   const filteredUsers = useMemo(() => {
@@ -220,23 +224,36 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
         </div>
       </div>
 
-      {/* Live members */}
+      {/* Live members — with Mute/Unmute toggle per non-owner */}
       <div style={sectionStyle}>
-        <span style={labelStyle}>In the channel right now</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+          <span style={labelStyle}>In the channel right now</span>
+          <span style={{ fontSize: "0.66rem", color: "#666" }}>Granted users join muted by default — click Unmute to give them mic.</span>
+        </div>
         {liveMembers.length === 0 ? (
           <div style={{ fontSize: "0.78rem", color: "#666", padding: "10px 0" }}>Empty — nobody connected.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-            {liveMembers.map((m) => (
-              <div key={m.discordId} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", padding: "6px 10px", background: "#0a0b0e", borderRadius: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: m.serverMute || m.selfMute ? "#ef4444" : "#22c55e" }} />
-                <span style={{ flex: 1, color: "#e6e7ee" }}>{m.name}</span>
-                {ownerSet.has(m.discordId) && <span style={{ fontSize: "0.6rem", padding: "2px 6px", borderRadius: 4, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", fontWeight: 800 }}>OWNER</span>}
-                {!ownerSet.has(m.discordId) && (
-                  <button onClick={() => onRevoke(m.discordId)} disabled={busy} style={btn("#ef4444")}>Kick</button>
-                )}
-              </div>
-            ))}
+            {liveMembers.map((m) => {
+              const isOwner = ownerSet.has(m.discordId);
+              const canSpeak = isOwner || speakersSet.has(m.discordId);
+              return (
+                <div key={m.discordId} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", padding: "6px 10px", background: "#0a0b0e", borderRadius: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: canSpeak && !m.selfMute ? "#22c55e" : "#ef4444" }} title={canSpeak ? (m.selfMute ? "Self-muted" : "Can speak") : "Muted by admin"} />
+                  <span style={{ flex: 1, color: "#e6e7ee" }}>{m.name}</span>
+                  {isOwner ? (
+                    <span style={{ fontSize: "0.6rem", padding: "2px 6px", borderRadius: 4, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", fontWeight: 800 }}>OWNER</span>
+                  ) : canSpeak ? (
+                    <button onClick={() => onMute(m.discordId)} disabled={busy} style={btn("#f59e0b")}>Mute</button>
+                  ) : (
+                    <button onClick={() => onUnmute(m.discordId)} disabled={busy} style={btn("#22c55e")}>Unmute</button>
+                  )}
+                  {!isOwner && (
+                    <button onClick={() => onRevoke(m.discordId)} disabled={busy} style={btn("#ef4444")}>Kick</button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
