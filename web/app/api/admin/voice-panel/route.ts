@@ -7,6 +7,7 @@ import {
   deleteChannel,
   muteVoiceUser,
   unmuteVoiceUser,
+  setServerMute,
   kickFromVoice,
 } from "@/lib/discord";
 import { FieldValue } from "firebase-admin/firestore";
@@ -119,8 +120,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Owners are always unmuted" }, { status: 400 });
       }
 
-      const r = await unmuteVoiceUser(data.channelId, userId);
-      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
+      // Two-layer unmute: channel SPEAK perm (persists across rejoins) +
+      // clear any existing server-mute (live in-voice fix). Either alone
+      // leaves visible "muted" states; doing both is what users expect.
+      const perm = await unmuteVoiceUser(data.channelId, userId);
+      if (!perm.ok) return NextResponse.json({ error: perm.error }, { status: 502 });
+      const sm = await setServerMute(guildId, userId, false);
+      if (!sm.ok) return NextResponse.json({ error: sm.error }, { status: 502 });
 
       await docRef.update({
         speakers: FieldValue.arrayUnion(userId),
@@ -139,8 +145,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Cannot mute an owner" }, { status: 400 });
       }
 
-      const r = await muteVoiceUser(data.channelId, userId);
-      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
+      // Mirror unmute: drop SPEAK perm + apply server-mute. Belt-and-suspenders.
+      const perm = await muteVoiceUser(data.channelId, userId);
+      if (!perm.ok) return NextResponse.json({ error: perm.error }, { status: 502 });
+      const sm = await setServerMute(guildId, userId, true);
+      if (!sm.ok) return NextResponse.json({ error: sm.error }, { status: 502 });
 
       await docRef.update({
         speakers: FieldValue.arrayRemove(userId),

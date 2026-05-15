@@ -310,6 +310,27 @@ export async function muteVoiceUser(channelId: string, userId: string): Promise<
   return { ok: true };
 }
 
+/** Toggle a user's server-mute voice state. Idempotent; "user not in voice"
+ *  is treated as success (the channel permission overwrite already covers
+ *  the case where they're offline). */
+export async function setServerMute(guildId: string, userId: string, mute: boolean): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ mute }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    // 40032 = "Target user is not connected to voice." — fine, permission
+    // overwrite still applies on their next join.
+    if (res.status === 400 && /not connected to voice/i.test(text)) return { ok: true };
+    return { ok: false, error: `Discord ${res.status}: ${text}` };
+  }
+  return { ok: true };
+}
+
 /** Disconnect a user from voice (sets channel_id = null on their voice state). */
 export async function kickFromVoice(guildId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
   const botToken = getBotToken();
