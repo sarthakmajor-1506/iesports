@@ -12,8 +12,6 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 
 interface PanelDoc {
   channelId?: string;
@@ -93,35 +91,46 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
-  // ─── Load Valorant tournaments to pick a name from ───────────────────────
+  // ─── Load tournaments via admin API (bypasses client Firestore rules) ────
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(collection(db, "valorantTournaments"));
-        const opts: TournamentOpt[] = snap.docs.map((d) => ({ id: d.id, name: (d.data() as any).name || d.id }));
+        const res = await fetch("/api/admin/list-tournaments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminKey }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(j.tournaments)) return;
+        const opts: TournamentOpt[] = j.tournaments.map((t: any) => ({ id: t.id, name: t.name || t.id }));
         opts.sort((a, b) => a.name.localeCompare(b.name));
         setTournaments(opts);
       } catch {}
     })();
-  }, []);
+  }, [adminKey]);
 
-  // ─── Load users (lazy, when search starts) ───────────────────────────────
+  // ─── Load users via admin API (lazy, on first search focus) ──────────────
   const loadUsers = async () => {
     if (usersLoaded) return;
     try {
-      const snap = await getDocs(collection(db, "users"));
-      const rows: UserRow[] = [];
-      snap.forEach((d) => {
-        const data = d.data() as any;
-        if (!data.discordId) return; // can't grant to people we have no Discord ID for
-        rows.push({
-          uid: d.id,
-          fullName: data.fullName,
-          discordId: data.discordId,
-          discordUsername: data.discordUsername,
-          riotGameName: data.riotGameName,
-        });
+      const res = await fetch("/api/valorant/list-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey }),
       });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(j.users)) {
+        throw new Error(j.error || "Unable to load users");
+      }
+      const rows: UserRow[] = j.users
+        .filter((u: any) => !!u.discordId) // can't grant to people we have no Discord ID for
+        .map((u: any) => ({
+          uid: u.uid,
+          fullName: u.fullName,
+          discordId: u.discordId,
+          discordUsername: u.discordUsername,
+          riotGameName: u.riotGameName,
+        }));
       rows.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
       setUsers(rows);
       setUsersLoaded(true);
