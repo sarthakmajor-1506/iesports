@@ -155,9 +155,17 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="dtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>{isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}</div>
             <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}}>{m.team1Name}</div>
             <div className="dtd-mc-roster">
-              {t1Members.length > 0
-                ? t1Members.slice(0, 5).map((p: any) => p.steamName || p.fullName || "?").join(" · ")
-                : ""}
+              {t1Members.slice(0, 5).map((p: any, idx: number) => {
+                const r = DOTA_ROLES.find(rr => rr.slug === p.assignedRole);
+                return (
+                  <span key={p.uid || idx}>
+                    {idx > 0 && <span className="dtd-mc-roster-sep"> · </span>}
+                    <span className="dtd-mc-roster-name" data-pos={r ? r.position : 0}>
+                      {p.steamName || p.fullName || "?"}
+                    </span>
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -205,7 +213,19 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           <div className="dtd-mc-team-info" style={{ textAlign: "right" }}>
             <div className="dtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
             <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}}>{m.team2Name}</div>
-            <div className="dtd-mc-roster">{t2Members.length > 0 ? t2Members.slice(0, 5).map((p: any) => p.steamName || p.fullName || "?").join(" · ") : ""}</div>
+            <div className="dtd-mc-roster">
+              {t2Members.slice(0, 5).map((p: any, idx: number) => {
+                const r = DOTA_ROLES.find(rr => rr.slug === p.assignedRole);
+                return (
+                  <span key={p.uid || idx}>
+                    {idx > 0 && <span className="dtd-mc-roster-sep"> · </span>}
+                    <span className="dtd-mc-roster-name" data-pos={r ? r.position : 0}>
+                      {p.steamName || p.fullName || "?"}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#A12B1F") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
@@ -725,7 +745,7 @@ function DotaTournamentDetailInner() {
         .dtd-hero-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; object-position: center 20%; z-index: 0; filter: brightness(0.35) saturate(1.2); animation: dtd-hero-kb 16s ease-in-out infinite alternate; will-change: transform; }
         @keyframes dtd-hero-kb { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.04) translate(-1%, -0.8%); } 100% { transform: scale(1.02) translate(0.8%, -0.4%); } }
         .dtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(161,43,31,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,14,24,0.3) 0%, rgba(10,14,24,0.7) 60%, rgba(10,14,24,1) 100%); }
-        .dtd-hero-content { position: relative; z-index: 3; max-width: 1400px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
+        .dtd-hero-content { position: relative; z-index: 3; max-width: 1200px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .dtd-hero-inner { flex: 1; }
         .dtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #A12B1F; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .dtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #A12B1F; }
@@ -814,7 +834,7 @@ function DotaTournamentDetailInner() {
         .dtd-role-pills:hover .dtd-role-pill { transform: translateY(-1px); filter: brightness(1.15); }
         @keyframes dtd-hero-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        .dtd-content { max-width: 1400px; margin: 0 auto; padding: 0 30px 80px; }
+        .dtd-content { max-width: 1200px; margin: 0 auto; padding: 0 30px 80px; }
 
         /* ── Tab bar ── */
         .dtd-tabs-wrap { position: sticky; top: 68px; z-index: 20; margin-bottom: 24px; background: rgba(10,14,24,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(161,43,31,0.12); margin-left: -30px; margin-right: -30px; padding: 12px 30px; }
@@ -967,9 +987,17 @@ function DotaTournamentDetailInner() {
         .dtd-mc-team-info { flex: 1; min-width: 0; }
         .dtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #A12B1F; text-transform: uppercase; }
         .dtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        /* Roster line under each match-card team name — 5 player names */
-        .dtd-mc-roster { font-size: 0.66rem; color: #8A8880; margin-top: 4px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        /* Roster line under each match-card team name — 5 player names,
+         * each coloured by their assigned position. */
+        .dtd-mc-roster { font-size: 0.66rem; margin-top: 4px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
         .dtd-mc-team.right .dtd-mc-roster { text-align: right; }
+        .dtd-mc-roster-sep { color: #3a3a3a; font-weight: 700; }
+        .dtd-mc-roster-name { color: #8A8880; }
+        .dtd-mc-roster-name[data-pos="1"] { color: #fbbf24; }   /* Pos 1 Safe Lane    — amber  */
+        .dtd-mc-roster-name[data-pos="2"] { color: #c084fc; }   /* Pos 2 Mid          — purple */
+        .dtd-mc-roster-name[data-pos="3"] { color: #ffae9d; }   /* Pos 3 Off Lane     — red    */
+        .dtd-mc-roster-name[data-pos="4"] { color: #86efac; }   /* Pos 4 Support      — green  */
+        .dtd-mc-roster-name[data-pos="5"] { color: #7dd3fc; }   /* Pos 5 Hard Support — blue   */
         .dtd-mc-center { min-width: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 4px; flex-shrink: 0; }
         .dtd-mc-score-box { display: flex; align-items: center; gap: 6px; font-size: 1.15rem; font-weight: 900; }
         .dtd-mc-score-box .s { min-width: 22px; text-align: center; color: #E6E6E6; }

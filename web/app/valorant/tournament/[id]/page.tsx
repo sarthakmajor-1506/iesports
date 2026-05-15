@@ -748,7 +748,7 @@ function ValorantTournamentDetailInner() {
         .vtd-hero-bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; object-position: center 20%; z-index: 0; filter: brightness(0.35) saturate(1.2); animation: vtd-hero-kb 16s ease-in-out infinite alternate; will-change: transform; }
         @keyframes vtd-hero-kb { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.04) translate(-1%, -0.8%); } 100% { transform: scale(1.02) translate(0.8%, -0.4%); } }
         .vtd-hero-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(160deg, rgba(60,203,255,0.25) 0%, transparent 40%), linear-gradient(to bottom, rgba(10,15,42,0.3) 0%, rgba(10,15,42,0.7) 60%, rgba(10,15,42,1) 100%); }
-        .vtd-hero-content { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
+        .vtd-hero-content { position: relative; z-index: 3; max-width: 1200px; margin: 0 auto; padding: 0 30px; width: 100%; min-height: 460px; display: flex; align-items: flex-end; padding-bottom: 36px; }
         .vtd-hero-inner { flex: 1; }
         .vtd-hero-game-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #3CCBFF; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .vtd-hero-game-tag::before { content: ""; display: block; width: 28px; height: 2px; background: #3CCBFF; }
@@ -761,7 +761,7 @@ function ValorantTournamentDetailInner() {
         @keyframes vtd-live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         /* ── Content wrapper ── */
-        .vtd-content { max-width: 1100px; margin: 0 auto; padding: 0 30px 80px; }
+        .vtd-content { max-width: 1200px; margin: 0 auto; padding: 0 30px 80px; }
 
         /* ── Registration bar ── */
         .vtd-reg-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 18px 24px; background: rgba(18,18,21,0.85); border: 1px solid rgba(60,203,255,0.15); border-radius: 16px; flex-wrap: wrap; backdrop-filter: blur(12px); animation: vtd-slide-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
