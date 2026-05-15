@@ -220,9 +220,10 @@ const ACCESS_NO_SPEAK_ALLOW = (DISCORD_PERMS.VIEW_CHANNEL | DISCORD_PERMS.CONNEC
 
 interface PermOverwrite { id: string; type: 0 | 1; allow: string; deny: string }
 
-/** Create a private voice channel. @everyone is denied VIEW_CHANNEL; each
- *  owner gets View+Connect+Speak. Returns the new channel id. */
-export async function createPrivateVoiceChannel(opts: {
+/** Create a public-but-muted voice channel: @everyone can see and join, but
+ *  is denied Speak so they enter muted. Owners get a per-user allow Speak
+ *  overwrite so they're never muted. Returns the new channel id. */
+export async function createPublicMutedVoiceChannel(opts: {
   guildId: string;
   name: string;
   ownerUserIds: string[];
@@ -232,10 +233,13 @@ export async function createPrivateVoiceChannel(opts: {
   if (!botToken) return { ok: false, error: "Missing bot token" };
 
   const overwrites: PermOverwrite[] = [
-    // @everyone role id is the guild id by Discord convention
-    { id: opts.guildId, type: 0, allow: "0", deny: DISCORD_PERMS.VIEW_CHANNEL.toString() },
+    // @everyone role id is the guild id by Discord convention.
+    // Don't grant View/Connect explicitly — Discord defaults already allow
+    // both for @everyone. We only need to *deny* SPEAK so joiners enter muted.
+    { id: opts.guildId, type: 0, allow: "0", deny: DISCORD_PERMS.SPEAK.toString() },
+    // Owners get an explicit allow for SPEAK that wins over @everyone deny.
     ...opts.ownerUserIds.map((uid): PermOverwrite => ({
-      id: uid, type: 1, allow: FULL_ACCESS_ALLOW, deny: "0",
+      id: uid, type: 1, allow: DISCORD_PERMS.SPEAK.toString(), deny: "0",
     })),
   ];
 
@@ -279,44 +283,29 @@ export async function deleteChannel(channelId: string): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
-/** Set a user's voice-channel overwrite with a specific allow mask.
- *  Helper used by grant (no speak), unmute (with speak), and mute (no speak). */
-async function putVoiceOverwrite(channelId: string, userId: string, allow: string): Promise<{ ok: boolean; error?: string }> {
+/** Add a per-user allow-SPEAK overwrite so they can transmit despite the
+ *  @everyone deny SPEAK on the channel. Idempotent. */
+export async function unmuteVoiceUser(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
   const botToken = getBotToken();
   if (!botToken) return { ok: false, error: "Missing bot token" };
   const res = await fetch(`${DISCORD_API}/channels/${channelId}/permissions/${userId}`, {
     method: "PUT",
     headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ type: 1, allow, deny: "0" }),
+    body: JSON.stringify({ type: 1, allow: DISCORD_PERMS.SPEAK.toString(), deny: "0" }),
   });
   if (!res.ok) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
   return { ok: true };
 }
 
-/** Grant a user View+Connect (no Speak — muted by default). */
-export async function grantVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
-  return putVoiceOverwrite(channelId, userId, ACCESS_NO_SPEAK_ALLOW);
-}
-
-/** Add SPEAK to a user's existing overwrite (gives mic). */
-export async function unmuteVoiceUser(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
-  return putVoiceOverwrite(channelId, userId, FULL_ACCESS_ALLOW);
-}
-
-/** Drop SPEAK from a user's overwrite (takes away mic, keeps them in channel). */
+/** Delete the user's per-channel overwrite — they fall back to @everyone
+ *  which denies SPEAK, so they're muted. Idempotent (404 = already gone). */
 export async function muteVoiceUser(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
-  return putVoiceOverwrite(channelId, userId, ACCESS_NO_SPEAK_ALLOW);
-}
-
-/** Revoke a user's permission overwrite — back to @everyone defaults (no access). */
-export async function revokeVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
   const botToken = getBotToken();
   if (!botToken) return { ok: false, error: "Missing bot token" };
   const res = await fetch(`${DISCORD_API}/channels/${channelId}/permissions/${userId}`, {
     method: "DELETE",
     headers: { Authorization: `Bot ${botToken}` },
   });
-  // 404 = no overwrite existed = already not granted; treat as success
   if (!res.ok && res.status !== 404) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
   return { ok: true };
 }

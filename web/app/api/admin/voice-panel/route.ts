@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyAdmin } from "@/lib/verifyAdmin";
 import {
-  createPrivateVoiceChannel,
+  createPublicMutedVoiceChannel,
   patchChannel,
   deleteChannel,
-  grantVoiceAccess,
-  revokeVoiceAccess,
   muteVoiceUser,
   unmuteVoiceUser,
+  kickFromVoice,
 } from "@/lib/discord";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -74,7 +73,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Channel already exists. Delete it first." }, { status: 409 });
       }
 
-      const created = await createPrivateVoiceChannel({
+      const created = await createPublicMutedVoiceChannel({
         guildId,
         name,
         ownerUserIds: VOICE_PANEL_OWNER_IDS,
@@ -88,7 +87,6 @@ export async function POST(req: NextRequest) {
         name,
         tournamentId: body.tournamentId || null,
         ownerDiscordIds: VOICE_PANEL_OWNER_IDS,
-        allowedDiscordIds: [],
         speakers: [],  // who currently has SPEAK perm (besides owners, who always do)
         members: [],
         createdAt: new Date().toISOString(),
@@ -111,48 +109,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, state: await loadState() });
     }
 
-    case "grant": {
-      const snap = await docRef.get();
-      const data = snap.data();
-      if (!snap.exists || !data?.channelId) return NextResponse.json({ error: "No channel" }, { status: 404 });
-      const userId = String(body.userId || "").trim();
-      if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
-      if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
-        return NextResponse.json({ error: "User is already an owner" }, { status: 400 });
-      }
-
-      const r = await grantVoiceAccess(data.channelId, userId);
-      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
-
-      await docRef.update({
-        allowedDiscordIds: FieldValue.arrayUnion(userId),
-        updatedAt: new Date().toISOString(),
-      });
-      return NextResponse.json({ ok: true, state: await loadState() });
-    }
-
-    case "revoke": {
-      const snap = await docRef.get();
-      const data = snap.data();
-      if (!snap.exists || !data?.channelId) return NextResponse.json({ error: "No channel" }, { status: 404 });
-      const userId = String(body.userId || "").trim();
-      if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
-      if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
-        return NextResponse.json({ error: "Cannot revoke an owner" }, { status: 400 });
-      }
-
-      const r = await revokeVoiceAccess(data.channelId, userId);
-      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
-
-      // Drop from both arrays — losing access also implies losing speak
-      await docRef.update({
-        allowedDiscordIds: FieldValue.arrayRemove(userId),
-        speakers: FieldValue.arrayRemove(userId),
-        updatedAt: new Date().toISOString(),
-      });
-      return NextResponse.json({ ok: true, state: await loadState() });
-    }
-
     case "unmute": {
       const snap = await docRef.get();
       const data = snap.data();
@@ -161,10 +117,6 @@ export async function POST(req: NextRequest) {
       if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
       if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
         return NextResponse.json({ error: "Owners are always unmuted" }, { status: 400 });
-      }
-      const allowed: string[] = data.allowedDiscordIds || [];
-      if (!allowed.includes(userId)) {
-        return NextResponse.json({ error: "User must be granted access first" }, { status: 400 });
       }
 
       const r = await unmuteVoiceUser(data.channelId, userId);
@@ -194,6 +146,22 @@ export async function POST(req: NextRequest) {
         speakers: FieldValue.arrayRemove(userId),
         updatedAt: new Date().toISOString(),
       });
+      return NextResponse.json({ ok: true, state: await loadState() });
+    }
+
+    case "kick": {
+      const snap = await docRef.get();
+      const data = snap.data();
+      if (!snap.exists || !data?.channelId) return NextResponse.json({ error: "No channel" }, { status: 404 });
+      const userId = String(body.userId || "").trim();
+      if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+      if (VOICE_PANEL_OWNER_IDS.includes(userId)) {
+        return NextResponse.json({ error: "Cannot kick an owner" }, { status: 400 });
+      }
+
+      // Disconnect them from voice (they can rejoin since the channel is public)
+      const r = await kickFromVoice(guildId, userId);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
       return NextResponse.json({ ok: true, state: await loadState() });
     }
 

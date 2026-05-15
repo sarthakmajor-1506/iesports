@@ -19,18 +19,9 @@ interface PanelDoc {
   name?: string;
   tournamentId?: string | null;
   ownerDiscordIds?: string[];
-  allowedDiscordIds?: string[];
   speakers?: string[];  // who has SPEAK perm besides owners — admin-toggled
   members?: { discordId: string; name: string; selfMute: boolean; selfDeaf: boolean; serverMute: boolean }[];
   updatedAt?: string;
-}
-
-interface UserRow {
-  uid: string;
-  fullName?: string;
-  discordId?: string;
-  discordUsername?: string;
-  riotGameName?: string;
 }
 
 interface TournamentOpt { id: string; name: string }
@@ -54,9 +45,6 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [usersLoaded, setUsersLoaded] = useState(false);
-  const [search, setSearch] = useState("");
 
   // ─── Poll panel state via API ────────────────────────────────────────────
   // We can't use Firestore client onSnapshot here because the
@@ -109,36 +97,6 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
     })();
   }, [adminKey]);
 
-  // ─── Load users via admin API (lazy, on first search focus) ──────────────
-  const loadUsers = async () => {
-    if (usersLoaded) return;
-    try {
-      const res = await fetch("/api/valorant/list-users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminKey }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(j.users)) {
-        throw new Error(j.error || "Unable to load users");
-      }
-      const rows: UserRow[] = j.users
-        .filter((u: any) => !!u.discordId) // can't grant to people we have no Discord ID for
-        .map((u: any) => ({
-          uid: u.uid,
-          fullName: u.fullName,
-          discordId: u.discordId,
-          discordUsername: u.discordUsername,
-          riotGameName: u.riotGameName,
-        }));
-      rows.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
-      setUsers(rows);
-      setUsersLoaded(true);
-    } catch (e: any) {
-      setErr("Failed to load users: " + e.message);
-    }
-  };
-
   const callApi = async (action: string, extra: Record<string, unknown> = {}) => {
     setBusy(true); setErr("");
     try {
@@ -176,29 +134,14 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
     if (!confirm("Delete the voice channel? Members will be kicked.")) return;
     await callApi("delete");
   };
-  const onGrant = async (discordId: string) => callApi("grant", { userId: discordId });
-  const onRevoke = async (discordId: string) => callApi("revoke", { userId: discordId });
   const onUnmute = async (discordId: string) => callApi("unmute", { userId: discordId });
   const onMute = async (discordId: string) => callApi("mute", { userId: discordId });
+  const onKick = async (discordId: string) => callApi("kick", { userId: discordId });
 
-  // ─── Derived: who's allowed, who's in the channel right now ──────────────
-  const allowedSet = useMemo(() => new Set(panel?.allowedDiscordIds || []), [panel?.allowedDiscordIds]);
+  // ─── Derived: who's in the channel right now ─────────────────────────────
   const ownerSet = useMemo(() => new Set(panel?.ownerDiscordIds || []), [panel?.ownerDiscordIds]);
   const speakersSet = useMemo(() => new Set(panel?.speakers || []), [panel?.speakers]);
   const liveMembers = panel?.members || [];
-
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users.slice(0, 20);
-    return users
-      .filter((u) =>
-        (u.fullName || "").toLowerCase().includes(q) ||
-        (u.discordUsername || "").toLowerCase().includes(q) ||
-        (u.riotGameName || "").toLowerCase().includes(q) ||
-        (u.discordId || "").includes(q),
-      )
-      .slice(0, 30);
-  }, [users, search]);
 
   if (!panelLoaded) return <div style={{ color: "#666", padding: 20 }}>Loading…</div>;
 
@@ -209,9 +152,10 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
         <div style={sectionStyle}>
           <span style={labelStyle}>Create Voice Channel</span>
           <p style={{ fontSize: "0.78rem", color: "#888", lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
-            Creates a <b>private</b> voice channel in the iesports server. Only the three owners
-            (Shrey, Bubble, Major) can see and join by default. You can grant other users
-            access below once it&apos;s created.
+            Creates a <b>public</b> voice channel in the iesports server. Anyone in the server
+            can see and join, but everyone joins <b>muted</b> by default. Owners (Shrey, Bubble,
+            Major) can speak immediately. For everyone else, click <b>Unmute</b> in the live
+            members list once they join to give them mic.
           </p>
           <label style={{ ...labelStyle, marginTop: 4 }}>Pick a tournament for the channel name</label>
           <select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} style={selectStyle}>
@@ -284,69 +228,13 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
                     <button onClick={() => onUnmute(m.discordId)} disabled={busy} style={btn("#22c55e")}>Unmute</button>
                   )}
                   {!isOwner && (
-                    <button onClick={() => onRevoke(m.discordId)} disabled={busy} style={btn("#ef4444")}>Kick</button>
+                    <button onClick={() => onKick(m.discordId)} disabled={busy} style={btn("#ef4444")} title="Disconnect them from the channel (they can rejoin)">Kick</button>
                   )}
                 </div>
               );
             })}
           </div>
         )}
-      </div>
-
-      {/* Granted (allowlist) — not necessarily in channel */}
-      {(panel.allowedDiscordIds?.length || 0) > 0 && (
-        <div style={sectionStyle}>
-          <span style={labelStyle}>Allowed guests ({panel.allowedDiscordIds!.length})</span>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-            {panel.allowedDiscordIds!.map((id) => {
-              const u = users.find((x) => x.discordId === id);
-              return (
-                <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.82rem", padding: "6px 10px", background: "#0a0b0e", borderRadius: 6 }}>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ color: "#e6e7ee" }}>{u?.fullName || u?.discordUsername || id}</span>
-                    {u?.discordUsername && <span style={{ color: "#666", marginLeft: 8 }}>@{u.discordUsername}</span>}
-                  </span>
-                  <button onClick={() => onRevoke(id)} disabled={busy} style={btn("#ef4444")}>Revoke</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Search + grant */}
-      <div style={sectionStyle}>
-        <span style={labelStyle}>Grant access to a user</span>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onFocus={loadUsers}
-          placeholder={usersLoaded ? "Search name / discord / riot…" : "Click to load users…"}
-          style={inputStyle}
-        />
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-          {filteredUsers.length === 0 && usersLoaded && (
-            <div style={{ fontSize: "0.74rem", color: "#666", padding: 10 }}>No matches.</div>
-          )}
-          {filteredUsers.map((u) => {
-            const granted = allowedSet.has(u.discordId!);
-            const isOwner = ownerSet.has(u.discordId!);
-            return (
-              <div key={u.uid} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.2fr 1.2fr auto", gap: 8, alignItems: "center", fontSize: "0.78rem", padding: "6px 10px", background: "#0a0b0e", borderRadius: 6 }}>
-                <span style={{ color: "#e6e7ee", fontWeight: 600 }}>{u.fullName || "—"}</span>
-                <span style={{ color: "#888" }}>{u.discordUsername ? `@${u.discordUsername}` : ""}</span>
-                <span style={{ color: "#666", fontFamily: "ui-monospace, monospace", fontSize: "0.68rem" }}>{u.discordId}</span>
-                {isOwner ? (
-                  <span style={{ fontSize: "0.62rem", padding: "4px 8px", borderRadius: 4, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", fontWeight: 800, textAlign: "center" }}>OWNER</span>
-                ) : granted ? (
-                  <button onClick={() => onRevoke(u.discordId!)} disabled={busy} style={btn("#ef4444")}>Revoke</button>
-                ) : (
-                  <button onClick={() => onGrant(u.discordId!)} disabled={busy} style={btn("#22c55e")}>Grant</button>
-                )}
-              </div>
-            );
-          })}
-        </div>
         {err && <div style={{ marginTop: 10, color: "#ef4444", fontSize: "0.78rem" }}>{err}</div>}
       </div>
     </>
