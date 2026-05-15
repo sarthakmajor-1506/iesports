@@ -155,7 +155,11 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="dtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>{isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}</div>
             <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}}>{m.team1Name}</div>
             <div className="dtd-mc-roster">
-              {t1Members.slice(0, 5).map((p: any, idx: number) => {
+              {[...t1Members].sort((a: any, b: any) => {
+                const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
+                const bi = DOTA_ROLES.findIndex(r => r.slug === b.assignedRole);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+              }).slice(0, 5).map((p: any, idx: number) => {
                 const r = DOTA_ROLES.find(rr => rr.slug === p.assignedRole);
                 return (
                   <span key={p.uid || idx}>
@@ -214,7 +218,11 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div className="dtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
             <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}}>{m.team2Name}</div>
             <div className="dtd-mc-roster">
-              {t2Members.slice(0, 5).map((p: any, idx: number) => {
+              {[...t2Members].sort((a: any, b: any) => {
+                const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
+                const bi = DOTA_ROLES.findIndex(r => r.slug === b.assignedRole);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+              }).slice(0, 5).map((p: any, idx: number) => {
                 const r = DOTA_ROLES.find(rr => rr.slug === p.assignedRole);
                 return (
                   <span key={p.uid || idx}>
