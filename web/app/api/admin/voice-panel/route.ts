@@ -50,7 +50,21 @@ export async function POST(req: NextRequest) {
   const action = body.action as string;
   const docRef = adminDb.collection(COLL).doc(DOC_ID);
 
+  // Helper: load the current doc state to include in every successful response.
+  // Lets the UI render the new state without a second round-trip.
+  const loadState = async () => {
+    const s = await docRef.get();
+    return s.exists ? s.data() : null;
+  };
+
   switch (action) {
+    case "get": {
+      // Pure read — used by the panel UI to load + poll state since the
+      // `discordVoicePanels` collection doesn't have client-side Firestore
+      // read rules yet.
+      return NextResponse.json({ ok: true, state: await loadState() });
+    }
+
     case "create": {
       const name = sanitizeChannelName(body.name);
       if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
@@ -80,7 +94,7 @@ export async function POST(req: NextRequest) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true, channelId: created.channelId });
+      return NextResponse.json({ ok: true, channelId: created.channelId, state: await loadState() });
     }
 
     case "rename": {
@@ -94,7 +108,7 @@ export async function POST(req: NextRequest) {
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
 
       await docRef.update({ name, tournamentId: body.tournamentId || null, updatedAt: new Date().toISOString() });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     case "grant": {
@@ -114,7 +128,7 @@ export async function POST(req: NextRequest) {
         allowedDiscordIds: FieldValue.arrayUnion(userId),
         updatedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     case "revoke": {
@@ -136,7 +150,7 @@ export async function POST(req: NextRequest) {
         speakers: FieldValue.arrayRemove(userId),
         updatedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     case "unmute": {
@@ -160,7 +174,7 @@ export async function POST(req: NextRequest) {
         speakers: FieldValue.arrayUnion(userId),
         updatedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     case "mute": {
@@ -180,7 +194,7 @@ export async function POST(req: NextRequest) {
         speakers: FieldValue.arrayRemove(userId),
         updatedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     case "delete": {
@@ -194,7 +208,7 @@ export async function POST(req: NextRequest) {
       const r = await deleteChannel(data.channelId);
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
       await docRef.delete();
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, state: await loadState() });
     }
 
     default:

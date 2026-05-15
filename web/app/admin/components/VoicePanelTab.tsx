@@ -11,9 +11,9 @@
  * All Discord ops go through `/api/admin/voice-panel` which uses the bot token.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 interface PanelDoc {
   channelId?: string;
@@ -60,14 +60,37 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [search, setSearch] = useState("");
 
-  // ─── Live subscribe to the panel doc ─────────────────────────────────────
+  // ─── Poll panel state via API ────────────────────────────────────────────
+  // We can't use Firestore client onSnapshot here because the
+  // `discordVoicePanels` collection isn't covered by client-side read rules.
+  // Server route uses admin SDK to bypass rules; we poll every 3s to pick up
+  // live members joining/leaving. Action calls return fresh state and apply
+  // it immediately, so the UI reacts to button clicks without polling lag.
+  const adminKeyRef = useRef(adminKey);
+  useEffect(() => { adminKeyRef.current = adminKey; }, [adminKey]);
+
   useEffect(() => {
-    const ref = doc(db, "discordVoicePanels", "main");
-    const unsub = onSnapshot(ref, (snap) => {
-      setPanel(snap.exists() ? (snap.data() as PanelDoc) : null);
-      setPanelLoaded(true);
-    }, () => setPanelLoaded(true));
-    return () => unsub();
+    let cancelled = false;
+    const fetchState = async () => {
+      try {
+        const res = await fetch("/api/admin/voice-panel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "get", ...adminKeyPayload(adminKeyRef.current) }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setPanel((j.state as PanelDoc) || null);
+        }
+        setPanelLoaded(true);
+      } catch {
+        if (!cancelled) setPanelLoaded(true);
+      }
+    };
+    fetchState();
+    const id = setInterval(fetchState, 3000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   // ─── Load Valorant tournaments to pick a name from ───────────────────────
@@ -117,6 +140,9 @@ export default function VoicePanelTab({ adminKey }: { adminKey: string }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      // Apply fresh state returned by the action so UI updates synchronously
+      // without waiting for the next poll tick.
+      if ("state" in j) setPanel((j.state as PanelDoc) || null);
       return j;
     } catch (e: any) { setErr(e.message); throw e; }
     finally { setBusy(false); }
