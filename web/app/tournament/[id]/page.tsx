@@ -86,11 +86,17 @@ const TABS: { key: Tab; label: string; Icon: React.FC<{ size?: number; strokeWid
 function formatDate(iso: string) {
   try { return new Date(iso).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }); } catch { return iso; }
 }
+// `en-IN` locale outputs "am"/"pm" lower-case; we want uppercase. Normalise
+// via a single regex (handles "a.m.", "p.m.", and any whitespace variant
+// Intl might decide to emit on different runtimes).
+function upperAmPm(s: string): string {
+  return s.replace(/\b(a|p)\.?\s?m\.?\b/gi, m => m.toUpperCase().replace(/\./g, "").replace(/\s/g, ""));
+}
 function formatTime(iso: string) {
-  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }); } catch { return ""; }
+  try { return upperAmPm(new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })); } catch { return ""; }
 }
 function formatDateTime(iso: string) {
-  try { return new Date(iso).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }); } catch { return iso; }
+  try { return upperAmPm(new Date(iso).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })); } catch { return iso; }
 }
 function getTimeUntilDeadline(deadline: string): string {
   const diff = new Date(deadline).getTime() - Date.now();
@@ -123,7 +129,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
   const t2Members = teamMembers[m.team2Id] || [];
   const isExpanded = expandedMatch === m.id;
   const scheduledDate = m.scheduledTime ? new Date(m.scheduledTime) : null;
-  const scheduledTime = scheduledDate ? scheduledDate.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+  const scheduledTime = scheduledDate ? upperAmPm(scheduledDate.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })) : "";
   const scheduledDay = scheduledDate ? scheduledDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
   const bracketAccent = "#f59e0b";
 
