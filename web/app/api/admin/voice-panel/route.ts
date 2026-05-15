@@ -25,11 +25,10 @@ import { FieldValue } from "firebase-admin/firestore";
  * The bot mirrors live voice membership into `members` via voiceStateUpdate.
  */
 
-// Keep co-located so it's obvious where to edit if owners change.
-// Shrey is temporarily removed so he can be muted/kicked for testing —
-// re-add the line below to restore him as an owner.
+// shrey, bubble, major — keep co-located so it's obvious where to edit
+// if owners change.
 const VOICE_PANEL_OWNER_IDS = [
-  // "746803954767364147",   // shrey8169 — Shrey Jain (temporarily demoted for testing)
+  "746803954767364147",   // shrey8169 — Shrey Jain
   "760183283182206987",   // bubble_subu — Shay
   "1302366375263735808",  // major1506_31908 — Sarthak
 ];
