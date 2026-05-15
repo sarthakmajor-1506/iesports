@@ -200,6 +200,124 @@ export async function sendRegistrationDM(opts: {
   }
 }
 
+// ─── Voice channel + permission overwrite helpers ────────────────────────────
+// Used by the Voice Panel admin tab to manage a private "test" voice channel
+// where owners always have access and other users are toggled on/off.
+
+/** Discord permission bit constants we care about. All fit in 32 bits so plain
+ *  Number math is safe (Discord's full permission set spans more bits, but
+ *  we never OR in the higher ones). Sent as decimal strings to the REST API. */
+export const DISCORD_PERMS = {
+  VIEW_CHANNEL: 1 << 10,    // 1024
+  CONNECT: 1 << 20,         // 1048576
+  SPEAK: 1 << 21,           // 2097152
+  MUTE_MEMBERS: 1 << 22,    // 4194304
+  MOVE_MEMBERS: 1 << 24,    // 16777216
+};
+
+const FULL_ACCESS_ALLOW = (DISCORD_PERMS.VIEW_CHANNEL | DISCORD_PERMS.CONNECT | DISCORD_PERMS.SPEAK).toString();
+
+interface PermOverwrite { id: string; type: 0 | 1; allow: string; deny: string }
+
+/** Create a private voice channel. @everyone is denied VIEW_CHANNEL; each
+ *  owner gets View+Connect+Speak. Returns the new channel id. */
+export async function createPrivateVoiceChannel(opts: {
+  guildId: string;
+  name: string;
+  ownerUserIds: string[];
+  parentId?: string;
+}): Promise<{ ok: true; channelId: string } | { ok: false; error: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+
+  const overwrites: PermOverwrite[] = [
+    // @everyone role id is the guild id by Discord convention
+    { id: opts.guildId, type: 0, allow: "0", deny: DISCORD_PERMS.VIEW_CHANNEL.toString() },
+    ...opts.ownerUserIds.map((uid): PermOverwrite => ({
+      id: uid, type: 1, allow: FULL_ACCESS_ALLOW, deny: "0",
+    })),
+  ];
+
+  const res = await fetch(`${DISCORD_API}/guilds/${opts.guildId}/channels`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: opts.name,
+      type: 2, // voice
+      parent_id: opts.parentId,
+      permission_overwrites: overwrites,
+    }),
+  });
+  if (!res.ok) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  const ch = await res.json();
+  return { ok: true, channelId: ch.id };
+}
+
+/** Patch a channel (rename, change parent, etc). */
+export async function patchChannel(channelId: string, body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  return { ok: true };
+}
+
+/** Delete a channel. */
+export async function deleteChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  if (!res.ok && res.status !== 404) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  return { ok: true };
+}
+
+/** Grant a user full access (View+Connect+Speak) to a voice channel. */
+export async function grantVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}/permissions/${userId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ type: 1, allow: FULL_ACCESS_ALLOW, deny: "0" }),
+  });
+  if (!res.ok) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  return { ok: true };
+}
+
+/** Revoke a user's permission overwrite — back to @everyone defaults (no access). */
+export async function revokeVoiceAccess(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}/permissions/${userId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  // 404 = no overwrite existed = already not granted; treat as success
+  if (!res.ok && res.status !== 404) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  return { ok: true };
+}
+
+/** Disconnect a user from voice (sets channel_id = null on their voice state). */
+export async function kickFromVoice(guildId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  const botToken = getBotToken();
+  if (!botToken) return { ok: false, error: "Missing bot token" };
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/members/${userId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ channel_id: null }),
+  });
+  // 404 / not connected → no-op
+  if (!res.ok && res.status !== 404 && res.status !== 400) return { ok: false, error: `Discord ${res.status}: ${await res.text()}` };
+  return { ok: true };
+}
+
 /** Split a message into chunks that fit Discord's character limit. */
 function splitMessage(content: string, maxLength: number): string[] {
   if (content.length <= maxLength) return [content];

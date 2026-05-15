@@ -19,6 +19,7 @@ import { handleButton } from "./events/button-handler";
 import { handleModal } from "./events/modal-handler";
 import { registerWelcomeEvent } from "./events/welcome";
 import { registerVcTracker } from "./services/vc-tracker";
+import { registerVoicePanel } from "./services/voice-panel";
 import { linksteamData, linksteamExecute, matchresultData, matchresultExecute } from "./commands/slash-commands";
 import { lobbyControlEmbed } from "./utils/embeds";
 import { createQueueButton, lobbyControlRow1, lobbyControlRow2, lobbyControlRow3 } from "./utils/buttons";
@@ -76,6 +77,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 registerWelcomeEvent(client);
 registerVcTracker(client);
+registerVoicePanel(client);
 
 // ─── DM Reply Forwarding ────────────────────────────────────
 // When someone replies to a bot DM, forward it to a channel so admins can see it.
