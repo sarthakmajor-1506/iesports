@@ -354,7 +354,14 @@ export async function POST(req: NextRequest) {
     const testChannelOverride: string | undefined = tournamentData.testDiscordChannelId;
     const skipVcOps: boolean = !!tournamentData.skipVcOps;
 
+    // Channel priority: explicit staging override → the tournament's own
+    // Discord channel (set per-tournament, e.g. the #domin8 channel) → env
+    // fallbacks. This makes EVERY web-side match post (set-lobby, start,
+    // next-game, toss/veto) land in the tournament channel when one is set,
+    // instead of the global Valorant lobby channel. Tournaments without a
+    // discordChannelId keep the old env behaviour unchanged.
     const notifyChannelId = testChannelOverride
+      || tournamentData.discordChannelId
       || process.env.Valorant_lobby
       || process.env.LOBBY_CONTROL_CHANNEL_ID
       || process.env.RESULTS_CHANNEL_ID;
