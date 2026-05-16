@@ -9,8 +9,9 @@ const H = { Authorization: `Bot ${TOKEN}`, "Content-Type": "application/json" };
   if (!TOKEN || !GUILD) { console.error("missing token/guild"); process.exit(1); }
   // Reuse an existing Administrator role if one is assignable, else create one.
   const roles = await (await fetch(`${API}/guilds/${GUILD}/roles`, { headers: H })).json();
+  const ADMIN_BIT = BigInt(8);
   const adminRole = (roles as any[]).find(r =>
-    (BigInt(r.permissions) & 8n) === 8n && !r.managed && r.name !== "@everyone");
+    (BigInt(r.permissions) & ADMIN_BIT) === ADMIN_BIT && !r.managed && r.name !== "@everyone");
   let roleId: string, roleName: string;
   if (adminRole) {
     roleId = adminRole.id; roleName = adminRole.name;

@@ -2252,6 +2252,9 @@ export default function AdminPanel() {
                               onClick={() => { setLobbyName(m.lobbyName || ""); setLobbyPassword(m.lobbyPassword || ""); setLobbyRedoing(true); }}>Redo</button>
                           )}
                         </div>
+                        {!hasLobby && !isCompleted && (
+                          <div style={stepHint("#888")}>Optional — for a manual lobby, skip this and go straight to <b>Step 3: Start Match</b> to create the 2 team VCs.</div>
+                        )}
                         {hasLobby && (lobbyRedoing || lobbyName !== m.lobbyName) && !isCompleted ? (
                           <div style={{ marginTop: 10 }}>
                             <div style={stepHint("#f59e0b")}>Previous lobby: {m.lobbyName} — set new details below to re-send</div>
@@ -2367,19 +2370,24 @@ export default function AdminPanel() {
                       </div>
 
                       {/* ── Step 3: Start Match + VC Status ────────────────────── */}
-                      <div style={stepBox(hasLobby, isLive || isCompleted)}>
+                      {/* Manual-lobby support: Step 1 (Set Lobby & Notify) is
+                         optional. Start Match works standalone — clicking it
+                         creates the 2 team VCs and moves players in, even when
+                         no auto-lobby was set (admin made the Dota lobby
+                         in-client themselves). */}
+                      <div style={stepBox(true, isLive || isCompleted)}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <span style={stepDone(isLive || isCompleted)}>{isLive || isCompleted ? "✓" : "3"}</span>
-                          <span style={stepTitle}>Start Match</span>
+                          <span style={stepTitle}>Start Match{!hasLobby ? " — Manual Lobby" : ""}</span>
                         </div>
-                        {!hasLobby && <div style={stepHint("#f59e0b")}>Set lobby first</div>}
-                        {hasLobby && !isLive && !isCompleted && (
+                        {!isLive && !isCompleted && (
                           <div style={{ marginTop: 10 }}>
-                            {!hasVeto && <div style={stepHint("#f59e0b")}>Consider completing toss & veto first (or skip if not needed)</div>}
+                            {!hasLobby && <div style={stepHint("#888")}>Step 1 is optional. If you created the Dota lobby yourself in-client, just click <b>Start Match</b> below to open the 2 team voice channels and move players in.</div>}
+                            {hasLobby && !hasVeto && <div style={stepHint("#f59e0b")}>Consider completing toss & veto first (or skip if not needed)</div>}
                             <div style={{ display: "flex", gap: 8 }}>
                               <button disabled={loading} style={btnStyle} onClick={() => apiCall("/api/valorant/match-update", {
                                 tournamentId, matchId: opsMatchId, action: "start",
-                              })}>Start Match</button>
+                              })}>{hasLobby ? "Start Match" : "Start Match (Create 2 VCs)"}</button>
                               <button disabled={loading} style={{ ...btnSecondary, fontSize: "0.72rem" }} onClick={() => apiCall("/api/valorant/match-update", {
                                 tournamentId, matchId: opsMatchId, action: "check-vc",
                               })}>Check VC Status</button>
@@ -2388,8 +2396,8 @@ export default function AdminPanel() {
                         )}
                         {(isLive || isCompleted) && <div style={stepHint("#4ade80")}>Match is {m.status}</div>}
 
-                        {/* ── Team VC Roster — always visible when lobby is set ─── */}
-                        {hasLobby && (() => {
+                        {/* ── Team VC Roster — visible once lobby set OR match started (manual) ─── */}
+                        {(hasLobby || isLive || isCompleted) && (() => {
                           const team1 = teams.find(t => t.id === m.team1Id);
                           const team2 = teams.find(t => t.id === m.team2Id);
                           const live = m.vcLiveStatus;
