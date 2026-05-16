@@ -157,7 +157,19 @@ async function handleCreateQueue(interaction: ButtonInteraction): Promise<void> 
 
 // ─── Lobby Controls (admin only) ─────────────────────────────
 
+// Discord IDs allowed to use lobby controls WITHOUT a guild Administrator
+// role — these people run lobbies manually. Shrey is a fixed controller;
+// extend via the LOBBY_CONTROLLER_IDS env var (comma-separated) if needed.
+const LOBBY_CONTROLLER_IDS = new Set<string>([
+  "746803954767364147", // Shrey (shrey8169)
+  ...(process.env.LOBBY_CONTROLLER_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+]);
+
 function isAdmin(interaction: ButtonInteraction): boolean {
+  if (LOBBY_CONTROLLER_IDS.has(interaction.user.id)) return true;
   return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
 }
 

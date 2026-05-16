@@ -102,6 +102,16 @@ export function lobbyEmbed(lobby: LobbyDoc): EmbedBuilder {
   }
 
   embed.addFields({ name: "Password", value: `\`${lobby.password}\``, inline: false });
+
+  // Self-service re-invite instruction — the 🎮 Invite Me button below
+  // resolves the clicker's linked Steam and re-sends the Dota invite.
+  embed.addFields({
+    name: "📨 Didn't get the Steam invite in Dota 2?",
+    value:
+      "Click the **🎮 Invite Me** button below — it re-sends the invite to *your* Steam instantly.\n" +
+      "Make sure Dota 2 is open. Still nothing? Open Dota 2 → **Play → Custom Lobbies** and search the lobby name above.",
+    inline: false,
+  });
   embed.setTimestamp();
 
   return embed;

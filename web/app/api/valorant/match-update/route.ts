@@ -428,6 +428,11 @@ export async function POST(req: NextRequest) {
 
         const players = await buildDotaQueuePlayers(tournamentRef, matchData);
         const withSteam = players.filter(p => p.steam32Id).length;
+        // Route the bot's lobby embed / announcements to this tournament's
+        // private Discord channel (created per-tournament) instead of the
+        // global queue channel. Falls back to bot env channels if unset.
+        const tournamentChannelId =
+          (await tournamentRef.get()).data()?.discordChannelId || null;
         const now = new Date().toISOString();
         await queueRef.set({
           id: queueId,
@@ -448,6 +453,7 @@ export async function POST(req: NextRequest) {
           tournamentId,
           tournamentMatchId: matchId,
           tournamentCollection: resolvedCollection,
+          tournamentChannelId,
           tournamentGameNumber: gameNumber || 1,
           source: "tournament",
           lobbyPassword: lobbyPassword || "",

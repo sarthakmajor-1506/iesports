@@ -32,7 +32,9 @@ function todayKey(): string {
 
 export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Promise<void> {
   const guildId = process.env.DISCORD_GUILD_ID!;
-  const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+  // Tournament-synthesized queues route all traffic to that tournament's
+  // private channel; plain queues use the global queue channel.
+  const queueChannelId = queue.tournamentChannelId || process.env.QUEUE_CHANNEL_ID;
   const guild = await client.guilds.fetch(guildId);
 
   if (queue.players.length === 0) { console.log("[PreMatch] No players, skipping."); return; }
@@ -74,7 +76,9 @@ export async function sendPreMatchWarning(client: Client, queue: QueueDoc): Prom
 
 export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<string | null> {
   const guildId = process.env.DISCORD_GUILD_ID!;
-  const lobbyChannelId = process.env.LOBBY_CONTROL_CHANNEL_ID;
+  // For tournament lobbies, post the embed + admin controls into that
+  // tournament's private Discord channel instead of the global control one.
+  const lobbyChannelId = queue.tournamentChannelId || process.env.LOBBY_CONTROL_CHANNEL_ID;
   const guild = await client.guilds.fetch(guildId);
 
   await updateQueue(queue.id, { status: "in_progress" });
@@ -171,7 +175,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   }
 
   // ── Step 6: Announce in #queue ───────────────────────────────
-  const queueChannelId = process.env.QUEUE_CHANNEL_ID;
+  const queueChannelId = queue.tournamentChannelId || process.env.QUEUE_CHANNEL_ID;
   if (queueChannelId) {
     try {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
