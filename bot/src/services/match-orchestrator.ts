@@ -128,6 +128,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   const firestoreLobbyId = await saveLobby({
     queueId: queue.id, gcLobbyId, lobbyName, password, gameMode, serverRegion: region,
     radiant: [], dire: [], spectators: allPlayers,
+    tournamentChannelId: queue.tournamentChannelId || null,
     status: "waiting", dotaMatchId: null, winner: null, mvp: null,
     duration: null, playerStats: null, createdAt: new Date().toISOString(), completedAt: null,
   });
@@ -327,17 +328,23 @@ export async function createVCsAndMovePlayers(
     waitingRoomId = null;
   }
 
-  // Announce
-  const lobbyChId = process.env.LOBBY_CONTROL_CHANNEL_ID;
+  // Announce — route to the tournament channel if this lobby came from a
+  // tournament; otherwise the global lobby-control channel. Each player is
+  // @-pinged and their team VC is a clickable channel link, and anyone
+  // already in voice was auto-moved above.
+  const annLobby = await getLobby(lobbyDocId);
+  const lobbyChId = annLobby?.tournamentChannelId || process.env.LOBBY_CONTROL_CHANNEL_ID;
   if (lobbyChId) {
     try {
       const ch = (await client.channels.fetch(lobbyChId)) as TextChannel;
       await ch.send(
-        `🎯 **Teams assigned! Get into your voice channels!**\n\n` +
-        `🟢 **Radiant:** ${radiant.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
-        `🔊 Radiant VC: <#${radiantCh.id}>\n\n` +
-        `🔴 **Dire:** ${dire.map((p) => `<@${p.discordId}>`).join(", ")}\n` +
-        `🔊 Dire VC: <#${direCh.id}>`
+        `🎯 **Teams assigned — join your team voice channel now!**\n\n` +
+        `🟢 **Radiant** → click to join: <#${radiantCh.id}>\n` +
+        `${radiant.map((p) => `<@${p.discordId}>`).join(" ")}\n\n` +
+        `🔴 **Dire** → click to join: <#${direCh.id}>\n` +
+        `${dire.map((p) => `<@${p.discordId}>`).join(" ")}\n\n` +
+        `_Tap the highlighted channel name above to jump straight into your VC. ` +
+        `If you were already in a voice channel, the bot moved you automatically._`
       );
     } catch {}
   }
@@ -407,7 +414,7 @@ export async function pollForMatchResult(client: Client, lobbyDocId: string, dot
         });
         await updateQueue(lobby.queueId, { status: "completed" });
 
-        const rch = process.env.RESULTS_CHANNEL_ID;
+        const rch = lobby.tournamentChannelId || process.env.RESULTS_CHANNEL_ID;
         if (rch) {
           try {
             const ch = (await client.channels.fetch(rch)) as TextChannel;
