@@ -754,10 +754,14 @@ export default function AdminPanel() {
   }, [authenticated, adminRole, adminKey]);
 
   // ─── Determine collection for selected tournament ────────────────────────────
+  // Use the reliable `game` field (set in every load path) rather than a
+  // fragile display-name prefix. The old `name.startsWith("[DOTA2]")` check
+  // silently fell through to valorantTournaments whenever the prefix wasn't
+  // present, so Dota tournaments showed zero matches.
   const getSelectedCollection = (): string => {
     const t = tournaments.find(t => t.id === tournamentId);
-    if (t?.name.startsWith("[DOTA2]")) return "tournaments";
-    if (t?.name.startsWith("[CS2]")) return "cs2Tournaments";
+    if (t?.game === "dota2" || t?.name.startsWith("[DOTA2]")) return "tournaments";
+    if (t?.game === "cs2" || t?.name.startsWith("[CS2]")) return "cs2Tournaments";
     return "valorantTournaments";
   };
 
@@ -769,21 +773,45 @@ export default function AdminPanel() {
     setShuffleVideoTeams(null);
     if (!tournamentId || !authenticated) { setTeams([]); setMatches([]); return; }
     const col = getSelectedCollection();
+    const game = col === "tournaments" ? "dota2" : col === "cs2Tournaments" ? "cs2" : "valorant";
+
+    const sortMatches = (m: MatchData[]) =>
+      [...m].sort((a, b) => (a.matchDay !== b.matchDay ? a.matchDay - b.matchDay : a.matchIndex - b.matchIndex));
+
+    // Admin-SDK fallback. The client Firestore SDK can read valorantTournaments
+    // subcollections but NOT the Dota `tournaments` subcollections (no client
+    // read rule → permission-denied), which is why Dota tournaments showed
+    // "0 teams · 0 matches". On any snapshot error we poll the admin-SDK
+    // /api/tournaments/detail endpoint instead, which bypasses rules.
+    let pollId: ReturnType<typeof setInterval> | null = null;
+    let apiFallbackActive = false;
+    const fetchViaApi = async () => {
+      try {
+        const res = await fetch(`/api/tournaments/detail?id=${encodeURIComponent(tournamentId)}&game=${game}`);
+        if (!res.ok) return;
+        const j = await res.json();
+        if (Array.isArray(j.teams)) setTeams(j.teams as TeamData[]);
+        if (Array.isArray(j.matches)) setMatches(sortMatches(j.matches as MatchData[]));
+      } catch { /* transient — next poll retries */ }
+    };
+    const startApiFallback = () => {
+      if (apiFallbackActive) return;
+      apiFallbackActive = true;
+      fetchViaApi();
+      pollId = setInterval(fetchViaApi, 5000);
+    };
+
     const unsub1 = onSnapshot(
       query(collection(db, col, tournamentId, "teams"), orderBy("teamIndex")),
-      (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData)))
+      (snap) => setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as TeamData))),
+      () => startApiFallback()
     );
     const unsub2 = onSnapshot(
       collection(db, col, tournamentId, "matches"),
-      (snap) => {
-        const m = snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchData));
-        setMatches(m.sort((a, b) => {
-          if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay;
-          return a.matchIndex - b.matchIndex;
-        }));
-      }
+      (snap) => setMatches(sortMatches(snap.docs.map(d => ({ id: d.id, ...d.data() } as MatchData)))),
+      () => startApiFallback()
     );
-    return () => { unsub1(); unsub2(); };
+    return () => { unsub1(); unsub2(); if (pollId) clearInterval(pollId); };
   }, [tournamentId, authenticated]);
 
   // ─── Hydrate sub picker when admin switches between matches ─────────────
