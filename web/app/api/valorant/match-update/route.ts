@@ -242,7 +242,7 @@ async function deleteMessage(channelId: string, messageId: string): Promise<void
 export async function POST(req: NextRequest) {
   try {
     const {
-      tournamentId, adminKey, matchId, action,
+      tournamentId, adminKey, matchId, action, game,
       gameNumber, lobbyName, lobbyPassword,
       notifyDiscord, scheduledTime, bo: bodyBo, vetoMode: bodyVetoMode,
       team1Subs: bodyTeam1Subs, team2Subs: bodyTeam2Subs,
@@ -255,7 +255,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const tournamentRef = adminDb.collection("valorantTournaments").doc(tournamentId);
+    // Resolve the tournament's collection. This route was Valorant-only
+    // (hardcoded `valorantTournaments`), so every match op silently failed
+    // for Dota/CS2. Honor an explicit `game` if the client sends one,
+    // otherwise probe the three tournament collections by id (slugs are
+    // globally unique, so at most one matches).
+    const GAME_COLLECTION: Record<string, string> = {
+      valorant: "valorantTournaments", dota2: "tournaments", cs2: "cs2Tournaments",
+    };
+    let tournamentRef = adminDb.collection(GAME_COLLECTION[game] || "valorantTournaments").doc(tournamentId);
+    if (!game || !GAME_COLLECTION[game]) {
+      for (const col of ["valorantTournaments", "tournaments", "cs2Tournaments"]) {
+        const candidate = adminDb.collection(col).doc(tournamentId);
+        if ((await candidate.get()).exists) { tournamentRef = candidate; break; }
+      }
+    }
     const matchRef = tournamentRef.collection("matches").doc(matchId);
     const matchDoc = await matchRef.get();
 
