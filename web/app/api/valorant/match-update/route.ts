@@ -98,6 +98,67 @@ async function resolveUserDiscordData(uids: string[]) {
 
 type ResolvedSub = { uid: string; discordId: string; name: string; riotPuuid: string };
 
+/** QueuePlayer shape the bot's `botQueues` pipeline expects (mirrors
+ *  bot/src/services/firebase.ts QueuePlayer). */
+interface BotQueuePlayer {
+  discordId: string;
+  username: string;
+  steamId: string | null;     // Steam64
+  steam32Id: string | null;   // Steam64 - 76561197960265728
+  steamName: string | null;
+  joinedAt: string;
+}
+
+const STEAM64_BASE = BigInt("76561197960265728");
+
+/** Resolve a tournament team's members into bot QueuePlayer objects.
+ *  Steam id comes from users/{uid}.steamId, or from a `steam_<id64>` uid
+ *  prefix as a fallback. Players with no Steam link are still included
+ *  (steamId null) — the bot's inviteAll just skips them, same as queues. */
+async function buildDotaQueuePlayers(
+  tournamentRef: FirebaseFirestore.DocumentReference,
+  matchData: any,
+): Promise<BotQueuePlayer[]> {
+  const [t1, t2] = await Promise.all([
+    tournamentRef.collection("teams").doc(matchData.team1Id).get(),
+    tournamentRef.collection("teams").doc(matchData.team2Id).get(),
+  ]);
+  const members = [
+    ...((t1.data()?.members || []) as any[]),
+    ...((t2.data()?.members || []) as any[]),
+  ];
+
+  const players: BotQueuePlayer[] = [];
+  const now = new Date().toISOString();
+  for (const m of members) {
+    let steamId: string | null = null;
+    let steamName: string | null = m.steamName || null;
+    let discordId: string = m.discordId || "";
+    try {
+      const u = (await adminDb.collection("users").doc(m.uid).get()).data() || {};
+      steamId = u.steamId || null;
+      steamName = steamName || u.steamName || null;
+      discordId = discordId || u.discordId || "";
+    } catch { /* fall through to uid-prefix */ }
+    if (!steamId && typeof m.uid === "string" && m.uid.startsWith("steam_")) {
+      steamId = m.uid.slice("steam_".length);
+    }
+    let steam32Id: string | null = null;
+    if (steamId) {
+      try { steam32Id = (BigInt(steamId) - STEAM64_BASE).toString(); } catch { steam32Id = null; }
+    }
+    players.push({
+      discordId,
+      username: m.fullName || steamName || m.uid,
+      steamId,
+      steam32Id,
+      steamName,
+      joinedAt: now,
+    });
+  }
+  return players;
+}
+
 /**
  * Creates a Discord voice channel via REST API.
  * Returns the channel ID or null on failure.
@@ -263,13 +324,15 @@ export async function POST(req: NextRequest) {
     const GAME_COLLECTION: Record<string, string> = {
       valorant: "valorantTournaments", dota2: "tournaments", cs2: "cs2Tournaments",
     };
-    let tournamentRef = adminDb.collection(GAME_COLLECTION[game] || "valorantTournaments").doc(tournamentId);
+    let resolvedCollection = GAME_COLLECTION[game] || "valorantTournaments";
+    let tournamentRef = adminDb.collection(resolvedCollection).doc(tournamentId);
     if (!game || !GAME_COLLECTION[game]) {
       for (const col of ["valorantTournaments", "tournaments", "cs2Tournaments"]) {
         const candidate = adminDb.collection(col).doc(tournamentId);
-        if ((await candidate.get()).exists) { tournamentRef = candidate; break; }
+        if ((await candidate.get()).exists) { tournamentRef = candidate; resolvedCollection = col; break; }
       }
     }
+    const isDotaTournament = resolvedCollection === "tournaments";
     const matchRef = tournamentRef.collection("matches").doc(matchId);
     const matchDoc = await matchRef.get();
 
@@ -341,6 +404,69 @@ export async function POST(req: NextRequest) {
         updateData[`games.${gameKey}.lobbyName`] = lobbyName || "";
         updateData[`games.${gameKey}.lobbyPassword`] = lobbyPassword || "";
         updateData[`games.${gameKey}.status`] = "lobby_set";
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // DOTA 2 → hand off to the bot's existing GC lobby pipeline.
+      // We synthesize a `botQueues` doc; the bot cron (every minute) picks up
+      // status:"open" + scheduledTime and runs startMatchLobby() which makes
+      // iesportsbot create the real Dota lobby, Steam-invite all players,
+      // post the Discord lobby embed/DMs, and build Radiant/Dire VCs.
+      // The web side does NO Discord here — the bot owns it for Dota.
+      // ═══════════════════════════════════════════════════════════════════════
+      if (isDotaTournament) {
+        const queueId = `tournament_${tournamentId}_${matchId}_g${gameNumber || 1}`;
+        const queueRef = adminDb.collection("botQueues").doc(queueId);
+        const existing = await queueRef.get();
+        const existingStatus = existing.exists ? (existing.data()?.status as string) : null;
+        if (existingStatus === "in_progress") {
+          return NextResponse.json({
+            ok: true, mode: "bot-lobby", queueId,
+            message: "Lobby already being created by the bot for this match.",
+          });
+        }
+
+        const players = await buildDotaQueuePlayers(tournamentRef, matchData);
+        const withSteam = players.filter(p => p.steam32Id).length;
+        const now = new Date().toISOString();
+        await queueRef.set({
+          id: queueId,
+          name: lobbyName || `${matchData.team1Name} vs ${matchData.team2Name}`,
+          type: "free",
+          entryFee: 0,
+          bonus: 0,
+          sponsorId: null,
+          players,
+          maxPlayers: players.length || 10,
+          status: "open",          // cron query is where status == "open"
+          createdAt: now,
+          createdBy: "tournament-admin",
+          lobbyId: null,
+          messageId: null,
+          scheduledTime: now,      // minsUntil≈0 → cron's start window fires ≤60s
+          // Traceability (extra fields; bot only reads the QueueDoc fields above)
+          tournamentId,
+          tournamentMatchId: matchId,
+          tournamentCollection: resolvedCollection,
+          tournamentGameNumber: gameNumber || 1,
+          source: "tournament",
+          lobbyPassword: lobbyPassword || "",
+        }, { merge: true });
+
+        updateData.botQueueId = queueId;
+        updateData.lobbyMode = "bot";
+        updateData.lobbyStatus = "bot-queued";
+        await matchRef.update(updateData);
+
+        return NextResponse.json({
+          ok: true,
+          mode: "bot-lobby",
+          queueId,
+          playersQueued: players.length,
+          playersWithSteam: withSteam,
+          message: `iesportsbot will create the Dota lobby & invite ${withSteam}/${players.length} players within ~1 minute.`
+            + (withSteam < players.length ? ` (${players.length - withSteam} have no linked Steam — they'll get the Discord DM only.)` : ""),
+        });
       }
 
       let discordSent = false;
