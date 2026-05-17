@@ -13,6 +13,7 @@ import type { ShuffleTeam } from "@/app/components/remotion/ShuffleReveal";
 
 const ShuffleVideoPlayer = dynamic(() => import("@/app/components/ShuffleVideoPlayer"), { ssr: false });
 const VoicePanelTab = dynamic(() => import("@/app/admin/components/VoicePanelTab"), { ssr: false });
+const BotLobbyTab = dynamic(() => import("@/app/admin/components/BotLobbyTab"), { ssr: false });
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ interface DiscordConnection { type: string; name: string; id: string; verified: 
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
 
-type AdminTab = "tournament" | "players" | "create" | "voicePanel";
+type AdminTab = "tournament" | "players" | "create" | "voicePanel" | "botLobby";
 
 // ─── Game config ──────────────────────────────────────────────────────────────
 const GAME_OPTIONS = [
@@ -1415,6 +1416,7 @@ export default function AdminPanel() {
             <button className={`adm-tab ${activeTab === "players" ? "active" : ""}`} onClick={() => setActiveTab("players")}>Player Registry</button>
             <button className={`adm-tab ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>Create Tournament</button>
             <button className={`adm-tab ${activeTab === "voicePanel" ? "active" : ""}`} onClick={() => setActiveTab("voicePanel")}>Voice Panel</button>
+            <button className={`adm-tab ${activeTab === "botLobby" ? "active" : ""}`} onClick={() => setActiveTab("botLobby")}>Bot Lobby</button>
             {loading && <span style={{ marginLeft: 12, fontSize: "0.7rem", color: "#f59e0b", fontWeight: 700, animation: "pulse 1s infinite" }}>LOADING...</span>}
           </div>
 
@@ -3656,6 +3658,13 @@ export default function AdminPanel() {
           {/* ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === "voicePanel" && (
             <VoicePanelTab adminKey={adminKey} />
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {/* TAB 5: BOT LOBBY                                                    */}
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === "botLobby" && (
+            <BotLobbyTab adminKey={adminKey} />
           )}
 
           {/* ═══ ACTIVITY LOG ═══ */}

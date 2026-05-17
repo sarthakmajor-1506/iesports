@@ -15,6 +15,7 @@ dotenv.config();
 import { initFirebase, getDb } from "./services/firebase";
 import { getDotaBot } from "./services/dota-gc";
 import { resolveDotaResults } from "./services/dota-results";
+import { startBotLobbyControl } from "./services/bot-lobby";
 import { sendPreMatchWarning, startMatchLobby } from "./services/match-orchestrator";
 import { handleButton } from "./events/button-handler";
 import { handleModal } from "./events/modal-handler";
@@ -126,6 +127,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   } else {
     console.log("\n[Steam] No STEAM_ACCOUNT_NAME — manual-lobby mode.");
   }
+
+  // Web-driven bot lobby control (command channel + live state).
+  try { startBotLobbyControl(getDb()); } catch (e: any) { console.error("[BotLobby] init failed:", e?.message || e); }
 
   // Post Create Queue panel to #create-queue
   const createQueueChId = process.env.CREATE_QUEUE_CHANNEL_ID;
