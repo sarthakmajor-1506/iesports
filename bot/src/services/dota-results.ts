@@ -11,6 +11,7 @@
  */
 import type { Firestore } from "firebase-admin/firestore";
 import { getDotaBot, type DotaMatchDetails } from "./dota-gc";
+import { enqueueWhatsApp } from "./firebase";
 
 const STEAM64_BASE = BigInt("76561197960265728");
 const to32 = (id64?: string | null) => { try { return id64 ? (BigInt(id64) - STEAM64_BASE).toString() : null; } catch { return null; } };
@@ -142,6 +143,16 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
       }, { merge: true });
       report.written = true;
       log(`     ✅ written (${playerStats.length} player stats)`);
+
+      // Mirror the Discord result post to WhatsApp (best-effort).
+      const loser = winner === "team1" ? d.md.team2Name : d.md.team1Name;
+      const waText =
+        `🏆 *${d.md.tournamentName || "IEsports"} — Result*\n` +
+        `${d.md.team1Name} 🆚 ${d.md.team2Name}\n` +
+        `Winner: *${winnerName}* (def. ${loser})\n` +
+        `Score: ${winner === "team1" ? 1 : 0}–${winner === "team2" ? 1 : 0}` +
+        ` · ⏱ ${Math.round(det.durationSec / 60)}m · Dota match ${hit.matchId}`;
+      await enqueueWhatsApp(waText, `dota-${tid}-${id}-${hit.matchId}`, "dota-results");
     }
     report.resolved.push({ tournamentMatchId: id, dotaMatchId: hit.matchId, winner, winnerName, overlap: hit.ov, durationSec: det.durationSec });
   }

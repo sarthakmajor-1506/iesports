@@ -25,5 +25,21 @@ export interface LobbyDoc { id:string; queueId:string; gcLobbyId:string|null; lo
 export async function saveLobby(data:Omit<LobbyDoc,"id">):Promise<string> { const r=await getDb().collection("botLobbies").add(data); await r.update({id:r.id}); return r.id; }
 export async function getLobby(id:string):Promise<LobbyDoc|null> { const d=await getDb().collection("botLobbies").doc(id).get(); return d.exists?({...d.data(),id:d.id} as LobbyDoc):null; }
 export async function updateLobby(id:string,data:Partial<LobbyDoc>):Promise<void> { await getDb().collection("botLobbies").doc(id).update(data); }
+
+/**
+ * Queue a WhatsApp message (the standalone whatsapp/ service delivers it to
+ * the group). Best-effort: never throws — a WhatsApp hiccup must not break
+ * result writing. `dedupeKey` prevents double-posts if a result is fetched
+ * more than once.
+ */
+export async function enqueueWhatsApp(text:string, dedupeKey?:string, source="bot"):Promise<void> {
+  try {
+    await getDb().collection("whatsappOutbox").add({
+      text, status:"pending", source,
+      ...(dedupeKey ? { dedupeKey } : {}),
+      createdAt:new Date().toISOString(),
+    });
+  } catch(e:any) { console.warn("[WA] enqueue failed:", e?.message||e); }
+}
 export async function getActiveLobby():Promise<LobbyDoc|null> { const s=await getDb().collection("botLobbies").where("status","in",["waiting","active"]).orderBy("createdAt","desc").limit(1).get(); if(s.empty) return null; return{...s.docs[0].data(),id:s.docs[0].id} as LobbyDoc; }
 export async function saveDailyRecord(date:string,data:any):Promise<void> { await getDb().collection("botDailyRecords").doc(date).set(data,{merge:true}); }

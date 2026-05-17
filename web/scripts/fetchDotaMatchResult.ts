@@ -115,5 +115,17 @@ async function main() {
     playerStats,
   }, { merge:true });
   console.log(`\n✅ Wrote result + ${playerStats.length} player stats into ${MATCH} (winner: ${winner==="team1"?md.team1Name:md.team2Name}).`);
+
+  // Mirror to WhatsApp (best-effort) — whatsapp/ service delivers it.
+  try {
+    const winName = winner==="team1"?md.team1Name:md.team2Name;
+    const loseName = winner==="team1"?md.team2Name:md.team1Name;
+    await db.collection("whatsappOutbox").add({
+      text:`🏆 *IEsports — Result*\n${md.team1Name} 🆚 ${md.team2Name}\nWinner: *${winName}* (def. ${loseName})\nScore: ${winner==="team1"?1:0}–${winner==="team2"?1:0} · Dota match ${matchId}`,
+      status:"pending", source:"fetchDotaMatchResult",
+      dedupeKey:`dota-${TID}-${MATCH}-${matchId}`, createdAt:new Date().toISOString(),
+    });
+    console.log("📲 WhatsApp result message queued.");
+  } catch(e:any){ console.warn("WA enqueue failed:", e?.message||e); }
 }
 main().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)});
