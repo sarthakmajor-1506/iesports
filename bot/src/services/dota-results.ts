@@ -78,9 +78,14 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
   if (!bot.isReady()) { log("Connecting GC…"); await bot.connect(); await sleep(2000); }
   log(`GC ready. iesportsbot steam32=${bot.getOwnSteam32()}`);
 
-  const hist = await bot.requestPlayerMatchHistory({ matchesRequested: 100 });
+  let hist: Awaited<ReturnType<typeof bot.requestPlayerMatchHistory>> = [];
+  try { hist = await bot.requestPlayerMatchHistory({ matchesRequested: 100 }); }
+  catch (e: any) { log(`Match history request failed: ${e?.message || e}`); }
+  const d = bot.lastMHDebug;
+  log(`Match-history GC raw: len=${d.rawLen} decodedCount=${d.rawCount} fields=[${d.fields}] err=${d.err || "-"}`);
   const inWin = hist.filter(h => h.startTime >= winFrom && h.startTime <= winTo);
-  log(`Match history ${hist.length}, in-window ${inWin.length}`);
+  log(`Match history ${hist.length}, in-window ${inWin.length}; window ${new Date(winFrom * 1000).toISOString()} → ${new Date(winTo * 1000).toISOString()}`);
+  if (hist.length) log(`  hist sample: ${hist.slice(0, 8).map(h => `${h.matchId}@${new Date(h.startTime * 1000).toISOString()}(lt${h.lobbyType})`).join(" ")}`);
   const candidateIds = Array.from(new Set([...(opts.forcedMatchIds || []), ...inWin.map(h => h.matchId)])).filter(Boolean);
   log(`Candidates (${candidateIds.length}): ${candidateIds.join(", ")}`);
 
@@ -94,7 +99,8 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
     for (const p of det.players) { const r = by32.get(String(p.accountId)); if (r) tally[r.matchId] = (tally[r.matchId] || 0) + 1; }
     const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
     const ov = top ? top[1] : 0, tgt = top ? top[0] : null;
-    log(`  dota ${mid} start=${new Date(det.startTime * 1000).toISOString()} lobby=${det.lobbyType} outcome=${det.matchOutcome} -> ${tgt || "?"} (ov ${ov}/10)`);
+    log(`  dota ${mid} result=${det.result} players=${det.players.length} start=${new Date(det.startTime * 1000).toISOString()} lobby=${det.lobbyType} outcome=${det.matchOutcome} -> ${tgt || "?"} (ov ${ov}/10)`);
+    log(`     raw len=${det.rawLen} fields=[${det.topFields}] hex=${det.rawHex}`);
     if (tgt && ov >= 6 && (!best[tgt] || ov > best[tgt].ov)) best[tgt] = { dota: det, matchId: mid, ov };
   }
 

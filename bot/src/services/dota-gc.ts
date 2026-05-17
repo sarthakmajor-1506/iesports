@@ -84,6 +84,7 @@ export interface DotaMatchDetails {
   matchId: string; result: number; durationSec: number; startTime: number;
   lobbyType: number; gameMode: number; matchOutcome: number;
   radiantWin: boolean | null; players: DotaPlayerStat[];
+  rawLen: number; rawHex: string; topFields: string;
 }
 export interface DotaHistoryEntry {
   matchId: string; startTime: number; lobbyType: number; gameMode: number; durationSec: number;
@@ -385,6 +386,26 @@ class DotaBot extends EventEmitter {
     });
   }
 
+  // Generic top-level protobuf field scan (schema-independent) — for diagnosing
+  // what the GC actually sent: "f1:varint=1 f2:len=842 f3:varint=0"
+  private scanProtoFields(buf: Buffer): string {
+    const parts: string[] = []; let pos = 0;
+    try {
+      while (pos < buf.length && parts.length < 16) {
+        const t = this.readVarint(buf, pos); pos = t.pos;
+        const f = t.value >>> 3, w = t.value & 7;
+        if (w === 0) { const v = this.readVarint(buf, pos); pos = v.pos; parts.push(`f${f}:v=${v.value}`); }
+        else if (w === 1) { pos += 8; parts.push(`f${f}:fx64`); }
+        else if (w === 2) { const l = this.readVarint(buf, pos); pos = l.pos; pos += l.value; parts.push(`f${f}:len=${l.value}`); }
+        else if (w === 5) { pos += 4; parts.push(`f${f}:fx32`); }
+        else { parts.push(`f${f}:w${w}?`); break; }
+      }
+    } catch { parts.push("…(truncated)"); }
+    return parts.join(" ");
+  }
+
+  public lastMHDebug = { rawLen: 0, rawCount: 0, fields: "", err: "" };
+
   private handleMatchDetailsResponse(payload: Buffer): void {
     try {
       const Resp = gcType("CMsgGCMatchDetailsResponse");
@@ -408,11 +429,21 @@ class DotaBot extends EventEmitter {
         durationSec: Number(m.duration || 0), startTime: Number(m.starttime || 0),
         lobbyType: Number(m.lobby_type || 0), gameMode: Number(m.game_mode || 0),
         matchOutcome: out, radiantWin: out === 2 ? true : out === 3 ? false : null, players,
+        rawLen: payload.length, rawHex: payload.slice(0, 48).toString("hex"),
+        topFields: this.scanProtoFields(payload),
       };
       const key = this.pendingMD.has(res.matchId) ? res.matchId : [...this.pendingMD.keys()][0];
       const pend = key != null ? this.pendingMD.get(key) : undefined;
       if (pend) { clearTimeout(pend.timer); this.pendingMD.delete(key as string); pend.resolve(res); }
-    } catch (e) { console.warn("[GC] match-details parse error:", e); }
+    } catch (e: any) {
+      console.warn("[GC] match-details parse error:", e);
+      const key = [...this.pendingMD.keys()][0];
+      const pend = key != null ? this.pendingMD.get(key) : undefined;
+      if (pend) {
+        clearTimeout(pend.timer); this.pendingMD.delete(key as string);
+        pend.reject(new Error(`decode failed (len=${payload.length}, fields=[${this.scanProtoFields(payload)}]): ${e?.message || e}`));
+      }
+    }
   }
 
   private handleMatchHistoryResponse(payload: Buffer): void {
@@ -425,9 +456,11 @@ class DotaBot extends EventEmitter {
         lobbyType: Number(m.lobby_type || 0), gameMode: Number(m.game_mode || 0),
         durationSec: Number(m.duration || 0),
       })).filter((m: DotaHistoryEntry) => m.matchId && m.matchId !== "0");
+      this.lastMHDebug = { rawLen: payload.length, rawCount: (r.matches || []).length, fields: this.scanProtoFields(payload), err: "" };
       const p = this.pendingMH; this.pendingMH = null;
       clearTimeout(p.timer); p.resolve(list);
-    } catch (e) {
+    } catch (e: any) {
+      this.lastMHDebug = { rawLen: payload.length, rawCount: -1, fields: this.scanProtoFields(payload), err: String(e?.message || e) };
       const p = this.pendingMH; this.pendingMH = null;
       if (p) { clearTimeout(p.timer); p.reject(e); }
     }
