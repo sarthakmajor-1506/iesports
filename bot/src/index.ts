@@ -14,6 +14,7 @@ dotenv.config();
 
 import { initFirebase, getDb } from "./services/firebase";
 import { getDotaBot } from "./services/dota-gc";
+import { resolveDotaResults } from "./services/dota-results";
 import { sendPreMatchWarning, startMatchLobby } from "./services/match-orchestrator";
 import { handleButton } from "./events/button-handler";
 import { handleModal } from "./events/modal-handler";
@@ -215,6 +216,51 @@ client.once(Events.ClientReady, async (readyClient) => {
   });
 
   console.log("[Cron] Scheduled match checker running every minute");
+
+  // ─── Dota result-fetch jobs ──────────────────────────────────
+  // Admin/web writes a doc to `dotaResultJobs`:
+  //   { tournamentId, status:"pending", apply?:true, forcedMatchIds?:[] }
+  // The bot already holds the GC session, so it resolves bot-hosted
+  // practice/custom lobbies (which no public API can serve) with no
+  // Steam single-session conflict, then writes results + a report.
+  const jobsRunning = new Set<string>();
+  cron.schedule("* * * * *", async () => {
+    try {
+      const snap = await getDb()
+        .collection("dotaResultJobs")
+        .where("status", "==", "pending")
+        .get();
+      for (const doc of snap.docs) {
+        if (jobsRunning.has(doc.id)) continue;
+        jobsRunning.add(doc.id);
+        const job = doc.data() as any;
+        const tid = job.tournamentId;
+        if (!tid) { await doc.ref.set({ status: "error", error: "missing tournamentId", updatedAt: new Date().toISOString() }, { merge: true }); continue; }
+        console.log(`[DotaJob] ▶ ${doc.id} tournament=${tid}`);
+        await doc.ref.set({ status: "processing", updatedAt: new Date().toISOString() }, { merge: true });
+        try {
+          const logs: string[] = [];
+          const report = await resolveDotaResults(getDb(), {
+            tournamentId: tid,
+            apply: job.apply !== false,
+            forcedMatchIds: Array.isArray(job.forcedMatchIds) ? job.forcedMatchIds.map(String) : [],
+            log: (s) => { logs.push(s); console.log(`[DotaJob] ${s}`); },
+          });
+          await doc.ref.set({ status: "done", report, logs: logs.slice(-200), updatedAt: new Date().toISOString() }, { merge: true });
+          console.log(`[DotaJob] ✅ ${doc.id} resolved=${report.resolved.length} unresolved=${report.unresolved.length}`);
+        } catch (err: any) {
+          await doc.ref.set({ status: "error", error: String(err?.message || err), updatedAt: new Date().toISOString() }, { merge: true });
+          console.error(`[DotaJob] ✗ ${doc.id}: ${err?.message || err}`);
+        } finally {
+          jobsRunning.delete(doc.id);
+        }
+      }
+    } catch (err: any) {
+      console.error("[DotaJob] Error:", err.message);
+    }
+  });
+  console.log("[Cron] Dota result-job consumer running every minute");
+
   console.log("\n✅ Bot fully operational!\n");
 });
 

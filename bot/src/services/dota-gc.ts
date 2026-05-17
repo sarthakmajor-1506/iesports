@@ -1,7 +1,93 @@
 import SteamUser from "steam-user";
 import EventEmitter from "events";
+import protobuf from "protobufjs";
 
 const DOTA2_APP_ID = 570;
+
+// ── GC match-data message ids (dota_gcmessages_msgid.proto) ─────────────────
+const GC_MSG = {
+  MatchDetailsRequest:        7095,
+  MatchDetailsResponse:       7096,
+  GetPlayerMatchHistory:      7408,
+  GetPlayerMatchHistoryResp:  7409,
+};
+
+// Self-contained schema (subset of the official Dota protos) — kept inline so
+// it works on Railway with no .proto files on disk. Field numbers verified
+// against SteamDatabase/Protobufs (dota_gcmessages_common/client.proto).
+const GC_SCHEMA = `
+syntax = "proto2";
+message CMsgGCMatchDetailsRequest { optional uint64 match_id = 1; }
+message MPlayer {
+  optional uint32 account_id = 1;
+  optional uint32 player_slot = 2;
+  optional int32  hero_id = 3;
+  optional uint32 kills = 14;
+  optional uint32 deaths = 15;
+  optional uint32 assists = 16;
+  optional uint32 last_hits = 19;
+  optional uint32 denies = 20;
+  optional uint32 gold_per_min = 21;
+  optional uint32 xp_per_min = 22;
+  optional uint32 hero_damage = 24;
+  optional uint32 tower_damage = 25;
+  optional uint32 hero_healing = 26;
+  optional uint32 level = 27;
+  optional uint32 net_worth = 52;
+}
+message CMsgDOTAMatch {
+  repeated MPlayer players = 5;
+  optional uint32  duration = 3;
+  optional fixed32 starttime = 4;
+  optional uint64  match_id = 6;
+  optional uint32  lobby_type = 16;
+  optional uint32  game_mode = 31;
+  optional uint32  match_outcome = 50;
+}
+message CMsgGCMatchDetailsResponse {
+  optional uint32 result = 1;
+  optional CMsgDOTAMatch match = 2;
+}
+message CMsgDOTAGetPlayerMatchHistory {
+  optional uint32 account_id = 1;
+  optional uint64 start_at_match_id = 2;
+  optional uint32 matches_requested = 3;
+  optional uint32 request_id = 5;
+  optional bool   include_practice_matches = 7;
+  optional bool   include_custom_games = 8;
+}
+message MHMatch {
+  optional uint64 match_id = 1;
+  optional uint32 start_time = 2;
+  optional bool   winner = 4;
+  optional uint32 game_mode = 5;
+  optional uint32 lobby_type = 8;
+  optional uint32 duration = 11;
+}
+message CMsgDOTAGetPlayerMatchHistoryResponse {
+  repeated MHMatch matches = 1;
+  optional uint32  request_id = 2;
+}`;
+let gcRoot: protobuf.Root | null = null;
+function gcType(name: string): protobuf.Type {
+  if (!gcRoot) gcRoot = protobuf.parse(GC_SCHEMA, { keepCase: true }).root;
+  return gcRoot.lookupType(name);
+}
+
+export interface DotaPlayerStat {
+  accountId: number; slot: number; isRadiant: boolean; heroId: number;
+  kills: number; deaths: number; assists: number; lastHits: number; denies: number;
+  gpm: number; xpm: number; heroDamage: number; towerDamage: number;
+  heroHealing: number; level: number; netWorth: number;
+}
+export interface DotaMatchDetails {
+  matchId: string; result: number; durationSec: number; startTime: number;
+  lobbyType: number; gameMode: number; matchOutcome: number;
+  radiantWin: boolean | null; players: DotaPlayerStat[];
+}
+export interface DotaHistoryEntry {
+  matchId: string; startTime: number; lobbyType: number; gameMode: number; durationSec: number;
+}
 
 const EGCBaseClientMsg = {
   k_EMsgGCClientHello:   4006,
@@ -76,6 +162,10 @@ class DotaBot extends EventEmitter {
 
   // Live lobby state — updated on every GC lobby message
   private liveLobbyMembers: LobbyMember[] = [];
+
+  // Pending GC match-data requests
+  private pendingMD = new Map<string, { resolve: (v: DotaMatchDetails) => void; reject: (e: any) => void; timer: NodeJS.Timeout }>();
+  private pendingMH: { resolve: (v: DotaHistoryEntry[]) => void; reject: (e: any) => void; timer: NodeJS.Timeout } | null = null;
 
   constructor() {
     super();
@@ -214,6 +304,10 @@ class DotaBot extends EventEmitter {
           console.log(`[GC] <- 7465 (${payload.length}b) — lobby state signal`);
           this.emit("lobbyCreated");
         }
+
+        // ── Match-data responses ────────────────────────────────────────────
+        if (msgType === GC_MSG.MatchDetailsResponse) this.handleMatchDetailsResponse(payload);
+        if (msgType === GC_MSG.GetPlayerMatchHistoryResp) this.handleMatchHistoryResponse(payload);
       });
 
       this.client.on("error", (err: any) => {
@@ -236,6 +330,108 @@ class DotaBot extends EventEmitter {
   }
 
   isReady() { return this.ready && this.gcReady; }
+
+  /** iesportsbot's own steam32 account id (valid after GC ready). */
+  getOwnSteam32(): number { return this.getBotSteam32(); }
+
+  /**
+   * Ask the GC for a single match's full details. Works for bot-hosted
+   * practice/custom lobbies (which the Steam Web API & OpenDota cannot serve).
+   * GC-rate-limited — space calls ~1.5s apart when looping.
+   */
+  async requestMatchDetails(matchId: string | number, timeoutMs = 20000): Promise<DotaMatchDetails> {
+    if (!this.gcReady) throw new Error("GC not ready");
+    const id = String(matchId);
+    const Req = gcType("CMsgGCMatchDetailsRequest");
+    const buf = Buffer.from(Req.encode(Req.create({ match_id: id })).finish());
+    return new Promise<DotaMatchDetails>((resolve, reject) => {
+      const prev = this.pendingMD.get(id);
+      if (prev) { clearTimeout(prev.timer); prev.reject(new Error("superseded")); }
+      const timer = setTimeout(() => { this.pendingMD.delete(id); reject(new Error(`match-details timeout for ${id}`)); }, timeoutMs);
+      this.pendingMD.set(id, { resolve, reject, timer });
+      this.client.sendToGC(DOTA2_APP_ID, GC_MSG.MatchDetailsRequest, {}, buf);
+      console.log(`[GC] -> MatchDetailsRequest ${id}`);
+    });
+  }
+
+  /**
+   * List a player's recent matches incl. practice + custom lobbies. Default
+   * account is iesportsbot itself, which hosted every tournament lobby — so
+   * this surfaces all tournament match ids even when none were captured live.
+   */
+  async requestPlayerMatchHistory(
+    opts: { accountId?: number; matchesRequested?: number; startAtMatchId?: string } = {},
+    timeoutMs = 20000,
+  ): Promise<DotaHistoryEntry[]> {
+    if (!this.gcReady) throw new Error("GC not ready");
+    const accountId = opts.accountId ?? this.getBotSteam32();
+    if (!accountId) throw new Error("no account id for match-history request");
+    const Req = gcType("CMsgDOTAGetPlayerMatchHistory");
+    const payload: any = {
+      account_id: accountId,
+      matches_requested: opts.matchesRequested ?? 50,
+      include_practice_matches: true,
+      include_custom_games: true,
+      request_id: (Date.now() & 0x7fffffff),
+    };
+    if (opts.startAtMatchId) payload.start_at_match_id = opts.startAtMatchId;
+    const buf = Buffer.from(Req.encode(Req.create(payload)).finish());
+    return new Promise<DotaHistoryEntry[]>((resolve, reject) => {
+      if (this.pendingMH) { clearTimeout(this.pendingMH.timer); this.pendingMH.reject(new Error("superseded")); }
+      const timer = setTimeout(() => { this.pendingMH = null; reject(new Error("match-history timeout")); }, timeoutMs);
+      this.pendingMH = { resolve, reject, timer };
+      this.client.sendToGC(DOTA2_APP_ID, GC_MSG.GetPlayerMatchHistory, {}, buf);
+      console.log(`[GC] -> GetPlayerMatchHistory account=${accountId}`);
+    });
+  }
+
+  private handleMatchDetailsResponse(payload: Buffer): void {
+    try {
+      const Resp = gcType("CMsgGCMatchDetailsResponse");
+      const r: any = Resp.toObject(Resp.decode(payload), { longs: String, defaults: true });
+      const m = r.match || {};
+      const out = Number(m.match_outcome || 0);
+      const players: DotaPlayerStat[] = (m.players || []).map((p: any) => {
+        const slot = Number(p.player_slot || 0);
+        return {
+          accountId: Number(p.account_id || 0), slot, isRadiant: slot < 128,
+          heroId: Number(p.hero_id || 0), kills: Number(p.kills || 0), deaths: Number(p.deaths || 0),
+          assists: Number(p.assists || 0), lastHits: Number(p.last_hits || 0), denies: Number(p.denies || 0),
+          gpm: Number(p.gold_per_min || 0), xpm: Number(p.xp_per_min || 0),
+          heroDamage: Number(p.hero_damage || 0), towerDamage: Number(p.tower_damage || 0),
+          heroHealing: Number(p.hero_healing || 0), level: Number(p.level || 0),
+          netWorth: Number(p.net_worth || 0),
+        };
+      });
+      const res: DotaMatchDetails = {
+        matchId: String(m.match_id ?? ""), result: Number(r.result || 0),
+        durationSec: Number(m.duration || 0), startTime: Number(m.starttime || 0),
+        lobbyType: Number(m.lobby_type || 0), gameMode: Number(m.game_mode || 0),
+        matchOutcome: out, radiantWin: out === 2 ? true : out === 3 ? false : null, players,
+      };
+      const key = this.pendingMD.has(res.matchId) ? res.matchId : [...this.pendingMD.keys()][0];
+      const pend = key != null ? this.pendingMD.get(key) : undefined;
+      if (pend) { clearTimeout(pend.timer); this.pendingMD.delete(key as string); pend.resolve(res); }
+    } catch (e) { console.warn("[GC] match-details parse error:", e); }
+  }
+
+  private handleMatchHistoryResponse(payload: Buffer): void {
+    if (!this.pendingMH) return;
+    try {
+      const Resp = gcType("CMsgDOTAGetPlayerMatchHistoryResponse");
+      const r: any = Resp.toObject(Resp.decode(payload), { longs: String, defaults: true });
+      const list: DotaHistoryEntry[] = (r.matches || []).map((m: any) => ({
+        matchId: String(m.match_id ?? ""), startTime: Number(m.start_time || 0),
+        lobbyType: Number(m.lobby_type || 0), gameMode: Number(m.game_mode || 0),
+        durationSec: Number(m.duration || 0),
+      })).filter((m: DotaHistoryEntry) => m.matchId && m.matchId !== "0");
+      const p = this.pendingMH; this.pendingMH = null;
+      clearTimeout(p.timer); p.resolve(list);
+    } catch (e) {
+      const p = this.pendingMH; this.pendingMH = null;
+      if (p) { clearTimeout(p.timer); p.reject(e); }
+    }
+  }
 
   private updateLiveLobby(members: LobbyMember[]): void {
     this.liveLobbyMembers = members;
