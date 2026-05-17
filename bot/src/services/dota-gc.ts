@@ -152,8 +152,10 @@ class DotaBot extends EventEmitter {
   private client: SteamUser;
   private ready = false;
   private gcReady = false;
+  private gcEverReady = false;          // true after the FIRST GC welcome
   private gcVersion = 0;
   private helloInterval: NodeJS.Timeout | null = null;
+  private keepAliveInterval: NodeJS.Timeout | null = null; // post-ready GC keepalive
   private ownershipTicket: Buffer | null = null;
   private waitingForLobby = false;
   private pendingTimers: NodeJS.Timeout[] = [];
@@ -241,27 +243,44 @@ class DotaBot extends EventEmitter {
           this.gcReady = true;
           this.stopHello();
           clearTimeout(timeout);
-          console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion}`);
+          const firstWelcome = !this.gcEverReady;
+          this.gcEverReady = true;
+          console.log(`[Dota2] ✅ GC ready! version=${this.gcVersion} (${firstWelcome ? "first welcome" : "RE-welcome/reconnect"})`);
 
-          // Destroy any stale lobby from previous session
-          // Send both Destroy + Leave, wait for GC to process before reporting ready
-          this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-          console.log("[GC] -> Startup DestroyLobbyRequest sent");
-          setTimeout(() => {
-            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
-            console.log("[GC] -> Startup LobbyLeave sent");
-          }, 2000);
-          this.lobbyActive = false;
-          this.liveLobbyMembers = [];
-          this.startupCleanup = true; // Flag to ignore stale lobby data during startup
+          // Keep the GC session warm so it doesn't idle-drop (an idle drop
+          // forces a reconnect AND makes Valve disband the bot's lobby).
+          this.startKeepAlive();
 
-          // Wait 8s for destroy+leave to process, then clear the startup flag
-          setTimeout(() => {
-            this.startupCleanup = false;
+          // CRITICAL: the GC sends ClientWelcome on EVERY reconnect, not just
+          // the first connect. Destroying/leaving here unconditionally was
+          // killing the live tournament lobby ~10 min in (the reported bug).
+          // Only clear a stale lobby on the very first welcome AND only when
+          // we don't have an intentional active lobby. On any reconnect with
+          // an active lobby, preserve it — Valve keeps the practice lobby
+          // alive briefly and the bot re-adopts it via the member-state parse.
+          if (firstWelcome && !this.lobbyActive) {
+            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+            console.log("[GC] -> Startup DestroyLobbyRequest sent");
+            setTimeout(() => {
+              this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
+              console.log("[GC] -> Startup LobbyLeave sent");
+            }, 2000);
+            this.lobbyActive = false;
             this.liveLobbyMembers = [];
-            console.log("[Steam] ✅ Dota 2 GC connected!");
-            resolve();
-          }, 8000);
+            this.startupCleanup = true; // ignore stale lobby data during startup
+
+            setTimeout(() => {
+              this.startupCleanup = false;
+              this.liveLobbyMembers = [];
+              console.log("[Steam] ✅ Dota 2 GC connected!");
+              resolve();
+            }, 8000);
+          } else {
+            // Reconnect (or already had a lobby) — DO NOT destroy/leave.
+            this.startupCleanup = false;
+            console.log(`[GC] re-welcome — preserving ${this.lobbyActive ? "ACTIVE lobby" : "session"} (no destroy/leave)`);
+            resolve(); // no-op if the connect() promise already settled
+          }
         }
 
         // ── Ownership challenge (msgType 24 or 26) ─────────────────────────
@@ -319,6 +338,7 @@ class DotaBot extends EventEmitter {
         }
         clearTimeout(timeout);
         this.stopHello();
+        this.stopKeepAlive();
         this.ready = false; this.gcReady = false;
         reject(err);
       });
@@ -326,6 +346,10 @@ class DotaBot extends EventEmitter {
       this.client.on("disconnected", () => {
         this.ready = false; this.gcReady = false;
         this.stopHello();
+        this.stopKeepAlive();
+        // steam-user auto-reconnects; on the next GC welcome we now PRESERVE
+        // an active lobby instead of destroying it.
+        console.warn(`[Steam] disconnected (lobbyActive=${this.lobbyActive}) — will reconnect & re-adopt lobby`);
       });
     });
   }
@@ -787,6 +811,8 @@ class DotaBot extends EventEmitter {
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
     this.stopHello();
+    this.stopKeepAlive();
+    this.gcEverReady = false;
     this.ready = false;
     this.gcReady = false;
     this.lobbyActive = false;
@@ -825,6 +851,26 @@ class DotaBot extends EventEmitter {
 
   private stopHello(): void {
     if (this.helloInterval) { clearInterval(this.helloInterval); this.helloInterval = null; }
+  }
+
+  // Post-ready GC keepalive. Without this the GC session idle-drops after a
+  // few minutes; the reconnect both interrupts the lobby and (because Valve
+  // sees the host disconnect) disbands the practice lobby. Re-sending a
+  // ClientHello every 30s keeps the session warm (same cadence node-dota2 uses).
+  private startKeepAlive(): void {
+    this.stopKeepAlive();
+    this.keepAliveInterval = setInterval(() => {
+      if (this.gcReady) {
+        try {
+          this.client.sendToGC(DOTA2_APP_ID, EGCBaseClientMsg.k_EMsgGCClientHello, {}, Buffer.alloc(0));
+        } catch (e: any) {
+          console.warn(`[GC] keepalive send failed: ${e?.message || e}`);
+        }
+      }
+    }, 30000);
+  }
+  private stopKeepAlive(): void {
+    if (this.keepAliveInterval) { clearInterval(this.keepAliveInterval); this.keepAliveInterval = null; }
   }
 
   // ── Protobuf encode helpers ───────────────────────────────────────────────
