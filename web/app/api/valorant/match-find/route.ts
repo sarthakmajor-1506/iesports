@@ -92,6 +92,14 @@ export async function POST(req: NextRequest) {
       resolvePuuids(team2Members),
     ]);
 
+    // ─── Fold in substitutes ──────────────────────────────────────────
+    // Subs (recorded on the match doc as team1Subs/team2Subs) actually
+    // played, while the roster member they replaced did not. Without this,
+    // sub-heavy matches never reach the cross-team overlap threshold and
+    // the finder reports "no match found".
+    for (const s of (existingMatch.team1Subs || []) as any[]) if (s?.riotPuuid) team1Puuids.add(s.riotPuuid);
+    for (const s of (existingMatch.team2Subs || []) as any[]) if (s?.riotPuuid) team2Puuids.add(s.riotPuuid);
+
     if (team1Puuids.size === 0) {
       return NextResponse.json(
         { error: "No Riot PUUIDs found for team 1 — players must link Riot IDs first" },
