@@ -17,7 +17,7 @@ import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
-  Share2, Copy, CheckCheck, Calendar, Clock, ScrollText,
+  Share2, Copy, CheckCheck, ChevronDown, Calendar, Clock, ScrollText,
   MessageCircle,
   Coins, Target, Info, Zap, Camera, Link2, X,
 } from "lucide-react";
@@ -345,6 +345,40 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         </div>
         );
       })()}
+    </div>
+  );
+}
+
+// Collapsible Swiss/group round. Completed past rounds collapse by default;
+// the current round and any upcoming rounds stay open. User can toggle either way.
+function RoundSection({ day, count, completed, defaultOpen, children }: {
+  day: number; count: number; completed: boolean; defaultOpen: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <div
+        className="vtd-match-day-header"
+        onClick={() => setOpen((o) => !o)}
+        role="button"
+        aria-expanded={open}
+        style={{ cursor: "pointer", userSelect: "none" }}
+      >
+        <ChevronDown
+          size={14}
+          strokeWidth={2.5}
+          style={{ color: "#555550", transition: "transform 0.15s ease", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
+        <span className="day-num">R{day}</span>
+        <span>· {count}</span>
+        {completed && (
+          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, color: "#6fcf8a", fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em" }}>
+            <CheckCheck size={12} strokeWidth={2.5} />
+            {open ? "COMPLETED" : "COMPLETED · TAP TO VIEW"}
+          </span>
+        )}
+      </div>
+      {open && <div style={{ animation: "vtd-fadein 0.2s ease" }}>{children}</div>}
     </div>
   );
 }
@@ -1718,7 +1752,21 @@ function ValorantTournamentDetailInner() {
                   {groupMatches.length > 0 && (
                     <div>
                       <div className="vtd-section-header group">Groups</div>
-                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">R{day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length}</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
+                      {(() => {
+                        const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b);
+                        const isDone = (day: number) => groupMatches.filter((m: any) => m.matchDay === day).every((m: any) => m.status === "completed");
+                        // Current round = first round not fully completed; if every round
+                        // is done, fall back to the last round so it stays expanded.
+                        const currentRound = days.find((d: number) => !isDone(d)) ?? days[days.length - 1];
+                        return days.map((day: number) => {
+                          const dayMatches = groupMatches.filter((m: any) => m.matchDay === day);
+                          return (
+                            <RoundSection key={day} day={day} count={dayMatches.length} completed={isDone(day)} defaultOpen={day >= currentRound}>
+                              {dayMatches.map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}
+                            </RoundSection>
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                   {bracketMatches.length > 0 && (
