@@ -145,7 +145,9 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
   // again (e.g. the new agent-ban punishment feature). Old keys become
   // orphan localStorage entries, the empty seenIds means every entry is
   // freshly "unseen" → badge shows full count.
-  const seenStorageKey = `wos_seen_v2_${tournamentId}`;
+  // v3 bump (May 2026 Ascension refresh): old wos_seen_v2_* keys become orphan
+  // localStorage entries, every entry is freshly "unseen" → badge re-lights.
+  const seenStorageKey = `wos_seen_v3_${tournamentId}`;
   const [seenIds, setSeenIds] = useState<string[]>([]);
   useEffect(() => {
     if (typeof window === "undefined" || !tournamentId) return;
