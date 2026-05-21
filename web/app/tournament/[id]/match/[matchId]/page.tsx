@@ -98,6 +98,35 @@ export default function DotaMatchDetail() {
   const radiantPlayers = sortPlayers(playerStats.filter(p => p.side === "radiant"));
   const direPlayers = sortPlayers(playerStats.filter(p => p.side === "dire"));
 
+  // ── Team aggregates for the side-by-side summary block ─────────────────
+  const aggregate = (arr: any[]) => arr.reduce((acc, p) => ({
+    kills: acc.kills + (p.kills || 0),
+    deaths: acc.deaths + (p.deaths || 0),
+    assists: acc.assists + (p.assists || 0),
+    netWorth: acc.netWorth + (p.netWorth || 0),
+    lastHits: acc.lastHits + (p.lastHits || 0),
+    denies: acc.denies + (p.denies || 0),
+    heroDamage: acc.heroDamage + (p.heroDamage || 0),
+    towerDamage: acc.towerDamage + (p.towerDamage || 0),
+    heroHealing: acc.heroHealing + (p.heroHealing || 0),
+    avgLevel: arr.length ? Math.round(arr.reduce((s, x) => s + (x.level || 0), 0) / arr.length) : 0,
+  }), { kills: 0, deaths: 0, assists: 0, netWorth: 0, lastHits: 0, denies: 0, heroDamage: 0, towerDamage: 0, heroHealing: 0, avgLevel: 0 });
+  const radAgg = aggregate(radiantPlayers);
+  const direAgg = aggregate(direPlayers);
+
+  // ── Top performers across both teams (single highest in 4 categories) ──
+  const topBy = (key: string) => playerStats.length > 0
+    ? [...playerStats].sort((a, b) => (b[key] || 0) - (a[key] || 0))[0]
+    : null;
+  const mostKills = topBy("kills");
+  const mostAssists = topBy("assists");
+  const mostHeroDmg = topBy("heroDamage");
+  const mostNetWorth = topBy("netWorth");
+  const mostHealing = playerStats.length > 0
+    ? [...playerStats].filter(p => (p.heroHealing || 0) > 0).sort((a, b) => (b.heroHealing || 0) - (a.heroHealing || 0))[0]
+    : null;
+  const mostFarm = topBy("lastHits");
+
   // ── MATCH MVP: highest-impact player across both sides, winner ties broken ──
   const mvpScore = (p: any) => {
     const won = p.side === g1.winner;
@@ -230,6 +259,86 @@ export default function DotaMatchDetail() {
             </div>
           )}
 
+          {/* ── TEAM SUMMARY (side-by-side aggregates) ── */}
+          <div className="dmd-team-summary">
+            <div className="dmd-team-summary-side" style={{ borderColor: radWon ? "rgba(74,222,128,0.35)" : "rgba(74,222,128,0.12)" }}>
+              <div className="dmd-tsum-head" style={{ color: "#4ade80" }}>
+                Radiant {radWon && <span className="dmd-tsum-win">👑</span>}
+                <span className="dmd-tsum-team">{radiantName}</span>
+              </div>
+              <div className="dmd-tsum-grid">
+                <div><div className="dmd-tsum-v" style={{ color: "#4ade80" }}>{radAgg.kills}</div><div className="dmd-tsum-l">Kills</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#ef4444" }}>{radAgg.deaths}</div><div className="dmd-tsum-l">Deaths</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#fbbf24" }}>{radAgg.netWorth.toLocaleString()}</div><div className="dmd-tsum-l">Net Worth</div></div>
+                <div><div className="dmd-tsum-v">{radAgg.heroDamage.toLocaleString()}</div><div className="dmd-tsum-l">Hero Dmg</div></div>
+                <div><div className="dmd-tsum-v">{radAgg.towerDamage.toLocaleString()}</div><div className="dmd-tsum-l">Twr Dmg</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#a78bfa" }}>{radAgg.heroHealing.toLocaleString()}</div><div className="dmd-tsum-l">Healing</div></div>
+                <div><div className="dmd-tsum-v">{radAgg.lastHits}</div><div className="dmd-tsum-l">Last Hits</div></div>
+                <div><div className="dmd-tsum-v">{radAgg.avgLevel}</div><div className="dmd-tsum-l">Avg Lvl</div></div>
+              </div>
+            </div>
+            <div className="dmd-team-summary-divider">
+              {(() => {
+                const nwDiff = radAgg.netWorth - direAgg.netWorth;
+                const dmgDiff = radAgg.heroDamage - direAgg.heroDamage;
+                return (
+                  <>
+                    <div className="dmd-tsum-diff-row">
+                      <span className={"dmd-tsum-diff-side " + (nwDiff > 0 ? "lead-r" : "")}>{nwDiff > 0 ? `+${Math.abs(nwDiff).toLocaleString()}` : ""}</span>
+                      <span className="dmd-tsum-diff-label">NET</span>
+                      <span className={"dmd-tsum-diff-side " + (nwDiff < 0 ? "lead-d" : "")}>{nwDiff < 0 ? `+${Math.abs(nwDiff).toLocaleString()}` : ""}</span>
+                    </div>
+                    <div className="dmd-tsum-diff-row">
+                      <span className={"dmd-tsum-diff-side " + (dmgDiff > 0 ? "lead-r" : "")}>{dmgDiff > 0 ? `+${Math.abs(dmgDiff).toLocaleString()}` : ""}</span>
+                      <span className="dmd-tsum-diff-label">HERO DMG</span>
+                      <span className={"dmd-tsum-diff-side " + (dmgDiff < 0 ? "lead-d" : "")}>{dmgDiff < 0 ? `+${Math.abs(dmgDiff).toLocaleString()}` : ""}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="dmd-team-summary-side" style={{ borderColor: !radWon ? "rgba(239,68,68,0.35)" : "rgba(239,68,68,0.12)" }}>
+              <div className="dmd-tsum-head" style={{ color: "#ef4444" }}>
+                Dire {!radWon && <span className="dmd-tsum-win">👑</span>}
+                <span className="dmd-tsum-team">{direName}</span>
+              </div>
+              <div className="dmd-tsum-grid">
+                <div><div className="dmd-tsum-v" style={{ color: "#4ade80" }}>{direAgg.kills}</div><div className="dmd-tsum-l">Kills</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#ef4444" }}>{direAgg.deaths}</div><div className="dmd-tsum-l">Deaths</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#fbbf24" }}>{direAgg.netWorth.toLocaleString()}</div><div className="dmd-tsum-l">Net Worth</div></div>
+                <div><div className="dmd-tsum-v">{direAgg.heroDamage.toLocaleString()}</div><div className="dmd-tsum-l">Hero Dmg</div></div>
+                <div><div className="dmd-tsum-v">{direAgg.towerDamage.toLocaleString()}</div><div className="dmd-tsum-l">Twr Dmg</div></div>
+                <div><div className="dmd-tsum-v" style={{ color: "#a78bfa" }}>{direAgg.heroHealing.toLocaleString()}</div><div className="dmd-tsum-l">Healing</div></div>
+                <div><div className="dmd-tsum-v">{direAgg.lastHits}</div><div className="dmd-tsum-l">Last Hits</div></div>
+                <div><div className="dmd-tsum-v">{direAgg.avgLevel}</div><div className="dmd-tsum-l">Avg Lvl</div></div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── TOP PERFORMERS (single highest in each category across the match) ── */}
+          <div className="dmd-top-perf">
+            <div className="dmd-top-perf-head">⚡ TOP PERFORMERS</div>
+            <div className="dmd-top-perf-grid">
+              {[
+                { lbl: "Most Kills",       p: mostKills,    metric: (p: any) => `${p.kills} K`, color: "#4ade80" },
+                { lbl: "Most Assists",     p: mostAssists,  metric: (p: any) => `${p.assists} A`, color: "#3CCBFF" },
+                { lbl: "Most Hero Dmg",    p: mostHeroDmg,  metric: (p: any) => `${(p.heroDamage || 0).toLocaleString()}`, color: "#fb923c" },
+                { lbl: "Biggest Farmer",   p: mostFarm,     metric: (p: any) => `${p.lastHits} LH`, color: "#fbbf24" },
+                { lbl: "Richest",          p: mostNetWorth, metric: (p: any) => `${(p.netWorth || 0).toLocaleString()}`, color: "#fbbf24" },
+                { lbl: "Most Healing",     p: mostHealing,  metric: (p: any) => `${(p.heroHealing || 0).toLocaleString()}`, color: "#a78bfa" },
+              ].filter(x => x.p && (x.lbl !== "Most Healing" || (x.p.heroHealing || 0) > 0)).map(({ lbl, p, metric, color }) => (
+                <div key={lbl} className="dmd-tp-card" style={{ borderLeft: `3px solid ${color}` }}>
+                  <div className="dmd-tp-lbl">{lbl}</div>
+                  <div className="dmd-tp-name">
+                    {p.uid ? <Link href={`/player/${p.uid}?tab=dota`} style={{ color: "inherit", textDecoration: "none" }}>{p.steamName || p.name}</Link> : (p.steamName || p.name)}
+                  </div>
+                  <div className="dmd-tp-hero" style={{ color: p.side === "radiant" ? "#4ade80" : "#ef4444" }}>{p.hero}</div>
+                  <div className="dmd-tp-metric" style={{ color }}>{metric(p)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Radiant table */}
           <div className="dmd-table-wrap" style={{ borderColor: radWon ? "rgba(74,222,128,0.35)" : "rgba(74,222,128,0.12)" }}>
             <div className="dmd-table-head" style={{ background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.10), transparent)" : "transparent" }}>
@@ -238,6 +347,19 @@ export default function DotaMatchDetail() {
               <span className="dmd-table-kills">{g1.radiantScore ?? 0} kills</span>
               {radWon && <Trophy size={14} style={{ color: "#fbbf24" }} />}
             </div>
+            {radAgg.heroDamage > 0 && (
+              <div className="dmd-dmg-bar">
+                {radiantPlayers.map((p, i) => {
+                  const pct = ((p.heroDamage || 0) / radAgg.heroDamage) * 100;
+                  return (
+                    <div key={(p.uid || p.name) + i} className="dmd-dmg-seg" style={{ width: `${pct}%`, background: `hsl(${140 + i * 20}, 50%, ${40 + i * 5}%)` }} title={`${p.steamName || p.name} (${p.hero}) — ${(p.heroDamage || 0).toLocaleString()} dmg, ${pct.toFixed(1)}%`}>
+                      <span>{p.hero?.split(" ")[0] || ""}</span>
+                      <span>{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="dmd-table">
               {renderHeader()}
               {radiantPlayers.map(renderRow)}
@@ -252,6 +374,19 @@ export default function DotaMatchDetail() {
               <span className="dmd-table-kills">{g1.direScore ?? 0} kills</span>
               {!radWon && <Trophy size={14} style={{ color: "#fbbf24" }} />}
             </div>
+            {direAgg.heroDamage > 0 && (
+              <div className="dmd-dmg-bar">
+                {direPlayers.map((p, i) => {
+                  const pct = ((p.heroDamage || 0) / direAgg.heroDamage) * 100;
+                  return (
+                    <div key={(p.uid || p.name) + i} className="dmd-dmg-seg" style={{ width: `${pct}%`, background: `hsl(${0 + i * 18}, 55%, ${42 + i * 5}%)` }} title={`${p.steamName || p.name} (${p.hero}) — ${(p.heroDamage || 0).toLocaleString()} dmg, ${pct.toFixed(1)}%`}>
+                      <span>{p.hero?.split(" ")[0] || ""}</span>
+                      <span>{pct.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="dmd-table">
               {renderHeader()}
               {direPlayers.map(renderRow)}
@@ -316,6 +451,39 @@ const styles = `
     .dmd-mvp-stat-val { font-size: 1.05rem; }
   }
 
+  /* ── Team summary block ── */
+  .dmd-team-summary { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: stretch; margin-bottom: 18px; }
+  .dmd-team-summary-side { background: rgba(18,18,21,0.85); border: 1px solid; border-radius: 12px; padding: 14px 18px; }
+  .dmd-tsum-head { font-size: 0.75rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .dmd-tsum-win { font-size: 0.95rem; }
+  .dmd-tsum-team { font-size: 0.7rem; color: #E6E6E6; font-weight: 700; letter-spacing: 0.04em; text-transform: none; }
+  .dmd-tsum-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 14px; }
+  .dmd-tsum-v { font-size: 0.95rem; font-weight: 900; color: #E6E6E6; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .dmd-tsum-l { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.1em; color: #555550; margin-top: 2px; text-transform: uppercase; }
+  .dmd-team-summary-divider { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 140px; align-self: center; }
+  .dmd-tsum-diff-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px; }
+  .dmd-tsum-diff-label { font-size: 0.55rem; font-weight: 900; letter-spacing: 0.12em; color: #555550; padding: 0 8px; }
+  .dmd-tsum-diff-side { font-size: 0.7rem; font-weight: 800; color: #555550; text-align: center; font-variant-numeric: tabular-nums; }
+  .dmd-tsum-diff-side.lead-r { color: #4ade80; }
+  .dmd-tsum-diff-side.lead-d { color: #ef4444; }
+
+  /* ── Top performers grid ── */
+  .dmd-top-perf { background: rgba(18,18,21,0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+  .dmd-top-perf-head { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.18em; color: #fbbf24; margin-bottom: 10px; }
+  .dmd-top-perf-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .dmd-tp-card { background: rgba(255,255,255,0.02); border-left: 3px solid; padding: 8px 12px; border-radius: 6px; }
+  .dmd-tp-lbl { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.12em; color: #555550; text-transform: uppercase; }
+  .dmd-tp-name { font-size: 0.82rem; font-weight: 800; color: #E6E6E6; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dmd-tp-hero { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .dmd-tp-metric { font-size: 0.95rem; font-weight: 900; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ── Damage distribution bar ── */
+  .dmd-dmg-bar { display: flex; height: 28px; overflow: hidden; }
+  .dmd-dmg-seg { display: flex; flex-direction: column; justify-content: center; align-items: center; color: rgba(0,0,0,0.7); font-size: 0.55rem; font-weight: 800; line-height: 1; padding: 2px 4px; border-right: 1px solid rgba(0,0,0,0.25); overflow: hidden; min-width: 24px; text-shadow: 0 1px 1px rgba(255,255,255,0.25); }
+  .dmd-dmg-seg:last-child { border-right: none; }
+  .dmd-dmg-seg span:first-child { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 100%; }
+  .dmd-dmg-seg span:last-child { opacity: 0.75; font-size: 0.5rem; }
+
   .dmd-table-wrap { background: rgba(18,18,21,0.85); border: 1px solid; border-radius: 12px; overflow: hidden; }
   .dmd-table-head { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
   .dmd-table-head .dmd-table-kills { margin-left: auto; font-size: 0.7rem; color: #8A8880; font-weight: 700; }
@@ -348,5 +516,14 @@ const styles = `
     .dmd-team-score { font-size: 1.8rem; }
     .dmd-vs { font-size: 0.8rem; }
     .dmd-meta { font-size: 0.62rem; gap: 7px; }
+    .dmd-team-summary { grid-template-columns: 1fr; gap: 8px; }
+    .dmd-team-summary-divider { flex-direction: row; min-width: 0; justify-content: space-around; padding: 8px 0; }
+    .dmd-tsum-grid { grid-template-columns: repeat(4, 1fr); gap: 8px 10px; }
+    .dmd-tsum-v { font-size: 0.82rem; }
+    .dmd-top-perf-grid { grid-template-columns: repeat(2, 1fr); }
+    .dmd-tp-name { font-size: 0.74rem; }
+    .dmd-tp-metric { font-size: 0.82rem; }
+    .dmd-dmg-bar { height: 24px; }
+    .dmd-dmg-seg { font-size: 0.5rem; }
   }
 `;
