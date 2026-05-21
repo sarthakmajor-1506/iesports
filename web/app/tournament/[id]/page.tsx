@@ -368,10 +368,93 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           {isComplete ? (
             <div style={{ textAlign: "center", padding: "10px 0 0", color: "#4ade80", fontSize: "0.75rem", fontWeight: 700 }}>
               {t1Win ? m.team1Name : t2Win ? m.team2Name : "Draw"} {t1Win || t2Win ? "wins" : ""} {m.team1Score} - {m.team2Score}
+              {m.game1?.radiantScore != null && m.game1?.direScore != null && (
+                <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>
+                  · Radiant {m.game1.radiantScore} – {m.game1.direScore} Dire
+                </span>
+              )}
+              {m.durationSec ? <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>· {Math.floor(m.durationSec/60)}:{String(m.durationSec%60).padStart(2,"0")}</span> : null}
+              {m.gameMode ? <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>· {m.gameMode.replace(/_/g, " ")}</span> : null}
             </div>
           ) : (
             <div style={{ textAlign: "center", padding: "10px 0 0", color: "#555550", fontSize: "0.72rem" }}>Match hasn&apos;t been played yet</div>
           )}
+
+          {/* Per-player Dota stats grid (only when we have game1.playerStats) */}
+          {isComplete && Array.isArray(m.game1?.playerStats) && m.game1.playerStats.length > 0 && (() => {
+            const ps: any[] = m.game1.playerStats;
+            const radiant = ps.filter((p: any) => p.side === "radiant");
+            const dire = ps.filter((p: any) => p.side === "dire");
+            const radWon = m.game1.winner === "radiant";
+            const renderRow = (p: any, idx: number) => (
+              <div key={(p.uid || p.name) + idx} className="dtd-mc-stat-row">
+                <div className="dtd-mc-stat-name" title={p.name}>
+                  <span className="dtd-mc-stat-hero">{p.hero || "?"}</span>
+                  <span className="dtd-mc-stat-player">{p.steamName || p.name}</span>
+                </div>
+                <div className="dtd-mc-stat-kda">
+                  <span style={{ color: "#4ade80" }}>{p.kills}</span>
+                  <span style={{ color: "#555550" }}> / </span>
+                  <span style={{ color: "#ef4444" }}>{p.deaths}</span>
+                  <span style={{ color: "#555550" }}> / </span>
+                  <span style={{ color: "#3CCBFF" }}>{p.assists}</span>
+                </div>
+                <div className="dtd-mc-stat-num">{p.gpm || 0}</div>
+                <div className="dtd-mc-stat-num">{p.xpm || 0}</div>
+                <div className="dtd-mc-stat-num">{(p.lastHits || 0)}/{p.denies || 0}</div>
+                <div className="dtd-mc-stat-num gold">{(p.netWorth || 0).toLocaleString()}</div>
+              </div>
+            );
+            const tableHeader = (
+              <div className="dtd-mc-stat-row dtd-mc-stat-head">
+                <div className="dtd-mc-stat-name">Hero · Player</div>
+                <div className="dtd-mc-stat-kda">K / D / A</div>
+                <div className="dtd-mc-stat-num">GPM</div>
+                <div className="dtd-mc-stat-num">XPM</div>
+                <div className="dtd-mc-stat-num">LH/DN</div>
+                <div className="dtd-mc-stat-num">Net Worth</div>
+              </div>
+            );
+            return (
+              <div style={{ marginTop: 16, position: "relative" }}>
+                {/* Radiant block */}
+                <div className="dtd-mc-stat-side" style={{
+                  background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.06), rgba(74,222,128,0.01))" : "rgba(255,255,255,0.02)",
+                  borderLeft: `2px solid ${radWon ? "#4ade80" : "rgba(74,222,128,0.4)"}`,
+                  marginBottom: 8,
+                }}>
+                  <div className="dtd-mc-stat-side-label" style={{ color: "#4ade80" }}>
+                    Radiant {radWon && <span style={{ marginLeft: 6, fontSize: "0.6rem", color: "#fbbf24" }}>👑 WIN</span>}
+                    <span style={{ color: "#8A8880", marginLeft: 8, fontSize: "0.62rem" }}>· {m.game1.radiantScore} kills</span>
+                  </div>
+                  {tableHeader}
+                  {radiant.map(renderRow)}
+                </div>
+                {/* Dire block */}
+                <div className="dtd-mc-stat-side" style={{
+                  background: !radWon ? "linear-gradient(90deg, rgba(239,68,68,0.06), rgba(239,68,68,0.01))" : "rgba(255,255,255,0.02)",
+                  borderLeft: `2px solid ${!radWon ? "#ef4444" : "rgba(239,68,68,0.4)"}`,
+                }}>
+                  <div className="dtd-mc-stat-side-label" style={{ color: "#ef4444" }}>
+                    Dire {!radWon && <span style={{ marginLeft: 6, fontSize: "0.6rem", color: "#fbbf24" }}>👑 WIN</span>}
+                    <span style={{ color: "#8A8880", marginLeft: 8, fontSize: "0.62rem" }}>· {m.game1.direScore} kills</span>
+                  </div>
+                  {tableHeader}
+                  {dire.map(renderRow)}
+                </div>
+                {m.dotaMatchId && (
+                  <div style={{ textAlign: "center", marginTop: 12, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                    <Link href={`/tournament/${tournamentId}/match/${m.id}`} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#A12B1F", textDecoration: "none", padding: "6px 18px", border: "1px solid #A12B1F", borderRadius: 100, display: "inline-block" }}>
+                      View Full Match Details →
+                    </Link>
+                    <a href={`https://stratz.com/matches/${m.dotaMatchId}`} target="_blank" rel="noopener" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#8A8880", textDecoration: "none", padding: "6px 18px", border: "1px solid #2A2A30", borderRadius: 100, display: "inline-block" }}>
+                      Open on Stratz · {m.dotaMatchId}
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
         );
       })()}
@@ -1015,6 +1098,27 @@ function DotaTournamentDetailInner() {
         .dtd-mc-score-box .dash { color: #555550; font-weight: 400; }
         .dtd-mc-status-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 8px; border-radius: 100px; margin-top: 3px; }
         .dtd-mc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: dtd-pulse 1.5s ease-in-out infinite; }
+
+        /* ── Per-player Dota stats grid (expanded match card) ── */
+        .dtd-mc-stat-side { border-radius: 8px; padding: 10px 12px; position: relative; }
+        .dtd-mc-stat-side-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .dtd-mc-stat-row { display: grid; grid-template-columns: 1.6fr 1fr 0.55fr 0.55fr 0.65fr 0.85fr; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.72rem; color: #C8C6BC; }
+        .dtd-mc-stat-row:last-child { border-bottom: none; }
+        .dtd-mc-stat-row.dtd-mc-stat-head { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #555550; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; margin-bottom: 2px; }
+        .dtd-mc-stat-name { display: flex; flex-direction: column; min-width: 0; }
+        .dtd-mc-stat-hero { font-size: 0.66rem; font-weight: 800; color: #A12B1F; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-stat-player { font-size: 0.7rem; font-weight: 600; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-stat-kda { font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+        .dtd-mc-stat-num { font-size: 0.72rem; font-weight: 700; color: #C8C6BC; text-align: right; font-variant-numeric: tabular-nums; }
+        .dtd-mc-stat-num.gold { color: #fbbf24; }
+        @media (max-width: 600px) {
+          .dtd-mc-stat-row { grid-template-columns: 1.4fr 0.95fr 0.5fr 0.5fr 0.6fr 0.8fr; gap: 5px; padding: 4px 2px; font-size: 0.62rem; }
+          .dtd-mc-stat-row.dtd-mc-stat-head { font-size: 0.52rem; }
+          .dtd-mc-stat-hero { font-size: 0.58rem; }
+          .dtd-mc-stat-player { font-size: 0.62rem; }
+          .dtd-mc-stat-kda { font-size: 0.68rem; }
+          .dtd-mc-stat-num { font-size: 0.62rem; }
+        }
 
         /* ── Tab share button ── */
         .dtd-tab-share { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 100px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 700; transition: all 0.15s; }
