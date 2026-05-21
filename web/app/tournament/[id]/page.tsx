@@ -386,6 +386,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             const radiant = ps.filter((p: any) => p.side === "radiant");
             const dire = ps.filter((p: any) => p.side === "dire");
             const radWon = m.game1.winner === "radiant";
+
+            // ── MATCH MVP: same impact formula as the detail page so they agree ──
+            const mvpScore = (p: any) => {
+              const won = p.side === m.game1.winner;
+              return (p.kills || 0) * 4 + (p.assists || 0) * 1.5 - (p.deaths || 0) * 2 +
+                (p.gpm || 0) / 100 + (p.heroDamage || 0) / 2500 + (p.towerDamage || 0) / 2500 +
+                (p.heroHealing || 0) / 3000 + (won ? 30 : 0) + ((p.kills || 0) >= 15 ? 25 : 0);
+            };
+            const mvp = [...ps].sort((a, b) => mvpScore(b) - mvpScore(a))[0];
+            const mvpKda = mvp ? (mvp.kills + 0.2 * mvp.assists) / Math.max(1, mvp.deaths || 1) : 0;
+            const mvpIsRadiant = mvp?.side === "radiant";
+            // 2nd place: highest hero damage among non-MVP players on the WINNER side
+            const secondPool = ps.filter((p: any) => p.side === m.game1.winner && p !== mvp);
+            const second = secondPool.sort((a, b) => (b.heroDamage || 0) - (a.heroDamage || 0))[0];
             const renderRow = (p: any, idx: number) => (
               <div key={(p.uid || p.name) + idx} className="dtd-mc-stat-row">
                 <div className="dtd-mc-stat-name" title={p.name}>
@@ -417,6 +431,54 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             );
             return (
               <div style={{ marginTop: 16, position: "relative" }}>
+                {/* ── MATCH MVP showcase (clickable → detail page, mirrors Valorant GameDetailCard) ── */}
+                {mvp && (
+                  <Link
+                    href={`/tournament/${tournamentId}/match/${m.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="dtd-mc-mvp-link"
+                  >
+                    <div className="dtd-mc-mvp-card" style={{
+                      borderColor: mvpIsRadiant ? "rgba(74,222,128,0.30)" : "rgba(239,68,68,0.30)",
+                      background: mvpIsRadiant
+                        ? "linear-gradient(135deg, rgba(74,222,128,0.08) 0%, rgba(251,191,36,0.06) 60%, rgba(255,255,255,0.02) 100%)"
+                        : "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(251,191,36,0.06) 60%, rgba(255,255,255,0.02) 100%)",
+                    }}>
+                      {/* gold halo */}
+                      <div style={{ position: "absolute", top: "30%", left: "50%", width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+                      <div className="dtd-mc-mvp-row">
+                        <div style={{ fontSize: "1.6rem", flexShrink: 0, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>👑</div>
+                        <div className="dtd-mc-mvp-avatar" style={{ borderColor: mvpIsRadiant ? "rgba(74,222,128,0.5)" : "rgba(239,68,68,0.5)" }}>
+                          {(mvp.steamName || mvp.name || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="dtd-mc-mvp-name-block">
+                          <div className="dtd-mc-mvp-label">MATCH MVP</div>
+                          <div className="dtd-mc-mvp-name">{mvp.steamName || mvp.name}</div>
+                          <div className="dtd-mc-mvp-meta" style={{ color: mvpIsRadiant ? "#4ade80" : "#ef4444" }}>
+                            {mvp.hero || "—"} · {mvpIsRadiant ? "Radiant" : "Dire"}{mvp.side === m.game1.winner ? " · WIN" : ""}
+                          </div>
+                        </div>
+                        <div className="dtd-mc-mvp-stats">
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#4ade80" }}>{mvp.kills}</span><span className="dtd-mc-mvp-stat-lbl">K</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#ef4444" }}>{mvp.deaths}</span><span className="dtd-mc-mvp-stat-lbl">D</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#3CCBFF" }}>{mvp.assists}</span><span className="dtd-mc-mvp-stat-lbl">A</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#fbbf24" }}>{mvpKda.toFixed(2)}</span><span className="dtd-mc-mvp-stat-lbl">KDA</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#fbbf24" }}>{(mvp.netWorth || 0).toLocaleString()}</span><span className="dtd-mc-mvp-stat-lbl">Net</span></div>
+                        </div>
+                        <div className="dtd-mc-mvp-cta">View Match →</div>
+                      </div>
+                      {second && (
+                        <div className="dtd-mc-mvp-second">
+                          <span style={{ color: "#8A8880", fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em" }}>2ND MENTION</span>
+                          <span style={{ color: "#E6E6E6", fontWeight: 700 }}>{second.steamName || second.name}</span>
+                          <span style={{ color: second.side === "radiant" ? "#4ade80" : "#ef4444", fontSize: "0.7rem", fontWeight: 700 }}>{second.hero}</span>
+                          <span style={{ color: "#8A8880", fontSize: "0.7rem" }}>{second.kills}/{second.deaths}/{second.assists}</span>
+                          <span style={{ color: "#fbbf24", fontSize: "0.7rem", fontWeight: 700, marginLeft: "auto" }}>{(second.heroDamage || 0).toLocaleString()} hero dmg</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                )}
                 {/* Radiant block */}
                 <div className="dtd-mc-stat-side" style={{
                   background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.06), rgba(74,222,128,0.01))" : "rgba(255,255,255,0.02)",
@@ -1117,6 +1179,29 @@ function DotaTournamentDetailInner() {
         .dtd-mc-stat-kda { font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
         .dtd-mc-stat-num { font-size: 0.72rem; font-weight: 700; color: #C8C6BC; text-align: right; font-variant-numeric: tabular-nums; }
         .dtd-mc-stat-num.gold { color: #fbbf24; }
+        /* ── Match MVP showcase (inside expanded MatchCard, clickable) ── */
+        .dtd-mc-mvp-link { display: block; text-decoration: none; color: inherit; margin-bottom: 14px; }
+        .dtd-mc-mvp-card { position: relative; overflow: hidden; padding: 14px 18px; border-radius: 12px; border: 1px solid; transition: all 0.2s ease; cursor: pointer; }
+        .dtd-mc-mvp-link:hover .dtd-mc-mvp-card { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 24px rgba(251,191,36,0.18); border-color: rgba(251,191,36,0.55); }
+        .dtd-mc-mvp-link:hover .dtd-mc-mvp-cta { background: #fbbf24; color: #0A0A10; }
+        .dtd-mc-mvp-row { display: flex; align-items: center; gap: 14px; position: relative; flex-wrap: wrap; }
+        .dtd-mc-mvp-avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, #fbbf24, #d97706); border: 2px solid; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 900; color: #0A0A10; flex-shrink: 0; box-shadow: 0 0 14px rgba(251,191,36,0.30); }
+        .dtd-mc-mvp-name-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+        .dtd-mc-mvp-label { font-size: 0.55rem; font-weight: 900; letter-spacing: 0.18em; color: #fbbf24; }
+        .dtd-mc-mvp-name { font-size: 1rem; font-weight: 900; color: #E6E6E6; line-height: 1.15; text-shadow: 0 0 12px rgba(251,191,36,0.25); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-mvp-meta { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+        .dtd-mc-mvp-stats { display: flex; gap: 12px; flex-shrink: 0; }
+        .dtd-mc-mvp-stats > div { display: flex; flex-direction: column; align-items: center; }
+        .dtd-mc-mvp-stat-val { font-size: 0.95rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+        .dtd-mc-mvp-stat-lbl { font-size: 0.5rem; font-weight: 700; letter-spacing: 0.08em; color: #555550; margin-top: 2px; }
+        .dtd-mc-mvp-cta { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; color: #fbbf24; background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.45); padding: 6px 12px; border-radius: 100px; flex-shrink: 0; transition: all 0.15s; }
+        .dtd-mc-mvp-second { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap; font-size: 0.7rem; }
+        @media (max-width: 600px) {
+          .dtd-mc-mvp-stats { width: 100%; justify-content: space-around; gap: 8px; margin-top: 4px; }
+          .dtd-mc-mvp-cta { width: 100%; text-align: center; margin-top: 6px; }
+          .dtd-mc-mvp-stat-val { font-size: 0.82rem; }
+        }
+
         .dtd-mc-detail-btn { font-size: 0.78rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #A12B1F, #7A1F15); text-decoration: none; padding: 9px 22px; border-radius: 100px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s; box-shadow: 0 4px 16px rgba(161,43,31,0.30); letter-spacing: 0.02em; border: 1px solid rgba(161,43,31,0.6); }
         .dtd-mc-detail-btn:hover { background: linear-gradient(135deg, #BE3A25, #A12B1F); box-shadow: 0 6px 22px rgba(161,43,31,0.45); transform: translateY(-1px); }
         .dtd-mc-stratz-btn { font-size: 0.7rem; font-weight: 700; color: #8A8880; text-decoration: none; padding: 8px 18px; border-radius: 100px; display: inline-block; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); transition: all 0.15s; }
