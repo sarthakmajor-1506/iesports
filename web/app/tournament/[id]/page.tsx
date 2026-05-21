@@ -442,16 +442,16 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                   {tableHeader}
                   {dire.map(renderRow)}
                 </div>
-                {m.dotaMatchId && (
-                  <div style={{ textAlign: "center", marginTop: 12, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                    <Link href={`/tournament/${tournamentId}/match/${m.id}`} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#A12B1F", textDecoration: "none", padding: "6px 18px", border: "1px solid #A12B1F", borderRadius: 100, display: "inline-block" }}>
-                      View Full Match Details →
-                    </Link>
-                    <a href={`https://stratz.com/matches/${m.dotaMatchId}`} target="_blank" rel="noopener" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#8A8880", textDecoration: "none", padding: "6px 18px", border: "1px solid #2A2A30", borderRadius: 100, display: "inline-block" }}>
+                <div style={{ textAlign: "center", marginTop: 16, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
+                  <Link href={`/tournament/${tournamentId}/match/${m.id}`} className="dtd-mc-detail-btn">
+                    View Full Match Details →
+                  </Link>
+                  {m.dotaMatchId && (
+                    <a href={`https://stratz.com/matches/${m.dotaMatchId}`} target="_blank" rel="noopener" className="dtd-mc-stratz-btn">
                       Open on Stratz · {m.dotaMatchId}
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })()}
@@ -1036,9 +1036,15 @@ function DotaTournamentDetailInner() {
         /* Sticky header row + first column. border-separate so sticky borders
            render reliably; sticky cells use an opaque bg so scrolling content
            can't bleed through (row tints on the first column are sacrificed). */
-        .dtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; }
-        .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
+        .dtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; white-space: nowrap; }
+        .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; white-space: nowrap; }
+        /* Default: every column after the first is numeric → right-align. */
+        .dtd-standings-table th:not(:first-child),
+        .dtd-standings-table td:not(:first-child) { text-align: right; }
+        /* Standings modifier: col 2 is the team name → keep it left-aligned. */
+        .dtd-standings-table.dtd-freeze-team th:nth-child(2),
+        .dtd-standings-table.dtd-freeze-team td:nth-child(2) { text-align: left; }
         .dtd-standings-table tr:last-child td { border-bottom: none; }
         .dtd-standings-table tbody tr { transition: background 0.15s; }
         .dtd-standings-table tbody tr:hover { background: rgba(161,43,31,0.04); }
@@ -1111,6 +1117,10 @@ function DotaTournamentDetailInner() {
         .dtd-mc-stat-kda { font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
         .dtd-mc-stat-num { font-size: 0.72rem; font-weight: 700; color: #C8C6BC; text-align: right; font-variant-numeric: tabular-nums; }
         .dtd-mc-stat-num.gold { color: #fbbf24; }
+        .dtd-mc-detail-btn { font-size: 0.78rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #A12B1F, #7A1F15); text-decoration: none; padding: 9px 22px; border-radius: 100px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s; box-shadow: 0 4px 16px rgba(161,43,31,0.30); letter-spacing: 0.02em; border: 1px solid rgba(161,43,31,0.6); }
+        .dtd-mc-detail-btn:hover { background: linear-gradient(135deg, #BE3A25, #A12B1F); box-shadow: 0 6px 22px rgba(161,43,31,0.45); transform: translateY(-1px); }
+        .dtd-mc-stratz-btn { font-size: 0.7rem; font-weight: 700; color: #8A8880; text-decoration: none; padding: 8px 18px; border-radius: 100px; display: inline-block; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); transition: all 0.15s; }
+        .dtd-mc-stratz-btn:hover { color: #E6E6E6; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.18); }
         @media (max-width: 600px) {
           .dtd-mc-stat-row { grid-template-columns: 1.4fr 0.95fr 0.5fr 0.5fr 0.6fr 0.8fr; gap: 5px; padding: 4px 2px; font-size: 0.62rem; }
           .dtd-mc-stat-row.dtd-mc-stat-head { font-size: 0.52rem; }
@@ -1695,8 +1705,14 @@ function DotaTournamentDetailInner() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="dtd-standings-table dtd-freeze-team">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#A12B1F" }}>Pts</th><th>BH</th></tr></thead>
-                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#A12B1F" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#A12B1F" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }} title="Kills For">KF</th><th style={{ color: "#f87171" }} title="Kills Against">KA</th><th style={{ color: "#fbbf24" }} title="Kill Difference">Diff</th><th style={{ color: "#A12B1F" }}>Pts</th></tr></thead>
+                      <tbody>{standings.map((s: any, i: number) => {
+                        const kf = s.killsFor ?? s.mapsWon ?? 0;
+                        const ka = s.killsAgainst ?? s.mapsLost ?? 0;
+                        const diff = s.killDiff ?? (kf - ka);
+                        return (
+                        <tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#A12B1F" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td style={{ color: "#4ade80" }}>{s.wins || 0}</td><td style={{ color: "#fbbf24" }}>{s.draws || 0}</td><td style={{ color: "#f87171" }}>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{kf}</td><td style={{ color: "#f87171" }}>{ka}</td><td style={{ fontWeight: 700, color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#8A8880" }}>{diff > 0 ? "+" : ""}{diff}</td><td style={{ fontWeight: 800, color: "#A12B1F" }}>{s.points || 0}</td></tr>);
+                      })}</tbody>
                     </table>
                   </div>
                 )}
@@ -1868,7 +1884,7 @@ function DotaTournamentDetailInner() {
                             </div>
                             <div style={{ overflowX: "auto" }}>
                               <table className="dtd-standings-table">
-                                <thead><tr><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
+                                <thead><tr><th>Player</th><th title="Games · Wins-Losses">Games</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th style={{ color: "#3CCBFF" }}>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
                                 <tbody>{entries.map((p: any, i: number) => {
                                   const isMvp = bracketMvpMap[p.id] === bracket;
                                   const isMeRow = user?.uid === p.uid;
@@ -1876,17 +1892,28 @@ function DotaTournamentDetailInner() {
                                   if (isMeRow) rowBg = { background: "rgba(60,203,255,0.08)", boxShadow: "inset 2px 0 0 #3CCBFF" };
                                   else if (isMvp) rowBg = { background: colors.bg };
 
-                                  const playerCell = (<>
-                                    <div style={{ fontWeight: 700 }}>{p.steamName || p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
-                                    <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: colors.text, padding: "1px 5px", borderRadius: 4, background: colors.bg, whiteSpace: "nowrap" }}>{colors.label}</span></div>
-                                  </>);
+                                  const playerCell = (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                      {p.steamAvatar ? (
+                                        <img src={p.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${colors.border}`, flexShrink: 0 }} />
+                                      ) : (
+                                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: colors.bg, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: colors.text, flexShrink: 0 }}>{((p.steamName || p.name || "?")[0]).toUpperCase()}</div>
+                                      )}
+                                      <span style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{p.steamName || p.name}</span>
+                                      {isMvp && <span style={{ flexShrink: 0, fontSize: "0.58rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}`, letterSpacing: "0.05em" }}>MVP</span>}
+                                      {isMeRow && <span style={{ flexShrink: 0, fontSize: "0.55rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}
+                                    </div>
+                                  );
 
+                                  const games = p.games || 0;
+                                  const wl = (p.wins ?? 0) + "-" + (p.losses ?? 0);
                                   return (
                                   <tr key={p.id} style={rowBg}>
                                     <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}>{playerCell}</Link>) : playerCell}</td>
+                                    <td style={{ color: "#8A8880", fontSize: "0.78rem" }}>{games > 0 ? `${games}G ${wl}` : "—"}</td>
                                     <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
                                     <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
-                                    <td>{p.totalAssists || 0}</td>
+                                    <td style={{ color: "#3CCBFF" }}>{p.totalAssists || 0}</td>
                                     <td>{p.avgGPM || 0}</td>
                                     <td>{p.avgXPM || 0}</td>
                                     <td style={{ fontWeight: 800, color: colors.text }}>{p.totalScore || 0}</td>

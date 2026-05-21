@@ -98,6 +98,27 @@ export default function DotaMatchDetail() {
   const radiantPlayers = sortPlayers(playerStats.filter(p => p.side === "radiant"));
   const direPlayers = sortPlayers(playerStats.filter(p => p.side === "dire"));
 
+  // ── MATCH MVP: highest-impact player across both sides, winner ties broken ──
+  const mvpScore = (p: any) => {
+    const won = p.side === g1.winner;
+    return (
+      (p.kills || 0) * 4 +
+      (p.assists || 0) * 1.5 +
+      -(p.deaths || 0) * 2 +
+      (p.gpm || 0) / 100 +
+      (p.heroDamage || 0) / 2500 +
+      (p.towerDamage || 0) / 2500 +
+      (p.heroHealing || 0) / 3000 +
+      (won ? 30 : 0) +
+      ((p.kills || 0) >= 15 ? 25 : 0)
+    );
+  };
+  const mvp = playerStats.length > 0
+    ? [...playerStats].sort((a, b) => mvpScore(b) - mvpScore(a))[0]
+    : null;
+  const mvpIsRadiant = mvp?.side === "radiant";
+  const mvpKda = mvp ? (mvp.kills + 0.2 * mvp.assists) / Math.max(1, mvp.deaths || 1) : 0;
+
   const renderHeader = () => (
     <div className="dmd-thead">
       <div className="dmd-th player" style={th("player")} onClick={() => handleSort("player")}>Player{arrow("player")}</div>
@@ -183,6 +204,32 @@ export default function DotaMatchDetail() {
             </div>
           </div>
 
+          {/* ── MATCH MVP ── */}
+          {mvp && (
+            <div className="dmd-mvp" style={{ borderColor: mvpIsRadiant ? "rgba(74,222,128,0.35)" : "rgba(239,68,68,0.35)", background: mvpIsRadiant ? "linear-gradient(135deg, rgba(74,222,128,0.08) 0%, rgba(251,191,36,0.06) 100%)" : "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(251,191,36,0.06) 100%)" }}>
+              <div className="dmd-mvp-badge">👑 MATCH MVP</div>
+              <div className="dmd-mvp-body">
+                <div className="dmd-mvp-name-block">
+                  <div className="dmd-mvp-hero" style={{ color: mvpIsRadiant ? "#4ade80" : "#ef4444" }}>{mvp.hero || "—"}</div>
+                  {mvp.uid ? (
+                    <Link href={`/player/${mvp.uid}?tab=dota`} className="dmd-mvp-name">{mvp.steamName || mvp.name}</Link>
+                  ) : (
+                    <span className="dmd-mvp-name">{mvp.steamName || mvp.name}</span>
+                  )}
+                  <div className="dmd-mvp-side" style={{ color: mvpIsRadiant ? "#4ade80" : "#ef4444" }}>{mvpIsRadiant ? "Radiant" : "Dire"}{mvp.side === g1.winner ? " · WINNER" : ""}</div>
+                </div>
+                <div className="dmd-mvp-stats">
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val" style={{ color: "#4ade80" }}>{mvp.kills}</div><div className="dmd-mvp-stat-lbl">Kills</div></div>
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val" style={{ color: "#ef4444" }}>{mvp.deaths}</div><div className="dmd-mvp-stat-lbl">Deaths</div></div>
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val" style={{ color: "#3CCBFF" }}>{mvp.assists}</div><div className="dmd-mvp-stat-lbl">Assists</div></div>
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val" style={{ color: "#fbbf24" }}>{mvpKda.toFixed(2)}</div><div className="dmd-mvp-stat-lbl">KDA</div></div>
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val">{mvp.gpm || 0}</div><div className="dmd-mvp-stat-lbl">GPM</div></div>
+                  <div className="dmd-mvp-stat"><div className="dmd-mvp-stat-val" style={{ color: "#fbbf24" }}>{(mvp.netWorth || 0).toLocaleString()}</div><div className="dmd-mvp-stat-lbl">Net Worth</div></div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Radiant table */}
           <div className="dmd-table-wrap" style={{ borderColor: radWon ? "rgba(74,222,128,0.35)" : "rgba(74,222,128,0.12)" }}>
             <div className="dmd-table-head" style={{ background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.10), transparent)" : "transparent" }}>
@@ -247,6 +294,27 @@ const styles = `
   .dmd-meta-date { font-size: 0.65rem; color: #555550; }
   .dmd-match-link { color: #A12B1F; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
   .dmd-match-link:hover { color: #BE3A25; }
+
+  /* ── MVP card ── */
+  .dmd-mvp { background: rgba(18,18,21,0.85); border: 1px solid; border-radius: 14px; padding: 18px 22px; margin-bottom: 18px; position: relative; overflow: hidden; }
+  .dmd-mvp::before { content: ""; position: absolute; top: -40%; right: -10%; width: 60%; height: 200%; background: radial-gradient(circle, rgba(251,191,36,0.10) 0%, transparent 60%); pointer-events: none; }
+  .dmd-mvp-badge { display: inline-block; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.18em; color: #fbbf24; background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.35); padding: 4px 12px; border-radius: 100px; margin-bottom: 14px; }
+  .dmd-mvp-body { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; position: relative; }
+  .dmd-mvp-name-block { display: flex; flex-direction: column; gap: 2px; min-width: 160px; }
+  .dmd-mvp-hero { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+  .dmd-mvp-name { font-size: 1.5rem; font-weight: 900; color: #E6E6E6; text-decoration: none; line-height: 1.1; }
+  .dmd-mvp-name:hover { color: #fbbf24; }
+  .dmd-mvp-side { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 4px; }
+  .dmd-mvp-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; flex: 1; min-width: 320px; }
+  .dmd-mvp-stat { text-align: center; }
+  .dmd-mvp-stat-val { font-size: 1.25rem; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; color: #E6E6E6; }
+  .dmd-mvp-stat-lbl { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555550; margin-top: 3px; }
+  @media (max-width: 600px) {
+    .dmd-mvp { padding: 14px; }
+    .dmd-mvp-name { font-size: 1.15rem; }
+    .dmd-mvp-stats { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .dmd-mvp-stat-val { font-size: 1.05rem; }
+  }
 
   .dmd-table-wrap { background: rgba(18,18,21,0.85); border: 1px solid; border-radius: 12px; overflow: hidden; }
   .dmd-table-head { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
