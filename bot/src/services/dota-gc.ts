@@ -165,6 +165,12 @@ class DotaBot extends EventEmitter {
 
   // Live lobby state — updated on every GC lobby message
   private liveLobbyMembers: LobbyMember[] = [];
+  // The dota match_id that the GC sticks onto the practice-lobby state once
+  // a match launches. Captured directly from the lobby payload — much more
+  // reliable than scanning player match histories after the fact.
+  private liveLobbyMatchId: string = "";
+  // The lobby's CSODOTALobby state enum. 0=UI, 1=READYUP, 2=SERVERSETUP, 3=RUN, 4=POSTGAME, 5=NOTREADY, 6=SERVERASSIGN.
+  private liveLobbyState: number = -1;
 
   // Pending GC match-data requests
   private pendingMD = new Map<string, { resolve: (v: DotaMatchDetails) => void; reject: (e: any) => void; timer: NodeJS.Timeout }>();
@@ -178,6 +184,14 @@ class DotaBot extends EventEmitter {
   getLobbyMembers(): LobbyMember[] {
     return this.liveLobbyMembers;
   }
+
+  /** Match id stamped onto the practice lobby by the GC once the match
+   *  server is allocated. Empty string until launch. */
+  getLobbyMatchId(): string { return this.liveLobbyMatchId; }
+
+  /** Current CSODOTALobby state enum, or -1 if no lobby state has been
+   *  observed yet. 3 = RUN (match in progress), 4 = POSTGAME. */
+  getLobbyState(): number { return this.liveLobbyState; }
 
   async connect(): Promise<void> {
     const username = process.env.STEAM_ACCOUNT_NAME;
@@ -305,15 +319,30 @@ class DotaBot extends EventEmitter {
         // should be ignored until the destroy+leave commands have processed.
         if (payload.length > 0 && !this.startupCleanup) {
           try {
-            const members = this.parseLobbyPayload(payload);
-            if (members.length > 0) {
-              this.updateLiveLobby(members);
+            const lob = this.parseLobbyState(payload);
+            if (lob.members.length > 0) {
+              this.updateLiveLobby(lob.members);
 
               // If we were waiting for lobby creation, this confirms it
               if (this.waitingForLobby) {
                 console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via member data`);
                 this.emit("lobbyCreated");
               }
+            }
+            // Capture lobby metadata regardless of member presence — the GC
+            // sometimes pushes match-launch lobby states with no member list
+            // (just the match_id transition).
+            if (lob.state >= 0 && lob.state !== this.liveLobbyState) {
+              const prev = this.liveLobbyState;
+              this.liveLobbyState = lob.state;
+              console.log(`[GC] 🪪 LobbyState transition ${prev} -> ${lob.state}`);
+              this.emit("lobbyStateChanged", { prev, next: lob.state, matchId: lob.matchId });
+            }
+            if (lob.matchId && lob.matchId !== this.liveLobbyMatchId) {
+              const prev = this.liveLobbyMatchId;
+              this.liveLobbyMatchId = lob.matchId;
+              console.log(`[GC] 🎯 dotaMatchId captured from lobby state: ${lob.matchId} (was ${prev || "—"})`);
+              this.emit("lobbyMatchId", lob.matchId);
             }
           } catch { /* not a lobby payload — that's fine */ }
         }
@@ -520,6 +549,8 @@ class DotaBot extends EventEmitter {
     this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
     this.lobbyActive = false;
     this.liveLobbyMembers = [];
+    this.liveLobbyMatchId = "";
+    this.liveLobbyState = -1;
     await new Promise(r => setTimeout(r, destroyWait));
     console.log("[Dota2] -> Sending create...");
 
@@ -804,6 +835,8 @@ class DotaBot extends EventEmitter {
 
     this.lobbyActive = false;
     this.liveLobbyMembers = [];
+    this.liveLobbyMatchId = "";
+    this.liveLobbyState = -1;
     console.log("[Dota2] ✅ Lobby destroyed and bot left");
   }
 
@@ -922,8 +955,22 @@ class DotaBot extends EventEmitter {
   //                          field 2 = varint flags
   //                          field 3 = varint team (0=Radiant,1=Dire,4=Unassigned)
   // steam32 = lower 32 bits of steam64
+  //
+  // Additional lobby-level fields we pull (from
+  // SteamDatabase/Protobufs/dota2/dota_gcmessages_common.proto — CSODOTALobby):
+  //   field   1 fixed64  lobby_id            (set as soon as the lobby exists)
+  //   field   4 varint   state               (0=UI 1=READYUP 2=SERVERSETUP 3=RUN 4=POSTGAME 5=NOTREADY 6=SERVERASSIGN)
+  //   field  60 fixed64  match_id            (set once the match server is allocated / launched)
+  // We capture these at the top level only — sub-messages don't carry them.
   parseLobbyPayload(buf: Buffer): LobbyMember[] {
+    return this.parseLobbyState(buf).members;
+  }
+
+  parseLobbyState(buf: Buffer): { members: LobbyMember[]; matchId: string; lobbyId: string; state: number } {
     const members: LobbyMember[] = [];
+    let matchId = "";
+    let lobbyId = "";
+    let state = -1;
     let pos = 0;
 
     try {
@@ -933,10 +980,21 @@ class DotaBot extends EventEmitter {
         const wireType = t.value & 0x7;
 
         if (wireType === 0) {
-          // varint — skip
           const r = this.readVarint(buf, pos); pos = r.pos;
+          if (fieldNum === 4) state = r.value;
+          // field 60 can in some protobuf builds be encoded as varint instead
+          // of fixed64 — be permissive.
+          if (fieldNum === 60 && r.value > 0) matchId = String(r.value);
         } else if (wireType === 1) {
-          // fixed64 — skip
+          // fixed64 — read low+high 32 bits and stringify as decimal
+          if (pos + 8 <= buf.length) {
+            const lo = buf.readUInt32LE(pos);
+            const hi = buf.readUInt32LE(pos + 4);
+            // Compose as BigInt for accurate decimal regardless of size.
+            const v = (BigInt(hi) << 32n) | BigInt(lo);
+            if (fieldNum === 60 && v > 0n) matchId = v.toString();
+            else if (fieldNum === 1 && v > 0n) lobbyId = v.toString();
+          }
           pos += 8;
         } else if (wireType === 2) {
           const l = this.readVarint(buf, pos); pos = l.pos;
@@ -947,9 +1005,11 @@ class DotaBot extends EventEmitter {
             const member = this.parseMemberEntry(sub);
             if (member) members.push(member);
           } else {
-            // Recurse into nested messages to find field 120 deeper
-            const nested = this.parseLobbyPayload(sub);
-            for (const m of nested) members.push(m);
+            // Recurse into nested messages to find field 120 deeper. Don't
+            // promote nested metadata — only the top-level CSODOTALobby
+            // carries the authoritative match_id/state.
+            const nestedMembers = this.parseLobbyPayload(sub);
+            for (const m of nestedMembers) members.push(m);
           }
         } else if (wireType === 5) {
           // fixed32 — skip
@@ -960,7 +1020,7 @@ class DotaBot extends EventEmitter {
       }
     } catch { /* truncated buffer, return what we have */ }
 
-    return members;
+    return { members, matchId, lobbyId, state };
   }
 
   // Parse a single CLobbyMember entry
