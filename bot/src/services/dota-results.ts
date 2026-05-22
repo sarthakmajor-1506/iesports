@@ -100,9 +100,16 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
     for (const p of det.players) { const r = by32.get(String(p.accountId)); if (r) tally[r.matchId] = (tally[r.matchId] || 0) + 1; }
     const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
     const ov = top ? top[1] : 0, tgt = top ? top[0] : null;
-    log(`  dota ${mid} result=${det.result} players=${det.players.length} start=${new Date(det.startTime * 1000).toISOString()} lobby=${det.lobbyType} outcome=${det.matchOutcome} -> ${tgt || "?"} (ov ${ov}/10)`);
+    // Scale the overlap threshold to the matched tournament fixture's roster
+    // size: a 1v1 / 2v2 test lobby has at most 2 / 4 players, so the legacy
+    // `ov >= 6` (designed for a full 10-player Dota fixture) would never
+    // confirm them. Threshold of 60% of roster (min 1) keeps the false-match
+    // rate just as low for full 5v5s — ceil(0.6 * 10) = 6, unchanged.
+    const tgtRosterSize = tgt ? (matchDefs[tgt]?.roster?.length || 10) : 10;
+    const minOv = Math.max(1, Math.min(6, Math.ceil(tgtRosterSize * 0.6)));
+    log(`  dota ${mid} result=${det.result} players=${det.players.length} start=${new Date(det.startTime * 1000).toISOString()} lobby=${det.lobbyType} outcome=${det.matchOutcome} -> ${tgt || "?"} (ov ${ov}/${tgtRosterSize}, need ${minOv})`);
     log(`     raw len=${det.rawLen} fields=[${det.topFields}] hex=${det.rawHex}`);
-    if (tgt && ov >= 6 && (!best[tgt] || ov > best[tgt].ov)) best[tgt] = { dota: det, matchId: mid, ov };
+    if (tgt && ov >= minOv && (!best[tgt] || ov > best[tgt].ov)) best[tgt] = { dota: det, matchId: mid, ov };
   }
 
   const report: ResolveReport = { resolved: [], unresolved: [], candidatesTried: candidateIds.length, written: false };
