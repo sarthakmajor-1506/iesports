@@ -254,32 +254,48 @@ class DotaBot extends EventEmitter {
           // CRITICAL: the GC sends ClientWelcome on EVERY reconnect, not just
           // the first connect. Destroying/leaving here unconditionally was
           // killing the live tournament lobby ~10 min in (the reported bug).
-          // Only clear a stale lobby on the very first welcome AND only when
-          // we don't have an intentional active lobby. On any reconnect with
-          // an active lobby, preserve it — Valve keeps the practice lobby
-          // alive briefly and the bot re-adopts it via the member-state parse.
-          if (firstWelcome && !this.lobbyActive) {
-            this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
-            console.log("[GC] -> Startup DestroyLobbyRequest sent");
-            setTimeout(() => {
-              this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
-              console.log("[GC] -> Startup LobbyLeave sent");
-            }, 2000);
-            this.lobbyActive = false;
-            this.liveLobbyMembers = [];
-            this.startupCleanup = true; // ignore stale lobby data during startup
-
-            setTimeout(() => {
-              this.startupCleanup = false;
-              this.liveLobbyMembers = [];
-              console.log("[Steam] ✅ Dota 2 GC connected!");
-              resolve();
-            }, 8000);
-          } else {
-            // Reconnect (or already had a lobby) — DO NOT destroy/leave.
-            this.startupCleanup = false;
+          //
+          // Even on a fresh process boot we must NOT destroy blindly — a
+          // Railway redeploy mid-tournament wipes in-memory `lobbyActive`
+          // but Valve still has the practice lobby open. So we observe for
+          // a few seconds: if the GC pushes a lobby state with members,
+          // re-adopt it; only if nothing arrives do we treat it as a stale
+          // leftover from a previous run and clean it up.
+          this.startupCleanup = false;
+          if (!firstWelcome || this.lobbyActive) {
             console.log(`[GC] re-welcome — preserving ${this.lobbyActive ? "ACTIVE lobby" : "session"} (no destroy/leave)`);
             resolve(); // no-op if the connect() promise already settled
+          } else {
+            const ADOPT_WINDOW_MS = 5000;
+            console.log(`[GC] first welcome — observing ${ADOPT_WINDOW_MS}ms for an existing lobby before deciding to clean up.`);
+            setTimeout(() => {
+              if (this.liveLobbyMembers.length > 0) {
+                // The GC told us we're still in a lobby — adopt it. This is
+                // the Railway-redeploy-mid-match path: the practice lobby
+                // outlived the process restart and we keep it alive so
+                // players still in the match can return to it.
+                this.lobbyActive = true;
+                console.log(`[GC] ✅ re-adopted existing lobby (${this.liveLobbyMembers.length} members) — skipping startup destroy.`);
+                console.log("[Steam] ✅ Dota 2 GC connected!");
+                resolve();
+                return;
+              }
+              // No lobby visible — treat as a stale leftover from a prior
+              // run and clean up so the next createLobby doesn't conflict.
+              this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgDestroyLobbyRequest, {}, Buffer.alloc(0));
+              console.log("[GC] -> Startup DestroyLobbyRequest sent (no existing lobby observed)");
+              setTimeout(() => {
+                this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyLeave, {}, Buffer.alloc(0));
+                console.log("[GC] -> Startup LobbyLeave sent");
+              }, 2000);
+              this.lobbyActive = false;
+              this.liveLobbyMembers = [];
+              setTimeout(() => {
+                this.liveLobbyMembers = [];
+                console.log("[Steam] ✅ Dota 2 GC connected!");
+                resolve();
+              }, 3000);
+            }, ADOPT_WINDOW_MS);
           }
         }
 
