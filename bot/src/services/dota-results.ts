@@ -79,14 +79,33 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
   if (!bot.isReady()) { log("Connecting GC…"); await bot.connect(); await sleep(2000); }
   log(`GC ready. iesportsbot steam32=${bot.getOwnSteam32()}`);
 
-  let hist: Awaited<ReturnType<typeof bot.requestPlayerMatchHistory>> = [];
-  try { hist = await bot.requestPlayerMatchHistory({ matchesRequested: 100 }); }
-  catch (e: any) { log(`Match history request failed: ${e?.message || e}`); }
-  const d = bot.lastMHDebug;
-  log(`Match-history GC raw: len=${d.rawLen} decodedCount=${d.rawCount} fields=[${d.fields}] err=${d.err || "-"}`);
-  const inWin = hist.filter(h => h.startTime >= winFrom && h.startTime <= winTo);
-  log(`Match history ${hist.length}, in-window ${inWin.length}; window ${new Date(winFrom * 1000).toISOString()} → ${new Date(winTo * 1000).toISOString()}`);
-  if (hist.length) log(`  hist sample: ${hist.slice(0, 8).map(h => `${h.matchId}@${new Date(h.startTime * 1000).toISOString()}(lt${h.lobbyType})`).join(" ")}`);
+  // Build the list of steam32 ids whose GC match-history we'll query.
+  // Historically this was just the bot's own history (works for daily-matches
+  // where the bot actually plays), but for tournament practice lobbies the
+  // bot sits in Unassigned and doesn't appear as a match participant — its
+  // history then returns 0 matches. Fall back to querying each player's
+  // history; one of them will see the match.
+  const playerIds = Array.from(by32.keys()).filter(Boolean);
+  const queryIds = Array.from(new Set([
+    String(bot.getOwnSteam32() || ""),
+    ...playerIds,
+  ])).filter(s => s && s !== "0");
+  log(`Querying match history for ${queryIds.length} accounts: ${queryIds.slice(0, 5).join(", ")}${queryIds.length > 5 ? ` …+${queryIds.length - 5}` : ""}`);
+
+  const seenIds = new Set<string>();
+  const histAll: Awaited<ReturnType<typeof bot.requestPlayerMatchHistory>> = [];
+  for (const accId of queryIds) {
+    let hist: Awaited<ReturnType<typeof bot.requestPlayerMatchHistory>> = [];
+    try { hist = await bot.requestPlayerMatchHistory({ accountId: Number(accId), matchesRequested: 100 }); }
+    catch (e: any) { log(`  account=${accId}: match-history request failed: ${e?.message || e}`); }
+    const d = bot.lastMHDebug;
+    log(`  account=${accId}: raw len=${d.rawLen} decodedCount=${d.rawCount} entries=${hist.length} fields=[${d.fields}] err=${d.err || "-"}`);
+    for (const h of hist) if (!seenIds.has(h.matchId)) { seenIds.add(h.matchId); histAll.push(h); }
+    await sleep(800);  // small gap so the GC doesn't drop concurrent requests
+  }
+  const inWin = histAll.filter(h => h.startTime >= winFrom && h.startTime <= winTo);
+  log(`Combined match history ${histAll.length}, in-window ${inWin.length}; window ${new Date(winFrom * 1000).toISOString()} → ${new Date(winTo * 1000).toISOString()}`);
+  if (histAll.length) log(`  hist sample: ${histAll.slice(0, 8).map(h => `${h.matchId}@${new Date(h.startTime * 1000).toISOString()}(lt${h.lobbyType})`).join(" ")}`);
   const candidateIds = Array.from(new Set([...(opts.forcedMatchIds || []), ...inWin.map(h => h.matchId)])).filter(Boolean);
   log(`Candidates (${candidateIds.length}): ${candidateIds.join(", ")}`);
 
