@@ -147,13 +147,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </span>
           <span className="dtd-mc-index-fmt" style={isBracket ? { background: "rgba(245,158,11,0.12)", color: bracketAccent } : {}}>BO{bestOf}</span>
         </div>
-        <div className="dtd-mc-team">
+        <div className="dtd-mc-team" style={
+          // Win/loss gradient stripe across the team's half of the card.
+          // Anchored at the outer edge (away from center) so the colour reads
+          // as "this side won/lost" at a glance. Subtle alpha values keep the
+          // team-name + roster text legible on top.
+          t1Win ? { background: "linear-gradient(90deg, rgba(74,222,128,0.22) 0%, rgba(74,222,128,0.02) 100%)" } :
+          t2Win ? { background: "linear-gradient(90deg, rgba(239,68,68,0.22) 0%, rgba(239,68,68,0.02) 100%)" } : {}
+        }>
           <div className="dtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
             {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
           </div>
           <div className="dtd-mc-team-info">
             <div className="dtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>{isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}</div>
-            <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}}>{m.team1Name}</div>
+            <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#9a8a8a" } : {}}>{m.team1Name}</div>
             <div className="dtd-mc-roster">
               {[...t1Members].sort((a: any, b: any) => {
                 const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
@@ -210,13 +217,18 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           )}
           {(isComplete || isLive) && scheduledDay && <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{scheduledDay} · {scheduledTime}</div>}
         </div>
-        <div className="dtd-mc-team right">
+        <div className="dtd-mc-team right" style={
+          // Mirrored gradient — anchored at the outer (right) edge so the
+          // colour fades inward toward the score area.
+          t2Win ? { background: "linear-gradient(270deg, rgba(74,222,128,0.22) 0%, rgba(74,222,128,0.02) 100%)" } :
+          t1Win ? { background: "linear-gradient(270deg, rgba(239,68,68,0.22) 0%, rgba(239,68,68,0.02) 100%)" } : {}
+        }>
           <div className="dtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
             {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" /> : getTeamInitials(m.team2Name)}
           </div>
           <div className="dtd-mc-team-info" style={{ textAlign: "right" }}>
             <div className="dtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
-            <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}}>{m.team2Name}</div>
+            <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#9a8a8a" } : {}}>{m.team2Name}</div>
             <div className="dtd-mc-roster">
               {[...t2Members].sort((a: any, b: any) => {
                 const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
@@ -1145,7 +1157,7 @@ function DotaTournamentDetailInner() {
         .dtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .dtd-mc-team-info { flex: 1; min-width: 0; }
         .dtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #A12B1F; text-transform: uppercase; }
-        .dtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-team-name { font-size: 1.18rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.005em; line-height: 1.18; }
         /* Roster line under each match-card team name — 5 player names,
          * each coloured by their assigned position. */
         .dtd-mc-roster { font-size: 0.66rem; margin-top: 4px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
@@ -1270,7 +1282,10 @@ function DotaTournamentDetailInner() {
           .dtd-tabs-wrap { margin-left: -16px; margin-right: -16px; padding: 8px 16px; }
           .dtd-overview-grid { grid-template-columns: 1fr; }
           .dtd-mc-roster { display: none; }
-          .dtd-mc-team-name { font-size: 0.78rem; }
+          /* Roster is hidden under 800px, so team-name can take the full
+           * vertical of the card. Bump it further to fill the freed space
+           * without growing the overall card height. */
+          .dtd-mc-team-name { font-size: 1.1rem; }
           .dtd-card { padding: 20px; }
         }
         @media (max-width: 600px) {
@@ -1280,7 +1295,10 @@ function DotaTournamentDetailInner() {
           .dtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .dtd-mc-team { padding: 8px 10px; gap: 8px; }
           .dtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
-          .dtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
+          /* Single-line + ellipsis on phone (was 2-line clamp). Keeps the
+           * card's vertical footprint identical while letting the bigger
+           * font breathe horizontally. */
+          .dtd-mc-team-name { font-size: 1rem; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.18; -webkit-line-clamp: unset; display: block; }
           .dtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .dtd-tab-label { display: none; }
           .dtd-tab-count { display: none; }
@@ -1322,7 +1340,7 @@ function DotaTournamentDetailInner() {
           .dtd-mc-center { min-width: 54px !important; }
           .dtd-mc-index { width: 28px !important; }
           .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
-          .dtd-mc-team-name { font-size: 0.7rem !important; }
+          .dtd-mc-team-name { font-size: 0.86rem !important; }
           .dtd-mc-team-tag { font-size: 0.56rem !important; }
           /* Expanded match section */
           .dtd-mc-expanded { padding: 10px 4px 8px !important; }

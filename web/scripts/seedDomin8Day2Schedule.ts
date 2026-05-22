@@ -1,14 +1,16 @@
 /**
  * Domin8 Day-2 schedule (23 May 2026 IST onward).
  *
- * Day 1 left r1-match-4 (10k ke Pohe vs Dog Tamers) un-played. Day 2 covers
- * that carryover plus 3 fresh Round-2 round-robin fixtures (each team plays
- * exactly 2 matches on the day). 2-hour slots starting 11 PM IST on 23 May.
+ * Day 1 left r1-match-4 (10k ke Pohe vs Dog Tamers) un-played. Day 2 plays
+ * that carryover plus a fresh Round-2 rematch of the same pair back-to-back,
+ * then three Round-2 fixtures involving the other two teams. 1.5-hour slots
+ * starting 11 PM IST on 23 May.
  *
- *   slot 1  23 May 23:00 IST  r1-match-4  10k ke Pohe vs Dog Tamers  (carryover)
- *   slot 2  24 May 01:00 IST  r2-match-1  Versatile Dogs vs 10k ke Pohe
- *   slot 3  24 May 03:00 IST  r2-match-2  Versatile Dogs vs Toxic but Talented
- *   slot 4  24 May 05:00 IST  r2-match-3  Toxic but Talented vs Dog Tamers
+ *   M1  23 May 23:00 IST       r1-match-4  10k ke Pohe vs Dog Tamers      (carryover from Day 1)
+ *   M2  24 May 00:30 IST       r2-match-1  10k ke Pohe vs Dog Tamers      (R2 rematch in continuation)
+ *   M3  24 May 02:00 IST       r2-match-2  Versatile Dogs vs 10k ke Pohe
+ *   M4  24 May 03:30 IST       r2-match-3  Versatile Dogs vs Toxic but Talented
+ *   M5  24 May 05:00 IST       r2-match-4  Toxic but Talented vs Dog Tamers
  *
  *   npx tsx scripts/seedDomin8Day2Schedule.ts            # dry-run
  *   npx tsx scripts/seedDomin8Day2Schedule.ts --apply    # write Firestore
@@ -32,11 +34,12 @@ const db = getFirestore();
 const TID = "domin8-ultimate-tilt-proof-tournament";
 const APPLY = process.argv.includes("--apply");
 
-// 23 May 23:00 IST = 17:30 UTC. Each slot is +2h IST = +2h UTC.
+// 23 May 23:00 IST = 17:30 UTC. Each slot is +1.5h.
 const SLOTS_ISO_UTC = [
   "2026-05-23T17:30:00Z",  // 23 May 23:00 IST
-  "2026-05-23T19:30:00Z",  // 24 May 01:00 IST
-  "2026-05-23T21:30:00Z",  // 24 May 03:00 IST
+  "2026-05-23T19:00:00Z",  // 24 May 00:30 IST
+  "2026-05-23T20:30:00Z",  // 24 May 02:00 IST
+  "2026-05-23T22:00:00Z",  // 24 May 03:30 IST
   "2026-05-23T23:30:00Z",  // 24 May 05:00 IST
 ];
 
@@ -53,11 +56,17 @@ type Plan = {
   isExisting: boolean;
 };
 
+// Slot 1 is r1-match-4 (carryover). Slot 2 is a fresh Round-2 rematch of the
+// same pair so the lobby/format can run back-to-back without disrupting the
+// other teams. Slots 3–5 are the originally planned VD/TbT round-robin.
+// r2-match-1 deliberately mirrors r1-match-4's matchup (10k vs DT) — that's
+// the user-requested "2 times in continuation" pattern.
 const PLAN: Plan[] = [
   { matchDocId: "r1-match-4", scheduledTime: SLOTS_ISO_UTC[0], matchDay: 1, matchIndex: 4, team1Id: "team-1", team2Id: "team-4", isExisting: true },
-  { matchDocId: "r2-match-1", scheduledTime: SLOTS_ISO_UTC[1], matchDay: 2, matchIndex: 1, team1Id: "team-3", team2Id: "team-1", isExisting: false },
-  { matchDocId: "r2-match-2", scheduledTime: SLOTS_ISO_UTC[2], matchDay: 2, matchIndex: 2, team1Id: "team-3", team2Id: "team-2", isExisting: false },
-  { matchDocId: "r2-match-3", scheduledTime: SLOTS_ISO_UTC[3], matchDay: 2, matchIndex: 3, team1Id: "team-2", team2Id: "team-4", isExisting: false },
+  { matchDocId: "r2-match-1", scheduledTime: SLOTS_ISO_UTC[1], matchDay: 2, matchIndex: 1, team1Id: "team-1", team2Id: "team-4", isExisting: false },
+  { matchDocId: "r2-match-2", scheduledTime: SLOTS_ISO_UTC[2], matchDay: 2, matchIndex: 2, team1Id: "team-3", team2Id: "team-1", isExisting: false },
+  { matchDocId: "r2-match-3", scheduledTime: SLOTS_ISO_UTC[3], matchDay: 2, matchIndex: 3, team1Id: "team-3", team2Id: "team-2", isExisting: false },
+  { matchDocId: "r2-match-4", scheduledTime: SLOTS_ISO_UTC[4], matchDay: 2, matchIndex: 4, team1Id: "team-2", team2Id: "team-4", isExisting: false },
 ];
 
 const fmtIST = (iso: string) =>
@@ -86,13 +95,15 @@ async function run() {
     }
   }
 
-  // Verify match-count per team comes out to exactly 2.
+  // Match-count per team. The carryover-then-rematch sequence (M1+M2 both
+  // 10k vs DT) pushes those two teams to 3 matches today by design — VD/TbT
+  // sit at 2. Print for visibility, don't enforce.
   const tally: Record<string, number> = {};
   for (const p of PLAN) {
     tally[p.team1Id] = (tally[p.team1Id] || 0) + 1;
     tally[p.team2Id] = (tally[p.team2Id] || 0) + 1;
   }
-  console.log("Day-2 match count per team (should all be 2):");
+  console.log("Day-2 match count per team:");
   for (const [tid, n] of Object.entries(tally)) console.log(`  ${(teams.get(tid)?.name || tid).padEnd(22)} ${n}`);
   console.log();
 
@@ -142,15 +153,17 @@ async function run() {
   const tData: any = tDoc.data() || {};
   const schedule = { ...(tData.schedule || {}) };
   schedule.day2Start = SLOTS_ISO_UTC[0];
-  schedule.day2End = SLOTS_ISO_UTC[3];
+  schedule.day2End = SLOTS_ISO_UTC[SLOTS_ISO_UTC.length - 1];
   batch.set(tRef, {
     groupStageRounds: 2,
     schedule,
   }, { merge: true });
 
   await batch.commit();
-  console.log("\n✅ Wrote Day-2 schedule (1 update + 3 creates + tournament meta).");
-  console.log(`   Slots span ${fmtIST(SLOTS_ISO_UTC[0])} → ${fmtIST(SLOTS_ISO_UTC[3])} IST.`);
+  const updateCount = PLAN.filter(p => p.isExisting).length;
+  const createCount = PLAN.length - updateCount;
+  console.log(`\n✅ Wrote Day-2 schedule (${updateCount} update + ${createCount} creates + tournament meta).`);
+  console.log(`   Slots span ${fmtIST(SLOTS_ISO_UTC[0])} → ${fmtIST(SLOTS_ISO_UTC[SLOTS_ISO_UTC.length - 1])} IST.`);
 }
 
 run().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
