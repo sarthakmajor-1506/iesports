@@ -94,6 +94,13 @@ type PlayerStat = {
   gpm: number; xpm: number;
   heroDamage?: number; towerDamage?: number; heroHealing?: number;
   bountyRunes?: number;
+  // Newer optional fields (extracted from M6 screenshots; safe to omit)
+  outposts?: number;
+  damageReceivedRaw?: number;
+  damageReducedPct?: number;
+  deathGoldLoss?: number;
+  deathTime?: string;
+  pickOrder?: number;
 };
 
 type ParsedMatch = {
@@ -221,10 +228,42 @@ const MATCHES: ParsedMatch[] = [
     ],
   },
 
-  // ── Match E: practice-1, 5/16 6:44 PM IST, Radiant Victory ────────────────
-  // Pre-tournament warmup. Several players (Major, Pangoluer, Gabe Newell,
-  // Venomanjar, SmallButMighty, Aizi, Egor) aren't on the tournament roster.
-  // Numbers transcribed from a phone photo of the monitor → dataQuality=low.
+  // ── Match F: r1-match-6, 5/17 5:55 AM IST, Radiant Victory 48-36 ─────────
+  //   Versatile Dogs (Radiant, team-3) beat Toxic but Talented (Dire, team-2).
+  //   Subs: Ninja (team-4) filled in for Naruto Uzumaki on team-3 side;
+  //         Major (external) and ITACHI (team-1) filled in for PABLO and nol on team-2.
+  {
+    matchDocId: "r1-match-6",
+    dotaMatchId: "8813997841",
+    gameMode: "captains_mode",
+    durationSec: 2629,                 // 43:49
+    completedAtIso: "2026-05-17T00:25:00Z",
+    radiantTeamId: "team-3",           // Versatile Dogs
+    direTeamId: "team-2",              // Toxic but Talented
+    winner: "radiant",
+    radiantScore: 48, direScore: 36,
+    radiant: [
+      { displayName: "Mr. Walru5",       hero: "Shadow Shaman", level: 19, kills:  4, deaths:  9, assists: 27, netWorth: 14518, lastHits:  63, denies:  3, gpm: 382, xpm:  476, heroDamage: 20957, towerDamage:  3054, heroHealing:  125, bountyRunes: 2, outposts: 2, damageReceivedRaw: 30043, damageReducedPct: 31.4, deathGoldLoss: 1215, deathTime: "5:29",  pickOrder: 10 },
+      { displayName: "Default'11",       hero: "Pudge",         level: 24, kills: 16, deaths:  7, assists: 15, netWorth: 20073, lastHits: 200, denies:  4, gpm: 525, xpm:  747, heroDamage: 31158, towerDamage:  1848, heroHealing:    0, bountyRunes: 6, outposts: 0, damageReceivedRaw: 65591, damageReducedPct: 51.7, deathGoldLoss: 1608, deathTime: "5:24",  pickOrder:  8 },
+      { displayName: "SMooth OperaTorr", hero: "Riki",          level: 25, kills: 12, deaths: 10, assists: 12, netWorth: 18679, lastHits: 174, denies:  9, gpm: 488, xpm:  847, heroDamage: 20320, towerDamage:  1818, heroHealing:    0, bountyRunes: 3, outposts: 0, damageReceivedRaw: 34080, damageReducedPct: 32.8, deathGoldLoss: 2228, deathTime: "6:55",  pickOrder:  7 },
+      { displayName: "Ninja",            hero: "Clockwerk",     level: 20, kills:  2, deaths:  8, assists: 30, netWorth: 11591, lastHits:  44, denies:  0, gpm: 306, xpm:  502, heroDamage: 15998, towerDamage:   383, heroHealing:    0, bountyRunes: 0, outposts: 0, damageReceivedRaw: 35091, damageReducedPct: 27.8, deathGoldLoss:  875, deathTime: "4:46",  pickOrder:  5 },
+      { displayName: "kysms",            hero: "Juggernaut",    level: 29, kills: 13, deaths:  3, assists: 14, netWorth: 37881, lastHits: 583, denies: 10, gpm: 895, xpm: 1440, heroDamage: 38614, towerDamage: 21846, heroHealing: 7069, bountyRunes: 1, outposts: 0, damageReceivedRaw: 49701, damageReducedPct: 53.1, deathGoldLoss:  562, deathTime: "2:23",  pickOrder:  9 },
+    ],
+    dire: [
+      { displayName: "enoughofgrief- -|",hero: "Phoenix",       level: 20, kills:  7, deaths:  9, assists: 18, netWorth: 11071, lastHits:  78, denies:  1, gpm: 309, xpm:  527, heroDamage: 26235, towerDamage:   202, heroHealing: 1560, bountyRunes: 1, outposts: 1, damageReceivedRaw: 26489, damageReducedPct: 36.3, deathGoldLoss: 1098, deathTime: "5:40",  pickOrder:  2 },
+      { displayName: "Major",            hero: "Bristleback",   level: 23, kills:  7, deaths: 11, assists: 17, netWorth: 16938, lastHits: 263, denies:  6, gpm: 489, xpm:  660, heroDamage: 33675, towerDamage:   159, heroHealing:    0, bountyRunes: 3, outposts: 1, damageReceivedRaw: 112619, damageReducedPct: 67.5, deathGoldLoss: 2192, deathTime: "6:15", pickOrder:  4 },
+      { displayName: "Caterpillar",      hero: "Slardar",       level: 22, kills: 11, deaths:  7, assists: 19, netWorth: 16670, lastHits: 220, denies:  8, gpm: 501, xpm:  635, heroDamage: 23226, towerDamage:   524, heroHealing:    0, bountyRunes: 2, outposts: 0, damageReceivedRaw: 65999, damageReducedPct: 50.9, deathGoldLoss: 2135, deathTime: "5:41",  pickOrder:  1 },
+      { displayName: "ITACHI",           hero: "Disruptor",     level: 18, kills:  4, deaths: 11, assists: 21, netWorth: 11198, lastHits:  30, denies:  1, gpm: 277, xpm:  411, heroDamage: 13725, towerDamage:   334, heroHealing:    0, bountyRunes: 4, outposts: 0, damageReceivedRaw: 27717, damageReducedPct: 39.8, deathGoldLoss: 1145, deathTime: "6:49",  pickOrder:  6 },
+      { displayName: "MiyaMC",           hero: "Clinkz",        level: 21, kills:  7, deaths: 11, assists: 11, netWorth: 18508, lastHits: 274, denies:  7, gpm: 475, xpm:  586, heroDamage: 27040, towerDamage:  2296, heroHealing:    0, bountyRunes: 1, outposts: 0, damageReceivedRaw: 41333, damageReducedPct: 40.8, deathGoldLoss: 2069, deathTime: "8:07",  pickOrder:  3 },
+    ],
+  },
+
+  // ── Match E: practice-1 — REMOVED ─────────────────────────────────────────
+  // Operator flagged this 5/16 6:44 PM warmup as junk (rosters were almost
+  // entirely non-tournament players; the bot wasn't tracking it). Doc deleted
+  // from Firestore on 21 May 2026. Keeping the comment so future seeds don't
+  // accidentally re-add it.
+  /* DELETED — practice-1 entry kept for reference only:
   {
     matchDocId: "practice-1",
     dotaMatchId: "8813222962",
@@ -251,6 +290,7 @@ const MATCHES: ParsedMatch[] = [
       { displayName: "Egor",             hero: "Storm Spirit", level: 0, kills:  9, deaths:  7, assists: 15, netWorth: 13003, lastHits:   0, denies:  0, gpm:   0, xpm:    0 },
     ],
   },
+  */
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -275,6 +315,12 @@ function buildPlayerStats(players: PlayerStat[], side: "radiant" | "dire", radia
       towerDamage: p.towerDamage ?? 0,
       heroHealing: p.heroHealing ?? 0,
       bountyRunes: p.bountyRunes ?? 0,
+      ...(p.outposts !== undefined ? { outposts: p.outposts } : {}),
+      ...(p.damageReceivedRaw !== undefined ? { damageReceivedRaw: p.damageReceivedRaw } : {}),
+      ...(p.damageReducedPct !== undefined ? { damageReducedPct: p.damageReducedPct } : {}),
+      ...(p.deathGoldLoss !== undefined ? { deathGoldLoss: p.deathGoldLoss } : {}),
+      ...(p.deathTime !== undefined ? { deathTime: p.deathTime } : {}),
+      ...(p.pickOrder !== undefined ? { pickOrder: p.pickOrder } : {}),
     };
   });
 }
