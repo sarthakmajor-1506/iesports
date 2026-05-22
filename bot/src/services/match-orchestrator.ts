@@ -134,6 +134,53 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   });
   console.log(`[Match] ✅ Firestore lobby saved: ${firestoreLobbyId}`);
 
+  // ── Step 2b: Capture dotaMatchId from lobby state as soon as the GC
+  // stamps it onto the practice lobby (happens when the match server is
+  // allocated / the game launches). This is the whole point of running
+  // the bot inside the lobby — no player-history scan needed afterward,
+  // result fetch becomes a direct requestMatchDetails(matchId) call.
+  //
+  // The listener is registered once per lobby and self-detaches the first
+  // time the GC reports a non-zero match_id. Re-using the same `bot`
+  // EventEmitter across multiple lobbies in a session is fine because
+  // dota-gc resets `liveLobbyMatchId` on createLobby/destroyLobby.
+  const onMatchId = async (matchId: string) => {
+    try {
+      console.log(`[Match] 🎯 dotaMatchId=${matchId} bound to firestoreLobby=${firestoreLobbyId}, queue=${queue.id}`);
+      // Stamp it on the lobby doc (covers daily-matches flow).
+      try { await updateLobby(firestoreLobbyId, { dotaMatchId: matchId } as any); } catch (e: any) { console.error("[Match] lobby update failed:", e?.message || e); }
+      // Stamp it on the queue + tournament fixture (covers the tournament flow).
+      const tQueueId = (queue as any).id;
+      const tid = (queue as any).tournamentId;
+      const tMatchId = (queue as any).tournamentMatchId;
+      const tColl = (queue as any).tournamentCollection || "tournaments";
+      const gNum = Number((queue as any).tournamentGameNumber || 1);
+      const { getDb } = await import("./firebase");
+      const db = getDb();
+      if (tQueueId) {
+        try { await db.collection("botQueues").doc(tQueueId).set({ dotaMatchId: matchId, dotaMatchIdCapturedAt: new Date().toISOString() }, { merge: true }); }
+        catch (e: any) { console.error("[Match] queue update failed:", e?.message || e); }
+      }
+      if (tid && tMatchId) {
+        const mref = db.collection(tColl).doc(tid).collection("matches").doc(tMatchId);
+        try {
+          const gameKey = `game${gNum}`;
+          await mref.set({
+            dotaMatchId: matchId,
+            // Mirror into game1/game2 etc. so the existing match-detail UI
+            // (which reads `game1.dotaMatchId`) sees it immediately too.
+            [gameKey]: { dotaMatchId: matchId, status: "in_progress" },
+            lobbyStatus: "match-running",
+          }, { merge: true });
+          console.log(`[Match] ✅ ${tColl}/${tid}/matches/${tMatchId}.dotaMatchId = ${matchId} (+ ${gameKey})`);
+        } catch (e: any) { console.error("[Match] tournament match update failed:", e?.message || e); }
+      }
+    } finally {
+      bot.removeListener("lobbyMatchId", onMatchId);
+    }
+  };
+  bot.on("lobbyMatchId", onMatchId);
+
   // ── Step 3: Post lobby embed to Discord ─────────────────────
   if (lobbyChannelId) {
     try {
