@@ -1302,11 +1302,11 @@ function DotaTournamentDetailInner() {
            * instead of being ellipsis-clipped. Smaller font + tighter
            * line-height keeps the card height comparable to before. */
           .dtd-mc-team-name {
-            font-size: 0.88rem;
+            font-size: 0.74rem;
             white-space: normal !important;
             overflow: hidden;
             text-overflow: clip;
-            line-height: 1.22;
+            line-height: 1.2;
             display: -webkit-box;
             -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
@@ -1341,7 +1341,7 @@ function DotaTournamentDetailInner() {
            * long team names — give it more horizontal room on phone, and
            * shrink the inline name font so 3 lines fit cleanly. */
           .dtd-mc-vs-col { padding: 0 4px !important; max-width: 160px !important; min-width: 110px !important; }
-          .dtd-mc-vs-name { font-size: 0.82rem !important; letter-spacing: 0.05em !important; line-height: 1.18 !important; }
+          .dtd-mc-vs-name { font-size: 0.7rem !important; letter-spacing: 0.04em !important; line-height: 1.16 !important; }
           .dtd-mc-vs { width: 24px !important; height: 24px !important; font-size: 0.55rem !important; }
           .dtd-mc-vs { width: 34px !important; height: 34px !important; font-size: 0.75rem !important; }
         }
@@ -1360,8 +1360,8 @@ function DotaTournamentDetailInner() {
           .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
           /* Tiny phone: same 3-line wrap, slightly smaller font so 3 lines
            * still fit without ballooning the card height. */
-          .dtd-mc-team-name { font-size: 0.78rem !important; line-height: 1.2; -webkit-line-clamp: 3; }
-          .dtd-mc-team-tag { font-size: 0.56rem !important; }
+          .dtd-mc-team-name { font-size: 0.66rem !important; line-height: 1.18; -webkit-line-clamp: 3; }
+          .dtd-mc-team-tag { font-size: 0.52rem !important; }
           /* Expanded match section */
           .dtd-mc-expanded { padding: 10px 4px 8px !important; }
           .dtd-mc-player-row { gap: 3px !important; }
@@ -1369,7 +1369,7 @@ function DotaTournamentDetailInner() {
           .dtd-fighter-card > div:first-child { width: 26px !important; height: 26px !important; font-size: 0.65rem !important; }
           .dtd-fighter-card > div:last-child { max-width: 32px !important; }
           .dtd-mc-vs-col { padding: 0 2px !important; max-width: 140px !important; min-width: 90px !important; }
-          .dtd-mc-vs-name { font-size: 0.74rem !important; letter-spacing: 0.04em !important; }
+          .dtd-mc-vs-name { font-size: 0.62rem !important; letter-spacing: 0.03em !important; }
           .dtd-mc-vs { width: 20px !important; height: 20px !important; font-size: 0.48rem !important; }
           .dtd-mc-vs { width: 28px !important; height: 28px !important; font-size: 0.6rem !important; }
         }
