@@ -249,6 +249,52 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
         },
       }, { merge: true });
       console.log(`[Match] ✅ Auto-resolved ${tColl}/${tid}/matches/${tMatchId} → ${winnerName} wins (team1=${team1Side}, team2=${team2Side})`);
+
+      // ── Post a match-result embed to the tournament's Discord channel ──
+      // Mirrors the IDPL_BOT style: green Radiant or red Dire victory header,
+      // dotabuff link, side mapping, plus a tag so cleanup-vcs can sweep it
+      // later if the admin chooses.
+      const tournamentChannelIdForResult = (queue as any).tournamentChannelId
+        || (await db.collection(tColl).doc(tid).get()).data()?.discordChannelId;
+      if (tournamentChannelIdForResult) {
+        try {
+          const loserName = winner === "team1" ? mdata.team2Name : mdata.team1Name;
+          const winnerSide = team1Side === (evt.radiantWin ? "radiant" : "dire") ? "radiant" : "dire";
+          const sideEmoji = winnerSide === "radiant" ? "🟢" : "🔴";
+          const sideLabel = winnerSide === "radiant" ? "Radiant" : "Dire";
+          const resultMsg = {
+            embeds: [{
+              title: `🏆 Match Complete — ${winnerName} wins!`,
+              description: [
+                `${sideEmoji} **${winnerName}** (${sideLabel}) defeated **${loserName}** (${winnerSide === "radiant" ? "Dire" : "Radiant"})`,
+                ``,
+                `**Dota match ID:** [\`${evt.matchId}\`](https://www.dotabuff.com/matches/${evt.matchId})`,
+                `**Tournament:** ${mdata.team1Name} vs ${mdata.team2Name}`,
+                ``,
+                `Full per-player stats: https://www.dotabuff.com/matches/${evt.matchId}`,
+              ].join("\n"),
+              color: 0x16a34a,
+              footer: { text: "iesports Tournament • auto-resolved from lobby" },
+              timestamp: nowIso,
+            }],
+          };
+          const resp = await client.channels.fetch(tournamentChannelIdForResult);
+          if (resp && resp.isTextBased() && "send" in resp) {
+            const sent = await (resp as any).send(resultMsg);
+            // Stash the result-message ID under a separate field — NOT in
+            // discordOpsMessageIds — so cleanup-vcs leaves it alone. The
+            // match result is the permanent record players want to see;
+            // only the prep/setup chatter should disappear on cleanup.
+            await db.collection(tColl).doc(tid).collection("matches").doc(tMatchId).set({
+              resultMessageId: sent.id,
+              resultMessageChannelId: tournamentChannelIdForResult,
+            }, { merge: true });
+            console.log(`[Match] 📢 Posted result embed to ${tournamentChannelIdForResult} (msg ${sent.id})`);
+          }
+        } catch (e: any) {
+          console.error(`[Match] posting result embed failed: ${e?.message || e}`);
+        }
+      }
     } catch (e: any) {
       console.error(`[Match] matchComplete handler failed: ${e?.message || e}`);
     } finally {
@@ -295,13 +341,30 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   bot.on("lobbyMatchId", onMatchId);
 
   // ── Step 3: Post lobby embed to Discord ─────────────────────
+  // Track the message IDs so the web's cleanup-vcs button can sweep them
+  // alongside web-posted embeds (web only knew about its own posts before).
   if (lobbyChannelId) {
     try {
       const ch = (await client.channels.fetch(lobbyChannelId)) as TextChannel;
       const lob = await getLobby(firestoreLobbyId);
       if (lob) {
-        await ch.send({ embeds: [lobbyEmbed(lob)], components: [inviteMeButton(firestoreLobbyId)] });
-        await ch.send({ content: "**Admin Controls:**", components: [lobbyControlRow1(firestoreLobbyId), lobbyControlRow2(firestoreLobbyId), lobbyControlRow3(firestoreLobbyId)] });
+        const sent1 = await ch.send({ embeds: [lobbyEmbed(lob)], components: [inviteMeButton(firestoreLobbyId)] });
+        const sent2 = await ch.send({ content: "**Admin Controls:**", components: [lobbyControlRow1(firestoreLobbyId), lobbyControlRow2(firestoreLobbyId), lobbyControlRow3(firestoreLobbyId)] });
+        // Stash on the tournament match doc (if this lobby is tied to one)
+        // so cleanup-vcs sees them in discordOpsMessageIds.
+        const tid = (queue as any).tournamentId;
+        const tMatchId = (queue as any).tournamentMatchId;
+        const tColl = (queue as any).tournamentCollection || "tournaments";
+        if (tid && tMatchId) {
+          try {
+            const { getDb } = await import("./firebase");
+            const mref = getDb().collection(tColl).doc(tid).collection("matches").doc(tMatchId);
+            const existing = ((await mref.get()).data()?.discordOpsMessageIds || []) as string[];
+            await mref.set({
+              discordOpsMessageIds: [...existing, sent1.id, sent2.id],
+            }, { merge: true });
+          } catch (e: any) { console.warn("[Match] track bot msg ids:", e?.message || e); }
+        }
       }
     } catch (err: any) { console.error("[Match] Lobby embed error:", err.message); }
   }
