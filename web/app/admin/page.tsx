@@ -434,6 +434,32 @@ export default function AdminPanel() {
   };
   const [findState, setFindState] = useState<Record<number, FindState>>({});
 
+  // ─── Dota Result Job ────────────────────────────────────────────────────────
+  const [dotaJobId, setDotaJobId] = useState<string | null>(null);
+  const [dotaJobStatus, setDotaJobStatus] = useState<string | null>(null);
+  const [dotaJobReport, setDotaJobReport] = useState<any>(null);
+  const [dotaJobLogs, setDotaJobLogs] = useState<string[]>([]);
+  const [dotaJobError, setDotaJobError] = useState<string | null>(null);
+  const [dotaForcedMatchId, setDotaForcedMatchId] = useState("");
+
+  // Poll dotaResultJobs doc until done/error
+  useEffect(() => {
+    if (!dotaJobId || !adminKey) return;
+    if (dotaJobStatus === "done" || dotaJobStatus === "error") return;
+    const iv = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/dota-result-job?jobId=${encodeURIComponent(dotaJobId)}&adminKey=${encodeURIComponent(adminKey)}`);
+        const d = await res.json();
+        if (!d.ok) return;
+        setDotaJobStatus(d.status);
+        if (d.report) setDotaJobReport(d.report);
+        if (d.logs?.length) setDotaJobLogs(d.logs);
+        if (d.error) setDotaJobError(d.error);
+      } catch {}
+    }, 5000);
+    return () => clearInterval(iv);
+  }, [dotaJobId, dotaJobStatus, adminKey]);
+
   // ─── Delete Game Data ───────────────────────────────────────────────────────
   const [deleteGameMatchId, setDeleteGameMatchId] = useState("");
   const [deleteGameNumber, setDeleteGameNumber] = useState("1");
@@ -2491,17 +2517,79 @@ export default function AdminPanel() {
                           <span style={stepDone(isCompleted)}>{isCompleted ? "✓" : "4"}</span>
                           <span style={stepTitle}>Fetch Match Results</span>
                         </div>
-                        {!isLive && !isCompleted && <div style={stepHint("#f59e0b")}>Start match first to fetch results</div>}
-                        {(isLive || isCompleted) && (
+                        {selectedTournament?.game === "dota2" ? (
+                          /* Dota 2 — resolve via GC bot (practice lobby), not Valorant API */
                           <div style={{ marginTop: 10 }}>
-                            <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                              <label style={{ ...smallLabel, marginBottom: 0 }}>Region:</label>
-                              <select value={fetchRegion} onChange={e => setFetchRegion(e.target.value)} style={{ ...selectStyle, width: 120, marginBottom: 0 }}>
-                                <option value="ap">AP (India)</option>
-                                <option value="eu">EU</option>
-                                <option value="na">NA</option>
-                              </select>
+                            {isCompleted && <div style={stepHint("#4ade80")}>Match resolved.</div>}
+                            {(m as any).dotaMatchId && <div style={stepHint("#888")}>Captured match ID: {(m as any).dotaMatchId}</div>}
+                            <div style={stepHint("#555")}>Results are fetched from the Dota GC by the Railway bot. The bot must be running and GC-connected. Optionally enter a forced Dota Match ID if auto-capture failed.</div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                              <input
+                                value={dotaForcedMatchId}
+                                onChange={e => setDotaForcedMatchId(e.target.value)}
+                                placeholder="Force Dota Match ID (optional)"
+                                style={{ ...inputStyle, flex: 1, marginBottom: 0 }}
+                              />
+                              <button
+                                disabled={loading || dotaJobStatus === "pending" || dotaJobStatus === "processing"}
+                                style={{ ...btnStyle, whiteSpace: "nowrap" as const, background: "#1e3a5f", border: "1px solid #3CCBFF44" }}
+                                onClick={async () => {
+                                  setDotaJobId(null); setDotaJobStatus(null); setDotaJobReport(null); setDotaJobLogs([]); setDotaJobError(null);
+                                  try {
+                                    const res = await fetch("/api/admin/dota-result-job", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ tournamentId, adminKey, forcedMatchIds: dotaForcedMatchId.trim() ? [dotaForcedMatchId.trim()] : [] }),
+                                    });
+                                    const d = await res.json();
+                                    if (d.ok) { setDotaJobId(d.jobId); setDotaJobStatus("pending"); addLog("Dota result job queued: " + d.jobId); }
+                                    else addLog("Error: " + (d.error || "unknown"));
+                                  } catch (e: any) { addLog("Error: " + e.message); }
+                                }}
+                              >
+                                {dotaJobStatus === "pending" || dotaJobStatus === "processing" ? "Resolving…" : "Resolve via GC"}
+                              </button>
                             </div>
+                            {dotaJobStatus && (
+                              <div style={{ marginTop: 8, padding: "8px 10px", background: "#0d0d0f", borderRadius: 8, border: `1px solid ${dotaJobStatus === "done" ? "#16a34a44" : dotaJobStatus === "error" ? "#7f1d1d44" : "#1e3a5f44"}` }}>
+                                <div style={{ fontSize: "0.62rem", fontWeight: 800, color: dotaJobStatus === "done" ? "#4ade80" : dotaJobStatus === "error" ? "#f87171" : "#3CCBFF", marginBottom: 4 }}>
+                                  {dotaJobStatus === "pending" ? "Waiting for bot (cron picks up within 1 min)…" : dotaJobStatus === "processing" ? "Bot is resolving via GC…" : dotaJobStatus === "done" ? "Done" : "Error"}
+                                </div>
+                                {dotaJobError && <div style={{ fontSize: "0.58rem", color: "#f87171", marginBottom: 4 }}>{dotaJobError}</div>}
+                                {dotaJobReport && (
+                                  <div style={{ fontSize: "0.58rem", color: "#888" }}>
+                                    Resolved: {dotaJobReport.resolved?.length ?? 0} · Unresolved: {dotaJobReport.unresolved?.length ?? 0}
+                                    {dotaJobReport.resolved?.map((r: any) => (
+                                      <div key={r.tournamentMatchId} style={{ color: "#4ade80", marginTop: 2 }}>✓ {r.winnerName} wins (dota {r.dotaMatchId}, {Math.round(r.durationSec / 60)}m)</div>
+                                    ))}
+                                    {dotaJobReport.unresolved?.length > 0 && <div style={{ color: "#f87171", marginTop: 2 }}>Unresolved: {dotaJobReport.unresolved.join(", ")} — try entering the match ID manually above and re-resolving.</div>}
+                                  </div>
+                                )}
+                                {dotaJobLogs.length > 0 && (
+                                  <details style={{ marginTop: 4 }}>
+                                    <summary style={{ fontSize: "0.54rem", color: "#555", cursor: "pointer" }}>Logs ({dotaJobLogs.length})</summary>
+                                    <div style={{ maxHeight: 120, overflowY: "auto", marginTop: 4 }}>
+                                      {dotaJobLogs.map((l, i) => <div key={i} style={{ fontSize: "0.52rem", color: "#555", fontFamily: "monospace" }}>{l}</div>)}
+                                    </div>
+                                  </details>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Valorant / CS2 — existing fetch flow */
+                          <>
+                            {!isLive && !isCompleted && <div style={stepHint("#f59e0b")}>Start match first to fetch results</div>}
+                            {(isLive || isCompleted) && (
+                              <div style={{ marginTop: 10 }}>
+                                <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                                  <label style={{ ...smallLabel, marginBottom: 0 }}>Region:</label>
+                                  <select value={fetchRegion} onChange={e => setFetchRegion(e.target.value)} style={{ ...selectStyle, width: 120, marginBottom: 0 }}>
+                                    <option value="ap">AP (India)</option>
+                                    <option value="eu">EU</option>
+                                    <option value="na">NA</option>
+                                  </select>
+                                </div>
                             <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bo, 3)}, 1fr)`, gap: 10 }}>
                               {gameMatchIds.slice(0, bo).map((val, i) => {
                                 const gameData = m.games?.[`game${i + 1}`] || (m as any)?.[`game${i + 1}`];
@@ -2652,6 +2740,8 @@ export default function AdminPanel() {
                               })}
                             </div>
                           </div>
+                            )}
+                          </>
                         )}
                       </div>
 

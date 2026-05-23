@@ -100,6 +100,18 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   const bot = getDotaBot();
   console.log(`[Match] bot.isReady() = ${bot.isReady()}`);
 
+  // Wait up to 30s for the GC session to become ready before falling to
+  // manual mode. This handles the window where the bot just reconnected
+  // (Steam auto-reconnect) but the GC Welcome hasn't arrived yet.
+  if (!bot.isReady()) {
+    console.log(`[Match] ⚠️  GC not ready — waiting up to 30s for reconnect...`);
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 2000));
+      if (bot.isReady()) { console.log(`[Match] ✅ GC became ready`); break; }
+    }
+  }
+
   if (bot.isReady()) {
     try {
       console.log(`[Match] Creating Dota lobby...`);
@@ -121,7 +133,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       }
     }
   } else {
-    console.log(`[Match] ⚠️  Bot not ready — skipping GC lobby creation (manual mode)`);
+    console.log(`[Match] ⚠️  Bot still not GC-ready after 30s — falling to manual mode`);
   }
 
   // ── Step 2: Save to Firestore ────────────────────────────────

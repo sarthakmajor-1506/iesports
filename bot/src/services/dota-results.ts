@@ -46,7 +46,9 @@ async function resolveRoster(db: Firestore, tid: string, teamId: string) {
 export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Promise<ResolveReport> {
   const log = opts.log || ((s: string) => console.log(s));
   const tid = opts.tournamentId;
-  const padMs = (opts.windowPaddingHrs ?? 6) * 3600_000;
+  // 24h padding so matches played well before/after the scheduled slot are
+  // still found. Practice lobbies can run hours late in tournament play.
+  const padMs = (opts.windowPaddingHrs ?? 24) * 3600_000;
 
   // Load every not-yet-completed match + both rosters
   const msnap = await db.collection("tournaments").doc(tid).collection("matches").get();

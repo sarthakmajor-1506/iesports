@@ -102,8 +102,13 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
   // same matchId is a no-op.
   if (lobbyMatchId) {
     try {
+      // Include "open" queues so the dotaMatchId is captured even when the
+      // lobby was created manually (admin BotLobby panel) rather than via the
+      // automated cron path — in that case startMatchLobby() never runs so
+      // the queue stays "open" and the orchestrator's onMatchId listener is
+      // never registered.  Writing here is idempotent (same value = no-op).
       const qs = await db.collection("botQueues")
-        .where("status", "==", "in_progress")
+        .where("status", "in", ["in_progress", "open"])
         .get();
       for (const qd of qs.docs) {
         const q = qd.data() as any;
