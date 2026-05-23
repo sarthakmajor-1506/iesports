@@ -274,6 +274,23 @@ async function sendMessage(channelId: string, payload: any): Promise<string | nu
  * 404s and 403s are swallowed so a half-cleaned channel state doesn't
  * block the rest of the cleanup.
  */
+/**
+ * Short, distinguishable team label for tight UI slots (Discord channel
+ * names, embed footers). Multi-word teams → uppercased word-initials;
+ * single-word teams → first 3 chars uppercased.
+ *   "Mohit Taparia" → "MT"
+ *   "10k ke Pohe"   → "1KP"
+ *   "Major"         → "MAJ"
+ *   "Money"         → "MON"
+ */
+function teamInitials(name: string | undefined | null): string {
+  if (!name) return "?";
+  const words = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.map(w => w[0]).join("").toUpperCase().slice(0, 4);
+}
+
 async function deleteMessage(channelId: string, messageId: string): Promise<void> {
   try {
     const res = await discordFetch(`/channels/${channelId}/messages/${messageId}`, "DELETE");
@@ -436,24 +453,55 @@ export async function POST(req: NextRequest) {
         const players = await buildDotaQueuePlayers(tournamentRef, matchData);
         const withSteam = players.filter(p => p.steam32Id).length;
 
-        // Create a waiting-room VC for Dota tournament matches, same UX as
-        // Valorant Set-Lobby. Players gather here while the bot creates the
-        // Dota lobby + sends Steam invites; on "Start Match" we move them to
-        // team-named VCs and delete this waiting room.
+        // Create a waiting-room VC + post a notification message in the
+        // tournament Discord channel so players know to join the waiting
+        // room while the bot spins up the Dota lobby.
+        // Waiting-room VC uses short team initials (e.g. "MT vs MO") since
+        // Discord channel labels truncate hard; team-named VCs on Start
+        // Match use the full names for clarity once the game starts.
+        let waitingRoomVcIdDota: string | null = null;
         if (notifyDiscord && botToken && guildId) {
           try {
             const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
             const allDiscordIds = [...team1Players, ...team2Players].map(p => p.discordId).filter(Boolean);
-            const wrName = `🎮 ${matchData.team1Name} vs ${matchData.team2Name}`;
+            const wrName = `🎮 ${teamInitials(matchData.team1Name)} vs ${teamInitials(matchData.team2Name)}`;
             const wrId = await maybeCreateVoice(guildId, wrName, voiceCategoryId, allDiscordIds);
             if (wrId) {
+              waitingRoomVcIdDota = wrId;
               updateData.waitingRoomVcId = wrId;
               for (const did of allDiscordIds) {
                 await maybeMoveToVoice(guildId, did, wrId);
               }
             }
+            // Post a "match starting — join waiting room" message in the
+            // tournament channel (or the env-configured notify channel).
+            const tournamentChannelIdForMsg =
+              (await tournamentRef.get()).data()?.discordChannelId || notifyChannelId;
+            if (tournamentChannelIdForMsg) {
+              const mentions = allDiscordIds.map(id => `<@${id}>`).join(" ");
+              const vcLine = wrId
+                ? `\n🎙️ **Join the waiting room:** <#${wrId}>`
+                : "";
+              await sendMessage(tournamentChannelIdForMsg, {
+                content: mentions || undefined,
+                embeds: [{
+                  title: `🎮 ${matchData.team1Name} vs ${matchData.team2Name}`,
+                  description: [
+                    `**Match starting!** ${withSteam}/${players.length} players will get auto-Steam-invites in Dota 2 in ~1 minute.${vcLine}`,
+                    ``,
+                    `**${matchData.team1Name}:** ${team1Players.map(p => p.name).join(", ") || "—"}`,
+                    `**${matchData.team2Name}:** ${team2Players.map(p => p.name).join(", ") || "—"}`,
+                    ``,
+                    `If you don't get the Steam invite within 2 min, open Dota 2 → Play → Custom Lobbies and search for the lobby name the bot posts here next.`,
+                  ].join("\n"),
+                  color: 0xf05a28,
+                  footer: { text: "IEsports Tournament" },
+                  timestamp: new Date().toISOString(),
+                }],
+              });
+            }
           } catch (e: any) {
-            console.error("[Dota set-lobby] waiting-room VC create failed:", e?.message || e);
+            console.error("[Dota set-lobby] waiting-room VC / notify failed:", e?.message || e);
           }
         }
         // Route the bot's lobby embed / announcements to this tournament's
@@ -703,8 +751,35 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // ── Delete waiting room VC if it exists ─────────────────────────
+          // ── Move any stragglers in the waiting room to the Dota General
+          //   fallback VC before deletion (env var DOTA_GENERAL_VC_ID). Catches
+          //   players who weren't on the resolved team rosters (subs, late
+          //   arrivals, anyone who joined the waiting room VC manually).
+          const dotaGeneralVcId = process.env.DOTA_GENERAL_VC_ID;
           const waitingRoomVcId = matchData.waitingRoomVcId;
+          if (waitingRoomVcId && dotaGeneralVcId && botToken) {
+            try {
+              const ch: any = await discordFetch(`/channels/${waitingRoomVcId}`, "GET").then(r => r.ok ? r.json() : null);
+              if (ch) {
+                const guildMembersRes = await discordFetch(`/guilds/${guildId}/members?limit=1000`, "GET");
+                const guildMembers: any[] = guildMembersRes.ok ? await guildMembersRes.json() : [];
+                const stuck = guildMembers
+                  .filter(m => m.voice_state?.channel_id === waitingRoomVcId)
+                  .map(m => m.user?.id)
+                  .filter(Boolean) as string[];
+                for (const did of stuck) {
+                  if (!allDiscordIds.includes(did)) {
+                    // Not on either team — bump to Dota general
+                    await maybeMoveToVoice(guildId, did, dotaGeneralVcId);
+                  }
+                }
+              }
+            } catch (e: any) {
+              console.warn("[Discord] straggler move skipped:", e?.message || e);
+            }
+          }
+
+          // ── Delete waiting room VC if it exists ─────────────────────────
           if (waitingRoomVcId) {
             await maybeDeleteChannel(waitingRoomVcId);
             startUpdateData.waitingRoomVcId = null; // clean up reference
@@ -748,6 +823,28 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // For Dota tournaments, also fire a Launch command to the bot. The bot
+      // owns the GC and is the only client that can actually start the
+      // practice lobby's match server — without this the lobby just sits in
+      // UI state forever waiting for the host to click Start in-client.
+      // Posted as a botLobbyCommands doc; bot picks up via onSnapshot in ~1s.
+      let launchCmdId: string | null = null;
+      if (isDotaTournament) {
+        try {
+          const ref = await adminDb.collection("botLobbyCommands").add({
+            action: "launch",
+            params: {},
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            createdBy: `start-match:${tournamentId}/${matchId}`,
+          });
+          launchCmdId = ref.id;
+          console.log(`[Dota start] enqueued launch command ${ref.id}`);
+        } catch (e: any) {
+          console.error(`[Dota start] launch enqueue failed: ${e?.message || e}`);
+        }
+      }
+
       startUpdateData.discordOpsMessageIds = startOpsMessageIds;
       await matchRef.update(startUpdateData);
 
@@ -757,6 +854,7 @@ export async function POST(req: NextRequest) {
         action: "start",
         team1VcId,
         team2VcId,
+        ...(launchCmdId ? { dotaLaunchCmdId: launchCmdId } : {}),
       });
 
 
