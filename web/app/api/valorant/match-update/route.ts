@@ -435,6 +435,27 @@ export async function POST(req: NextRequest) {
 
         const players = await buildDotaQueuePlayers(tournamentRef, matchData);
         const withSteam = players.filter(p => p.steam32Id).length;
+
+        // Create a waiting-room VC for Dota tournament matches, same UX as
+        // Valorant Set-Lobby. Players gather here while the bot creates the
+        // Dota lobby + sends Steam invites; on "Start Match" we move them to
+        // team-named VCs and delete this waiting room.
+        if (notifyDiscord && botToken && guildId) {
+          try {
+            const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
+            const allDiscordIds = [...team1Players, ...team2Players].map(p => p.discordId).filter(Boolean);
+            const wrName = `🎮 ${matchData.team1Name} vs ${matchData.team2Name}`;
+            const wrId = await maybeCreateVoice(guildId, wrName, voiceCategoryId, allDiscordIds);
+            if (wrId) {
+              updateData.waitingRoomVcId = wrId;
+              for (const did of allDiscordIds) {
+                await maybeMoveToVoice(guildId, did, wrId);
+              }
+            }
+          } catch (e: any) {
+            console.error("[Dota set-lobby] waiting-room VC create failed:", e?.message || e);
+          }
+        }
         // Route the bot's lobby embed / announcements to this tournament's
         // private Discord channel (created per-tournament) instead of the
         // global queue channel. Falls back to bot env channels if unset.
@@ -622,25 +643,12 @@ export async function POST(req: NextRequest) {
       let team1VcId: string | null = null;
       let team2VcId: string | null = null;
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // DOTA 2 → the bot already owns the entire match lifecycle:
-      //   set-lobby → bot creates Dota lobby + invites
-      //   lobbyUpdate → bot creates 🟢 Radiant / 🔴 Dire VCs and moves players
-      //   match launch happens INSIDE the Dota client (host clicks "Start
-      //   Game" in the lobby UI) — there is no web-side trigger for that.
-      // So this admin-panel "Start Match" action is a no-op for Dota apart
-      // from flipping the doc status to live. Creating team-named VCs here
-      // (the Valorant flow below) would duplicate the bot's Radiant/Dire
-      // VCs and confuse players. Bail before VC creation.
-      // ═══════════════════════════════════════════════════════════════════════
-      if (isDotaTournament) {
-        await matchRef.update(startUpdateData);
-        return NextResponse.json({
-          ok: true,
-          mode: "bot-lobby",
-          message: "Match status set to live. The Dota match itself launches when the lobby host clicks Start Game inside Dota — the bot already created Radiant/Dire VCs and moved players when teams were picked.",
-        });
-      }
+      // DOTA 2 NOTE: web creates the team-named VCs (🔴 {team1}, 🔵 {team2})
+      // here on Start Match, same flow as Valorant. The bot used to also
+      // create generic "🟢 Radiant" / "🔴 Dire" VCs in pollFirestoreForTeams
+      // when it saw both teams populated in the lobby SO, which produced
+      // duplicates. The bot side now skips VC creation for tournament queues
+      // (queues with tournamentId set) so only web's team-named VCs exist.
 
       if (botToken && guildId) {
         try {

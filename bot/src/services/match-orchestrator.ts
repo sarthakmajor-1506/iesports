@@ -350,7 +350,17 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   }
 
   // ── Step 7: Poll Firestore for teams, then move to VCs ───────
-  pollFirestoreForTeams(client, firestoreLobbyId, allPlayers);
+  // For tournament queues, the web admin panel creates team-named VCs
+  // (🔴 {team1Name}, 🔵 {team2Name}) on the Start Match action via the
+  // /api/valorant/match-update endpoint. Skip the bot's generic
+  // Radiant/Dire VC creation to avoid duplicates. For non-tournament
+  // daily-match queues, keep the existing bot-managed flow.
+  const isTournamentQueue = !!(queue as any).tournamentId;
+  if (!isTournamentQueue) {
+    pollFirestoreForTeams(client, firestoreLobbyId, allPlayers);
+  } else {
+    console.log(`[Match] tournament queue (${(queue as any).tournamentId}) — skipping bot VC creation; web handles team-named VCs.`);
+  }
 
   await saveDailyRecord(todayKey(), {
     date: todayKey(), queueId: queue.id, lobbyId: firestoreLobbyId,
