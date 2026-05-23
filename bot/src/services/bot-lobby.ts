@@ -189,8 +189,12 @@ let processing = false;
 
 /** Wire into index.ts after the bot is up. Low-latency via onSnapshot. */
 export function startBotLobbyControl(db: Firestore): void {
-  // Live-state heartbeat so the panel always shows fresh members/GC status.
-  setInterval(() => { publishLobbyState(db).catch(() => {}); }, 5000);
+  // Live-state heartbeat so the admin panel sees fresh GC status + members.
+  // Reduced from 5s → 1.5s so ambient updates (players joining the lobby,
+  // hero picks, lobbyState transitions to POSTGAME) reach the panel quickly.
+  // Command-triggered updates already publish immediately after runCommand,
+  // so this interval only matters for state Valve pushes us out-of-band.
+  setInterval(() => { publishLobbyState(db).catch(() => {}); }, 1500);
   publishLobbyState(db, { status: cfg.status }).catch(() => {});
 
   db.collection("botLobbyCommands").where("status", "==", "pending")

@@ -13,6 +13,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { db } from "@/lib/firebase";
+import { doc, collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 
 interface Member { steam32: string; name: string; team: number; teamLabel: string }
 interface LobbyState {
@@ -59,8 +61,6 @@ export default function BotLobbyTab({ adminKey }: { adminKey: string }) {
   const [region, setRegion] = useState("India");
   const [gameMode, setGameMode] = useState("CM");
   const [inviteIds, setInviteIds] = useState("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const api = useCallback(async (action: string, params?: any) => {
     const res = await fetch("/api/admin/bot-lobby", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -71,6 +71,7 @@ export default function BotLobbyTab({ adminKey }: { adminKey: string }) {
     return j;
   }, [adminKey]);
 
+  // Manual refresh button (rarely needed now that state arrives via onSnapshot).
   const refresh = useCallback(async () => {
     try {
       const j = await api("state");
@@ -80,20 +81,30 @@ export default function BotLobbyTab({ adminKey }: { adminKey: string }) {
     finally { setLoaded(true); }
   }, [api]);
 
+  // Real-time Firestore listeners — replace the 3s poll. Updates push from the
+  // bot's heartbeat (every 1.5s) AND immediately after every command.
   useEffect(() => {
     if (!adminKey) return;
-    refresh();
-    pollRef.current = setInterval(refresh, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [adminKey, refresh]);
+    const unsubState = onSnapshot(doc(db, "botLobbyControl", "state"), (snap) => {
+      if (snap.exists()) setState(snap.data() as LobbyState);
+      setLoaded(true);
+    }, (err) => { setMsg(`state listen err: ${err.message}`); setLoaded(true); });
+    const unsubCmds = onSnapshot(
+      query(collection(db, "botLobbyCommands"), orderBy("createdAt", "desc"), limit(8)),
+      (snap) => {
+        setCmds(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as CmdLog[]);
+      },
+      (err) => { setMsg(`cmds listen err: ${err.message}`); }
+    );
+    return () => { unsubState(); unsubCmds(); };
+  }, [adminKey]);
 
   const cmd = async (action: string, params?: any, confirmMsg?: string) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
-    setBusy(action); setMsg("");
+    setBusy(action); setMsg(`⏳ ${action}…`);
     try {
       const j = await api(action, params);
-      setMsg(`✓ ${action} queued${j.commandId ? ` (${j.commandId.slice(0, 6)})` : ""}`);
-      setTimeout(refresh, 600);
+      setMsg(`✓ ${action} sent${j.commandId ? ` (${j.commandId.slice(0, 6)})` : ""} — bot picking up…`);
     } catch (e: any) { setMsg(`✗ ${action}: ${e.message}`); }
     finally { setBusy(null); }
   };

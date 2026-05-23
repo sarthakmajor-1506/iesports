@@ -442,23 +442,22 @@ export default function AdminPanel() {
   const [dotaJobError, setDotaJobError] = useState<string | null>(null);
   const [dotaForcedMatchId, setDotaForcedMatchId] = useState("");
 
-  // Poll dotaResultJobs doc until done/error
+  // Real-time listener on the dotaResultJobs doc — bot writes status updates
+  // through it as it processes. Updates push within ~500ms of the bot writing.
   useEffect(() => {
-    if (!dotaJobId || !adminKey) return;
+    if (!dotaJobId) return;
     if (dotaJobStatus === "done" || dotaJobStatus === "error") return;
-    const iv = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/admin/dota-result-job?jobId=${encodeURIComponent(dotaJobId)}&adminKey=${encodeURIComponent(adminKey)}`);
-        const d = await res.json();
-        if (!d.ok) return;
-        setDotaJobStatus(d.status);
-        if (d.report) setDotaJobReport(d.report);
-        if (d.logs?.length) setDotaJobLogs(d.logs);
-        if (d.error) setDotaJobError(d.error);
-      } catch {}
-    }, 5000);
-    return () => clearInterval(iv);
-  }, [dotaJobId, dotaJobStatus, adminKey]);
+    const ref = doc(db, "dotaResultJobs", dotaJobId);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const d: any = snap.data();
+      setDotaJobStatus(d.status);
+      if (d.report) setDotaJobReport(d.report);
+      if (Array.isArray(d.logs)) setDotaJobLogs(d.logs.slice(-50));
+      if (d.error) setDotaJobError(d.error);
+    }, () => {});
+    return () => unsub();
+  }, [dotaJobId, dotaJobStatus]);
 
   // ─── Delete Game Data ───────────────────────────────────────────────────────
   const [deleteGameMatchId, setDeleteGameMatchId] = useState("");
