@@ -622,6 +622,26 @@ export async function POST(req: NextRequest) {
       let team1VcId: string | null = null;
       let team2VcId: string | null = null;
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // DOTA 2 → the bot already owns the entire match lifecycle:
+      //   set-lobby → bot creates Dota lobby + invites
+      //   lobbyUpdate → bot creates 🟢 Radiant / 🔴 Dire VCs and moves players
+      //   match launch happens INSIDE the Dota client (host clicks "Start
+      //   Game" in the lobby UI) — there is no web-side trigger for that.
+      // So this admin-panel "Start Match" action is a no-op for Dota apart
+      // from flipping the doc status to live. Creating team-named VCs here
+      // (the Valorant flow below) would duplicate the bot's Radiant/Dire
+      // VCs and confuse players. Bail before VC creation.
+      // ═══════════════════════════════════════════════════════════════════════
+      if (isDotaTournament) {
+        await matchRef.update(startUpdateData);
+        return NextResponse.json({
+          ok: true,
+          mode: "bot-lobby",
+          message: "Match status set to live. The Dota match itself launches when the lobby host clicks Start Game inside Dota — the bot already created Radiant/Dire VCs and moved players when teams were picked.",
+        });
+      }
+
       if (botToken && guildId) {
         try {
           // ── Fetch team discord data ──────────────────────────────────────
