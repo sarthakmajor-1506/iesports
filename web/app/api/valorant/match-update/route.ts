@@ -495,7 +495,7 @@ export async function POST(req: NextRequest) {
                     `If you don't get the Steam invite within 2 min, open Dota 2 → Play → Custom Lobbies and search for the lobby name the bot posts here next.`,
                   ].join("\n"),
                   color: 0xf05a28,
-                  footer: { text: "IEsports Tournament" },
+                  footer: { text: "iesports Tournament" },
                   timestamp: new Date().toISOString(),
                 }],
               });
@@ -627,7 +627,7 @@ export async function POST(req: NextRequest) {
                 `Please join the custom game lobby in Valorant.${vcLine}`,
               ].join("\n"),
               color: 0xff4655,
-              footer: { text: "IEsports Tournament" },
+              footer: { text: "iesports Tournament" },
               timestamp: new Date().toISOString(),
             }],
           };
@@ -809,7 +809,7 @@ export async function POST(req: NextRequest) {
                   `Get into your voice channels and good luck! 🎯`,
                 ].join("\n"),
                 color: 0x16a34a,
-                footer: { text: "IEsports Tournament" },
+                footer: { text: "iesports Tournament" },
                 timestamp: new Date().toISOString(),
               }],
             });
@@ -993,7 +993,7 @@ export async function POST(req: NextRequest) {
                 vcLines,
               ].join("\n"),
               color: 0x3CCBFF,
-              footer: { text: "IEsports Tournament" },
+              footer: { text: "iesports Tournament" },
               timestamp: new Date().toISOString(),
             }],
           };

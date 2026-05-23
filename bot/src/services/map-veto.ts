@@ -261,7 +261,7 @@ function buildSidePickEmbed(state: VetoState): EmbedBuilder {
     .setTitle(title)
     .setDescription(desc)
     .setColor(0xff4655)
-    .setFooter({ text: current ? `Any player on ${tName(state, current.sidePicker)} can click` : `BO${state.bo} · IEsports Tournament` });
+    .setFooter({ text: current ? `Any player on ${tName(state, current.sidePicker)} can click` : `BO${state.bo} · iesports Tournament` });
 }
 
 function buildSidePickRow(
@@ -343,7 +343,7 @@ function buildVetoEmbed(state: VetoState): EmbedBuilder {
       .setTitle(`✅ Veto complete — ready to start`)
       .setDescription([matchLine, "", mapLines.join("\n") + banStr].join("\n"))
       .setColor(0x16a34a)
-      .setFooter({ text: `BO${state.bo} · IEsports Tournament` });
+      .setFooter({ text: `BO${state.bo} · iesports Tournament` });
   }
 
   // ── In progress ──
@@ -564,7 +564,7 @@ function buildRandomEmbed(state: VetoState): EmbedBuilder {
     .setTitle(title)
     .setDescription(desc)
     .setColor(0x22c55e)
-    .setFooter({ text: remainingReveals > 0 ? `Any player on ${tName(state, actor)} can click` : `BO${state.bo} · IEsports Tournament` });
+    .setFooter({ text: remainingReveals > 0 ? `Any player on ${tName(state, actor)} can click` : `BO${state.bo} · iesports Tournament` });
 }
 
 function buildRandomRevealRow(

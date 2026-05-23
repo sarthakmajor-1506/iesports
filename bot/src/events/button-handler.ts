@@ -417,7 +417,7 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
     const lobby = await getLobby(lobbyId);
     await interaction.editReply(
       `⚠️ Bot is offline. Join manually:\n` +
-      `**Lobby:** \`${lobby?.lobbyName ?? "IEsports Lobby"}\`\n` +
+      `**Lobby:** \`${lobby?.lobbyName ?? "iesports Lobby"}\`\n` +
       `**Password:** \`${lobby?.password ?? "—"}\``
     );
     return;
@@ -456,7 +456,7 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
     await interaction.editReply(
       `⚠️ No active lobby yet — the bot hasn't created one.\n\n` +
       `**Join manually in Dota 2:**\n` +
-      `**Lobby:** \`${lobby?.lobbyName ?? "IEsports Lobby"}\`\n` +
+      `**Lobby:** \`${lobby?.lobbyName ?? "iesports Lobby"}\`\n` +
       `**Password:** \`${lobby?.password ?? "—"}\`\n` +
       `_Open Dota 2 → Play → Custom Lobbies → search the lobby name above_`
     );
@@ -470,7 +470,7 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
     `**If it doesn't appear in Dota 2:**\n` +
     `• Make sure Dota 2 is open\n` +
     `• Play → Custom Lobby → Browse Lobbies\n` +
-    `• Search: \`IEsports Lobby\``
+    `• Search: \`iesports Lobby\``
   );
 }
 

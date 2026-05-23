@@ -62,7 +62,7 @@ export function queueEmbed(q: QueueDoc): EmbedBuilder {
 
 export function lobbyEmbed(lobby: LobbyDoc): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setTitle("🏟️ IEsports Lobby")
+    .setTitle("🏟️ iesports Lobby")
     .setDescription("Lobby created successfully!")
     .setColor(Colors.Green);
 
@@ -135,7 +135,7 @@ export function lobbyControlEmbed(lobby: LobbyDoc | null): EmbedBuilder {
     embed.setDescription("No active lobby. Create a queue first, then the lobby will be auto-created.");
   }
 
-  embed.setFooter({ text: "IEsports Hub" });
+  embed.setFooter({ text: "iesports Hub" });
   return embed;
 }
 
@@ -198,7 +198,7 @@ export function matchResultEmbed(
 
 export function welcomeEmbed(): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle("Welcome to IEsports! 🎮")
+    .setTitle("Welcome to iesports! 🎮")
     .setColor(BRAND)
     .setDescription(
       `**Get started:**\n` +

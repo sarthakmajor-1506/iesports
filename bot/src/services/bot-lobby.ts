@@ -152,7 +152,7 @@ async function runCommand(db: Firestore, id: string, action: string, params: any
     if (!bot.isReady() && action !== "refresh") return { ok: false, error: "GC not ready (bot still connecting)" };
     switch (action) {
       case "create": {
-        const name = String(params?.name || "IEsports Lobby");
+        const name = String(params?.name || "iesports Lobby");
         const password = String(params?.password || "ies");
         const region = String(params?.region || "India");
         const gameMode = String(params?.gameMode || "AP");

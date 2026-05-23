@@ -200,7 +200,7 @@ export async function resolveDotaResults(db: Firestore, opts: ResolveOpts): Prom
       // Mirror the Discord result post to WhatsApp (best-effort).
       const loser = winner === "team1" ? d.md.team2Name : d.md.team1Name;
       const waText =
-        `🏆 *${d.md.tournamentName || "IEsports"} — Result*\n` +
+        `🏆 *${d.md.tournamentName || "iesports"} — Result*\n` +
         `${d.md.team1Name} 🆚 ${d.md.team2Name}\n` +
         `Winner: *${winnerName}* (def. ${loser})\n` +
         `Score: ${winner === "team1" ? 1 : 0}–${winner === "team2" ? 1 : 0}` +

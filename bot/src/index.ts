@@ -140,7 +140,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       const hasPanel = msgs.some((m) => m.author.id === readyClient.user.id && m.components.length > 0);
       if (!hasPanel) {
         await ch.send({
-          embeds: [{ title: "📋 Game Queues", description: "Admins can click **Create Queue** to start a new queue.\nQueues with join/leave buttons appear in #queue.", color: 0xf05a28, footer: { text: "IEsports Hub" } }],
+          embeds: [{ title: "📋 Game Queues", description: "Admins can click **Create Queue** to start a new queue.\nQueues with join/leave buttons appear in #queue.", color: 0xf05a28, footer: { text: "iesports Hub" } }],
           components: [createQueueButton()],
         });
         console.log("[Setup] Posted queue panel to #create-queue");

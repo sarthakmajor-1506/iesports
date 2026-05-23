@@ -88,7 +88,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     steam32Id: p.steam32Id, steamName: p.steamName,
   }));
 
-  const lobbyName = process.env.DEFAULT_LOBBY_NAME || "IEsports Lobby";
+  const lobbyName = process.env.DEFAULT_LOBBY_NAME || "iesports Lobby";
   const password = String(Math.floor(100 + Math.random() * 900));
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
@@ -326,7 +326,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
         ? `A Dota 2 invite has been sent to your Steam account.\nIf you don't see it, join manually:`
         : `Please join the lobby manually:`;
       await member.send(
-        `🎮 **IEsports Match Starting!**\n\n` +
+        `🎮 **iesports Match Starting!**\n\n` +
         `${modeMsg}\n` +
         `Lobby: \`${lobbyName}\`\nPassword: \`${password}\`\n` +
         `Server: ${region} | Mode: ${gameMode}\n\n` +
