@@ -2575,6 +2575,48 @@ export default function AdminPanel() {
                                 )}
                               </div>
                             )}
+
+                            {/* ── Manual Result fallback (when GC fetch denies practice lobbies) ─ */}
+                            <div style={{ marginTop: 14, padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #2a2a2e" }}>
+                              <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#fbbf24", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                MANUAL RESULT (FALLBACK)
+                              </div>
+                              <div style={{ fontSize: "0.58rem", color: "#888", marginBottom: 10 }}>
+                                Use when "Resolve via GC" fails (Valve blocks bot from fetching practice lobby details). Admin picks the winner; standings update the same.
+                              </div>
+                              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#16a34a44", border: "1px solid #16a34a88" }}
+                                  onClick={async () => {
+                                    if (!confirm(`Mark ${m.team1Name} as winner of this match?`)) return;
+                                    try {
+                                      const res = await fetch("/api/admin/dota-manual-result", {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ tournamentId, matchId: opsMatchId, winner: "team1", dotaMatchId: (m as any).dotaMatchId || null, adminKey }),
+                                      });
+                                      const d = await res.json();
+                                      if (d.ok) addLog(`✅ Manual result: ${d.winnerName} wins ${opsMatchId}`);
+                                      else addLog(`❌ ${d.error}`);
+                                    } catch (e: any) { addLog(`❌ ${e.message}`); }
+                                  }}>
+                                  🏆 {m.team1Name} wins
+                                </button>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#16a34a44", border: "1px solid #16a34a88" }}
+                                  onClick={async () => {
+                                    if (!confirm(`Mark ${m.team2Name} as winner of this match?`)) return;
+                                    try {
+                                      const res = await fetch("/api/admin/dota-manual-result", {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ tournamentId, matchId: opsMatchId, winner: "team2", dotaMatchId: (m as any).dotaMatchId || null, adminKey }),
+                                      });
+                                      const d = await res.json();
+                                      if (d.ok) addLog(`✅ Manual result: ${d.winnerName} wins ${opsMatchId}`);
+                                      else addLog(`❌ ${d.error}`);
+                                    } catch (e: any) { addLog(`❌ ${e.message}`); }
+                                  }}>
+                                  🏆 {m.team2Name} wins
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           /* Valorant / CS2 — existing fetch flow */
