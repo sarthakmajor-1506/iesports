@@ -65,6 +65,18 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
     team: m.team,
     teamLabel: TEAM_LABEL[m.team] ?? `team${m.team}`,
   }));
+
+  // Pull the bot's current view of the CSODOTALobby state + match_id.
+  // Exposing these on the heartbeat doc makes failures visible from
+  // Firestore (no Railway log access needed) and lets a separate sync
+  // loop write the matchId to the active tournament fixture even when
+  // the orchestrator's per-lobby listener didn't fire (e.g. after a
+  // mid-match Railway redeploy — the lobby is re-adopted but the in-
+  // process listener is gone).
+  const lobbyMatchId = (() => { try { return bot.getLobbyMatchId() || null; } catch { return null; } })();
+  const lobbyState = (() => { try { return bot.getLobbyState(); } catch { return -1; } })();
+  const lastLobbyFields = (() => { try { return (bot as any).lastLobbyFields || ""; } catch { return ""; } })();
+
   await db.collection("botLobbyControl").doc("state").set({
     status: cfg.status,
     gcReady: ready,
@@ -74,10 +86,45 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
     gameMode: cfg.gameMode,
     members,
     memberCount: members.length,
+    lobbyMatchId,
+    lobbyState,
+    lastLobbyFields,
     lastError: patch.lastError ?? null,
     lastCommand: patch.lastCommand ?? null,
     updatedAt: new Date().toISOString(),
   }, { merge: true });
+
+  // If the bot has captured a match_id, mirror it onto any in-flight
+  // tournament botQueue + the linked match doc. This makes capture
+  // resilient to process restarts: even if the orchestrator's onMatchId
+  // listener died with the previous process, this heartbeat path
+  // populates Firestore on the next tick. Idempotent — re-writing the
+  // same matchId is a no-op.
+  if (lobbyMatchId) {
+    try {
+      const qs = await db.collection("botQueues")
+        .where("status", "==", "in_progress")
+        .get();
+      for (const qd of qs.docs) {
+        const q = qd.data() as any;
+        if (q.dotaMatchId === lobbyMatchId) continue;  // already synced
+        const updates: any = { dotaMatchId: lobbyMatchId, dotaMatchIdCapturedAt: new Date().toISOString(), dotaMatchIdSource: "heartbeat-sync" };
+        await qd.ref.set(updates, { merge: true });
+        if (q.tournamentId && q.tournamentMatchId) {
+          const tColl = q.tournamentCollection || "tournaments";
+          const gNum = Number(q.tournamentGameNumber || 1);
+          const gameKey = `game${gNum}`;
+          await db.collection(tColl).doc(q.tournamentId).collection("matches").doc(q.tournamentMatchId).set({
+            dotaMatchId: lobbyMatchId,
+            [gameKey]: { dotaMatchId: lobbyMatchId, status: "in_progress" },
+            lobbyStatus: "match-running",
+          }, { merge: true });
+        }
+      }
+    } catch (e: any) {
+      console.error("[BotLobby] heartbeat-sync matchId failed:", e?.message || e);
+    }
+  }
 }
 
 async function runCommand(db: Firestore, id: string, action: string, params: any): Promise<{ ok: boolean; result?: any; error?: string }> {

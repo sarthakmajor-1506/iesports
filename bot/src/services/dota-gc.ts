@@ -344,6 +344,12 @@ class DotaBot extends EventEmitter {
               console.log(`[GC] 🎯 dotaMatchId captured from lobby state: ${lob.matchId} (was ${prev || "—"})`);
               this.emit("lobbyMatchId", lob.matchId);
             }
+            // Debug: capture the top-level proto fields of larger lobby
+            // payloads so we can verify field 60 is actually present (or
+            // discover what Valve renamed it to). Exposed via publishLobbyState.
+            if (payload.length > 100) {
+              this.lastLobbyFields = `msg=${msgType} len=${payload.length} fields=[${this.scanProtoFields(payload)}]`;
+            }
           } catch { /* not a lobby payload — that's fine */ }
         }
 
@@ -458,6 +464,10 @@ class DotaBot extends EventEmitter {
   }
 
   public lastMHDebug = { rawLen: 0, rawCount: 0, fields: "", err: "" };
+  // Most recent lobby-state payload's top-level field summary (for debug
+  // when match_id capture isn't firing as expected). Published via
+  // bot-lobby.publishLobbyState.
+  public lastLobbyFields = "";
 
   private handleMatchDetailsResponse(payload: Buffer): void {
     try {
