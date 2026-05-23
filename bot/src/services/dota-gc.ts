@@ -407,10 +407,15 @@ class DotaBot extends EventEmitter {
             if (lob) {
               if (lob.members.length > 0) {
                 this.updateLiveLobby(lob.members);
-                if (this.waitingForLobby) {
-                  console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via CSODOTALobby SO`);
-                  this.emit("lobbyCreated");
-                }
+              }
+              // Fire lobbyCreated as soon as ANY CSODOTALobby SO arrives while
+              // waiting. Previously this only fired when members.length > 0,
+              // but Valve creates the lobby with 0 members initially (the host
+              // is added a tick later) — so we'd time out 90s for nothing.
+              // The lobby is real the moment the SO appears.
+              if (lob && this.waitingForLobby) {
+                console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via CSODOTALobby SO (members=${lob.members.length}, state=${lob.state})`);
+                this.emit("lobbyCreated");
               }
               if (lob.state >= 0 && lob.state !== this.liveLobbyState) {
                 const prev = this.liveLobbyState;
