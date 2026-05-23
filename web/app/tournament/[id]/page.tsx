@@ -1913,62 +1913,115 @@ function DotaTournamentDetailInner() {
                     if (p.uid) playerBracketMap[p.uid] = p.dotaRankTier ? computeBracketLb(p.dotaRankTier) : (p.dotaBracket || "herald_guardian");
                     if (p.uid && p.steamAvatar) playerAvatarMap[p.uid] = p.steamAvatar;
                   });
-                  const kdaScore = (p: any) => ((p.totalKills || 0) + 0.2 * (p.totalAssists || 0)) / Math.max(1, p.totalDeaths || 1);
+                  // ── IMPACT SCORE ─────────────────────────────────────────
+                  // Role-fair MVP formula — picks the max of a carry-style
+                  // score (heavy on kills/damage/farm) and a support-style
+                  // score (heavy on assists/healing). Either archetype can
+                  // win MVP if they crush their role.
+                  //
+                  // Modelled after OpenDota's IMP and Stratz's per-role
+                  // scoring; we don't have ward/stack data so heal + assist
+                  // share carry the support weight. References:
+                  //   https://docs.opendota.com/#tag/players (player imp)
+                  //   https://stratz.com/api/v1/docs (per-role weights)
+                  const carryComponent = (p: any) => {
+                    const games = Math.max(1, p.games || 1);
+                    return (
+                      (p.totalKills || 0) / games * 5 +
+                      (p.totalHeroDamage || 0) / games / 1500 +
+                      (p.avgGPM || 0) / 60 +
+                      (p.totalTowerDamage || 0) / games / 800 -
+                      (p.totalDeaths || 0) / games * 2 +
+                      (p.wins || 0) / games * 15
+                    );
+                  };
+                  const supportComponent = (p: any) => {
+                    const games = Math.max(1, p.games || 1);
+                    return (
+                      (p.totalAssists || 0) / games * 3 +
+                      (p.totalHeroHealing || 0) / games / 500 +
+                      (p.totalKills || 0) / games * 2 +
+                      (p.wins || 0) / games * 15 -
+                      Math.max(0, (p.totalDeaths || 0) / games - 5) // deaths above 5 only
+                    );
+                  };
+                  const impactScore = (p: any) => Math.max(
+                    Math.round(carryComponent(p)),
+                    Math.round(supportComponent(p)),
+                  );
+                  const impactArchetype = (p: any) =>
+                    supportComponent(p) > carryComponent(p) ? "support" : "carry";
+                  const kdaRatio = (p: any) => {
+                    const k = p.totalKills || 0, a = p.totalAssists || 0, d = Math.max(1, p.totalDeaths || 1);
+                    return Math.round(((k + a) / d) * 100) / 100;
+                  };
                   const grouped: Record<string, any[]> = {};
                   leaderboard.forEach((p: any) => {
                     const bracket = playerBracketMap[p.uid || p.id] || "herald_guardian";
                     if (!grouped[bracket]) grouped[bracket] = [];
                     grouped[bracket].push(p);
                   });
-                  Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0)));
+                  // Sort each bracket by IMPACT score (was totalScore).
+                  Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => impactScore(b) - impactScore(a)));
                   const sortedBrackets = Object.keys(grouped).sort((a, b) => {
                     const order = ["herald_guardian", "crusader_archon", "legend_ancient", "divine_immortal"];
                     return order.indexOf(b) - order.indexOf(a);
                   });
-                  // Per-bracket MVP: highest KDA in each bracket
+                  // Per-bracket MVP: highest IMPACT score in each bracket
+                  // (ties broken by total kills, then total assists).
                   const bracketMvpMap: Record<string, string> = {};
                   const bracketMvpData: { bracket: string; player: any }[] = [];
                   for (const bracket of sortedBrackets) {
-                    const kdaSorted = [...grouped[bracket]].sort((a: any, b: any) => {
-                      const diff = kdaScore(b) - kdaScore(a);
-                      if (Math.abs(diff) > 0.01) return diff;
-                      return (b.totalKills || 0) - (a.totalKills || 0);
+                    const sorted = [...grouped[bracket]].sort((a: any, b: any) => {
+                      const diff = impactScore(b) - impactScore(a);
+                      if (diff !== 0) return diff;
+                      const kd = (b.totalKills || 0) - (a.totalKills || 0);
+                      if (kd !== 0) return kd;
+                      return (b.totalAssists || 0) - (a.totalAssists || 0);
                     });
-                    if (kdaSorted.length > 0) {
-                      bracketMvpMap[kdaSorted[0].id] = bracket;
-                      bracketMvpData.push({ bracket, player: kdaSorted[0] });
+                    if (sorted.length > 0) {
+                      bracketMvpMap[sorted[0].id] = bracket;
+                      bracketMvpData.push({ bracket, player: sorted[0] });
                     }
                   }
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                      {/* ── MVP Banner ── */}
+                      {/* ── MVP Banner ───────────────────────────────────── */}
                       <div style={{ padding: "16px 0" }}>
                         <div style={{ textAlign: "center", marginBottom: 16 }}>
                           <div style={{ fontSize: "1.4rem", marginBottom: 4 }}>{"\u{1F451}"}</div>
                           <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" as const, color: "#8A8880" }}>Bracket MVPs</span>
-                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>KDA = (K + 0.2 &times; A) / D</div>
+                          <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>Impact = best of carry (K + dmg + GPM) or support (A + heal) score</div>
                         </div>
                         <div className="dtd-tier-columns" style={{ justifyContent: "center" }}>
                           {bracketMvpData.map(({ bracket: bk, player: pl }) => {
                             const bColors = bracketColors[bk] || bracketColors.herald_guardian;
                             const avatar = playerAvatarMap[pl.uid] || "";
-                            const kda = kdaScore(pl);
+                            const impact = impactScore(pl);
+                            const archetype = impactArchetype(pl);
+                            const kda = kdaRatio(pl);
                             return (
-                              <div key={bk} className="dtd-tier-col" style={{ minWidth: 130, maxWidth: 180 }}>
+                              <div key={bk} className="dtd-tier-col" style={{ minWidth: 150, maxWidth: 200 }}>
                                 <div className="dtd-tier-header" style={{ background: bColors.bg, border: `1px solid ${bColors.border}`, color: bColors.text, justifyContent: "center" }}>
                                   <span>{bColors.label}</span>
                                 </div>
-                                <div onClick={() => pl.uid && router.push(`/player/${pl.uid}?tab=dota`)} style={{ cursor: pl.uid ? "pointer" : "default", padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                <div onClick={() => pl.uid && router.push(`/player/${pl.uid}?tab=dota`)} style={{ cursor: pl.uid ? "pointer" : "default", padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                                   {avatar ? (
-                                    <img src={avatar} alt={pl.steamName || pl.name} style={{ width: 48, height: 48, borderRadius: "50%", border: `2px solid ${bColors.border}` }} />
+                                    <img src={avatar} alt={pl.steamName || pl.name} style={{ width: 56, height: 56, borderRadius: "50%", border: `2px solid ${bColors.border}` }} />
                                   ) : (
-                                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: bColors.bg, border: `2px solid ${bColors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: bColors.text }}>{((pl.steamName || pl.name || "?")[0]).toUpperCase()}</div>
+                                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: bColors.bg, border: `2px solid ${bColors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20, color: bColors.text }}>{((pl.steamName || pl.name || "?")[0]).toUpperCase()}</div>
                                   )}
-                                  <div style={{ textAlign: "center" }}>
-                                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>{pl.steamName || pl.name}</div>
+                                  <div style={{ fontWeight: 700, fontSize: "0.85rem", textAlign: "center" }}>{pl.steamName || pl.name}</div>
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 100, background: bColors.bg, border: `1px solid ${bColors.border}` }}>
+                                    <span style={{ fontWeight: 900, fontSize: "1rem", color: bColors.text, lineHeight: 1 }}>{impact}</span>
+                                    <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.08em", color: bColors.text, opacity: 0.7 }}>IMPACT</span>
                                   </div>
-                                  <div style={{ fontWeight: 800, fontSize: "0.9rem", color: bColors.text }}>{Math.round(kda * 100) / 100} KDA</div>
-                                  <div style={{ fontSize: "0.65rem", color: "#555550" }}>{pl.totalKills || 0}K / {pl.totalDeaths || 0}D / {pl.totalAssists || 0}A</div>
+                                  <div style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: archetype === "support" ? "#3CCBFF" : "#fbbf24" }}>
+                                    {archetype === "support" ? "🛡 Support" : "⚔ Carry"}
+                                  </div>
+                                  <div style={{ fontSize: "0.62rem", color: "#888" }}>
+                                    {pl.totalKills || 0}K · {pl.totalDeaths || 0}D · {pl.totalAssists || 0}A · {kda} KDA
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -1979,56 +2032,110 @@ function DotaTournamentDetailInner() {
                       {sortedBrackets.map((bracket) => {
                         const colors = bracketColors[bracket] || bracketColors.herald_guardian;
                         const entries = grouped[bracket];
+                        // Grid columns: Rank | Player | Games | K/D/A | KDA | GPM | DMG | HEAL | IMPACT
+                        const gridCols = "44px minmax(180px, 1.6fr) 70px 110px 56px 56px 70px 70px 80px";
                         return (
                           <div key={bracket}>
                             <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text, fontWeight: 800, fontSize: "0.95rem", padding: "8px 14px", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
                               <span>{colors.label}</span>
                               <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: 8 }}>({entries.length})</span>
                             </div>
-                            <div style={{ overflowX: "auto" }}>
-                              <table className="dtd-standings-table">
-                                <thead><tr><th>Player</th><th title="Games · Wins-Losses">Games</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th style={{ color: "#3CCBFF" }}>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
-                                <tbody>{entries.map((p: any, i: number) => {
-                                  const isMvp = bracketMvpMap[p.id] === bracket;
-                                  const isMeRow = user?.uid === p.uid;
-                                  let rowBg: React.CSSProperties = {};
-                                  if (isMeRow) rowBg = { background: "rgba(60,203,255,0.08)", boxShadow: "inset 2px 0 0 #3CCBFF" };
-                                  else if (isMvp) rowBg = { background: colors.bg };
-
-                                  const playerCell = (
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                      {p.steamAvatar ? (
-                                        <img src={p.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${colors.border}`, flexShrink: 0 }} />
-                                      ) : (
-                                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: colors.bg, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: colors.text, flexShrink: 0 }}>{((p.steamName || p.name || "?")[0]).toUpperCase()}</div>
+                            <div style={{ overflowX: "auto", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, background: "rgba(0,0,0,0.15)" }}>
+                              {/* Column header */}
+                              <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", color: "#666", textTransform: "uppercase" as const, alignItems: "center", minWidth: 760 }}>
+                                <div>#</div>
+                                <div>Player</div>
+                                <div title="Games played · Wins-Losses">Games</div>
+                                <div style={{ textAlign: "center" as const }}>K · D · A</div>
+                                <div style={{ textAlign: "right" as const }} title="(K + A) / D">KDA</div>
+                                <div style={{ textAlign: "right" as const }}>GPM</div>
+                                <div style={{ textAlign: "right" as const }} title="Total hero damage">Dmg</div>
+                                <div style={{ textAlign: "right" as const }} title="Total healing">Heal</div>
+                                <div style={{ textAlign: "right" as const, color: colors.text }} title="Role-fair impact score">Impact</div>
+                              </div>
+                              {entries.map((p: any, i: number) => {
+                                const isMvp = bracketMvpMap[p.id] === bracket;
+                                const isMeRow = user?.uid === p.uid;
+                                const rowStyle: React.CSSProperties = {
+                                  display: "grid",
+                                  gridTemplateColumns: gridCols,
+                                  gap: 0,
+                                  padding: "12px 14px",
+                                  alignItems: "center",
+                                  borderBottom: i < entries.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                                  minWidth: 760,
+                                  ...(isMeRow ? { background: "rgba(60,203,255,0.08)", boxShadow: "inset 3px 0 0 #3CCBFF" } : {}),
+                                  ...(isMvp && !isMeRow ? { background: colors.bg, boxShadow: `inset 3px 0 0 ${colors.text}` } : {}),
+                                };
+                                const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(Math.round(n));
+                                const dmg = p.totalHeroDamage || 0;
+                                const heal = p.totalHeroHealing || 0;
+                                const impact = impactScore(p);
+                                const kda = kdaRatio(p);
+                                const archetype = impactArchetype(p);
+                                const playerCell = (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                                    {p.steamAvatar ? (
+                                      <img src={p.steamAvatar} alt="" style={{ width: 32, height: 32, borderRadius: "50%", border: `1px solid ${colors.border}`, flexShrink: 0 }} />
+                                    ) : (
+                                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: colors.bg, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: colors.text, flexShrink: 0 }}>{((p.steamName || p.name || "?")[0]).toUpperCase()}</div>
+                                    )}
+                                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 2 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                        <span style={{ fontWeight: 700, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", fontSize: "0.86rem" }}>{p.steamName || p.name}</span>
+                                        {isMvp && <span style={{ flexShrink: 0, fontSize: "0.55rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: colors.text, color: "#0a0b0e", letterSpacing: "0.05em" }}>MVP</span>}
+                                        {isMeRow && <span style={{ flexShrink: 0, fontSize: "0.52rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "rgba(60,203,255,0.18)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}
+                                      </div>
+                                      {p.mostPlayedHero && (
+                                        <div style={{ fontSize: "0.62rem", color: "#666", whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                          <span style={{ color: archetype === "support" ? "#3CCBFF" : "#fbbf24" }}>{archetype === "support" ? "🛡" : "⚔"}</span> {p.mostPlayedHero}
+                                        </div>
                                       )}
-                                      <span style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{p.steamName || p.name}</span>
-                                      {isMvp && <span style={{ flexShrink: 0, fontSize: "0.58rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}`, letterSpacing: "0.05em" }}>MVP</span>}
-                                      {isMeRow && <span style={{ flexShrink: 0, fontSize: "0.55rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}
                                     </div>
-                                  );
-
-                                  const games = p.games || 0;
-                                  const wl = (p.wins ?? 0) + "-" + (p.losses ?? 0);
-                                  return (
-                                  <tr key={p.id} style={rowBg}>
-                                    <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}>{playerCell}</Link>) : playerCell}</td>
-                                    <td style={{ color: "#8A8880", fontSize: "0.78rem" }}>{games > 0 ? `${games}G ${wl}` : "—"}</td>
-                                    <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
-                                    <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
-                                    <td style={{ color: "#3CCBFF" }}>{p.totalAssists || 0}</td>
-                                    <td>{p.avgGPM || 0}</td>
-                                    <td>{p.avgXPM || 0}</td>
-                                    <td style={{ fontWeight: 800, color: colors.text }}>{p.totalScore || 0}</td>
-                                  </tr>);
-                                })}</tbody>
-                              </table>
+                                  </div>
+                                );
+                                const games = p.games || 0;
+                                const wl = (p.wins ?? 0) + "-" + (p.losses ?? 0);
+                                const row = (
+                                  <>
+                                    <div style={{ fontSize: "0.72rem", color: isMvp ? colors.text : "#666", fontWeight: isMvp ? 800 : 600 }}>{i + 1}</div>
+                                    {playerCell}
+                                    <div style={{ color: "#8A8880", fontSize: "0.72rem" }}>{games > 0 ? `${games}G · ${wl}` : "—"}</div>
+                                    <div style={{ textAlign: "center" as const, fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" as const }}>
+                                      <span style={{ color: "#4ade80", fontWeight: 700 }}>{p.totalKills || 0}</span>
+                                      <span style={{ color: "#444", margin: "0 4px" }}>/</span>
+                                      <span style={{ color: "#f87171", fontWeight: 700 }}>{p.totalDeaths || 0}</span>
+                                      <span style={{ color: "#444", margin: "0 4px" }}>/</span>
+                                      <span style={{ color: "#3CCBFF", fontWeight: 700 }}>{p.totalAssists || 0}</span>
+                                    </div>
+                                    <div style={{ textAlign: "right" as const, fontWeight: 700, color: "#e6e7ee", fontVariantNumeric: "tabular-nums" as const }}>{kda.toFixed(2)}</div>
+                                    <div style={{ textAlign: "right" as const, color: "#999", fontVariantNumeric: "tabular-nums" as const }}>{p.avgGPM || 0}</div>
+                                    <div style={{ textAlign: "right" as const, color: "#fbbf24", fontVariantNumeric: "tabular-nums" as const, fontSize: "0.84rem" }}>{fmtK(dmg)}</div>
+                                    <div style={{ textAlign: "right" as const, color: heal > 0 ? "#3CCBFF" : "#3a3a3a", fontVariantNumeric: "tabular-nums" as const, fontSize: "0.84rem" }}>{heal > 0 ? fmtK(heal) : "—"}</div>
+                                    <div style={{ textAlign: "right" as const, fontWeight: 900, color: colors.text, fontSize: "1rem", fontVariantNumeric: "tabular-nums" as const }}>{impact}</div>
+                                  </>
+                                );
+                                return p.uid ? (
+                                  <Link href={`/player/${p.uid}?tab=dota`} key={p.id} style={{ ...rowStyle, textDecoration: "none", color: "inherit" }}>{row}</Link>
+                                ) : (
+                                  <div key={p.id} style={rowStyle}>{row}</div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
                       })}
-                      <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#555550", lineHeight: 1.6, border: "1px solid rgba(255,255,255,0.05)" }}>
-                        <strong style={{ color: "#8A8880" }}>How MVP is determined:</strong> Each rank bracket has its own {"\u{1F451}"} MVP — the player with the highest KDA score: (K + 0.2 &times; A) / D.
+                      <div style={{ padding: "14px 18px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: "0.78rem", color: "#888", lineHeight: 1.7, border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div style={{ marginBottom: 6 }}>
+                          <strong style={{ color: "#e6e7ee" }}>{"\u{1F451}"} How MVP is determined:</strong> Each rank bracket's MVP is the player with the highest <strong style={{ color: "#fbbf24" }}>Impact score</strong> — calculated as the <em>better</em> of two role-aware tracks:
+                        </div>
+                        <div style={{ paddingLeft: 16, fontSize: "0.74rem", color: "#777" }}>
+                          <div><span style={{ color: "#fbbf24" }}>⚔ Carry track</span> — per-game kills × 5 + hero damage / 1500 + GPM / 60 + tower damage / 800 + win % × 15 − deaths × 2</div>
+                          <div><span style={{ color: "#3CCBFF" }}>🛡 Support track</span> — per-game assists × 3 + healing / 500 + kills × 2 + win % × 15 − (deaths above 5)</div>
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: "0.72rem", color: "#666" }}>
+                          Supports who heal/assist heavily can win MVP over carries who only farm — same approach as OpenDota's IMP and Stratz per-role scoring. Ward data isn't exposed by Valve for non-host queries, so healing + assist share carry the support weight here.
+                        </div>
                       </div>
                     </div>
                   );
