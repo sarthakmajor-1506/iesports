@@ -2616,6 +2616,50 @@ export default function AdminPanel() {
                                 </button>
                               </div>
                             </div>
+
+                            {/* ── Reset Match (soft / hard) ─────────────────────────── */}
+                            <div style={{ marginTop: 14, padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #2a2a2e" }}>
+                              <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                RESET MATCH
+                              </div>
+                              <div style={{ fontSize: "0.58rem", color: "#888", marginBottom: 10 }}>
+                                <strong>Soft</strong>: clears the admin doc (status, lobby creds) so you can re-fire Set Lobby & Notify. Bot lobby + VCs stay live — use when the bot is mid-game and you just want the admin view fresh.
+                                <br/>
+                                <strong>Hard</strong>: also destroys the bot's Dota lobby, wipes scores/result/VCs, deletes the queue. Use when you want to fully start the match over.
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#3b3b44", border: "1px solid #4a4a55" }}
+                                  onClick={async () => {
+                                    if (!confirm(`Soft-reset ${opsMatchId}? Admin status → pending. Bot lobby + VCs unchanged.`)) return;
+                                    try {
+                                      const r = await fetch("/api/admin/dota-match-reset", {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ tournamentId, matchId: opsMatchId, mode: "soft", adminKey }),
+                                      });
+                                      const d = await r.json();
+                                      if (d.ok) addLog(`✅ Soft reset: ${opsMatchId}`);
+                                      else addLog(`❌ ${d.error}`);
+                                    } catch (e: any) { addLog(`❌ ${e.message}`); }
+                                  }}>
+                                  ↻ Soft Reset
+                                </button>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#7f1d1d", border: "1px solid #b91c1c" }}
+                                  onClick={async () => {
+                                    if (!confirm(`HARD-reset ${opsMatchId}? This destroys the bot's active Dota lobby (everyone disconnected) AND wipes the match doc.`)) return;
+                                    try {
+                                      const r = await fetch("/api/admin/dota-match-reset", {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ tournamentId, matchId: opsMatchId, mode: "hard", adminKey }),
+                                      });
+                                      const d = await r.json();
+                                      if (d.ok) addLog(`💥 Hard reset: ${opsMatchId} (queue×${d.queueDeleted} deleted, destroy cmd ${d.destroyCmdId?.slice(0, 6) || "—"})`);
+                                      else addLog(`❌ ${d.error}`);
+                                    } catch (e: any) { addLog(`❌ ${e.message}`); }
+                                  }}>
+                                  💥 Hard Reset
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           /* Valorant / CS2 — existing fetch flow */
