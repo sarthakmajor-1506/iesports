@@ -36,7 +36,22 @@ function ensureApp(): App {
 
 const lazy = <T extends object>(get: () => T): T =>
   new Proxy({} as T, {
-    get(_t, prop) { return (get() as any)[prop]; },
+    // CRITICAL: bind methods to the real target. Without this, calling
+    // `adminDb.collection("...")` invokes the unbound method with `this`
+    // set to the Proxy, and the Firestore SDK's internal write to
+    // `this._settingsFrozen = true` throws "Cannot assign to read only
+    // property '_settingsFrozen'" — the Proxy has no `set` trap that
+    // forwards to the underlying instance.
+    get(_t, prop) {
+      const target = get();
+      const value = (target as any)[prop];
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+    // Forward direct property writes (Firestore SDK does these internally).
+    set(_t, prop, value) {
+      (get() as any)[prop] = value;
+      return true;
+    },
     has(_t, prop) { return prop in (get() as any); },
     ownKeys(_t) { return Reflect.ownKeys(get() as any); },
     getOwnPropertyDescriptor(_t, prop) {
