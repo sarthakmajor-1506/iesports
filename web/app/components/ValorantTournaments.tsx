@@ -11,11 +11,14 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 const DEDUP_MS = 30_000;
 
 export default function ValorantTournaments() {
-  const { registeredValorantTournaments: registeredIds, refreshUser, userProfile } = useAuth();
+  const { user, registeredValorantTournaments: registeredIds, refreshUser, userProfile } = useAuth();
   const router = useRouter();
   const lastRefreshRef = useRef(0);
 
-  const { data, isLoading } = useSWR("/api/tournaments/list?game=valorant", fetcher, {
+  const listUrl = user?.uid
+    ? `/api/tournaments/list?game=valorant&uid=${encodeURIComponent(user.uid)}`
+    : `/api/tournaments/list?game=valorant`;
+  const { data, isLoading } = useSWR(listUrl, fetcher, {
     revalidateOnFocus: true,
     dedupingInterval: DEDUP_MS,
   });

@@ -10,13 +10,16 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 const DEDUP_MS = 30_000;
 
 export default function CS2Tournaments() {
-  const { registeredCS2Tournaments: registeredIds, refreshUser } = useAuth() as any;
+  const { user, registeredCS2Tournaments: registeredIds, refreshUser } = useAuth() as any;
   const router = useRouter();
   const lastRefreshRef = useRef(0);
 
   const registeredSet: Set<string> = registeredIds instanceof Set ? registeredIds : new Set(Array.isArray(registeredIds) ? registeredIds : []);
 
-  const { data, isLoading } = useSWR("/api/tournaments/list?game=cs2", fetcher, {
+  const listUrl = user?.uid
+    ? `/api/tournaments/list?game=cs2&uid=${encodeURIComponent(user.uid)}`
+    : `/api/tournaments/list?game=cs2`;
+  const { data, isLoading } = useSWR(listUrl, fetcher, {
     revalidateOnFocus: true,
     dedupingInterval: DEDUP_MS,
   });

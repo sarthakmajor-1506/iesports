@@ -11,11 +11,16 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 const DEDUP_MS = 30_000;
 
 export default function DotaTournaments() {
-  const { registeredTournaments: registeredIds, refreshUser } = useAuth();
+  const { user, registeredTournaments: registeredIds, refreshUser } = useAuth();
   const router = useRouter();
   const lastRefreshRef = useRef(0);
 
-  const { data, isLoading } = useSWR("/api/tournaments/list?game=dota2", fetcher, {
+  // Pass uid so test tournaments whitelisted to a tiny set of users
+  // (e.g. internal Dota dry-runs) can still surface for those users only.
+  const listUrl = user?.uid
+    ? `/api/tournaments/list?game=dota2&uid=${encodeURIComponent(user.uid)}`
+    : `/api/tournaments/list?game=dota2`;
+  const { data, isLoading } = useSWR(listUrl, fetcher, {
     revalidateOnFocus: true,
     dedupingInterval: DEDUP_MS,
   });

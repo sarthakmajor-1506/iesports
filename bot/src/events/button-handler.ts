@@ -446,6 +446,23 @@ async function handleInviteMe(interaction: ButtonInteraction, lobbyId: string): 
   }
 
   console.log(`${tag} steam64=${webUser.steamId} → steam32=${steam32}`);
+
+  // Guard: only invite if the bot actually has an active lobby.
+  // Sending a GC invite without a live lobby puts the player in a broken
+  // Dota 2 state ("Back to Lobby" for ~10 min with no lobby to join).
+  const lobbyState = bot.getLobbyState();
+  if (lobbyState < 0) {
+    const lobby = await getLobby(lobbyId);
+    await interaction.editReply(
+      `⚠️ No active lobby yet — the bot hasn't created one.\n\n` +
+      `**Join manually in Dota 2:**\n` +
+      `**Lobby:** \`${lobby?.lobbyName ?? "IEsports Lobby"}\`\n` +
+      `**Password:** \`${lobby?.password ?? "—"}\`\n` +
+      `_Open Dota 2 → Play → Custom Lobbies → search the lobby name above_`
+    );
+    return;
+  }
+
   bot.invitePlayer(steam32);
 
   await interaction.editReply(

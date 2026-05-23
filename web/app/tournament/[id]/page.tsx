@@ -147,13 +147,20 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           </span>
           <span className="dtd-mc-index-fmt" style={isBracket ? { background: "rgba(245,158,11,0.12)", color: bracketAccent } : {}}>BO{bestOf}</span>
         </div>
-        <div className="dtd-mc-team">
+        <div className="dtd-mc-team" style={
+          // Win/loss gradient stripe across the team's half of the card.
+          // Anchored at the outer edge (away from center) so the colour reads
+          // as "this side won/lost" at a glance. Subtle alpha values keep the
+          // team-name + roster text legible on top.
+          t1Win ? { background: "linear-gradient(90deg, rgba(74,222,128,0.22) 0%, rgba(74,222,128,0.02) 100%)" } :
+          t2Win ? { background: "linear-gradient(90deg, rgba(239,68,68,0.22) 0%, rgba(239,68,68,0.02) 100%)" } : {}
+        }>
           <div className="dtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
             {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" /> : getTeamInitials(m.team1Name)}
           </div>
           <div className="dtd-mc-team-info">
             <div className="dtd-mc-team-tag" style={isBracket ? { color: bracketAccent } : {}}>{isBracket ? m.bracketLabel : getTeamTag(m.team1Name)}</div>
-            <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#555550" } : {}}>{m.team1Name}</div>
+            <div className="dtd-mc-team-name" style={t1Win ? { color: "#4ade80" } : t2Win ? { color: "#9a8a8a" } : {}}>{m.team1Name}</div>
             <div className="dtd-mc-roster">
               {[...t1Members].sort((a: any, b: any) => {
                 const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
@@ -210,13 +217,18 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           )}
           {(isComplete || isLive) && scheduledDay && <div style={{ fontSize: "0.6rem", color: "#555550", marginTop: 2 }}>{scheduledDay} · {scheduledTime}</div>}
         </div>
-        <div className="dtd-mc-team right">
+        <div className="dtd-mc-team right" style={
+          // Mirrored gradient — anchored at the outer (right) edge so the
+          // colour fades inward toward the score area.
+          t2Win ? { background: "linear-gradient(270deg, rgba(74,222,128,0.22) 0%, rgba(74,222,128,0.02) 100%)" } :
+          t1Win ? { background: "linear-gradient(270deg, rgba(239,68,68,0.22) 0%, rgba(239,68,68,0.02) 100%)" } : {}
+        }>
           <div className="dtd-mc-team-logo" style={isBracket ? { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" } : {}}>
             {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" /> : getTeamInitials(m.team2Name)}
           </div>
           <div className="dtd-mc-team-info" style={{ textAlign: "right" }}>
             <div className="dtd-mc-team-tag">{getTeamTag(m.team2Name)}</div>
-            <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#555550" } : {}}>{m.team2Name}</div>
+            <div className="dtd-mc-team-name" style={t2Win ? { color: "#4ade80" } : t1Win ? { color: "#9a8a8a" } : {}}>{m.team2Name}</div>
             <div className="dtd-mc-roster">
               {[...t2Members].sort((a: any, b: any) => {
                 const ai = DOTA_ROLES.findIndex(r => r.slug === a.assignedRole);
@@ -368,10 +380,155 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
           {isComplete ? (
             <div style={{ textAlign: "center", padding: "10px 0 0", color: "#4ade80", fontSize: "0.75rem", fontWeight: 700 }}>
               {t1Win ? m.team1Name : t2Win ? m.team2Name : "Draw"} {t1Win || t2Win ? "wins" : ""} {m.team1Score} - {m.team2Score}
+              {m.game1?.radiantScore != null && m.game1?.direScore != null && (
+                <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>
+                  · Radiant {m.game1.radiantScore} – {m.game1.direScore} Dire
+                </span>
+              )}
+              {m.durationSec ? <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>· {Math.floor(m.durationSec/60)}:{String(m.durationSec%60).padStart(2,"0")}</span> : null}
+              {m.gameMode ? <span style={{ color: "#8A8880", fontWeight: 600, marginLeft: 6 }}>· {m.gameMode.replace(/_/g, " ")}</span> : null}
             </div>
           ) : (
             <div style={{ textAlign: "center", padding: "10px 0 0", color: "#555550", fontSize: "0.72rem" }}>Match hasn&apos;t been played yet</div>
           )}
+
+          {/* Per-player Dota stats grid (only when we have game1.playerStats) */}
+          {isComplete && Array.isArray(m.game1?.playerStats) && m.game1.playerStats.length > 0 && (() => {
+            const ps: any[] = m.game1.playerStats;
+            const radiant = ps.filter((p: any) => p.side === "radiant");
+            const dire = ps.filter((p: any) => p.side === "dire");
+            const radWon = m.game1.winner === "radiant";
+
+            // ── MATCH MVP: same impact formula as the detail page so they agree ──
+            const mvpScore = (p: any) => {
+              const won = p.side === m.game1.winner;
+              return (p.kills || 0) * 4 + (p.assists || 0) * 1.5 - (p.deaths || 0) * 2 +
+                (p.gpm || 0) / 100 + (p.heroDamage || 0) / 2500 + (p.towerDamage || 0) / 2500 +
+                (p.heroHealing || 0) / 3000 + (won ? 30 : 0) + ((p.kills || 0) >= 15 ? 25 : 0);
+            };
+            const mvp = [...ps].sort((a, b) => mvpScore(b) - mvpScore(a))[0];
+            const mvpKda = mvp ? (mvp.kills + 0.2 * mvp.assists) / Math.max(1, mvp.deaths || 1) : 0;
+            const mvpIsRadiant = mvp?.side === "radiant";
+            // 2nd place: highest hero damage among non-MVP players on the WINNER side
+            const secondPool = ps.filter((p: any) => p.side === m.game1.winner && p !== mvp);
+            const second = secondPool.sort((a, b) => (b.heroDamage || 0) - (a.heroDamage || 0))[0];
+            const renderRow = (p: any, idx: number) => (
+              <div key={(p.uid || p.name) + idx} className="dtd-mc-stat-row">
+                <div className="dtd-mc-stat-name" title={p.name}>
+                  <span className="dtd-mc-stat-hero">{p.hero || "?"}</span>
+                  <span className="dtd-mc-stat-player">{p.steamName || p.name}</span>
+                </div>
+                <div className="dtd-mc-stat-kda">
+                  <span style={{ color: "#4ade80" }}>{p.kills}</span>
+                  <span style={{ color: "#555550" }}> / </span>
+                  <span style={{ color: "#ef4444" }}>{p.deaths}</span>
+                  <span style={{ color: "#555550" }}> / </span>
+                  <span style={{ color: "#3CCBFF" }}>{p.assists}</span>
+                </div>
+                <div className="dtd-mc-stat-num">{p.gpm || 0}</div>
+                <div className="dtd-mc-stat-num">{p.xpm || 0}</div>
+                <div className="dtd-mc-stat-num">{(p.lastHits || 0)}/{p.denies || 0}</div>
+                <div className="dtd-mc-stat-num gold">{(p.netWorth || 0).toLocaleString()}</div>
+              </div>
+            );
+            const tableHeader = (
+              <div className="dtd-mc-stat-row dtd-mc-stat-head">
+                <div className="dtd-mc-stat-name">Hero · Player</div>
+                <div className="dtd-mc-stat-kda">K / D / A</div>
+                <div className="dtd-mc-stat-num">GPM</div>
+                <div className="dtd-mc-stat-num">XPM</div>
+                <div className="dtd-mc-stat-num">LH/DN</div>
+                <div className="dtd-mc-stat-num">Net Worth</div>
+              </div>
+            );
+            return (
+              <div style={{ marginTop: 16, position: "relative" }}>
+                {/* ── MATCH MVP showcase (clickable → detail page, mirrors Valorant GameDetailCard) ── */}
+                {mvp && (
+                  <Link
+                    href={`/tournament/${tournamentId}/match/${m.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="dtd-mc-mvp-link"
+                  >
+                    <div className="dtd-mc-mvp-card" style={{
+                      borderColor: mvpIsRadiant ? "rgba(74,222,128,0.30)" : "rgba(239,68,68,0.30)",
+                      background: mvpIsRadiant
+                        ? "linear-gradient(135deg, rgba(74,222,128,0.08) 0%, rgba(251,191,36,0.06) 60%, rgba(255,255,255,0.02) 100%)"
+                        : "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(251,191,36,0.06) 60%, rgba(255,255,255,0.02) 100%)",
+                    }}>
+                      {/* gold halo */}
+                      <div style={{ position: "absolute", top: "30%", left: "50%", width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+                      <div className="dtd-mc-mvp-row">
+                        <div style={{ fontSize: "1.6rem", flexShrink: 0, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.6))" }}>👑</div>
+                        <div className="dtd-mc-mvp-avatar" style={{ borderColor: mvpIsRadiant ? "rgba(74,222,128,0.5)" : "rgba(239,68,68,0.5)" }}>
+                          {(mvp.steamName || mvp.name || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="dtd-mc-mvp-name-block">
+                          <div className="dtd-mc-mvp-label">MATCH MVP</div>
+                          <div className="dtd-mc-mvp-name">{mvp.steamName || mvp.name}</div>
+                          <div className="dtd-mc-mvp-meta" style={{ color: mvpIsRadiant ? "#4ade80" : "#ef4444" }}>
+                            {mvp.hero || "—"} · {mvpIsRadiant ? "Radiant" : "Dire"}{mvp.side === m.game1.winner ? " · WIN" : ""}
+                          </div>
+                        </div>
+                        <div className="dtd-mc-mvp-stats">
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#4ade80" }}>{mvp.kills}</span><span className="dtd-mc-mvp-stat-lbl">K</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#ef4444" }}>{mvp.deaths}</span><span className="dtd-mc-mvp-stat-lbl">D</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#3CCBFF" }}>{mvp.assists}</span><span className="dtd-mc-mvp-stat-lbl">A</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#fbbf24" }}>{mvpKda.toFixed(2)}</span><span className="dtd-mc-mvp-stat-lbl">KDA</span></div>
+                          <div><span className="dtd-mc-mvp-stat-val" style={{ color: "#fbbf24" }}>{(mvp.netWorth || 0).toLocaleString()}</span><span className="dtd-mc-mvp-stat-lbl">Net</span></div>
+                        </div>
+                        <div className="dtd-mc-mvp-cta">View Match →</div>
+                      </div>
+                      {second && (
+                        <div className="dtd-mc-mvp-second">
+                          <span style={{ color: "#8A8880", fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em" }}>2ND MENTION</span>
+                          <span style={{ color: "#E6E6E6", fontWeight: 700 }}>{second.steamName || second.name}</span>
+                          <span style={{ color: second.side === "radiant" ? "#4ade80" : "#ef4444", fontSize: "0.7rem", fontWeight: 700 }}>{second.hero}</span>
+                          <span style={{ color: "#8A8880", fontSize: "0.7rem" }}>{second.kills}/{second.deaths}/{second.assists}</span>
+                          <span style={{ color: "#fbbf24", fontSize: "0.7rem", fontWeight: 700, marginLeft: "auto" }}>{(second.heroDamage || 0).toLocaleString()} hero dmg</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                )}
+                {/* Radiant block */}
+                <div className="dtd-mc-stat-side" style={{
+                  background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.06), rgba(74,222,128,0.01))" : "rgba(255,255,255,0.02)",
+                  borderLeft: `2px solid ${radWon ? "#4ade80" : "rgba(74,222,128,0.4)"}`,
+                  marginBottom: 8,
+                }}>
+                  <div className="dtd-mc-stat-side-label" style={{ color: "#4ade80" }}>
+                    Radiant {radWon && <span style={{ marginLeft: 6, fontSize: "0.6rem", color: "#fbbf24" }}>👑 WIN</span>}
+                    <span style={{ color: "#8A8880", marginLeft: 8, fontSize: "0.62rem" }}>· {m.game1.radiantScore} kills</span>
+                  </div>
+                  {tableHeader}
+                  {radiant.map(renderRow)}
+                </div>
+                {/* Dire block */}
+                <div className="dtd-mc-stat-side" style={{
+                  background: !radWon ? "linear-gradient(90deg, rgba(239,68,68,0.06), rgba(239,68,68,0.01))" : "rgba(255,255,255,0.02)",
+                  borderLeft: `2px solid ${!radWon ? "#ef4444" : "rgba(239,68,68,0.4)"}`,
+                }}>
+                  <div className="dtd-mc-stat-side-label" style={{ color: "#ef4444" }}>
+                    Dire {!radWon && <span style={{ marginLeft: 6, fontSize: "0.6rem", color: "#fbbf24" }}>👑 WIN</span>}
+                    <span style={{ color: "#8A8880", marginLeft: 8, fontSize: "0.62rem" }}>· {m.game1.direScore} kills</span>
+                  </div>
+                  {tableHeader}
+                  {dire.map(renderRow)}
+                </div>
+                <div style={{ textAlign: "center", marginTop: 16, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
+                  <Link href={`/tournament/${tournamentId}/match/${m.id}`} className="dtd-mc-detail-btn">
+                    View Full Match Details →
+                  </Link>
+                  {m.dotaMatchId && (
+                    <a href={`https://stratz.com/matches/${m.dotaMatchId}`} target="_blank" rel="noopener" className="dtd-mc-stratz-btn">
+                      Open on Stratz · {m.dotaMatchId}
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         );
       })()}
@@ -953,9 +1110,15 @@ function DotaTournamentDetailInner() {
         /* Sticky header row + first column. border-separate so sticky borders
            render reliably; sticky cells use an opaque bg so scrolling content
            can't bleed through (row tints on the first column are sacrificed). */
-        .dtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; }
-        .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; }
+        .dtd-standings-table { width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+        .dtd-standings-table th { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #555550; padding: 10px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: #14141a; white-space: nowrap; }
+        .dtd-standings-table td { font-size: 0.88rem; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e0e0da; white-space: nowrap; }
+        /* Default: every column after the first is numeric → right-align. */
+        .dtd-standings-table th:not(:first-child),
+        .dtd-standings-table td:not(:first-child) { text-align: right; }
+        /* Standings modifier: col 2 is the team name → keep it left-aligned. */
+        .dtd-standings-table.dtd-freeze-team th:nth-child(2),
+        .dtd-standings-table.dtd-freeze-team td:nth-child(2) { text-align: left; }
         .dtd-standings-table tr:last-child td { border-bottom: none; }
         .dtd-standings-table tbody tr { transition: background 0.15s; }
         .dtd-standings-table tbody tr:hover { background: rgba(161,43,31,0.04); }
@@ -994,7 +1157,7 @@ function DotaTournamentDetailInner() {
         .dtd-mc-team-logo img { width: 100%; height: 100%; object-fit: cover; }
         .dtd-mc-team-info { flex: 1; min-width: 0; }
         .dtd-mc-team-tag { font-size: 0.64rem; font-weight: 800; color: #A12B1F; text-transform: uppercase; }
-        .dtd-mc-team-name { font-size: 0.85rem; font-weight: 700; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-team-name { font-size: 1.18rem; font-weight: 800; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.005em; line-height: 1.18; }
         /* Roster line under each match-card team name — 5 player names,
          * each coloured by their assigned position. */
         .dtd-mc-roster { font-size: 0.66rem; margin-top: 4px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
@@ -1015,6 +1178,54 @@ function DotaTournamentDetailInner() {
         .dtd-mc-score-box .dash { color: #555550; font-weight: 400; }
         .dtd-mc-status-badge { font-size: 0.58rem; font-weight: 800; padding: 2px 8px; border-radius: 100px; margin-top: 3px; }
         .dtd-mc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: dtd-pulse 1.5s ease-in-out infinite; }
+
+        /* ── Per-player Dota stats grid (expanded match card) ── */
+        .dtd-mc-stat-side { border-radius: 8px; padding: 10px 12px; position: relative; }
+        .dtd-mc-stat-side-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .dtd-mc-stat-row { display: grid; grid-template-columns: 1.6fr 1fr 0.55fr 0.55fr 0.65fr 0.85fr; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.72rem; color: #C8C6BC; }
+        .dtd-mc-stat-row:last-child { border-bottom: none; }
+        .dtd-mc-stat-row.dtd-mc-stat-head { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #555550; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; margin-bottom: 2px; }
+        .dtd-mc-stat-name { display: flex; flex-direction: column; min-width: 0; }
+        .dtd-mc-stat-hero { font-size: 0.66rem; font-weight: 800; color: #A12B1F; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-stat-player { font-size: 0.7rem; font-weight: 600; color: #E6E6E6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-stat-kda { font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+        .dtd-mc-stat-num { font-size: 0.72rem; font-weight: 700; color: #C8C6BC; text-align: right; font-variant-numeric: tabular-nums; }
+        .dtd-mc-stat-num.gold { color: #fbbf24; }
+        /* ── Match MVP showcase (inside expanded MatchCard, clickable) ── */
+        .dtd-mc-mvp-link { display: block; text-decoration: none; color: inherit; margin-bottom: 14px; }
+        .dtd-mc-mvp-card { position: relative; overflow: hidden; padding: 14px 18px; border-radius: 12px; border: 1px solid; transition: all 0.2s ease; cursor: pointer; }
+        .dtd-mc-mvp-link:hover .dtd-mc-mvp-card { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 24px rgba(251,191,36,0.18); border-color: rgba(251,191,36,0.55); }
+        .dtd-mc-mvp-link:hover .dtd-mc-mvp-cta { background: #fbbf24; color: #0A0A10; }
+        .dtd-mc-mvp-row { display: flex; align-items: center; gap: 14px; position: relative; flex-wrap: wrap; }
+        .dtd-mc-mvp-avatar { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, #fbbf24, #d97706); border: 2px solid; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 900; color: #0A0A10; flex-shrink: 0; box-shadow: 0 0 14px rgba(251,191,36,0.30); }
+        .dtd-mc-mvp-name-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+        .dtd-mc-mvp-label { font-size: 0.55rem; font-weight: 900; letter-spacing: 0.18em; color: #fbbf24; }
+        .dtd-mc-mvp-name { font-size: 1rem; font-weight: 900; color: #E6E6E6; line-height: 1.15; text-shadow: 0 0 12px rgba(251,191,36,0.25); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtd-mc-mvp-meta { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+        .dtd-mc-mvp-stats { display: flex; gap: 12px; flex-shrink: 0; }
+        .dtd-mc-mvp-stats > div { display: flex; flex-direction: column; align-items: center; }
+        .dtd-mc-mvp-stat-val { font-size: 0.95rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+        .dtd-mc-mvp-stat-lbl { font-size: 0.5rem; font-weight: 700; letter-spacing: 0.08em; color: #555550; margin-top: 2px; }
+        .dtd-mc-mvp-cta { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; color: #fbbf24; background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.45); padding: 6px 12px; border-radius: 100px; flex-shrink: 0; transition: all 0.15s; }
+        .dtd-mc-mvp-second { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap; font-size: 0.7rem; }
+        @media (max-width: 600px) {
+          .dtd-mc-mvp-stats { width: 100%; justify-content: space-around; gap: 8px; margin-top: 4px; }
+          .dtd-mc-mvp-cta { width: 100%; text-align: center; margin-top: 6px; }
+          .dtd-mc-mvp-stat-val { font-size: 0.82rem; }
+        }
+
+        .dtd-mc-detail-btn { font-size: 0.78rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #A12B1F, #7A1F15); text-decoration: none; padding: 9px 22px; border-radius: 100px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s; box-shadow: 0 4px 16px rgba(161,43,31,0.30); letter-spacing: 0.02em; border: 1px solid rgba(161,43,31,0.6); }
+        .dtd-mc-detail-btn:hover { background: linear-gradient(135deg, #BE3A25, #A12B1F); box-shadow: 0 6px 22px rgba(161,43,31,0.45); transform: translateY(-1px); }
+        .dtd-mc-stratz-btn { font-size: 0.7rem; font-weight: 700; color: #8A8880; text-decoration: none; padding: 8px 18px; border-radius: 100px; display: inline-block; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); transition: all 0.15s; }
+        .dtd-mc-stratz-btn:hover { color: #E6E6E6; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.18); }
+        @media (max-width: 600px) {
+          .dtd-mc-stat-row { grid-template-columns: 1.4fr 0.95fr 0.5fr 0.5fr 0.6fr 0.8fr; gap: 5px; padding: 4px 2px; font-size: 0.62rem; }
+          .dtd-mc-stat-row.dtd-mc-stat-head { font-size: 0.52rem; }
+          .dtd-mc-stat-hero { font-size: 0.58rem; }
+          .dtd-mc-stat-player { font-size: 0.62rem; }
+          .dtd-mc-stat-kda { font-size: 0.68rem; }
+          .dtd-mc-stat-num { font-size: 0.62rem; }
+        }
 
         /* ── Tab share button ── */
         .dtd-tab-share { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 100px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 700; transition: all 0.15s; }
@@ -1071,7 +1282,10 @@ function DotaTournamentDetailInner() {
           .dtd-tabs-wrap { margin-left: -16px; margin-right: -16px; padding: 8px 16px; }
           .dtd-overview-grid { grid-template-columns: 1fr; }
           .dtd-mc-roster { display: none; }
-          .dtd-mc-team-name { font-size: 0.78rem; }
+          /* Roster is hidden under 800px, so team-name can take the full
+           * vertical of the card. Bump it further to fill the freed space
+           * without growing the overall card height. */
+          .dtd-mc-team-name { font-size: 1.1rem; }
           .dtd-card { padding: 20px; }
         }
         @media (max-width: 600px) {
@@ -1081,7 +1295,10 @@ function DotaTournamentDetailInner() {
           .dtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .dtd-mc-team { padding: 8px 10px; gap: 8px; }
           .dtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
-          .dtd-mc-team-name { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
+          /* Single-line + ellipsis on phone (was 2-line clamp). Keeps the
+           * card's vertical footprint identical while letting the bigger
+           * font breathe horizontally. */
+          .dtd-mc-team-name { font-size: 1rem; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.18; -webkit-line-clamp: unset; display: block; }
           .dtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .dtd-tab-label { display: none; }
           .dtd-tab-count { display: none; }
@@ -1123,7 +1340,7 @@ function DotaTournamentDetailInner() {
           .dtd-mc-center { min-width: 54px !important; }
           .dtd-mc-index { width: 28px !important; }
           .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
-          .dtd-mc-team-name { font-size: 0.7rem !important; }
+          .dtd-mc-team-name { font-size: 0.86rem !important; }
           .dtd-mc-team-tag { font-size: 0.56rem !important; }
           /* Expanded match section */
           .dtd-mc-expanded { padding: 10px 4px 8px !important; }
@@ -1591,8 +1808,14 @@ function DotaTournamentDetailInner() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="dtd-standings-table dtd-freeze-team">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }}>MW</th><th style={{ color: "#f87171" }}>ML</th><th style={{ color: "#A12B1F" }}>Pts</th><th>BH</th></tr></thead>
-                      <tbody>{standings.map((s: any, i: number) => (<tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#A12B1F" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td>{s.wins || 0}</td><td>{s.draws || 0}</td><td>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{s.mapsWon || 0}</td><td style={{ color: "#f87171" }}>{s.mapsLost || 0}</td><td style={{ fontWeight: 800, color: "#A12B1F" }}>{s.points || 0}</td><td style={{ color: "#555550" }}>{s.buchholz || 0}</td></tr>))}</tbody>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#4ade80" }} title="Kills For">KF</th><th style={{ color: "#f87171" }} title="Kills Against">KA</th><th style={{ color: "#fbbf24" }} title="Kill Difference">Diff</th><th style={{ color: "#A12B1F" }}>Pts</th></tr></thead>
+                      <tbody>{standings.map((s: any, i: number) => {
+                        const kf = s.killsFor ?? s.mapsWon ?? 0;
+                        const ka = s.killsAgainst ?? s.mapsLost ?? 0;
+                        const diff = s.killDiff ?? (kf - ka);
+                        return (
+                        <tr key={s.id}><td style={{ fontWeight: 800, color: i < 6 ? "#A12B1F" : "#555550" }}>{i + 1}</td><td style={{ fontWeight: 700 }}>{s.teamName}</td><td>{s.played || 0}</td><td style={{ color: "#4ade80" }}>{s.wins || 0}</td><td style={{ color: "#fbbf24" }}>{s.draws || 0}</td><td style={{ color: "#f87171" }}>{s.losses || 0}</td><td style={{ color: "#4ade80" }}>{kf}</td><td style={{ color: "#f87171" }}>{ka}</td><td style={{ fontWeight: 700, color: diff > 0 ? "#4ade80" : diff < 0 ? "#f87171" : "#8A8880" }}>{diff > 0 ? "+" : ""}{diff}</td><td style={{ fontWeight: 800, color: "#A12B1F" }}>{s.points || 0}</td></tr>);
+                      })}</tbody>
                     </table>
                   </div>
                 )}
@@ -1764,7 +1987,7 @@ function DotaTournamentDetailInner() {
                             </div>
                             <div style={{ overflowX: "auto" }}>
                               <table className="dtd-standings-table">
-                                <thead><tr><th>Player</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
+                                <thead><tr><th>Player</th><th title="Games · Wins-Losses">Games</th><th style={{ color: "#4ade80" }}>K</th><th style={{ color: "#f87171" }}>D</th><th style={{ color: "#3CCBFF" }}>A</th><th>GPM</th><th>XPM</th><th style={{ color: colors.text }}>Score</th></tr></thead>
                                 <tbody>{entries.map((p: any, i: number) => {
                                   const isMvp = bracketMvpMap[p.id] === bracket;
                                   const isMeRow = user?.uid === p.uid;
@@ -1772,17 +1995,28 @@ function DotaTournamentDetailInner() {
                                   if (isMeRow) rowBg = { background: "rgba(60,203,255,0.08)", boxShadow: "inset 2px 0 0 #3CCBFF" };
                                   else if (isMvp) rowBg = { background: colors.bg };
 
-                                  const playerCell = (<>
-                                    <div style={{ fontWeight: 700 }}>{p.steamName || p.name}{isMvp && <span style={{ marginLeft: 6, fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}` }}>MVP</span>}{isMeRow && <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, padding: "1px 6px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}</div>
-                                    <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.62rem", fontWeight: 700, color: colors.text, padding: "1px 5px", borderRadius: 4, background: colors.bg, whiteSpace: "nowrap" }}>{colors.label}</span></div>
-                                  </>);
+                                  const playerCell = (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                      {p.steamAvatar ? (
+                                        <img src={p.steamAvatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${colors.border}`, flexShrink: 0 }} />
+                                      ) : (
+                                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: colors.bg, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: colors.text, flexShrink: 0 }}>{((p.steamName || p.name || "?")[0]).toUpperCase()}</div>
+                                      )}
+                                      <span style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{p.steamName || p.name}</span>
+                                      {isMvp && <span style={{ flexShrink: 0, fontSize: "0.58rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: colors.border, color: colors.text, border: `1px solid ${colors.border}`, letterSpacing: "0.05em" }}>MVP</span>}
+                                      {isMeRow && <span style={{ flexShrink: 0, fontSize: "0.55rem", fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "rgba(60,203,255,0.15)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)" }}>YOU</span>}
+                                    </div>
+                                  );
 
+                                  const games = p.games || 0;
+                                  const wl = (p.wins ?? 0) + "-" + (p.losses ?? 0);
                                   return (
                                   <tr key={p.id} style={rowBg}>
                                     <td>{p.uid ? (<Link href={`/player/${p.uid}?tab=dota`} style={{ textDecoration: "none", color: "inherit" }}>{playerCell}</Link>) : playerCell}</td>
+                                    <td style={{ color: "#8A8880", fontSize: "0.78rem" }}>{games > 0 ? `${games}G ${wl}` : "—"}</td>
                                     <td style={{ fontWeight: 700, color: "#4ade80" }}>{p.totalKills || 0}</td>
                                     <td style={{ color: "#f87171" }}>{p.totalDeaths || 0}</td>
-                                    <td>{p.totalAssists || 0}</td>
+                                    <td style={{ color: "#3CCBFF" }}>{p.totalAssists || 0}</td>
                                     <td>{p.avgGPM || 0}</td>
                                     <td>{p.avgXPM || 0}</td>
                                     <td style={{ fontWeight: 800, color: colors.text }}>{p.totalScore || 0}</td>

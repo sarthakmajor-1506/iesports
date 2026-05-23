@@ -3,10 +3,24 @@ import { adminDb } from "@/lib/firebaseAdmin";
 
 export async function GET(req: NextRequest) {
   const game = req.nextUrl.searchParams.get("game");
+  // Caller's uid (best-effort, optional). Used to whitelist `isTestTournament`
+  // tournaments to the uids listed in `visibleToUids` — so a Dota test
+  // tournament can be made visible to a tiny subset of users without
+  // surfacing in the public list.
+  const callerUid = req.nextUrl.searchParams.get("uid") || "";
 
   if (!game || !["dota2", "valorant", "cs2"].includes(game)) {
     return NextResponse.json({ error: "Invalid game parameter" }, { status: 400 });
   }
+
+  // Hide test tournaments from the public list, unless the caller is on the
+  // whitelist for that specific tournament. Single helper shared by all games.
+  const visibleToCaller = (t: any): boolean => {
+    if (!t.isTestTournament) return true;
+    if (!callerUid) return false;
+    const whitelist: string[] = Array.isArray(t.visibleToUids) ? t.visibleToUids : [];
+    return whitelist.includes(callerUid);
+  };
 
   try {
     const collectionName = game === "valorant" ? "valorantTournaments" : game === "cs2" ? "cs2Tournaments" : "tournaments";
@@ -15,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     if (game === "valorant") {
       const now = new Date();
-      const visible = all.filter((t: any) => !t.isTestTournament);
+      const visible = all.filter(visibleToCaller);
       const isEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
       const ended = visible
         .filter((t: any) => isEnded(t))
@@ -62,7 +76,7 @@ export async function GET(req: NextRequest) {
 
     if (game === "cs2") {
       const now = new Date();
-      const visible = all.filter((t: any) => !t.isTestTournament);
+      const visible = all.filter(visibleToCaller);
       const isEnded = (t: any) => t.status === "ended" || (t.endDate && now > new Date(t.endDate));
       const ended = visible.filter((t: any) => isEnded(t)).sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 20);
       const upcoming = visible.filter((t: any) => !isEnded(t)).sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3);
@@ -70,11 +84,12 @@ export async function GET(req: NextRequest) {
     }
 
     // dota2
-    const ended = all
+    const visible = all.filter(visibleToCaller);
+    const ended = visible
       .filter((t: any) => t.status === "ended")
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
       .slice(0, 1);
-    const upcoming = all
+    const upcoming = visible
       .filter((t: any) => t.status === "upcoming" || t.status === "ongoing")
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
       .slice(0, 3);
