@@ -118,16 +118,28 @@ message CMsgClientWelcomeMin {
 }
 
 // ── CSODOTALobby — the practice/tournament-lobby Shared Object.
-message CDOTALobbyMemberMin {
+// CRITICAL field numbers verified against SteamDatabase/Protobufs
+// (dota_gcmessages_common_lobby.proto on Github):
+//   - all_members is field 120 (NOT field 2 — the prior parser was wrong,
+//     which is why members always decoded as []). Reading from field 2
+//     yielded garbage that the old code masked by gating lobbyCreated on
+//     members.length > 0.
+//   - state enum: UI=0, SERVERSETUP=1, RUN=2, POSTGAME=3, READYUP=4,
+//     NOTREADY=5, SERVERASSIGN=6. Previous comments had these wrong.
+//   - match_outcome at field 70: EMatchOutcome enum
+//     (Unknown=0, RadVictory=2, DireVictory=3, NotScored_* = 64+).
+message CSODOTALobbyMember {
   optional fixed64 id = 1;       // steam64
-  optional uint32  team = 3;     // DOTA_GC_TEAM
+  optional int32  hero_id = 2;   // hero picked (also present pre-game once locked)
+  optional uint32 team = 3;      // DOTA_GC_TEAM (0=Radiant, 1=Dire, 4=Pool, 5=Spectator)
+  optional uint32 slot = 7;
 }
 message CSODOTALobbyMin {
   optional uint64 lobby_id = 1;
-  repeated CDOTALobbyMemberMin members = 2;
-  optional uint32 state = 4;     // CSODOTALobby.State enum
+  optional uint32 state = 4;     // CSODOTALobby.State enum (see above)
   optional uint64 match_id = 30; // set once the match server is allocated
   optional uint32 match_outcome = 70;
+  repeated CSODOTALobbyMember all_members = 120;  // ← field 120, not 2
 }`;
 let gcRoot: protobuf.Root | null = null;
 function gcType(name: string): protobuf.Type {
@@ -236,8 +248,16 @@ class DotaBot extends EventEmitter {
   // a match launches. Captured directly from the lobby payload — much more
   // reliable than scanning player match histories after the fact.
   private liveLobbyMatchId: string = "";
-  // The lobby's CSODOTALobby state enum. 0=UI, 1=READYUP, 2=SERVERSETUP, 3=RUN, 4=POSTGAME, 5=NOTREADY, 6=SERVERASSIGN.
+  // The lobby's CSODOTALobby state enum (verified Sept 2025 against
+  // SteamDatabase/Protobufs): UI=0, SERVERSETUP=1, RUN=2, POSTGAME=3,
+  // READYUP=4, NOTREADY=5, SERVERASSIGN=6. (The old comment swapped
+  // RUN/SERVERSETUP/POSTGAME — fixed.)
   private liveLobbyState: number = -1;
+  // EMatchOutcome from the lobby SO once Valve transitions to POSTGAME (3).
+  // 0=Unknown, 2=RadVictory, 3=DireVictory, 64+=NotScored variants.
+  private liveLobbyMatchOutcome: number = 0;
+  // Map steam32 → hero_id pulled from CSODOTALobbyMember at POSTGAME.
+  private liveLobbyHeroes: Record<number, number> = {};
 
   // Pending GC match-data requests
   private pendingMD = new Map<string, { resolve: (v: DotaMatchDetails) => void; reject: (e: any) => void; timer: NodeJS.Timeout }>();
@@ -259,6 +279,8 @@ class DotaBot extends EventEmitter {
   /** Current CSODOTALobby state enum, or -1 if no lobby state has been
    *  observed yet. 3 = RUN (match in progress), 4 = POSTGAME. */
   getLobbyState(): number { return this.liveLobbyState; }
+  getLobbyMatchOutcome(): number { return this.liveLobbyMatchOutcome; }
+  getLobbyHeroes(): Record<number, number> { return { ...this.liveLobbyHeroes }; }
 
   async connect(): Promise<void> {
     const username = process.env.STEAM_ACCOUNT_NAME;
@@ -429,8 +451,34 @@ class DotaBot extends EventEmitter {
                 console.log(`[GC] 🎯 dotaMatchId captured from lobby state: ${lob.matchId} (was ${prev || "—"})`);
                 this.emit("lobbyMatchId", lob.matchId);
               }
+              // Merge in any hero picks (overwrite on each update so the latest
+              // picked hero per player wins; locked in by POSTGAME).
+              if (lob.heroBySteam32 && Object.keys(lob.heroBySteam32).length) {
+                Object.assign(this.liveLobbyHeroes, lob.heroBySteam32);
+              }
+              // Capture match_outcome the moment Valve stamps it on the lobby.
+              if (lob.matchOutcome && lob.matchOutcome !== this.liveLobbyMatchOutcome) {
+                const prev = this.liveLobbyMatchOutcome;
+                this.liveLobbyMatchOutcome = lob.matchOutcome;
+                console.log(`[GC] 🏁 matchOutcome captured: ${lob.matchOutcome} (was ${prev}) — 2=Radiant, 3=Dire, 64+=NotScored`);
+              }
+              // POSTGAME (state=3) means Valve has finalized the match server.
+              // If we have a matchId AND a non-zero outcome, fire matchComplete.
+              // The orchestrator listens for this to write the winner + roster
+              // sides to Firestore without needing requestMatchDetails (which
+              // Valve denies for practice-lobby host accounts in Unassigned).
+              if (lob.state === 3 && this.liveLobbyMatchId && this.liveLobbyMatchOutcome > 0) {
+                this.emit("matchComplete", {
+                  matchId: this.liveLobbyMatchId,
+                  matchOutcome: this.liveLobbyMatchOutcome,
+                  radiantWin: this.liveLobbyMatchOutcome === 2,
+                  direWin: this.liveLobbyMatchOutcome === 3,
+                  members: this.liveLobbyMembers,
+                  heroBySteam32: { ...this.liveLobbyHeroes },
+                });
+              }
               // Debug — what we actually decoded out of the SO container.
-              this.lastLobbyFields = `msg=${msgType} len=${payload.length} lobby={matchId=${lob.matchId || "—"} state=${lob.state} members=${lob.members.length}}`;
+              this.lastLobbyFields = `msg=${msgType} len=${payload.length} lobby={matchId=${lob.matchId || "—"} state=${lob.state} outcome=${lob.matchOutcome} members=${lob.members.length}}`;
             }
           } catch (e: any) {
             // Decode failure on a payload we thought might be a lobby SO —
@@ -649,6 +697,8 @@ class DotaBot extends EventEmitter {
     this.liveLobbyMembers = [];
     this.liveLobbyMatchId = "";
     this.liveLobbyState = -1;
+    this.liveLobbyMatchOutcome = 0;
+    this.liveLobbyHeroes = {};
     await new Promise(r => setTimeout(r, destroyWait));
     console.log("[Dota2] -> Sending create...");
 
@@ -935,6 +985,8 @@ class DotaBot extends EventEmitter {
     this.liveLobbyMembers = [];
     this.liveLobbyMatchId = "";
     this.liveLobbyState = -1;
+    this.liveLobbyMatchOutcome = 0;
+    this.liveLobbyHeroes = {};
     console.log("[Dota2] ✅ Lobby destroyed and bot left");
   }
 
@@ -1059,26 +1111,32 @@ class DotaBot extends EventEmitter {
   // The old hand-rolled byte scanner looked for field 60 / 120 at the top
   // level and recursed greedily — both wrong. Real CSODOTALobby uses
   // field 30 for match_id and field 2 for members.
-  private extractLobbyFromGCMessage(msgType: number, payload: Buffer): { members: LobbyMember[]; matchId: string; state: number } | null {
+  private extractLobbyFromGCMessage(msgType: number, payload: Buffer): { members: LobbyMember[]; matchId: string; state: number; matchOutcome: number; heroBySteam32: Record<number, number> } | null {
     // Decode the CSODOTALobby bytes once we've located them.
-    const decodeLobby = (lobbyBytes: Buffer | Uint8Array): { members: LobbyMember[]; matchId: string; state: number } | null => {
+    const decodeLobby = (lobbyBytes: Buffer | Uint8Array): { members: LobbyMember[]; matchId: string; state: number; matchOutcome: number; heroBySteam32: Record<number, number> } | null => {
       try {
         const T = gcType("CSODOTALobbyMin");
         const obj: any = T.toObject(T.decode(lobbyBytes), { longs: String, defaults: false });
-        const members: LobbyMember[] = ((obj.members || []) as any[]).map((m) => {
-          // CDOTALobbyMember.id is a fixed64 steam64; steam32 = low 32 bits.
-          // protobufjs returns it as a decimal string when longs:String.
+        // FIXED: members are in all_members (field 120), not field 2. The
+        // pre-fix schema read garbage from field 2 and so always returned [].
+        const rawMembers = (obj.all_members || []) as any[];
+        const heroBySteam32: Record<number, number> = {};
+        const members: LobbyMember[] = rawMembers.map((m) => {
+          // CSODOTALobbyMember.id is a fixed64 steam64; steam32 = low 32 bits.
           let steam32 = 0;
           try {
             const big = BigInt(String(m.id || "0"));
             steam32 = Number(big & 0xffffffffn);
           } catch { steam32 = 0; }
+          const heroId = Number(m.hero_id ?? 0);
+          if (steam32 > 0 && heroId > 0) heroBySteam32[steam32] = heroId;
           return { id: steam32, team: Number(m.team ?? DOTA_GC_TEAM_PLAYER_POOL) };
         }).filter(m => m.id > 0);
         const matchId = String(obj.match_id || "");
         const state = typeof obj.state === "number" ? obj.state : -1;
-        if (matchId === "0") return { members, matchId: "", state };
-        return { members, matchId, state };
+        const matchOutcome = Number(obj.match_outcome ?? 0);
+        if (matchId === "0") return { members, matchId: "", state, matchOutcome, heroBySteam32 };
+        return { members, matchId, state, matchOutcome, heroBySteam32 };
       } catch {
         return null;
       }
@@ -1086,7 +1144,7 @@ class DotaBot extends EventEmitter {
 
     // Pull all CSODOTALobby blobs out of a container, then decode the first
     // one with members or match_id (there's only ever one per cache anyway).
-    const pickFromObjects = (typeIds: number[], blobsPerType: Buffer[][]): { members: LobbyMember[]; matchId: string; state: number } | null => {
+    const pickFromObjects = (typeIds: number[], blobsPerType: Buffer[][]): { members: LobbyMember[]; matchId: string; state: number; matchOutcome: number; heroBySteam32: Record<number, number> } | null => {
       for (let i = 0; i < typeIds.length; i++) {
         if (typeIds[i] !== CSO_DOTA_LOBBY_TYPE_ID) continue;
         for (const blob of blobsPerType[i]) {
@@ -1148,7 +1206,8 @@ class DotaBot extends EventEmitter {
     try {
       const T = gcType("CSODOTALobbyMin");
       const obj: any = T.toObject(T.decode(buf), { longs: String, defaults: false });
-      return ((obj.members || []) as any[]).map((m): LobbyMember => {
+      // FIXED: all_members at field 120, not members at field 2.
+      return ((obj.all_members || []) as any[]).map((m): LobbyMember => {
         let steam32 = 0;
         try { steam32 = Number(BigInt(String(m.id || "0")) & 0xffffffffn); } catch { steam32 = 0; }
         return { id: steam32, team: Number(m.team ?? DOTA_GC_TEAM_PLAYER_POOL) };

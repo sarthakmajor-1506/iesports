@@ -75,6 +75,8 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
   // process listener is gone).
   const lobbyMatchId = (() => { try { return bot.getLobbyMatchId() || null; } catch { return null; } })();
   const lobbyState = (() => { try { return bot.getLobbyState(); } catch { return -1; } })();
+  const lobbyMatchOutcome = (() => { try { return (bot as any).getLobbyMatchOutcome?.() ?? 0; } catch { return 0; } })();
+  const lobbyHeroes = (() => { try { return (bot as any).getLobbyHeroes?.() ?? {}; } catch { return {}; } })();
   const lastLobbyFields = (() => { try { return (bot as any).lastLobbyFields || ""; } catch { return ""; } })();
 
   await db.collection("botLobbyControl").doc("state").set({
@@ -88,6 +90,8 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
     memberCount: members.length,
     lobbyMatchId,
     lobbyState,
+    lobbyMatchOutcome,
+    lobbyHeroes,
     lastLobbyFields,
     lastError: patch.lastError ?? null,
     lastCommand: patch.lastCommand ?? null,

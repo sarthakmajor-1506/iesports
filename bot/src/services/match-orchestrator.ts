@@ -156,6 +156,107 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // time the GC reports a non-zero match_id. Re-using the same `bot`
   // EventEmitter across multiple lobbies in a session is fine because
   // dota-gc resets `liveLobbyMatchId` on createLobby/destroyLobby.
+  // Listen for POSTGAME match-complete event from the GC. Fires when Valve
+  // stamps a non-zero match_outcome onto the practice-lobby SO (state=3=POSTGAME).
+  // This bypasses requestMatchDetails entirely — which Valve denies for our
+  // bot account because it's in Unassigned, not a team slot — and gives us
+  // the winner side directly from the lobby's own SO that the bot already
+  // receives as a lobby member. Self-detaches after first fire.
+  const onMatchComplete = async (evt: { matchId: string; matchOutcome: number; radiantWin: boolean; direWin: boolean; members: Array<{ id: number; team: number }>; heroBySteam32: Record<number, number> }) => {
+    try {
+      console.log(`[Match] 🏁 matchComplete: dota ${evt.matchId} outcome=${evt.matchOutcome} (radiantWin=${evt.radiantWin})`);
+      // Figure out which tournament side (team1/team2) was Radiant vs Dire
+      // by checking which of the lobby members are on each tournament team.
+      const team1Steam32s = new Set<number>();
+      const team2Steam32s = new Set<number>();
+      for (const p of queue.players) {
+        const s32 = p.steam32Id ? Number(p.steam32Id) : 0;
+        if (!s32) continue;
+        // tournament-side: we don't know team affiliation from queue alone;
+        // pull from tournament team docs.
+      }
+      // Pull both team rosters to determine sides.
+      const { getDb } = await import("./firebase");
+      const db = getDb();
+      const tid = (queue as any).tournamentId;
+      const tMatchId = (queue as any).tournamentMatchId;
+      const tColl = (queue as any).tournamentCollection || "tournaments";
+      if (!tid || !tMatchId) {
+        console.log(`[Match] matchComplete fired but no tournament link on queue — skipping write`);
+        return;
+      }
+      const mdoc = await db.collection(tColl).doc(tid).collection("matches").doc(tMatchId).get();
+      const mdata: any = mdoc.data() || {};
+      const STEAM64_BASE = BigInt("76561197960265728");
+      const to32 = (s64?: string | null) => { try { return s64 ? Number(BigInt(s64) - STEAM64_BASE) : 0; } catch { return 0; } };
+
+      const loadTeam = async (teamId: string) => {
+        const td = (await db.collection(tColl).doc(tid).collection("teams").doc(teamId).get()).data() as any;
+        const out: number[] = [];
+        for (const mem of (td?.members || [])) {
+          let s32 = mem.steam32Id ? Number(mem.steam32Id) : 0;
+          if (!s32 && mem.steamId) s32 = to32(mem.steamId);
+          if (!s32) {
+            try { const u = (await db.collection("users").doc(mem.uid).get()).data() as any; s32 = to32(u?.steamId); } catch {}
+          }
+          if (s32 > 0) out.push(s32);
+        }
+        return out;
+      };
+      const t1Ids = mdata.team1Id ? await loadTeam(mdata.team1Id) : [];
+      const t2Ids = mdata.team2Id ? await loadTeam(mdata.team2Id) : [];
+
+      // Tally which side each tournament team's players landed on
+      let t1Rad = 0, t1Dire = 0, t2Rad = 0, t2Dire = 0;
+      for (const mem of evt.members) {
+        if (mem.team !== 0 && mem.team !== 1) continue;
+        if (t1Ids.includes(mem.id)) (mem.team === 0 ? t1Rad++ : t1Dire++);
+        if (t2Ids.includes(mem.id)) (mem.team === 0 ? t2Rad++ : t2Dire++);
+      }
+      const team1Side = t1Rad >= t1Dire ? "radiant" : "dire";
+      const team2Side = t2Rad >= t2Dire ? "radiant" : "dire";
+      const winnerSide = evt.radiantWin ? "radiant" : (evt.direWin ? "dire" : null);
+      let winner: "team1" | "team2" | null = null;
+      if (winnerSide === "radiant") winner = team1Side === "radiant" ? "team1" : "team2";
+      if (winnerSide === "dire")    winner = team1Side === "dire"    ? "team1" : "team2";
+
+      if (!winner) {
+        console.log(`[Match] matchComplete but outcome ${evt.matchOutcome} = no scored result — skipping`);
+        return;
+      }
+      const winnerName = winner === "team1" ? mdata.team1Name : mdata.team2Name;
+      const nowIso = new Date().toISOString();
+      await db.collection(tColl).doc(tid).collection("matches").doc(tMatchId).set({
+        status: "completed",
+        winner,
+        team1Score: winner === "team1" ? 1 : 0,
+        team2Score: winner === "team2" ? 1 : 0,
+        completedAt: nowIso,
+        dotaMatchId: evt.matchId,
+        result: {
+          source: "lobby-so-postgame",
+          dotaMatchId: evt.matchId,
+          radiantWin: evt.radiantWin,
+          winnerTeam: winner,
+          team1Side, team2Side, matchOutcome: evt.matchOutcome,
+          fetchedAt: nowIso,
+        },
+        games: {
+          game1: {
+            dotaMatchId: evt.matchId, winner, completedAt: nowIso, status: "completed",
+            team1Side, team2Side,
+          },
+        },
+      }, { merge: true });
+      console.log(`[Match] ✅ Auto-resolved ${tColl}/${tid}/matches/${tMatchId} → ${winnerName} wins (team1=${team1Side}, team2=${team2Side})`);
+    } catch (e: any) {
+      console.error(`[Match] matchComplete handler failed: ${e?.message || e}`);
+    } finally {
+      bot.removeListener("matchComplete", onMatchComplete);
+    }
+  };
+  bot.on("matchComplete", onMatchComplete);
+
   const onMatchId = async (matchId: string) => {
     try {
       console.log(`[Match] 🎯 dotaMatchId=${matchId} bound to firestoreLobby=${firestoreLobbyId}, queue=${queue.id}`);
