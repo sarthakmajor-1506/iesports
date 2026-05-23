@@ -14,7 +14,21 @@ const GC_MSG = {
 
 // Self-contained schema (subset of the official Dota protos) — kept inline so
 // it works on Railway with no .proto files on disk. Field numbers verified
-// against SteamDatabase/Protobufs (dota_gcmessages_common/client.proto).
+// against the bundled node_modules/steam/node_modules/steam-resources/
+// protobufs/dota2/dota_gcmessages_common_match_management.proto (the same
+// schema node-dota2 itself uses).
+//
+// CRITICAL CORRECTIONS over the previous hand-rolled scanner:
+//   • CSODOTALobby.match_id is field 30, NOT 60. The old parser searched
+//     field 60 (which is series_id, default 0) — explaining why match_id
+//     was never captured for the Major-vs-Vanshaj test.
+//   • CSODOTALobby.members is field 2, NOT 120. The "3 members" the old
+//     scanner reported were coincidentally-decoded junk from a different
+//     nested message — actual member parsing was broken.
+//   • CSODOTALobby arrives nested inside SO container messages
+//     (CacheSubscribed / UpdateMultiple / SingleObject / ClientWelcome).
+//     We dispatch on the outer msgType, decode the proper container, and
+//     pull out objects with type_id === 2004 (CSODOTALobby).
 const GC_SCHEMA = `
 syntax = "proto2";
 message CMsgGCMatchDetailsRequest { optional uint64 match_id = 1; }
@@ -67,6 +81,53 @@ message MHMatch {
 message CMsgDOTAGetPlayerMatchHistoryResponse {
   repeated MHMatch matches = 1;
   optional uint32  request_id = 2;
+}
+
+// ── Shared Object (SO) container messages — from
+// steam-resources/protobufs/tf2/gcsdk_gcmessages.proto. Same schema across
+// all Valve GC games; type_id is what distinguishes CSODOTALobby (2004)
+// from CSOEconItem etc.
+message CMsgSOSingleObjectMin {
+  optional int32 type_id = 2;
+  optional bytes object_data = 3;
+}
+message CMsgSOMultipleObjectsSingle {
+  optional int32 type_id = 1;
+  optional bytes object_data = 2;
+}
+message CMsgSOMultipleObjectsMin {
+  repeated CMsgSOMultipleObjectsSingle objects = 2;
+}
+message CMsgSOCacheSubscribedSubType {
+  optional int32 type_id = 1;
+  repeated bytes object_data = 2;
+}
+message CMsgSOCacheSubscribedMin {
+  repeated CMsgSOCacheSubscribedSubType objects = 2;
+}
+// CMsgClientWelcome bundles initial SO state on connect. The bot was
+// previously ignoring everything inside it, so on reconnect-mid-match
+// we never extracted the live lobby's match_id.
+message CMsgClientWelcomeCacheGroup {
+  repeated CMsgSOCacheSubscribedSubType objects = 5;
+}
+message CMsgClientWelcomeMin {
+  optional uint32 version = 1;
+  repeated CMsgClientWelcomeCacheGroup outofdate_subscribed_caches = 3;
+  repeated CMsgClientWelcomeCacheGroup uptodate_subscribed_caches = 6;
+}
+
+// ── CSODOTALobby — the practice/tournament-lobby Shared Object.
+message CDOTALobbyMemberMin {
+  optional fixed64 id = 1;       // steam64
+  optional uint32  team = 3;     // DOTA_GC_TEAM
+}
+message CSODOTALobbyMin {
+  optional uint64 lobby_id = 1;
+  repeated CDOTALobbyMemberMin members = 2;
+  optional uint32 state = 4;     // CSODOTALobby.State enum
+  optional uint64 match_id = 30; // set once the match server is allocated
+  optional uint32 match_outcome = 70;
 }`;
 let gcRoot: protobuf.Root | null = null;
 function gcType(name: string): protobuf.Type {
@@ -113,6 +174,12 @@ const EGCBaseMsg = {
 };
 
 const DOTA_GC_TEAM_PLAYER_POOL = 4;
+
+// CSODOTALobby's type_id in the Shared Object cache. Distinguishes a
+// practice/tournament-lobby SO from other SOs (CSOEconItem, CSODOTAParty,
+// etc.) within the same CacheSubscribed / Update payload.
+// Reference: node-dota2 cache.js → CSOTypeIDs.CSODOTALobby = 2004.
+const CSO_DOTA_LOBBY_TYPE_ID = 2004;
 
 // Message types that indicate a lobby state update from GC
 // These are the responses we should listen to for lobby creation confirmation
@@ -310,47 +377,47 @@ class DotaBot extends EventEmitter {
           console.log(`[GC] -> Ticket response sent (${msgType} -> ${replyMsg})`);
         }
 
-        // ── FIX #1: Broad lobby state detection ─────────────────────────────
-        // Any GC message that contains lobby member data should:
-        // a) Parse members and update live state
-        // b) If we're waiting for lobby creation, confirm it
+        // ── Lobby state detection via proper SO-container decoding ──────────
+        // The lobby never arrives at the top level of a GC payload; it's
+        // always inside one of the SO container messages, distinguished by
+        // type_id === 2004 (CSODOTALobby). Dispatch on the outer msgType so
+        // we decode with the correct container schema.
         //
-        // Skip during startup cleanup — stale lobby data from previous session
-        // should be ignored until the destroy+leave commands have processed.
+        // Skipped during startup cleanup so stale lobby data from a
+        // previous session can't pollute our live view.
         if (payload.length > 0 && !this.startupCleanup) {
           try {
-            const lob = this.parseLobbyState(payload);
-            if (lob.members.length > 0) {
-              this.updateLiveLobby(lob.members);
-
-              // If we were waiting for lobby creation, this confirms it
-              if (this.waitingForLobby) {
-                console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via member data`);
-                this.emit("lobbyCreated");
+            const lob = this.extractLobbyFromGCMessage(msgType, payload);
+            if (lob) {
+              if (lob.members.length > 0) {
+                this.updateLiveLobby(lob.members);
+                if (this.waitingForLobby) {
+                  console.log(`[GC] <- ${msgType} (${payload.length}b) — lobby confirmed via CSODOTALobby SO`);
+                  this.emit("lobbyCreated");
+                }
               }
+              if (lob.state >= 0 && lob.state !== this.liveLobbyState) {
+                const prev = this.liveLobbyState;
+                this.liveLobbyState = lob.state;
+                console.log(`[GC] 🪪 LobbyState transition ${prev} -> ${lob.state}`);
+                this.emit("lobbyStateChanged", { prev, next: lob.state, matchId: lob.matchId });
+              }
+              if (lob.matchId && lob.matchId !== this.liveLobbyMatchId) {
+                const prev = this.liveLobbyMatchId;
+                this.liveLobbyMatchId = lob.matchId;
+                console.log(`[GC] 🎯 dotaMatchId captured from lobby state: ${lob.matchId} (was ${prev || "—"})`);
+                this.emit("lobbyMatchId", lob.matchId);
+              }
+              // Debug — what we actually decoded out of the SO container.
+              this.lastLobbyFields = `msg=${msgType} len=${payload.length} lobby={matchId=${lob.matchId || "—"} state=${lob.state} members=${lob.members.length}}`;
             }
-            // Capture lobby metadata regardless of member presence — the GC
-            // sometimes pushes match-launch lobby states with no member list
-            // (just the match_id transition).
-            if (lob.state >= 0 && lob.state !== this.liveLobbyState) {
-              const prev = this.liveLobbyState;
-              this.liveLobbyState = lob.state;
-              console.log(`[GC] 🪪 LobbyState transition ${prev} -> ${lob.state}`);
-              this.emit("lobbyStateChanged", { prev, next: lob.state, matchId: lob.matchId });
+          } catch (e: any) {
+            // Decode failure on a payload we thought might be a lobby SO —
+            // log to lastLobbyFields so we can see it from Firestore.
+            if (payload.length > 100 && [21, 22, 24, 26, 4004].includes(msgType)) {
+              this.lastLobbyFields = `msg=${msgType} len=${payload.length} decode-error=${e?.message || e}`;
             }
-            if (lob.matchId && lob.matchId !== this.liveLobbyMatchId) {
-              const prev = this.liveLobbyMatchId;
-              this.liveLobbyMatchId = lob.matchId;
-              console.log(`[GC] 🎯 dotaMatchId captured from lobby state: ${lob.matchId} (was ${prev || "—"})`);
-              this.emit("lobbyMatchId", lob.matchId);
-            }
-            // Debug: capture the top-level proto fields of larger lobby
-            // payloads so we can verify field 60 is actually present (or
-            // discover what Valve renamed it to). Exposed via publishLobbyState.
-            if (payload.length > 100) {
-              this.lastLobbyFields = `msg=${msgType} len=${payload.length} fields=[${this.scanProtoFields(payload)}]`;
-            }
-          } catch { /* not a lobby payload — that's fine */ }
+          }
         }
 
         // ── Also handle 7465 specifically (lobby state with no members yet) ──
@@ -958,126 +1025,115 @@ class DotaBot extends EventEmitter {
     return { value: val, pos };
   }
 
-  // ── Main parser — handles the actual GC lobby format ─────────────────────
-  // From hex analysis of real GC payload:
-  // Members are at field 120 (tag bytes c2 07), wire type 2
-  // Each member sub-message: field 1 = fixed64 steam64 (wire type 1)
-  //                          field 2 = varint flags
-  //                          field 3 = varint team (0=Radiant,1=Dire,4=Unassigned)
-  // steam32 = lower 32 bits of steam64
+  // ── Lobby extraction via proper protobuf decoding ────────────────────────
+  // CSODOTALobby (Shared Object type_id=2004) never arrives at the top level
+  // of a GC message; it's nested inside one of these containers:
+  //   msgType  21  CMsgSOSingleObject       (k_ESOMsg_Create)
+  //   msgType  22  CMsgSOSingleObject       (k_ESOMsg_Update)
+  //   msgType  23  CMsgSOSingleObject       (k_ESOMsg_Destroy)
+  //   msgType  24  CMsgSOCacheSubscribed    (k_ESOMsg_CacheSubscribed)
+  //   msgType  26  CMsgSOMultipleObjects    (k_ESOMsg_UpdateMultiple)
+  //   msgType 4004 CMsgClientWelcome        (bundles SO caches on reconnect)
   //
-  // Additional lobby-level fields we pull (from
-  // SteamDatabase/Protobufs/dota2/dota_gcmessages_common.proto — CSODOTALobby):
-  //   field   1 fixed64  lobby_id            (set as soon as the lobby exists)
-  //   field   4 varint   state               (0=UI 1=READYUP 2=SERVERSETUP 3=RUN 4=POSTGAME 5=NOTREADY 6=SERVERASSIGN)
-  //   field  60 fixed64  match_id            (set once the match server is allocated / launched)
-  // We capture these at the top level only — sub-messages don't carry them.
-  parseLobbyPayload(buf: Buffer): LobbyMember[] {
-    return this.parseLobbyState(buf).members;
-  }
+  // The old hand-rolled byte scanner looked for field 60 / 120 at the top
+  // level and recursed greedily — both wrong. Real CSODOTALobby uses
+  // field 30 for match_id and field 2 for members.
+  private extractLobbyFromGCMessage(msgType: number, payload: Buffer): { members: LobbyMember[]; matchId: string; state: number } | null {
+    // Decode the CSODOTALobby bytes once we've located them.
+    const decodeLobby = (lobbyBytes: Buffer | Uint8Array): { members: LobbyMember[]; matchId: string; state: number } | null => {
+      try {
+        const T = gcType("CSODOTALobbyMin");
+        const obj: any = T.toObject(T.decode(lobbyBytes), { longs: String, defaults: false });
+        const members: LobbyMember[] = ((obj.members || []) as any[]).map((m) => {
+          // CDOTALobbyMember.id is a fixed64 steam64; steam32 = low 32 bits.
+          // protobufjs returns it as a decimal string when longs:String.
+          let steam32 = 0;
+          try {
+            const big = BigInt(String(m.id || "0"));
+            steam32 = Number(big & 0xffffffffn);
+          } catch { steam32 = 0; }
+          return { id: steam32, team: Number(m.team ?? DOTA_GC_TEAM_PLAYER_POOL) };
+        }).filter(m => m.id > 0);
+        const matchId = String(obj.match_id || "");
+        const state = typeof obj.state === "number" ? obj.state : -1;
+        if (matchId === "0") return { members, matchId: "", state };
+        return { members, matchId, state };
+      } catch {
+        return null;
+      }
+    };
 
-  parseLobbyState(buf: Buffer): { members: LobbyMember[]; matchId: string; lobbyId: string; state: number } {
-    const members: LobbyMember[] = [];
-    let matchId = "";
-    let lobbyId = "";
-    let state = -1;
-    let pos = 0;
-
-    try {
-      while (pos < buf.length) {
-        const t = this.readVarint(buf, pos); pos = t.pos;
-        const fieldNum = t.value >>> 3;
-        const wireType = t.value & 0x7;
-
-        if (wireType === 0) {
-          const r = this.readVarint(buf, pos); pos = r.pos;
-          if (fieldNum === 4) state = r.value;
-          // field 60 can in some protobuf builds be encoded as varint instead
-          // of fixed64 — be permissive.
-          if (fieldNum === 60 && r.value > 0) matchId = String(r.value);
-        } else if (wireType === 1) {
-          // fixed64 — read low+high 32 bits and stringify as decimal
-          if (pos + 8 <= buf.length) {
-            const lo = buf.readUInt32LE(pos);
-            const hi = buf.readUInt32LE(pos + 4);
-            // Compose as BigInt for accurate decimal regardless of size.
-            const v = (BigInt(hi) << 32n) | BigInt(lo);
-            if (fieldNum === 60 && v > 0n) matchId = v.toString();
-            else if (fieldNum === 1 && v > 0n) lobbyId = v.toString();
-          }
-          pos += 8;
-        } else if (wireType === 2) {
-          const l = this.readVarint(buf, pos); pos = l.pos;
-          const sub = buf.slice(pos, pos + l.value); pos += l.value;
-
-          // Field 120 = members (tag = 120 << 3 | 2 = 0x3c2 = varint c2 07)
-          if (fieldNum === 120) {
-            const member = this.parseMemberEntry(sub);
-            if (member) members.push(member);
-          } else {
-            // The lobby payload often arrives wrapped — CMsgSO_Update /
-            // CMsgSO_CacheSubscribed nest the CSODOTALobby one (or more)
-            // levels deep. The existing member parser already recurses
-            // for this reason; we MUST also promote match_id / state /
-            // lobby_id from nested messages, otherwise the in-lobby
-            // matchId capture never fires (the data is there, just one
-            // protobuf frame deeper than the outermost SO envelope).
-            const nested = this.parseLobbyState(sub);
-            for (const m of nested.members) members.push(m);
-            if (!matchId && nested.matchId) matchId = nested.matchId;
-            if (!lobbyId && nested.lobbyId) lobbyId = nested.lobbyId;
-            if (state === -1 && nested.state !== -1) state = nested.state;
-          }
-        } else if (wireType === 5) {
-          // fixed32 — skip
-          pos += 4;
-        } else {
-          break; // unknown wire type — stop
+    // Pull all CSODOTALobby blobs out of a container, then decode the first
+    // one with members or match_id (there's only ever one per cache anyway).
+    const pickFromObjects = (typeIds: number[], blobsPerType: Buffer[][]): { members: LobbyMember[]; matchId: string; state: number } | null => {
+      for (let i = 0; i < typeIds.length; i++) {
+        if (typeIds[i] !== CSO_DOTA_LOBBY_TYPE_ID) continue;
+        for (const blob of blobsPerType[i]) {
+          const r = decodeLobby(blob);
+          if (r) return r;
         }
       }
-    } catch { /* truncated buffer, return what we have */ }
+      return null;
+    };
 
-    return { members, matchId, lobbyId, state };
-  }
-
-  // Parse a single CLobbyMember entry
-  // field 1 = fixed64 (steam64), field 3 = varint team
-  private parseMemberEntry(buf: Buffer): LobbyMember | null {
-    let steam64Lo = 0; // lower 32 bits = steam32
-    let team = DOTA_GC_TEAM_PLAYER_POOL;
-    let pos = 0;
-    let hasSteam = false;
-
-    try {
-      while (pos < buf.length) {
-        const t = this.readVarint(buf, pos); pos = t.pos;
-        const fieldNum = t.value >>> 3;
-        const wireType = t.value & 0x7;
-
-        if (wireType === 0) {
-          const r = this.readVarint(buf, pos); pos = r.pos;
-          if (fieldNum === 3) team = r.value; // team field
-        } else if (wireType === 1) {
-          // fixed64 — read lower 32 bits as steam32
-          if (pos + 8 <= buf.length) {
-            steam64Lo = buf.readUInt32LE(pos);
-            hasSteam = true;
-          }
-          pos += 8;
-        } else if (wireType === 2) {
-          const l = this.readVarint(buf, pos); pos = l.pos;
-          pos += l.value;
-        } else if (wireType === 5) {
-          pos += 4;
-        } else break;
+    if (msgType === 21 || msgType === 22 || msgType === 23) {
+      // CMsgSOSingleObject — Create / Update / Destroy
+      const T = gcType("CMsgSOSingleObjectMin");
+      const obj: any = T.toObject(T.decode(payload), { longs: String, defaults: false });
+      if (Number(obj.type_id) !== CSO_DOTA_LOBBY_TYPE_ID) return null;
+      return decodeLobby(obj.object_data || Buffer.alloc(0));
+    }
+    if (msgType === 26) {
+      // CMsgSOMultipleObjects
+      const T = gcType("CMsgSOMultipleObjectsMin");
+      const obj: any = T.toObject(T.decode(payload), { longs: String, defaults: false });
+      const typeIds = ((obj.objects || []) as any[]).map(o => Number(o.type_id));
+      const blobs = ((obj.objects || []) as any[]).map(o => [o.object_data || Buffer.alloc(0)] as Buffer[]);
+      return pickFromObjects(typeIds, blobs);
+    }
+    if (msgType === 24) {
+      // CMsgSOCacheSubscribed
+      const T = gcType("CMsgSOCacheSubscribedMin");
+      const obj: any = T.toObject(T.decode(payload), { longs: String, defaults: false });
+      const typeIds = ((obj.objects || []) as any[]).map(o => Number(o.type_id));
+      const blobs = ((obj.objects || []) as any[]).map(o => (o.object_data || []) as Buffer[]);
+      return pickFromObjects(typeIds, blobs);
+    }
+    if (msgType === 4004) {
+      // CMsgClientWelcome — the SO caches bundled on connect/reconnect.
+      // Critical for the reconnect-mid-match scenario: we get the live
+      // CSODOTALobby snapshot right here, no separate subscription needed.
+      const T = gcType("CMsgClientWelcomeMin");
+      const obj: any = T.toObject(T.decode(payload), { longs: String, defaults: false });
+      const groups = [
+        ...((obj.outofdate_subscribed_caches || []) as any[]),
+        ...((obj.uptodate_subscribed_caches  || []) as any[]),
+      ];
+      for (const g of groups) {
+        const typeIds = ((g.objects || []) as any[]).map((o: any) => Number(o.type_id));
+        const blobs = ((g.objects || []) as any[]).map((o: any) => (o.object_data || []) as Buffer[]);
+        const r = pickFromObjects(typeIds, blobs);
+        if (r) return r;
       }
-    } catch { /* truncated */ }
-
-    if (!hasSteam || steam64Lo === 0) return null;
-    return { id: steam64Lo, team };
+      return null;
+    }
+    return null;
   }
 
-  // Legacy alias
+  // Legacy aliases kept so older callers (tests / dev scripts) don't break.
+  // The new flow goes through extractLobbyFromGCMessage; these just decode
+  // a raw CSODOTALobby buffer if one is handed in directly.
+  parseLobbyPayload(buf: Buffer): LobbyMember[] {
+    try {
+      const T = gcType("CSODOTALobbyMin");
+      const obj: any = T.toObject(T.decode(buf), { longs: String, defaults: false });
+      return ((obj.members || []) as any[]).map((m): LobbyMember => {
+        let steam32 = 0;
+        try { steam32 = Number(BigInt(String(m.id || "0")) & 0xffffffffn); } catch { steam32 = 0; }
+        return { id: steam32, team: Number(m.team ?? DOTA_GC_TEAM_PLAYER_POOL) };
+      }).filter(m => m.id > 0);
+    } catch { return []; }
+  }
   parseLobbyMembers(buf: Buffer): LobbyMember[] {
     return this.parseLobbyPayload(buf);
   }
