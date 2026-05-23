@@ -716,6 +716,22 @@ class DotaBot extends EventEmitter {
         this.lobbyActive = true;
         console.log("[Dota2] ✅ Lobby confirmed by GC.");
 
+        // Auto-invite Shrey Jain (steam32 from env LOBBY_ADMIN_STEAM32, default
+        // 129122102) as a co-admin / broadcaster. He gets the standard lobby
+        // invite, can join, and can sit in the Caster slot to broadcast.
+        // Practice-lobby host rights (kick/launch) stay bot-only — Valve's
+        // protocol doesn't expose a co-host concept.
+        const ADMIN_STEAM32 = process.env.LOBBY_ADMIN_STEAM32 || "129122102";
+        const at = setTimeout(() => {
+          try {
+            console.log(`[Dota2] -> Auto-invite lobby admin (Shrey Jain, steam32=${ADMIN_STEAM32})`);
+            this.invitePlayer(ADMIN_STEAM32);
+          } catch (e: any) {
+            console.error(`[Dota2] admin invite failed: ${e?.message || e}`);
+          }
+        }, 3000);
+        this.pendingTimers.push(at);
+
         // FIX #5: Do NOT kick bot to Unassigned immediately.
         // The bot needs to stay in Radiant slot 0 (host position) so that
         // BalancedShuffle works. Instead, we'll move the bot to Unassigned

@@ -751,14 +751,34 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // ── Delete waiting room VC ──────────────────────────────────────
-          // Team players were already moved to their team VCs above, so they
-          // won't get disconnected when the waiting room is deleted. (Any
-          // non-roster strangers who joined the waiting room manually will
-          // get disconnected — acceptable trade-off since REST has no batch
-          // voice-state enum to find them.)
+          // ── Evacuate waiting room → Dota General, then delete ──────────
+          // Team roster players were already moved to their team VCs above.
+          // Anyone STILL in the waiting room is a non-roster straggler (sub,
+          // visitor, friend) — bump them to Dota General so they keep voice
+          // continuity instead of getting disconnected when the channel
+          // dies. We enqueue an `evacuate_vc` Discord-bot command (the bot
+          // has gateway voice-state cache; REST can't enumerate voice
+          // channel members), wait briefly, then delete.
+          const DOTA_GENERAL_VC = process.env.DOTA_GENERAL_VC_ID || "1475549366600073321";
           const waitingRoomVcId = matchData.waitingRoomVcId;
           if (waitingRoomVcId) {
+            try {
+              const cmdRef = await adminDb.collection("botDiscordCommands").add({
+                action: "evacuate_vc",
+                params: { vcId: waitingRoomVcId, fallbackVcId: DOTA_GENERAL_VC },
+                status: "pending",
+                createdAt: new Date().toISOString(),
+                createdBy: `start-match:${tournamentId}/${matchId}/waitingroom`,
+              });
+              // Poll up to 3s for done (bot processes via onSnapshot, ~1s)
+              for (let i = 0; i < 6; i++) {
+                await new Promise(r => setTimeout(r, 500));
+                const s = (await cmdRef.get()).data() as any;
+                if (s?.status === "done" || s?.status === "error") break;
+              }
+            } catch (e: any) {
+              console.warn(`[start] evacuate waiting room failed: ${e?.message || e}`);
+            }
             await maybeDeleteChannel(waitingRoomVcId);
             startUpdateData.waitingRoomVcId = null; // clean up reference
           }
@@ -848,36 +868,32 @@ export async function POST(req: NextRequest) {
         matchData.team2VcId,
       ].filter(Boolean);
 
-      // Evacuate everyone we know about to the Dota 2 General VC before we
-      // delete the match-specific VCs. Without this, Discord disconnects
-      // anyone in a deleted VC from voice entirely — the user explicitly
-      // wants people moved, not kicked. Env-overridable but defaults to the
-      // server's permanent "Dota 2 General" channel.
+      // Evacuate every VC's actual occupants → Dota General before delete,
+      // via the bot's gateway voice cache (REST can't enumerate). The bot
+      // moves everyone currently in each VC regardless of whether they're
+      // on a roster, on a sub list, or just a friend who hopped in. We
+      // enqueue all three evacuate commands first, briefly wait, then delete.
       const DOTA_GENERAL_VC = process.env.DOTA_GENERAL_VC_ID || "1475549366600073321";
-      if (botToken && guildId && vcsToDelete.length > 0) {
+      const evacRefs: FirebaseFirestore.DocumentReference[] = [];
+      for (const vcId of vcsToDelete) {
         try {
-          // Build the full list of discord IDs across both rosters + subs.
-          // These are the people we expect to be in the team / waiting-room
-          // VCs at cleanup time.
-          const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
-          const team1Subs: ResolvedSub[] = (matchData.team1Subs || []) as ResolvedSub[];
-          const team2Subs: ResolvedSub[] = (matchData.team2Subs || []) as ResolvedSub[];
-          const allKnownIds = [
-            ...team1Players.map(p => p.discordId),
-            ...team2Players.map(p => p.discordId),
-            ...team1Subs.map(s => s.discordId),
-            ...team2Subs.map(s => s.discordId),
-          ].filter(Boolean);
-          let movedCount = 0;
-          for (const did of allKnownIds) {
-            // maybeMoveToVoice no-ops if the user isn't currently in voice
-            const ok = await maybeMoveToVoice(guildId, did, DOTA_GENERAL_VC);
-            if (ok) movedCount++;
-          }
-          console.log(`[cleanup-vcs] evacuated ${movedCount}/${allKnownIds.length} to Dota General before delete`);
+          const ref = await adminDb.collection("botDiscordCommands").add({
+            action: "evacuate_vc",
+            params: { vcId, fallbackVcId: DOTA_GENERAL_VC },
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            createdBy: `cleanup-vcs:${tournamentId}/${matchId}`,
+          });
+          evacRefs.push(ref);
         } catch (e: any) {
-          console.warn(`[cleanup-vcs] evacuation failed (proceeding to delete anyway): ${e?.message || e}`);
+          console.warn(`[cleanup-vcs] evacuate enqueue for ${vcId} failed: ${e?.message || e}`);
         }
+      }
+      // Wait briefly for the bot to process all evacuates (parallel, ~1-2s).
+      for (let i = 0; i < 8 && evacRefs.length > 0; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        const states = await Promise.all(evacRefs.map(r => r.get().then(s => (s.data() as any)?.status)));
+        if (states.every(s => s === "done" || s === "error")) break;
       }
 
       for (const vcId of vcsToDelete) {

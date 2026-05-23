@@ -106,17 +106,27 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
   // same matchId is a no-op.
   if (lobbyMatchId) {
     try {
-      // Include "open" queues so the dotaMatchId is captured even when the
-      // lobby was created manually (admin BotLobby panel) rather than via the
-      // automated cron path — in that case startMatchLobby() never runs so
-      // the queue stays "open" and the orchestrator's onMatchId listener is
-      // never registered.  Writing here is idempotent (same value = no-op).
+      // FIX: only write to queues that
+      //   (a) don't already have a dotaMatchId stamped (don't overwrite past
+      //       captures with the current lobby's matchId), AND
+      //   (b) were created in the last 6 hours (cuts off ancient stale
+      //       queues from weeks ago that would otherwise all get the same
+      //       current matchId).
+      //
+      // Previously: heartbeat wrote to every in_progress/open queue with a
+      // tournamentMatchId, which meant Domin8's stale March/May queues all
+      // got stamped with whatever test match the bot was running today.
+      // Same lobby's matchId ended up on r1-match-1, r1-match-2 across two
+      // different tournaments.
+      const cutoff = Date.now() - 6 * 3600 * 1000;
       const qs = await db.collection("botQueues")
         .where("status", "in", ["in_progress", "open"])
         .get();
       for (const qd of qs.docs) {
         const q = qd.data() as any;
-        if (q.dotaMatchId === lobbyMatchId) continue;  // already synced
+        if (q.dotaMatchId) continue;                          // never overwrite
+        const createdMs = q.createdAt ? Date.parse(q.createdAt) : 0;
+        if (!createdMs || createdMs < cutoff) continue;        // skip stale queues
         const updates: any = { dotaMatchId: lobbyMatchId, dotaMatchIdCapturedAt: new Date().toISOString(), dotaMatchIdSource: "heartbeat-sync" };
         await qd.ref.set(updates, { merge: true });
         if (q.tournamentId && q.tournamentMatchId) {

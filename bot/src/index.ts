@@ -265,6 +265,61 @@ client.once(Events.ClientReady, async (readyClient) => {
   });
   console.log("[Cron] Dota result-job consumer running every minute");
 
+  // ─── Discord-side command bus ────────────────────────────────────────────
+  // Lets web admin enqueue Discord operations (mainly VC evacuation) that
+  // need the bot's Discord.js Gateway voice state cache — REST alone can't
+  // enumerate voice channel members.
+  //
+  // Queue: `botDiscordCommands/{id}` {action, params, status:"pending"}
+  // Actions:
+  //   - evacuate_vc {vcId, fallbackVcId}: move every member in vcId → fallbackVcId
+  //
+  // After processing, bot writes {status:"done"|"error", result, error}.
+  // Web typically waits ~2s after enqueue then deletes the VC, so by the
+  // time the channel disappears Discord has already moved everyone.
+  const discordOpsRunning = new Set<string>();
+  getDb().collection("botDiscordCommands").where("status", "==", "pending").onSnapshot(async (snap) => {
+    for (const d of snap.docs) {
+      if (discordOpsRunning.has(d.id)) continue;
+      discordOpsRunning.add(d.id);
+      const cmd = d.data() as any;
+      try {
+        await d.ref.set({ status: "processing", updatedAt: new Date().toISOString() }, { merge: true });
+        let result: any = null;
+        if (cmd.action === "evacuate_vc") {
+          const vcId = String(cmd.params?.vcId || "");
+          const fallbackVcId = String(cmd.params?.fallbackVcId || "");
+          if (!vcId || !fallbackVcId) throw new Error("evacuate_vc requires vcId and fallbackVcId");
+          const guildId = process.env.DISCORD_GUILD_ID!;
+          const guild = await client.guilds.fetch(guildId);
+          const channel = await guild.channels.fetch(vcId).catch(() => null);
+          if (!channel || !channel.isVoiceBased()) {
+            result = { ok: false, reason: "channel not found / not voice-based", vcId };
+          } else {
+            const members = Array.from(channel.members.values());
+            let movedCount = 0;
+            const movedIds: string[] = [];
+            for (const m of members) {
+              try { await m.voice.setChannel(fallbackVcId); movedCount++; movedIds.push(m.id); }
+              catch (e: any) { console.warn(`[Discord] evacuate move failed for ${m.id}: ${e?.message || e}`); }
+            }
+            result = { ok: true, movedCount, totalMembers: members.length, movedIds };
+            console.log(`[Discord] evacuated ${movedCount}/${members.length} from ${vcId} → ${fallbackVcId}`);
+          }
+        } else {
+          result = { ok: false, reason: `unknown action "${cmd.action}"` };
+        }
+        await d.ref.set({ status: "done", result, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e: any) {
+        await d.ref.set({ status: "error", error: String(e?.message || e), updatedAt: new Date().toISOString() }, { merge: true });
+        console.error(`[Discord] command ${d.id} error: ${e?.message || e}`);
+      } finally {
+        discordOpsRunning.delete(d.id);
+      }
+    }
+  }, (err) => console.error("[botDiscordCommands] snapshot error:", err?.message || err));
+  console.log("[botDiscordCommands] consumer running (evacuate_vc etc)");
+
   console.log("\n✅ Bot fully operational!\n");
 });
 
