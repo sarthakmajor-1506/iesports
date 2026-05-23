@@ -308,11 +308,12 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
                 <div style={{ width: 52, height: 52, borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(161,43,31,0.35)", background: "linear-gradient(135deg, #A12B1F22, #7A1F1522)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {teamLogoMap[m.team1Id] ? <img src={teamLogoMap[m.team1Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#A12B1F" }}>{(m.team1Name || "?")[0]}</span>}
                 </div>
-                <div style={{
+                <div className="dtd-mc-vs-name" style={{
                   fontSize: "0.95rem", fontWeight: 900, color: "#A12B1F", textAlign: "center",
                   textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
                   textShadow: "0 0 12px rgba(161,43,31,0.4), 0 0 24px rgba(161,43,31,0.15)",
-                  wordBreak: "break-word" as any,
+                  wordBreak: "break-word" as any, overflowWrap: "anywhere",
+                  display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as any, overflow: "hidden",
                 }}>{m.team1Name}</div>
               </div>
               {/* VS Badge */}
@@ -327,11 +328,12 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               {isComplete && <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#4ade80", textShadow: "0 0 8px rgba(74,222,128,0.4)", marginTop: 4 }}>{m.team1Score} - {m.team2Score}</div>}
               {/* Team 2 Logo + Name */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 10, animation: "dtd-team-name-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.25s both" }}>
-                <div style={{
+                <div className="dtd-mc-vs-name" style={{
                   fontSize: "0.95rem", fontWeight: 900, color: "#ef4444", textAlign: "center",
                   textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2,
                   textShadow: "0 0 12px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",
-                  wordBreak: "break-word" as any,
+                  wordBreak: "break-word" as any, overflowWrap: "anywhere",
+                  display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as any, overflow: "hidden",
                 }}>{m.team2Name}</div>
                 <div style={{ width: 52, height: 52, borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(239,68,68,0.35)", background: "linear-gradient(135deg, #ef444422, #dc262622)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {teamLogoMap[m.team2Id] ? <img src={teamLogoMap[m.team2Id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#ef4444" }}>{(m.team2Name || "?")[0]}</span>}
@@ -1295,10 +1297,22 @@ function DotaTournamentDetailInner() {
           .dtd-tier-col { min-width: 100%; flex: 0 0 100%; }
           .dtd-mc-team { padding: 8px 10px; gap: 8px; }
           .dtd-mc-team-logo { width: 44px; height: 44px; font-size: 11px; border-radius: 10px; }
-          /* Single-line + ellipsis on phone (was 2-line clamp). Keeps the
-           * card's vertical footprint identical while letting the bigger
-           * font breathe horizontally. */
-          .dtd-mc-team-name { font-size: 1rem; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.18; -webkit-line-clamp: unset; display: block; }
+          /* Phone: allow team names to wrap up to 3 lines so long names
+           * (e.g. "Toxic but Talented", "10k ke Pohe") display fully
+           * instead of being ellipsis-clipped. Smaller font + tighter
+           * line-height keeps the card height comparable to before. */
+          .dtd-mc-team-name {
+            font-size: 0.88rem;
+            white-space: normal !important;
+            overflow: hidden;
+            text-overflow: clip;
+            line-height: 1.22;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
           .dtd-tab { min-height: 42px; padding: 0 6px; font-size: 0.74rem; gap: 4px; }
           .dtd-tab-label { display: none; }
           .dtd-tab-count { display: none; }
@@ -1323,7 +1337,11 @@ function DotaTournamentDetailInner() {
           .dtd-fighter-card > div:first-child { width: 32px !important; height: 32px !important; font-size: 0.75rem !important; }
           .dtd-fighter-card > div:last-child { max-width: 40px !important; }
           .dtd-fighter-card > div:last-child > div:first-child { font-size: 0.52rem !important; }
-          .dtd-mc-vs-col { padding: 0 4px !important; max-width: 140px !important; min-width: 90px !important; }
+          /* VS column: was 140px max which forced single-letter wraps for
+           * long team names — give it more horizontal room on phone, and
+           * shrink the inline name font so 3 lines fit cleanly. */
+          .dtd-mc-vs-col { padding: 0 4px !important; max-width: 160px !important; min-width: 110px !important; }
+          .dtd-mc-vs-name { font-size: 0.82rem !important; letter-spacing: 0.05em !important; line-height: 1.18 !important; }
           .dtd-mc-vs { width: 24px !important; height: 24px !important; font-size: 0.55rem !important; }
           .dtd-mc-vs { width: 34px !important; height: 34px !important; font-size: 0.75rem !important; }
         }
@@ -1340,7 +1358,9 @@ function DotaTournamentDetailInner() {
           .dtd-mc-center { min-width: 54px !important; }
           .dtd-mc-index { width: 28px !important; }
           .dtd-mc-score-box { font-size: 0.85rem !important; gap: 3px !important; }
-          .dtd-mc-team-name { font-size: 0.86rem !important; }
+          /* Tiny phone: same 3-line wrap, slightly smaller font so 3 lines
+           * still fit without ballooning the card height. */
+          .dtd-mc-team-name { font-size: 0.78rem !important; line-height: 1.2; -webkit-line-clamp: 3; }
           .dtd-mc-team-tag { font-size: 0.56rem !important; }
           /* Expanded match section */
           .dtd-mc-expanded { padding: 10px 4px 8px !important; }
@@ -1348,7 +1368,8 @@ function DotaTournamentDetailInner() {
           .dtd-fighter-card > img { width: 26px !important; height: 26px !important; }
           .dtd-fighter-card > div:first-child { width: 26px !important; height: 26px !important; font-size: 0.65rem !important; }
           .dtd-fighter-card > div:last-child { max-width: 32px !important; }
-          .dtd-mc-vs-col { padding: 0 2px !important; max-width: 120px !important; min-width: 70px !important; }
+          .dtd-mc-vs-col { padding: 0 2px !important; max-width: 140px !important; min-width: 90px !important; }
+          .dtd-mc-vs-name { font-size: 0.74rem !important; letter-spacing: 0.04em !important; }
           .dtd-mc-vs { width: 20px !important; height: 20px !important; font-size: 0.48rem !important; }
           .dtd-mc-vs { width: 28px !important; height: 28px !important; font-size: 0.6rem !important; }
         }
