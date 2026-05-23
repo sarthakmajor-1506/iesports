@@ -1005,11 +1005,18 @@ class DotaBot extends EventEmitter {
             const member = this.parseMemberEntry(sub);
             if (member) members.push(member);
           } else {
-            // Recurse into nested messages to find field 120 deeper. Don't
-            // promote nested metadata — only the top-level CSODOTALobby
-            // carries the authoritative match_id/state.
-            const nestedMembers = this.parseLobbyPayload(sub);
-            for (const m of nestedMembers) members.push(m);
+            // The lobby payload often arrives wrapped — CMsgSO_Update /
+            // CMsgSO_CacheSubscribed nest the CSODOTALobby one (or more)
+            // levels deep. The existing member parser already recurses
+            // for this reason; we MUST also promote match_id / state /
+            // lobby_id from nested messages, otherwise the in-lobby
+            // matchId capture never fires (the data is there, just one
+            // protobuf frame deeper than the outermost SO envelope).
+            const nested = this.parseLobbyState(sub);
+            for (const m of nested.members) members.push(m);
+            if (!matchId && nested.matchId) matchId = nested.matchId;
+            if (!lobbyId && nested.lobbyId) lobbyId = nested.lobbyId;
+            if (state === -1 && nested.state !== -1) state = nested.state;
           }
         } else if (wireType === 5) {
           // fixed32 — skip
