@@ -751,35 +751,13 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // ── Move any stragglers in the waiting room to the Dota General
-          //   fallback VC before deletion (env var DOTA_GENERAL_VC_ID). Catches
-          //   players who weren't on the resolved team rosters (subs, late
-          //   arrivals, anyone who joined the waiting room VC manually).
-          const dotaGeneralVcId = process.env.DOTA_GENERAL_VC_ID;
+          // ── Delete waiting room VC ──────────────────────────────────────
+          // Team players were already moved to their team VCs above, so they
+          // won't get disconnected when the waiting room is deleted. (Any
+          // non-roster strangers who joined the waiting room manually will
+          // get disconnected — acceptable trade-off since REST has no batch
+          // voice-state enum to find them.)
           const waitingRoomVcId = matchData.waitingRoomVcId;
-          if (waitingRoomVcId && dotaGeneralVcId && botToken) {
-            try {
-              const ch: any = await discordFetch(`/channels/${waitingRoomVcId}`, "GET").then(r => r.ok ? r.json() : null);
-              if (ch) {
-                const guildMembersRes = await discordFetch(`/guilds/${guildId}/members?limit=1000`, "GET");
-                const guildMembers: any[] = guildMembersRes.ok ? await guildMembersRes.json() : [];
-                const stuck = guildMembers
-                  .filter(m => m.voice_state?.channel_id === waitingRoomVcId)
-                  .map(m => m.user?.id)
-                  .filter(Boolean) as string[];
-                for (const did of stuck) {
-                  if (!allDiscordIds.includes(did)) {
-                    // Not on either team — bump to Dota general
-                    await maybeMoveToVoice(guildId, did, dotaGeneralVcId);
-                  }
-                }
-              }
-            } catch (e: any) {
-              console.warn("[Discord] straggler move skipped:", e?.message || e);
-            }
-          }
-
-          // ── Delete waiting room VC if it exists ─────────────────────────
           if (waitingRoomVcId) {
             await maybeDeleteChannel(waitingRoomVcId);
             startUpdateData.waitingRoomVcId = null; // clean up reference
@@ -869,6 +847,38 @@ export async function POST(req: NextRequest) {
         matchData.team1VcId,
         matchData.team2VcId,
       ].filter(Boolean);
+
+      // Evacuate everyone we know about to the Dota 2 General VC before we
+      // delete the match-specific VCs. Without this, Discord disconnects
+      // anyone in a deleted VC from voice entirely — the user explicitly
+      // wants people moved, not kicked. Env-overridable but defaults to the
+      // server's permanent "Dota 2 General" channel.
+      const DOTA_GENERAL_VC = process.env.DOTA_GENERAL_VC_ID || "1475549366600073321";
+      if (botToken && guildId && vcsToDelete.length > 0) {
+        try {
+          // Build the full list of discord IDs across both rosters + subs.
+          // These are the people we expect to be in the team / waiting-room
+          // VCs at cleanup time.
+          const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
+          const team1Subs: ResolvedSub[] = (matchData.team1Subs || []) as ResolvedSub[];
+          const team2Subs: ResolvedSub[] = (matchData.team2Subs || []) as ResolvedSub[];
+          const allKnownIds = [
+            ...team1Players.map(p => p.discordId),
+            ...team2Players.map(p => p.discordId),
+            ...team1Subs.map(s => s.discordId),
+            ...team2Subs.map(s => s.discordId),
+          ].filter(Boolean);
+          let movedCount = 0;
+          for (const did of allKnownIds) {
+            // maybeMoveToVoice no-ops if the user isn't currently in voice
+            const ok = await maybeMoveToVoice(guildId, did, DOTA_GENERAL_VC);
+            if (ok) movedCount++;
+          }
+          console.log(`[cleanup-vcs] evacuated ${movedCount}/${allKnownIds.length} to Dota General before delete`);
+        } catch (e: any) {
+          console.warn(`[cleanup-vcs] evacuation failed (proceeding to delete anyway): ${e?.message || e}`);
+        }
+      }
 
       for (const vcId of vcsToDelete) {
         await maybeDeleteChannel(vcId);
