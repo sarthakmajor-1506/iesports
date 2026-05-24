@@ -122,14 +122,22 @@
       valorantPlayerSnapshot.ts               ← Valorant player aggregate snapshot
       checkAdmin.ts, verifyAdmin.ts           ← admin auth helpers
     scripts/
-      seedTournaments.ts, seedValorantTournaments.ts, seedCS2Tournaments.ts,
-      seedDota2Tournament.ts, seedSoloTournaments.ts, seedShuffleTournament.ts
-      clearRegistrations.ts, clearLeaderboard.ts, clearShareBgs.ts
-      refreshRanks.ts, recalcTiers (via lib), syncSoloPlayers.ts
-      applyMatchElo.ts, buildDiscordMsg.ts, checkLeaderboard.ts, dumpGrandFinal.ts
-      fixBracketAdvancement.ts, makeAscensionFree.ts, removePlayer.ts,
-      resetLbFinal.ts, resetPrelims.ts, resetRatings.ts, restoreLbFinal.ts,
-      sendAscensionDMs.ts, testToss.ts, unregDotaPlayer.ts
+      dev-tools/                              ← reusable CLI utilities (see scripts/dev-tools/README.md)
+        botState.ts, testCreateLobby.ts, listAllDotaTournaments.ts,
+        softResetMatch.ts, recomputeDotaStandings.ts, watchMatchId.ts,
+        tryStratz.ts, tryWebAPI.ts, ... (16 generic tools)
+      ad-hoc/                                 ← incident-specific scripts (see scripts/ad-hoc/README.md)
+        _restoreDomin8Matches.ts, _swapBsingerForMoney.ts, _resetR2M2.ts,
+        _findKilluminati.ts, ... (24 one-offs kept for history)
+      (root, unprefixed)                      ← stable seed / repair / ops scripts:
+        seedTournaments.ts, seedValorantTournaments.ts, seedCS2Tournaments.ts,
+        seedDota2Tournament.ts, seedSoloTournaments.ts, seedShuffleTournament.ts
+        clearRegistrations.ts, clearLeaderboard.ts, clearShareBgs.ts
+        refreshRanks.ts, recalcTiers (via lib), syncSoloPlayers.ts
+        applyMatchElo.ts, buildDiscordMsg.ts, checkLeaderboard.ts, dumpGrandFinal.ts
+        fixBracketAdvancement.ts, makeAscensionFree.ts, removePlayer.ts,
+        resetLbFinal.ts, resetPrelims.ts, resetRatings.ts, restoreLbFinal.ts,
+        sendAscensionDMs.ts, testToss.ts, unregDotaPlayer.ts
     public/
       riot.txt                                ← Riot domain verification (placeholder until approved)
       ielogo.png, riot-games.png, valorantlogo.png, dota2logo.png, cs2logo.png, codlogo.jpeg, ...
