@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyAdmin } from "@/lib/verifyAdmin";
+import { recomputeDotaStandings } from "@/lib/recomputeDotaStandings";
 
 /**
  * Manual Dota match result entry — fallback when GC/Web API/OpenDota all
@@ -63,5 +64,12 @@ export async function POST(req: NextRequest) {
     },
   }, { merge: true });
 
-  return NextResponse.json({ ok: true, winner, winnerName, matchId });
+  // Refresh tournament standings — keeps the public Standings tab in sync
+  // without an admin needing to rerun the recompute script after every
+  // manual entry.
+  let standingsRefresh: any = null;
+  try { standingsRefresh = await recomputeDotaStandings(adminDb, tournamentId); }
+  catch (e: any) { standingsRefresh = { error: e?.message || String(e) }; }
+
+  return NextResponse.json({ ok: true, winner, winnerName, matchId, standingsRefresh });
 }

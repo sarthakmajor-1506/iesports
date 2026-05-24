@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyAdmin } from "@/lib/verifyAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { recomputeDotaStandings } from "@/lib/recomputeDotaStandings";
 
 /**
  * Reset a Dota tournament match — either soft (admin doc only) or hard
@@ -54,7 +55,11 @@ export async function POST(req: NextRequest) {
       team1Subs: FieldValue.delete(),
       team2Subs: FieldValue.delete(),
     });
-    return NextResponse.json({ ok: true, mode, message: "Match soft-reset. Bot lobby + VCs + queue untouched." });
+    // Soft reset doesn't change completed-match counts but doesn't hurt to
+    // refresh standings (cheap; idempotent).
+    let standingsRefresh: any = null;
+    try { standingsRefresh = await recomputeDotaStandings(adminDb, tournamentId); } catch (e: any) { standingsRefresh = { error: e?.message || String(e) }; }
+    return NextResponse.json({ ok: true, mode, standingsRefresh, message: "Match soft-reset. Bot lobby + VCs + queue untouched." });
   }
 
   // HARD path — destroy bot lobby + full match doc wipe + delete queue.
@@ -95,8 +100,13 @@ export async function POST(req: NextRequest) {
     .where("tournamentMatchId", "==", matchId).get();
   for (const d of stale.docs) { await d.ref.delete(); queueDeleted++; }
 
+  // Hard reset removes a completed match's contribution, so recompute.
+  let standingsRefresh: any = null;
+  try { standingsRefresh = await recomputeDotaStandings(adminDb, tournamentId); }
+  catch (e: any) { standingsRefresh = { error: e?.message || String(e) }; }
+
   return NextResponse.json({
-    ok: true, mode, destroyCmdId, queueDeleted,
+    ok: true, mode, destroyCmdId, queueDeleted, standingsRefresh,
     message: "Hard reset: bot lobby destroy enqueued, match doc wiped, queue deleted.",
   });
 }

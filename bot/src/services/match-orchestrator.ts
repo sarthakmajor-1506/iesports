@@ -250,6 +250,68 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       }, { merge: true });
       console.log(`[Match] ✅ Auto-resolved ${tColl}/${tid}/matches/${tMatchId} → ${winnerName} wins (team1=${team1Side}, team2=${team2Side})`);
 
+      // ── Recompute tournament standings ────────────────────────────────
+      // Without this every match-complete leaves the public Standings tab
+      // stale until an admin reruns _recomputeDomin8Standings.ts. Cheap
+      // idempotent rebuild from the completed matches.
+      try {
+        const standings: Record<string, any> = {};
+        const init = (id: string, name: string) => {
+          if (!standings[id]) standings[id] = {
+            teamId: id, teamName: name || id,
+            played: 0, wins: 0, losses: 0, draws: 0, points: 0,
+            killsFor: 0, killsAgainst: 0,
+            mapsWon: 0, mapsLost: 0,
+          };
+        };
+        const allCompleted = await db.collection(tColl).doc(tid).collection("matches").where("status", "==", "completed").get();
+        for (const md of allCompleted.docs) {
+          const x: any = md.data();
+          if (!x.team1Id || !x.team2Id) continue;
+          let w: "team1" | "team2" | "draw" | null = x.winner ?? null;
+          if (!w) {
+            const t1 = x.team1Score ?? 0, t2 = x.team2Score ?? 0;
+            if (t1 > t2) w = "team1"; else if (t2 > t1) w = "team2";
+            else if (t1 === t2 && t1 > 0) w = "draw";
+          }
+          if (!w) continue;
+          init(x.team1Id, x.team1Name); init(x.team2Id, x.team2Name);
+          const a = standings[x.team1Id], b = standings[x.team2Id];
+          a.played++; b.played++;
+          const m1 = x.team1Score || 0, m2 = x.team2Score || 0;
+          a.mapsWon += m1; a.mapsLost += m2; b.mapsWon += m2; b.mapsLost += m1;
+          if (w === "team1") { a.wins++; b.losses++; a.points += 3; }
+          else if (w === "team2") { b.wins++; a.losses++; b.points += 3; }
+          else { a.draws++; b.draws++; a.points++; b.points++; }
+          const ps: any[] = x.game1?.playerStats || x.playerStats || [];
+          if (Array.isArray(ps) && ps.length > 0) {
+            const team1Sd = x.result?.team1Side || x.game1?.team1Side;
+            let k1 = 0, k2 = 0;
+            for (const p of ps) {
+              const k = p.kills || 0;
+              if (team1Sd) { if (p.side === team1Sd) k1 += k; else k2 += k; }
+              else if (p.teamId) { if (p.teamId === x.team1Id) k1 += k; else if (p.teamId === x.team2Id) k2 += k; }
+            }
+            a.killsFor += k1; a.killsAgainst += k2;
+            b.killsFor += k2; b.killsAgainst += k1;
+          }
+        }
+        const existing = await db.collection(tColl).doc(tid).collection("standings").get();
+        const newIds = new Set(Object.keys(standings));
+        const batch = db.batch();
+        for (const d of existing.docs) if (!newIds.has(d.id)) batch.delete(d.ref);
+        for (const sid of newIds) {
+          const s = standings[sid];
+          batch.set(db.collection(tColl).doc(tid).collection("standings").doc(sid), {
+            ...s, killDiff: s.killsFor - s.killsAgainst,
+          });
+        }
+        await batch.commit();
+        console.log(`[Match] ✅ Standings refreshed (${newIds.size} teams, ${allCompleted.size} completed matches)`);
+      } catch (e: any) {
+        console.error(`[Match] standings refresh failed: ${e?.message || e}`);
+      }
+
       // ── Post a match-result embed to the tournament's Discord channel ──
       // Mirrors the IDPL_BOT style: green Radiant or red Dire victory header,
       // dotabuff link, side mapping, plus a tag so cleanup-vcs can sweep it
