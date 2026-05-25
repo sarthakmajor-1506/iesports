@@ -243,18 +243,30 @@ function TeamRow({ team, logoUrl, score, isWinner, isLoser, isComplete, isLive, 
   // Use the team's logo image when we have one + the slot is populated.
   // Falls back to coloured initials box when there's no logo URL.
   const hasLogo = !isEmpty && !!logoUrl;
+  // Top 2 seeds get a gold accent — they earned a bye straight to UB Semis,
+  // visually marks them as the protected top-of-standings teams. Applies
+  // everywhere they appear in the bracket (semis, UB Final, GF) so the
+  // visual identity follows them through.
+  const isTopSeed = !isEmpty && (team.seed === 1 || team.seed === 2);
 
   let nameColor = isEmpty ? C.textPlaceholder : C.text;
   if (isWinner) nameColor = C.win;
   if (isEliminated) nameColor = "#f87171";
   else if (isLoser) nameColor = "#f87171";
+  else if (isTopSeed) nameColor = "#fbbf24"; // amber/gold for #1 and #2 seeds
 
-  let logoBg = isEmpty ? C.divider : C.accentLight;
-  let logoColor = isEmpty ? C.textPlaceholder : C.accent;
-  let logoBorder = isEmpty ? C.cardBorder : C.accentBorder;
+  let logoBg = isEmpty ? C.divider : (isTopSeed ? "rgba(251,191,36,0.15)" : C.accentLight);
+  let logoColor = isEmpty ? C.textPlaceholder : (isTopSeed ? "#fbbf24" : C.accent);
+  let logoBorder = isEmpty ? C.cardBorder : (isTopSeed ? "rgba(251,191,36,0.45)" : C.accentBorder);
 
   return (
     <g transform={`translate(0, ${y})`} pointerEvents="none">
+      {/* Top-seed (#1 / #2) gold-tinted background — sits under everything,
+          dimmer than winner highlight so it doesn't compete when a top seed
+          also wins. */}
+      {isTopSeed && !isWinner && !isEliminated && (
+        <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={5} fill="rgba(251,191,36,0.06)" />
+      )}
       {/* Winner highlight bar */}
       {isWinner && <rect x={2} y={0} width={MATCH_W - 4} height={rowH} rx={5} fill={C.winBg} />}
       {/* Eliminated highlight bar */}

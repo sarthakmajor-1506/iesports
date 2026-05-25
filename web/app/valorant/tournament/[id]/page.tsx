@@ -499,6 +499,9 @@ function ValorantTournamentDetailInner() {
   const [waitlistData, setWaitlistData] = useState<any[]>([]);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(() => searchParams.get("match") || null);
+  // Group-stage section collapsed by default once playoffs exist — keeps the
+  // Matches tab focused on the active stage. User can expand to see history.
+  const [groupsCollapsed, setGroupsCollapsed] = useState(true);
   const [lbSort, setLbSort] = useState<"kd" | "kills" | "deaths" | "assists" | "hs" | "fk" | "fd" | "adr" | "acs" | "maps">("kd");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
@@ -1723,8 +1726,22 @@ function ValorantTournamentDetailInner() {
                   </div>
                   {groupMatches.length > 0 && (
                     <div>
-                      <div className="vtd-section-header group">Groups</div>
-                      {(() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">R{day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length}</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
+                      {/* Group stage section is collapsed by default when playoffs
+                          have started — keeps the focus on the active stage.
+                          Click the header to expand again. State is local to this
+                          render so it resets on tab switch (acceptable). */}
+                      <div
+                        className="vtd-section-header group"
+                        onClick={() => setGroupsCollapsed(c => !c)}
+                        style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+                        title={groupsCollapsed ? "Click to expand group stage" : "Click to collapse group stage"}
+                      >
+                        <span>Groups{groupsCollapsed ? ` (${groupMatches.length} matches — click to expand)` : ""}</span>
+                        <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>
+                          {groupsCollapsed ? "▼ show" : "▲ hide"}
+                        </span>
+                      </div>
+                      {!groupsCollapsed && (() => { const days = [...new Set(groupMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); return days.map((day: number) => (<div key={day}><div className="vtd-match-day-header"><span className="day-num">R{day}</span><span>· {groupMatches.filter((m: any) => m.matchDay === day).length}</span></div>{groupMatches.filter((m: any) => m.matchDay === day).map((m: any) => (<MatchCard key={m.id} m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={false} bestOf={tournament?.matchesPerRound || 2} />))}</div>)); })()}
                     </div>
                   )}
                   {bracketMatches.length > 0 && (
