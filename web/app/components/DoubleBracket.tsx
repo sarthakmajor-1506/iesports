@@ -137,7 +137,12 @@ function makePlaceholder(
 }
 
 // ── SVG Match Card ────────────────────────────────────────────────────────────
-function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMatch; x: number; y: number; bestOf?: number; tournamentId?: string }) {
+// Placeholder-name regex: matches "Rank 3", "RANK 3", "Seed #5", "rank 10" etc.
+// These literal strings sometimes get saved to bracket matches when generated
+// before group stage standings were finalised — at render time we resolve them
+// back to the real team name via the seeded `teams[]` array.
+const RANK_PLACEHOLDER_RE = /^(rank|seed)\s*#?\s*\d+$/i;
+function MatchCard({ match, x, y, bestOf = 1, tournamentId, teams = [] }: { match: BracketMatch; x: number; y: number; bestOf?: number; tournamentId?: string; teams?: TeamSlot[] }) {
   const isComplete = match.status === "completed";
   const isLive = match.status === "live";
   const t1Won = isComplete && match.team1Score > match.team2Score;
@@ -145,15 +150,28 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId }: { match: BracketMa
   // A losing team is eliminated if there's no loserGoesTo (they have nowhere to advance)
   const loserEliminated = isComplete && !match.loserGoesTo;
 
+  // Resolve a slot's display name. If the stored name is empty / "TBD" /
+  // a "Rank N"-style placeholder, fall back to the seeded team from
+  // standings (teams[seed-1]) so post-group-stage brackets show real names.
+  const resolveName = (rawName: string | undefined, seed: number, embedded?: TeamSlot): string => {
+    const isPlaceholder = !rawName || rawName === "TBD" || RANK_PLACEHOLDER_RE.test(rawName);
+    if (!isPlaceholder) return rawName!;
+    if (seed > 0 && teams[seed - 1]?.teamName && teams[seed - 1].teamName !== "TBD") {
+      return teams[seed - 1].teamName;
+    }
+    return embedded?.teamName || rawName || "TBD";
+  };
+  const t1Seed = match.team1?.seed || 0;
+  const t2Seed = match.team2?.seed || 0;
   const t1 = {
     teamId: match.team1Id,
-    teamName: match.team1Name !== "TBD" ? match.team1Name : (match.team1?.teamName || "TBD"),
-    seed: match.team1?.seed || 0,
+    teamName: resolveName(match.team1Name, t1Seed, match.team1),
+    seed: t1Seed,
   };
   const t2 = {
     teamId: match.team2Id,
-    teamName: match.team2Name !== "TBD" ? match.team2Name : (match.team2?.teamName || "TBD"),
-    seed: match.team2?.seed || 0,
+    teamName: resolveName(match.team2Name, t2Seed, match.team2),
+    seed: t2Seed,
   };
   const borderColor = isLive ? C.live : isComplete ? C.winBorder : C.cardBorder;
   const clickable = !!tournamentId && match.team1Id !== "TBD" && match.team2Id !== "TBD";
@@ -285,13 +303,24 @@ function TeamRow({ team, score, isWinner, isLoser, isComplete, isLive, isElimina
 }
 
 // ── Connector helpers ─────────────────────────────────────────────────────────
-function Connector({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) {
+// Connector colours:
+//   - upper bracket flow:  blue (#3b82f6 at ~55% opacity → "5b9eff8c")
+//   - lower bracket flow:  cyan (#3CCBFF at ~55% opacity → "3CCBFF8c")
+//   - UB→LB drop (loser):  amber dashed (#fbbf24 at ~50% opacity) — visually
+//     distinguishes "losing team falls to LB" from same-bracket progression
+// The user feedback was that the original uniform dim-gray (#3a3a42) made it
+// hard to trace which match feeds which — coloured lanes solve that.
+const FLOW_UPPER = "rgba(59,130,246,0.65)";    // bright blue
+const FLOW_LOWER = "rgba(60,203,255,0.65)";    // bright cyan
+const FLOW_DROP  = "rgba(251,191,36,0.55)";    // amber for losers dropping to LB
+
+function Connector({ x1, y1, x2, y2, color = C.connector, dashed = false, strokeWidth = 1.8 }: { x1: number; y1: number; x2: number; y2: number; color?: string; dashed?: boolean; strokeWidth?: number }) {
   const midX = (x1 + x2) / 2;
-  return <path d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none" stroke={C.connector} strokeWidth={1.5} />;
+  return <path d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dashed ? "5 4" : undefined} />;
 }
 
 function CDot({ x, y, lower = false }: { x: number; y: number; lower?: boolean }) {
-  return <circle cx={x} cy={y} r={3} fill={lower ? C.connectorDotLower : C.connectorDotUpper} />;
+  return <circle cx={x} cy={y} r={3.5} fill={lower ? C.connectorDotLower : C.connectorDotUpper} stroke="rgba(10,11,14,0.8)" strokeWidth={1} />;
 }
 
 function SectionLine({ x1, x2, y, label, color }: { x1: number; x2: number; y: number; label: string; color: string }) {
@@ -303,8 +332,23 @@ function SectionLine({ x1, x2, y, label, color }: { x1: number; x2: number; y: n
   );
 }
 
+// Column header for each round (UPPER R1, UPPER SEMIS, LOWER R3, GRAND FINAL).
+// Was 10px muted-grey text — easy to miss. Now a 13px bold uppercase chip
+// with a subtle accent pill so each round's name reads clearly at the top
+// of its column.
 function ColHeader({ x, y, text: t, accent = false }: { x: number; y: number; text: string; accent?: boolean }) {
-  return <text x={x} y={y} fill={accent ? C.live : C.textMuted} fontSize={10} fontWeight={800} textAnchor="middle" letterSpacing="0.1em" fontFamily="system-ui">{t}</text>;
+  const fill = accent ? C.live : "#E6E7EE";
+  const pillFill = accent ? "rgba(245,158,11,0.10)" : "rgba(60,203,255,0.06)";
+  const pillStroke = accent ? "rgba(245,158,11,0.30)" : "rgba(60,203,255,0.18)";
+  const width = Math.max(94, t.length * 7 + 18);
+  return (
+    <g>
+      <rect x={x - width / 2} y={y - 11} width={width} height={20} rx={10}
+            fill={pillFill} stroke={pillStroke} strokeWidth={0.8} />
+      <text x={x} y={y + 3} fill={fill} fontSize={11.5} fontWeight={900}
+            textAnchor="middle" letterSpacing="0.15em" fontFamily="system-ui">{t}</text>
+    </g>
+  );
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
@@ -440,7 +484,7 @@ function Bracket2({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length}>
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
-      <MatchCard match={match} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={match} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} />
     </BracketWrapper>
   );
 }
@@ -488,9 +532,9 @@ function Bracket3({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
-      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
       <text x={lbFinal.x + MATCH_W + 10} y={lbFinal.y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={9} fontFamily="system-ui" fontStyle="italic">
@@ -546,10 +590,10 @@ function Bracket4({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={lbF.x + MATCH_W} y1={lbF.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbF.x + MATCH_W} y={lbF.y + MATCH_H / 2} lower />
 
-      <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mUBSemi} x={ubSemi.x} y={ubSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBR1} x={lbR1.x} y={lbR1.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBF} x={lbF.x} y={lbF.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
       <text x={ubSemi.x + MATCH_W + 10} y={ubSemi.y + MATCH_H / 2 - 4}
         fill={C.win} fontSize={8.5} fontFamily="system-ui" fontWeight={700}>
@@ -660,17 +704,17 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
       <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
 
-      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
 
-      <MatchCard match={mLBR1_1} x={lbR1[0].x} y={lbR1[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBR1_2} x={lbR1[1].x} y={lbR1[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBR2_2} x={lbR2[1].x} y={lbR2[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mLBR1_1} x={lbR1[0].x} y={lbR1[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBR1_2} x={lbR1[1].x} y={lbR1[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBR2_1} x={lbR2[0].x} y={lbR2[0].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBR2_2} x={lbR2[1].x} y={lbR2[1].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
       <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
         fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
@@ -776,35 +820,35 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
       {/* UB R1 → UB Semis (crossed: R1 M1 winner → Semi M2, R1 M2 winner → Semi M1) */}
-      <Connector x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2} x2={ubSemi[0].x} y2={ubSemi[0].y + 3 * MATCH_H / 4} />
-      <Connector x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2} x2={ubSemi[1].x} y2={ubSemi[1].y + MATCH_H / 4} />
+      <Connector color={FLOW_UPPER} x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2} x2={ubSemi[0].x} y2={ubSemi[0].y + 3 * MATCH_H / 4} />
+      <Connector color={FLOW_UPPER} x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2} x2={ubSemi[1].x} y2={ubSemi[1].y + MATCH_H / 4} />
       <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
       <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
 
       {/* UB Semis → UB Final */}
-      <Connector x1={ubSemi[0].x + MATCH_W} y1={ubSemi[0].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + MATCH_H / 4} />
-      <Connector x1={ubSemi[1].x + MATCH_W} y1={ubSemi[1].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + 3 * MATCH_H / 4} />
+      <Connector color={FLOW_UPPER} x1={ubSemi[0].x + MATCH_W} y1={ubSemi[0].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + MATCH_H / 4} />
+      <Connector color={FLOW_UPPER} x1={ubSemi[1].x + MATCH_W} y1={ubSemi[1].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + 3 * MATCH_H / 4} />
       <CDot x={ubSemi[0].x + MATCH_W} y={ubSemi[0].y + MATCH_H / 2} />
       <CDot x={ubSemi[1].x + MATCH_W} y={ubSemi[1].y + MATCH_H / 2} />
 
       {/* UB Final → GF */}
-      <Connector x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
+      <Connector color={FLOW_UPPER} x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
 
-      {/* UB R1 losers → LB R2 (crossed: R1 M1 loser → LB R2 M2, R1 M2 loser → LB R2 M1) */}
-      <Connector x1={ubR1[0].x + MATCH_W / 2} y1={ubR1[0].y + MATCH_H} x2={lbR2[1].x + MATCH_W / 4} y2={lbR2[1].y} />
+      {/* UB R1 losers → LB R2 (crossed: R1 M1 loser → LB R2 M2, R1 M2 loser → LB R2 M1) — amber dashed = "loser falls to LB" */}
+      <Connector color={FLOW_DROP} dashed x1={ubR1[0].x + MATCH_W / 2} y1={ubR1[0].y + MATCH_H} x2={lbR2[1].x + MATCH_W / 4} y2={lbR2[1].y} />
       <CDot x={ubR1[0].x + MATCH_W / 2} y={ubR1[0].y + MATCH_H} lower />
-      <Connector x1={ubR1[1].x + MATCH_W / 2} y1={ubR1[1].y + MATCH_H} x2={lbR2[0].x + MATCH_W / 4} y2={lbR2[0].y} />
+      <Connector color={FLOW_DROP} dashed x1={ubR1[1].x + MATCH_W / 2} y1={ubR1[1].y + MATCH_H} x2={lbR2[0].x + MATCH_W / 4} y2={lbR2[0].y} />
       <CDot x={ubR1[1].x + MATCH_W / 2} y={ubR1[1].y + MATCH_H} lower />
 
       {/* UB Semi losers → LB R3 (crossed) */}
-      <Connector x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H} x2={lbR3[1].x + MATCH_W / 4} y2={lbR3[1].y} />
+      <Connector color={FLOW_DROP} dashed x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H} x2={lbR3[1].x + MATCH_W / 4} y2={lbR3[1].y} />
       <CDot x={ubSemi[0].x + MATCH_W / 2} y={ubSemi[0].y + MATCH_H} lower />
-      <Connector x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H} x2={lbR3[0].x + MATCH_W / 4} y2={lbR3[0].y} />
+      <Connector color={FLOW_DROP} dashed x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H} x2={lbR3[0].x + MATCH_W / 4} y2={lbR3[0].y} />
       <CDot x={ubSemi[1].x + MATCH_W / 2} y={ubSemi[1].y + MATCH_H} lower />
 
       {/* UB Final loser → LB Final */}
-      <Connector x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
+      <Connector color={FLOW_DROP} dashed x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H} x2={lbFinal.x + MATCH_W / 4} y2={lbFinal.y} />
       <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
 
       <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
@@ -818,7 +862,7 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       {/* LB R1 → LB R2 */}
       {[0, 1].map(i => (
         <g key={`lbr1-lbr2-${i}`}>
-          <Connector x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + 3 * MATCH_H / 4} />
+          <Connector color={FLOW_LOWER} x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + 3 * MATCH_H / 4} />
           <CDot x={lbR1[i].x + MATCH_W} y={lbR1[i].y + MATCH_H / 2} lower />
         </g>
       ))}
@@ -826,37 +870,37 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       {/* LB R2 → LB R3 */}
       {[0, 1].map(i => (
         <g key={`lbr2-lbr3-${i}`}>
-          <Connector x1={lbR2[i].x + MATCH_W} y1={lbR2[i].y + MATCH_H / 2} x2={lbR3[i].x} y2={lbR3[i].y + MATCH_H / 4} />
+          <Connector color={FLOW_LOWER} x1={lbR2[i].x + MATCH_W} y1={lbR2[i].y + MATCH_H / 2} x2={lbR3[i].x} y2={lbR3[i].y + MATCH_H / 4} />
           <CDot x={lbR2[i].x + MATCH_W} y={lbR2[i].y + MATCH_H / 2} lower />
         </g>
       ))}
 
       {/* LB R3 → LB Semi */}
-      <Connector x1={lbR3[0].x + MATCH_W} y1={lbR3[0].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + MATCH_H / 4} />
-      <Connector x1={lbR3[1].x + MATCH_W} y1={lbR3[1].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + 3 * MATCH_H / 4} />
+      <Connector color={FLOW_LOWER} x1={lbR3[0].x + MATCH_W} y1={lbR3[0].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + MATCH_H / 4} />
+      <Connector color={FLOW_LOWER} x1={lbR3[1].x + MATCH_W} y1={lbR3[1].y + MATCH_H / 2} x2={lbSemi.x} y2={lbSemi.y + 3 * MATCH_H / 4} />
       <CDot x={lbR3[0].x + MATCH_W} y={lbR3[0].y + MATCH_H / 2} lower />
       <CDot x={lbR3[1].x + MATCH_W} y={lbR3[1].y + MATCH_H / 2} lower />
 
       {/* LB Semi → LB Final */}
-      <Connector x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={lbFinal.y + MATCH_H / 4} />
+      <Connector color={FLOW_LOWER} x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={lbFinal.y + MATCH_H / 4} />
       <CDot x={lbSemi.x + MATCH_W} y={lbSemi.y + MATCH_H / 2} lower />
 
       {/* LB Final → GF */}
-      <Connector x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
+      <Connector color={FLOW_LOWER} x1={lbFinal.x + MATCH_W} y1={lbFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + 3 * MATCH_H / 4} />
       <CDot x={lbFinal.x + MATCH_W} y={lbFinal.y + MATCH_H / 2} lower />
 
       {/* Match cards */}
-      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      {mUBSemi.map((m, i) => <MatchCard key={m.id} match={m} x={ubSemi[i].x} y={ubSemi[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
+      {mUBR1.map((m, i) => <MatchCard key={m.id} match={m} x={ubR1[i].x} y={ubR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      {mUBSemi.map((m, i) => <MatchCard key={m.id} match={m} x={ubSemi[i].x} y={ubSemi[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      <MatchCard match={mUBF} x={ubFinal.x} y={ubFinal.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
 
-      {mLBR1.map((m, i) => <MatchCard key={m.id} match={m} x={lbR1[i].x} y={lbR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      {mLBR2.map((m, i) => <MatchCard key={m.id} match={m} x={lbR2[i].x} y={lbR2[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      {mLBR3.map((m, i) => <MatchCard key={m.id} match={m} x={lbR3[i].x} y={lbR3[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} />)}
-      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} />
-      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} />
+      {mLBR1.map((m, i) => <MatchCard key={m.id} match={m} x={lbR1[i].x} y={lbR1[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      {mLBR2.map((m, i) => <MatchCard key={m.id} match={m} x={lbR2[i].x} y={lbR2[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      {mLBR3.map((m, i) => <MatchCard key={m.id} match={m} x={lbR3[i].x} y={lbR3[i].y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />)}
+      <MatchCard match={mLBS} x={lbSemi.x} y={lbSemi.y} bestOf={bracketBestOf} tournamentId={tournamentId} teams={teams} />
+      <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
-      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} />
+      <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} />
 
       {/* Annotations */}
       <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
