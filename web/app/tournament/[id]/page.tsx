@@ -1517,9 +1517,14 @@ function DotaTournamentDetailInner() {
           )}
 
           {/* ═══ TAB BAR ═══ */}
+          {/* Leaderboard tab can be hidden per-tournament via the
+              `hideLeaderboard: true` flag on the tournament doc — set when
+              per-player Dota stats aren't reliable (e.g. when result.source
+              is "lobby-so-postgame" / "manual-admin" which don't capture
+              K/D/A). */}
           <div className="dtd-tabs-wrap" ref={tabsWrapRef}>
             <div className="dtd-tabs">
-              {TABS.map(t => (
+              {TABS.filter(t => !(t.key === "leaderboard" && (tournament as any)?.hideLeaderboard)).map(t => (
                 <button key={t.key} className={`dtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }} title={t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
                   <span className="dtd-tab-label">{t.label}</span>
@@ -1906,7 +1911,7 @@ function DotaTournamentDetailInner() {
           )}
 
           {/* ═══ LEADERBOARD ═══ */}
-          {activeTab === "leaderboard" && (
+          {activeTab === "leaderboard" && !(tournament as any)?.hideLeaderboard && (
             <div className="dtd-tab-pane" ref={tabContentRef}>
               <div className="dtd-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>

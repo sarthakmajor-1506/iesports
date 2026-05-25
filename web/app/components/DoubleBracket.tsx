@@ -141,7 +141,9 @@ function makePlaceholder(
 // These literal strings sometimes get saved to bracket matches when generated
 // before group stage standings were finalised — at render time we resolve them
 // back to the real team name via the seeded `teams[]` array.
-const RANK_PLACEHOLDER_RE = /^(rank|seed)\s*#?\s*\d+$/i;
+// Capture group #1 is the seed number itself — used as a fallback when
+// `match.team1?.seed` isn't set on the doc (older generator).
+const RANK_PLACEHOLDER_RE = /^(?:rank|seed)\s*#?\s*(\d+)$/i;
 function MatchCard({ match, x, y, bestOf = 1, tournamentId, teams = [] }: { match: BracketMatch; x: number; y: number; bestOf?: number; tournamentId?: string; teams?: TeamSlot[] }) {
   const isComplete = match.status === "completed";
   const isLive = match.status === "live";
@@ -150,29 +152,26 @@ function MatchCard({ match, x, y, bestOf = 1, tournamentId, teams = [] }: { matc
   // A losing team is eliminated if there's no loserGoesTo (they have nowhere to advance)
   const loserEliminated = isComplete && !match.loserGoesTo;
 
-  // Resolve a slot's display name. If the stored name is empty / "TBD" /
-  // a "Rank N"-style placeholder, fall back to the seeded team from
-  // standings (teams[seed-1]) so post-group-stage brackets show real names.
-  const resolveName = (rawName: string | undefined, seed: number, embedded?: TeamSlot): string => {
-    const isPlaceholder = !rawName || rawName === "TBD" || RANK_PLACEHOLDER_RE.test(rawName);
-    if (!isPlaceholder) return rawName!;
-    if (seed > 0 && teams[seed - 1]?.teamName && teams[seed - 1].teamName !== "TBD") {
-      return teams[seed - 1].teamName;
+  // Resolve a slot's display name + seed. If the stored name is empty /
+  // "TBD" / a "Rank N"-style placeholder, fall back to the seeded team
+  // from standings — preferring the explicit `match.team1.seed` field,
+  // but ALSO extracting the seed from "Rank N" itself when that field
+  // is missing (older bracket generator wrote names but not seeds).
+  const resolveSlot = (rawName: string | undefined, embeddedSeed: number, embedded?: TeamSlot): { name: string; seed: number } => {
+    const placeholderMatch = rawName ? rawName.match(RANK_PLACEHOLDER_RE) : null;
+    const isPlaceholder = !rawName || rawName === "TBD" || !!placeholderMatch;
+    // Effective seed: embedded field first, else parsed from "Rank N"
+    const effectiveSeed = embeddedSeed || (placeholderMatch ? Number(placeholderMatch[1]) : 0);
+    if (!isPlaceholder) return { name: rawName!, seed: effectiveSeed };
+    if (effectiveSeed > 0 && teams[effectiveSeed - 1]?.teamName && teams[effectiveSeed - 1].teamName !== "TBD") {
+      return { name: teams[effectiveSeed - 1].teamName, seed: effectiveSeed };
     }
-    return embedded?.teamName || rawName || "TBD";
+    return { name: embedded?.teamName || rawName || "TBD", seed: effectiveSeed };
   };
-  const t1Seed = match.team1?.seed || 0;
-  const t2Seed = match.team2?.seed || 0;
-  const t1 = {
-    teamId: match.team1Id,
-    teamName: resolveName(match.team1Name, t1Seed, match.team1),
-    seed: t1Seed,
-  };
-  const t2 = {
-    teamId: match.team2Id,
-    teamName: resolveName(match.team2Name, t2Seed, match.team2),
-    seed: t2Seed,
-  };
+  const slot1 = resolveSlot(match.team1Name, match.team1?.seed || 0, match.team1);
+  const slot2 = resolveSlot(match.team2Name, match.team2?.seed || 0, match.team2);
+  const t1 = { teamId: match.team1Id, teamName: slot1.name, seed: slot1.seed };
+  const t2 = { teamId: match.team2Id, teamName: slot2.name, seed: slot2.seed };
   const borderColor = isLive ? C.live : isComplete ? C.winBorder : C.cardBorder;
   const clickable = !!tournamentId && match.team1Id !== "TBD" && match.team2Id !== "TBD";
 
