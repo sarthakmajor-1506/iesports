@@ -37,6 +37,14 @@ interface Props {
    * used by the dedicated /wall-of-shame permalink page so the URL is a
    * direct link to the wall instead of the parent tournament page. */
   forceOpen?: boolean;
+  /** Per-tournament mode toggle. When "thanks", the modal shows a celebratory
+   *  thank-you panel instead of fetching/rendering shame entries — used
+   *  during weeks where ops staff want to recognise the community for being
+   *  on time, helpful, etc. Set on the tournament doc as `wallOfShameMode`. */
+  mode?: "shame" | "thanks";
+  /** Optional custom thank-you message body when mode === "thanks". Falls
+   *  back to a default if absent. Set as `wallOfShameThanksMessage`. */
+  thanksMessage?: string;
 }
 
 const INLINE_STYLES = `
@@ -112,7 +120,7 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function WallOfShame({ tournamentId, user, onRequireLogin, forceOpen }: Props) {
+export default function WallOfShame({ tournamentId, user, onRequireLogin, forceOpen, mode = "shame", thanksMessage }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(!!forceOpen);
   const [mounted, setMounted] = useState(false);
@@ -398,6 +406,32 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
               </button>
             </div>
 
+            {/* Thanks-mode override — hide all shame entries from previous weeks
+                and show a celebratory thank-you panel instead. Used when ops
+                wants to recognise the community for being on time + helpful
+                rather than calling out offenders. Tournament-level toggle:
+                `wallOfShameMode: "thanks"` + optional `wallOfShameThanksMessage`. */}
+            {mode === "thanks" ? (
+              <div style={{
+                textAlign: "center",
+                padding: "60px 24px",
+                border: "1px solid rgba(74,222,128,0.25)",
+                borderRadius: 16,
+                background: "linear-gradient(135deg, rgba(74,222,128,0.06) 0%, rgba(60,203,255,0.05) 100%)",
+              }}>
+                <div style={{ fontSize: "3rem", marginBottom: 12 }}>🙏</div>
+                <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#4ade80", letterSpacing: "0.05em", marginBottom: 12 }}>
+                  THANK YOU
+                </div>
+                <div style={{ fontSize: "0.96rem", color: "#E6E7EE", lineHeight: 1.6, maxWidth: 520, margin: "0 auto 20px", whiteSpace: "pre-line" as const }}>
+                  {thanksMessage || "Massive thank you to everyone who showed up on time, supported tournament staff, helped fellow players, and kept the community vibe positive this week.\n\nIt's because of you that we can run these tournaments smoothly. We see you, we appreciate you — and the Wall is quiet this week because you've earned it.\n\nSee you in the next match. 🎯"}
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "rgba(226,232,240,0.45)", marginTop: 8 }}>
+                  — iesports tournament staff
+                </div>
+              </div>
+            ) : (
+              <>
             {loading && (
               <div style={{ textAlign: "center", color: "rgba(226,232,240,0.55)", padding: "60px 0", fontSize: "0.92rem" }}>
                 Exhuming records…
@@ -479,6 +513,8 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
                     </div>
                   )}
                 </div>
+              </>
+            )}
               </>
             )}
 
