@@ -221,24 +221,24 @@ function PlayerCard({ p, index }: { p: any; index: number }) {
           background: "rgba(255,255,255,0.06)", color: C.text3, border: `1px solid ${C.border}`,
         }}>SUB</span>
       )}
-      <div className="vtd-team-player-header" style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
+      <div className="vtd-team-player-header" style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0, overflow: "hidden" }}>
         {p.riotAvatar ? (
-          <img src={p.riotAvatar} alt={p.name} style={{ width: 54, height: 54, borderRadius: 12, border: `1px solid ${C.border}`, objectFit: "cover" }} />
+          <img className="vtd-team-player-avatar" src={p.riotAvatar} alt={p.name} style={{ width: 54, height: 54, borderRadius: 12, border: `1px solid ${C.border}`, objectFit: "cover", flexShrink: 0 }} />
         ) : (
-          <div style={{ width: 54, height: 54, borderRadius: 12, background: C.accentSoft, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>
+          <div className="vtd-team-player-avatar" style={{ width: 54, height: 54, borderRadius: 12, background: C.accentSoft, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, flexShrink: 0 }}>
             {(p.name || "?").slice(0, 2).toUpperCase()}
           </div>
         )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.text }}>{p.name}</span>
-            <span style={{ fontSize: "0.75rem", color: C.text3 }}>#{p.tag}</span>
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+            <span className="vtd-team-player-name" style={{ fontSize: "1.05rem", fontWeight: 800, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{p.name}</span>
+            <span style={{ fontSize: "0.75rem", color: C.text3, flexShrink: 0 }}>#{p.tag}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-            {p.riotRank && <span style={{ fontSize: "0.72rem", color: C.text2 }}>{p.riotRank}</span>}
+          <div className="vtd-team-player-meta" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2, minWidth: 0, overflow: "hidden" }}>
+            {p.riotRank && <span style={{ fontSize: "0.72rem", color: C.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.riotRank}</span>}
             {p.topAgent && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.72rem", color: C.text2 }}>
-                {agentIcon(p.topAgent) && <img src={agentIcon(p.topAgent)!} alt={p.topAgent} style={{ width: 16, height: 16, borderRadius: 3 }} />}
+              <span className="vtd-team-player-agent" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.72rem", color: C.text2, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {agentIcon(p.topAgent) && <img className="vtd-team-player-agent-icon" src={agentIcon(p.topAgent)!} alt={p.topAgent} style={{ width: 16, height: 16, borderRadius: 3, flexShrink: 0 }} />}
                 {p.topAgent}
               </span>
             )}
@@ -733,18 +733,19 @@ export default function TeamDetailPage() {
           /* Coach's Notebook: single column */
           .vtd-team-insight-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
 
-          /* Roster: 2-col dense */
-          .vtd-team-roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
-          .vtd-team-roster-grid .vtd-team-player-card { padding: 12px !important; gap: 10px !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-header { gap: 8px !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-header img,
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-header > div:first-child { width: 40px !important; height: 40px !important; flex: 0 0 40px !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-stats > div:nth-child(3),
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-stats > div:nth-child(4) { display: none; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-foot { display: none !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-stats > div > div:first-child { font-size: 0.55rem !important; }
-          .vtd-team-roster-grid .vtd-team-player-card .vtd-team-player-stats > div > div:nth-child(2) { font-size: 0.95rem !important; }
+          /* Roster: 2-col dense, clean cards */
+          .vtd-team-roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; align-items: start; }
+          .vtd-team-page-root .vtd-team-player-card { padding: 12px !important; gap: 10px !important; overflow: hidden !important; min-width: 0; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-header { gap: 10px !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-avatar { width: 42px !important; height: 42px !important; flex: 0 0 42px !important; border-radius: 10px !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-name { font-size: 0.86rem !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-agent { display: none !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-stats > div:nth-child(3),
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-stats > div:nth-child(4) { display: none !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-foot { display: none !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-stats > div > div:first-child { font-size: 0.54rem !important; letter-spacing: 0.06em !important; }
+          .vtd-team-page-root .vtd-team-player-card .vtd-team-player-stats > div > div:nth-child(2) { font-size: 0.98rem !important; }
 
           /* Map cards: horizontal scroll carousel, breaks out of page gutter */
           .vtd-team-map-grid-wrap { margin-left: -14px; margin-right: -14px; }
