@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import {
   computeTeamAnalytics,
   generateMatchupAdvice,
+  generateTeamInsights,
   findUpcomingMatch,
   type MatchDoc,
   type StandingEntry,
@@ -61,8 +62,12 @@ export async function GET(req: NextRequest) {
       if (oppTeam) {
         const oppAnalytics = computeTeamAnalytics(oppTeam, oppStanding, matches, standings);
         analytics.upcomingMatch = generateMatchupAdvice(analytics, oppAnalytics, upcoming, { logo: oppTeam.teamLogo });
+        analytics.insights = generateTeamInsights(analytics);
       }
     }
+
+    const teamLogos: Record<string, string> = {};
+    teams.forEach(t => { if (t.teamLogo) teamLogos[t.id] = t.teamLogo; });
 
     const tournament = tDoc.data() as any;
     return NextResponse.json({
@@ -73,6 +78,7 @@ export async function GET(req: NextRequest) {
         currentMatchDay: tournament.currentMatchDay,
       },
       analytics,
+      teamLogos,
     });
   } catch (e: any) {
     console.error("[team-analytics] error:", e?.message || e);

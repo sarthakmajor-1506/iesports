@@ -8,7 +8,7 @@
  * the page to render.
  */
 
-export type SideLabel = "Attack" | "Defense";
+export type SideLabel = "Red" | "Blue" | "Attack" | "Defense";
 export type ResultLabel = "W" | "L" | "D";
 
 export interface TeamMemberLite {
@@ -72,7 +72,7 @@ export interface GameDoc {
   team1RoundsWon: number;
   team2RoundsWon: number;
   team1ValorantSide?: SideLabel;
-  roundResults?: Array<{ winningTeam?: string; winning_team?: string; roundResult?: string }>;
+  roundResults?: Array<{ round?: number; winTeam?: string; winner?: "team1" | "team2" | string; endType?: string }>;
   playerStats?: PlayerStatLine[];
   winner?: string;
   status?: string;
@@ -166,6 +166,7 @@ export interface PlayerAggregate {
   topAgent: string;
   consistency: number;
   acsByGame: number[];
+  isCoreSquad: boolean;
 }
 
 export interface Insight {
@@ -219,7 +220,7 @@ export interface TeamAnalytics {
   tournamentBaseline: { avgACS: number; avgKD: number; avgRoundDiff: number };
 }
 
-const SIDE_FLIP: Record<SideLabel, SideLabel> = { Attack: "Defense", Defense: "Attack" };
+const SIDE_FLIP: Record<string, SideLabel> = { Attack: "Defense", Defense: "Attack", Red: "Blue", Blue: "Red" };
 
 function gamesOf(m: MatchDoc): GameDoc[] {
   const out: GameDoc[] = [];
@@ -256,7 +257,9 @@ function resultOf(myScore: number, oppScore: number): ResultLabel {
 
 function gameSideForTeam(g: GameDoc, mine: 1 | 2): SideLabel | null {
   if (!g.team1ValorantSide) return null;
-  return mine === 1 ? g.team1ValorantSide : SIDE_FLIP[g.team1ValorantSide];
+  if (mine === 1) return g.team1ValorantSide;
+  const s = g.team1ValorantSide;
+  return SIDE_FLIP[s] || (s === "Red" ? "Blue" : s === "Blue" ? "Red" : null);
 }
 
 function gameScoreForTeam(g: GameDoc, mine: 1 | 2): { won: number; lost: number } {
@@ -319,6 +322,15 @@ export function computeMapStats(matches: MatchDoc[], teamId: string): MapStat[] 
   return Object.values(acc).sort((a, b) => b.played - a.played || b.roundDiff - a.roundDiff);
 }
 
+function roundWinnerForTeam(r: any, mine: 1 | 2): "won" | "lost" | null {
+  if (!r) return null;
+  const myKey = mine === 1 ? "team1" : "team2";
+  const oppKey = mine === 1 ? "team2" : "team1";
+  if (r.winner === myKey) return "won";
+  if (r.winner === oppKey) return "lost";
+  return null;
+}
+
 function halfRoundCounts(g: GameDoc, mine: 1 | 2, which: "first" | "second"): { won: number; lost: number } {
   const rr = g.roundResults || [];
   if (!rr.length) {
@@ -328,39 +340,34 @@ function halfRoundCounts(g: GameDoc, mine: 1 | 2, which: "first" | "second"): { 
   }
   let won = 0, lost = 0;
   const startIdx = which === "first" ? 0 : 12;
-  const endIdx = which === "first" ? Math.min(12, rr.length) : Math.min(24, rr.length);
-  const myTag = mine === 1 ? "Blue" : "Red";
+  const endIdx = which === "first" ? Math.min(12, rr.length) : rr.length;
   for (let i = startIdx; i < endIdx; i++) {
-    const r = rr[i];
-    const w = r?.winningTeam || r?.winning_team;
-    if (!w) continue;
-    if (w === myTag) won++; else lost++;
+    const res = roundWinnerForTeam(rr[i], mine);
+    if (res === "won") won++;
+    else if (res === "lost") lost++;
   }
   return { won, lost };
 }
 
 export function computeSideStats(matches: MatchDoc[], teamId: string): { attack: SideStat; defense: SideStat } {
-  let aP = 0, aW = 0, dP = 0, dW = 0;
+  // We label "attack" and "defense" purely as first-half-as-starting-side vs
+  // second-half-as-flipped-side. Without a per-map attacker-color mapping we
+  // can't compute true attack/defense splits across maps, so this stays as a
+  // proxy for "side A consistency vs side B consistency" per starting half.
+  let fP = 0, fW = 0, sP = 0, sW = 0;
   for (const m of matches) {
     if (!isCompleted(m) || !involvesTeam(m, teamId)) continue;
     const { mine } = perspective(m, teamId);
     for (const g of gamesOf(m)) {
-      const side = gameSideForTeam(g, mine);
-      if (!side) continue;
       const first = halfRoundCounts(g, mine, "first");
       const second = halfRoundCounts(g, mine, "second");
-      if (side === "Attack") {
-        aP += first.won + first.lost; aW += first.won;
-        dP += second.won + second.lost; dW += second.won;
-      } else {
-        dP += first.won + first.lost; dW += first.won;
-        aP += second.won + second.lost; aW += second.won;
-      }
+      fP += first.won + first.lost; fW += first.won;
+      sP += second.won + second.lost; sW += second.won;
     }
   }
   return {
-    attack: { roundsPlayed: aP, roundsWon: aW, winRate: pct(aW, aP) },
-    defense: { roundsPlayed: dP, roundsWon: dW, winRate: pct(dW, dP) },
+    attack: { roundsPlayed: fP, roundsWon: fW, winRate: pct(fW, fP) },
+    defense: { roundsPlayed: sP, roundsWon: sW, winRate: pct(sW, sP) },
   };
 }
 
@@ -372,15 +379,10 @@ export function computePistolAndHalves(matches: MatchDoc[], teamId: string): { p
     const { mine } = perspective(m, teamId);
     for (const g of gamesOf(m)) {
       const rr = g.roundResults || [];
-      const myTag = mine === 1 ? "Blue" : "Red";
-      if (rr.length >= 1 && (rr[0]?.winningTeam || rr[0]?.winning_team)) {
-        pP++;
-        if ((rr[0].winningTeam || rr[0].winning_team) === myTag) pW++;
-      }
-      if (rr.length >= 13 && (rr[12]?.winningTeam || rr[12]?.winning_team)) {
-        pP++;
-        if ((rr[12].winningTeam || rr[12].winning_team) === myTag) pW++;
-      }
+      const r0 = roundWinnerForTeam(rr[0], mine);
+      if (r0) { pP++; if (r0 === "won") pW++; }
+      const r12 = rr.length >= 13 ? roundWinnerForTeam(rr[12], mine) : null;
+      if (r12) { pP++; if (r12 === "won") pW++; }
       const first = halfRoundCounts(g, mine, "first");
       const second = halfRoundCounts(g, mine, "second");
       fW += first.won; fL += first.lost; sW += second.won; sL += second.lost;
@@ -440,7 +442,13 @@ export function computeForm(matches: MatchDoc[], teamId: string, limit: number =
 
 export function computePlayers(matches: MatchDoc[], team: TeamDocLite): PlayerAggregate[] {
   const memberByPuuid: Record<string, TeamMemberLite> = {};
-  (team.members || []).forEach(mb => { if (mb.riotPuuid) memberByPuuid[mb.riotPuuid] = mb; });
+  const coreSquadPuuids = new Set<string>();
+  (team.members || []).forEach(mb => {
+    if (mb.riotPuuid) {
+      memberByPuuid[mb.riotPuuid] = mb;
+      coreSquadPuuids.add(mb.riotPuuid);
+    }
+  });
   type Acc = { games: number; rounds: number; kills: number; deaths: number; assists: number; score: number; headshots: number; shotsTotal: number; damageDealt: number; damageReceived: number; firstKills: number; firstDeaths: number; agents: Record<string, number>; acsByGame: number[]; name: string; tag: string; puuid: string };
   const accs: Record<string, Acc> = {};
   for (const m of matches) {
@@ -498,8 +506,12 @@ export function computePlayers(matches: MatchDoc[], team: TeamDocLite): PlayerAg
       topAgent: agents[0]?.agent || "",
       consistency: Math.round(stdev(a.acsByGame) * 10) / 10,
       acsByGame: a.acsByGame.map(x => Math.round(x * 10) / 10),
+      isCoreSquad: coreSquadPuuids.has(a.puuid),
     };
-  }).sort((x, y) => y.acs - x.acs);
+  }).sort((x, y) => {
+    if (x.isCoreSquad !== y.isCoreSquad) return x.isCoreSquad ? -1 : 1;
+    return y.acs - x.acs;
+  });
   return players;
 }
 
@@ -563,11 +575,17 @@ export function generateTeamInsights(a: TeamAnalytics): Insight[] {
   const ins: Insight[] = [];
   const s = a.standing;
   if (a.form.streak && a.form.streak.count >= 2) {
+    const isDrawStreak = a.form.streak.type === "D";
+    const longDraw = isDrawStreak && a.form.streak.count >= 4;
     ins.push({
       id: "streak",
-      kind: a.form.streak.type === "W" ? "strength" : a.form.streak.type === "L" ? "weakness" : "neutral",
-      headline: `${a.form.streak.count}-match ${a.form.streak.type === "W" ? "winning" : a.form.streak.type === "L" ? "losing" : "draw"} streak`,
-      detail: `Recent form: ${a.form.recent.join(" ")}`,
+      kind: a.form.streak.type === "W" ? "strength" : a.form.streak.type === "L" ? "weakness" : longDraw ? "trend" : "neutral",
+      headline: longDraw
+        ? `Draw artist: ${a.form.streak.count} draws in a row`
+        : `${a.form.streak.count}-match ${a.form.streak.type === "W" ? "winning" : a.form.streak.type === "L" ? "losing" : "draw"} streak`,
+      detail: longDraw
+        ? "Every match has gone the distance. Practice closing maps from a 12-12 position. Tiebreaker scenarios will decide your tournament."
+        : `Recent form: ${a.form.recent.join(" ")}`,
     });
   }
   const sortedMaps = [...a.mapStats].sort((x, y) => (y.wins - y.losses) - (x.wins - x.losses) || y.roundDiff - x.roundDiff);
@@ -595,9 +613,11 @@ export function generateTeamInsights(a: TeamAnalytics): Insight[] {
     if (Math.abs(diff) >= 10) {
       ins.push({
         id: "side-bias",
-        kind: diff > 0 ? "strength" : "trend",
-        headline: diff > 0 ? `Attack-heavy team (${side.attack.winRate}% atk vs ${side.defense.winRate}% def)` : `Defense-heavy team (${side.defense.winRate}% def vs ${side.attack.winRate}% atk)`,
-        detail: diff > 0 ? "Win pistols on attack and you snowball. On defense, focus on stack setups and util-heavy retakes." : "Play patient defense to bank rounds. On attack, save aggressive entries for force/full-buy rounds.",
+        kind: "trend",
+        headline: diff > 0 ? `Strong first half (${side.attack.winRate}% vs ${side.defense.winRate}% 2H)` : `Strong second half (${side.defense.winRate}% vs ${side.attack.winRate}% 1H)`,
+        detail: diff > 0
+          ? "You bank rounds early then leak after the swap. Tighten 2nd half exec calls and post-plant util. Close out maps you have already led."
+          : "Slow start, strong finish. Win pistol rounds and the early bonus reads to avoid digging holes that depend on second-half heroics.",
       });
     }
   }
@@ -624,7 +644,8 @@ export function generateTeamInsights(a: TeamAnalytics): Insight[] {
       ins.push({ id: "od-weak", kind: "weakness", headline: `Losing opening duels (${od.openingWinRate}%)`, detail: `Only ${od.firstKills} first kills vs ${od.firstDeaths} first deaths. Slow it down. Default for info before committing.` });
     }
   }
-  const players = a.players;
+  const corePlayers = a.players.filter(p => p.isCoreSquad);
+  const players = corePlayers.length ? corePlayers : a.players;
   if (players.length) {
     const topFragger = players[0];
     ins.push({ id: "top-fragger", kind: "strength", headline: `Top fragger: ${topFragger.name} (${topFragger.acs} ACS)`, detail: `${topFragger.kdaSum} K/D/A, ${topFragger.headshotPct}% HS. ${topFragger.topAgent ? `Plays ${topFragger.topAgent} most.` : ""} Build sets around them.` });
@@ -639,6 +660,35 @@ export function generateTeamInsights(a: TeamAnalytics): Insight[] {
     const inconsistent = [...players].filter(p => p.gamesPlayed >= 3).sort((x, y) => y.consistency - x.consistency)[0];
     if (inconsistent && inconsistent !== consistent && inconsistent.consistency > 60) {
       ins.push({ id: "inconsistent", kind: "weakness", headline: `Variance flag: ${inconsistent.name}`, detail: `ACS swings by ${inconsistent.consistency} across games. Coach for consistency: same util, same rotations.` });
+    }
+  }
+  if (a.upcomingMatch) {
+    const oppMapWinRates: Record<string, { wr: number; played: number }> = {};
+    for (const mp of a.upcomingMatch.mapPicks || []) {}
+    const oppName = a.upcomingMatch.opponent.teamName;
+    const myWorst = [...a.mapStats].filter(mm => mm.played >= 2).sort((x, y) => (x.wins - x.losses) - (y.wins - y.losses) || x.roundDiff - y.roundDiff)[0];
+    if (myWorst && (myWorst.wins - myWorst.losses) < 0) {
+      const pickForMyWorst = (a.upcomingMatch.mapPicks || []).find(mp => mp.map === myWorst.map);
+      if (pickForMyWorst && pickForMyWorst.recommendation === "ban") {
+        ins.push({
+          id: "crossmap-worst-opp-strong",
+          kind: "weakness",
+          headline: `Their best map is your worst: ${myWorst.map}`,
+          detail: `You are ${myWorst.wins}-${myWorst.losses} on ${myWorst.map} with ${myWorst.roundDiff > 0 ? "+" : ""}${myWorst.roundDiff} round diff. ${oppName} thrives here. Ban first or expect to lose this map.`,
+        });
+      }
+    }
+    const myBest = [...a.mapStats].filter(mm => mm.played >= 2).sort((x, y) => (y.wins - y.losses) - (x.wins - x.losses) || y.roundDiff - x.roundDiff)[0];
+    if (myBest && (myBest.wins - myBest.losses) > 0) {
+      const pickForMyBest = (a.upcomingMatch.mapPicks || []).find(mp => mp.map === myBest.map);
+      if (pickForMyBest && pickForMyBest.recommendation === "pick") {
+        ins.push({
+          id: "crossmap-best-opp-weak",
+          kind: "strength",
+          headline: `Your best map ${myBest.map} is also their worst`,
+          detail: `You are ${myBest.wins}-${myBest.losses} here. ${oppName} struggles. Force ${myBest.map} into the veto pool no matter what.`,
+        });
+      }
     }
   }
   if (s && a.tournamentBaseline.avgRoundDiff !== 0) {

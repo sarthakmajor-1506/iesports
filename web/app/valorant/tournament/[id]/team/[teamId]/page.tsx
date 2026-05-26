@@ -13,6 +13,7 @@ import {
 type AnalyticsResponse = {
   tournament: { id: string; name: string; format?: string; currentMatchDay?: number };
   analytics: any;
+  teamLogos?: Record<string, string>;
 };
 
 const C = {
@@ -59,7 +60,14 @@ const agentIcon = (n?: string) => {
 
 function getInitials(name: string): string {
   if (!name || name === "TBD") return "?";
-  return name.replace(/\[.*?\]\s*/, "").split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 3);
+  const cleaned = name
+    .replace(/\[.*?\]\s*/, "")
+    .replace(/^[^A-Za-z0-9]+/, "")
+    .split(/\s+/)
+    .map(w => w.replace(/^[^A-Za-z0-9]+/, "")[0])
+    .filter(Boolean)
+    .join("");
+  return (cleaned || name.replace(/[^A-Za-z0-9]/g, "").slice(0, 3) || "?").toUpperCase().slice(0, 3);
 }
 
 function fmtDateTime(iso?: string): string {
@@ -74,8 +82,9 @@ function fmtDateTime(iso?: string): string {
 function ResultPill({ r, size = 22 }: { r: "W" | "L" | "D"; size?: number }) {
   const bg = r === "W" ? C.winSoft : r === "L" ? C.lossSoft : C.drawSoft;
   const col = r === "W" ? C.win : r === "L" ? C.loss : C.draw;
+  const label = r === "W" ? "Win" : r === "L" ? "Loss" : "Draw";
   return (
-    <div style={{
+    <div role="img" aria-label={label} style={{
       width: size, height: size, borderRadius: 6, background: bg, color: col,
       fontWeight: 900, fontSize: size * 0.5, display: "flex", alignItems: "center", justifyContent: "center",
       border: `1px solid ${col}55`,
@@ -198,12 +207,20 @@ function InsightCard({ insight, index }: { insight: any; index: number }) {
 function PlayerCard({ p, index }: { p: any; index: number }) {
   const acsColor = p.acs >= 220 ? C.win : p.acs >= 170 ? C.amber : C.text2;
   const kdColor = p.kd >= 1.2 ? C.win : p.kd >= 0.9 ? C.text : C.loss;
+  const isSub = p.isCoreSquad === false;
   return (
     <div style={{
-      background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18,
+      background: C.card, border: `1px solid ${isSub ? "rgba(255,255,255,0.04)" : C.border}`, borderRadius: 16, padding: 18,
       display: "flex", flexDirection: "column", gap: 14, animation: `vtdFadeUp 0.4s ease-out ${index * 0.06}s both`,
-      backdropFilter: "blur(10px)",
+      backdropFilter: "blur(10px)", opacity: isSub ? 0.78 : 1, position: "relative",
     }}>
+      {isSub && (
+        <span style={{
+          position: "absolute", top: 12, right: 12,
+          fontSize: "0.56rem", fontWeight: 900, letterSpacing: "0.12em", padding: "2px 7px", borderRadius: 5,
+          background: "rgba(255,255,255,0.06)", color: C.text3, border: `1px solid ${C.border}`,
+        }}>SUB</span>
+      )}
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         {p.riotAvatar ? (
           <img src={p.riotAvatar} alt={p.name} style={{ width: 54, height: 54, borderRadius: 12, border: `1px solid ${C.border}`, objectFit: "cover" }} />
@@ -251,7 +268,7 @@ function PlayerCard({ p, index }: { p: any; index: number }) {
         <span>{p.gamesPlayed} maps</span>
         <span>{p.damagePerRound} DMG/rnd</span>
       </div>
-      {p.acsByGame?.length >= 2 && (
+      {p.acsByGame?.length >= 3 && (
         <div>
           <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.text3, marginBottom: 4 }}>ACS BY MAP</div>
           <Sparkline values={p.acsByGame} color={acsColor} height={26} />
@@ -291,7 +308,7 @@ function MapPerformanceCard({ m, isBest, isWorst }: { m: any; isBest: boolean; i
       {(m.attackRoundsWon + m.attackRoundsLost > 0 || m.defenseRoundsWon + m.defenseRoundsLost > 0) && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingTop: 8, borderTop: `1px dashed ${C.border}` }}>
           <div>
-            <div style={{ fontSize: "0.6rem", fontWeight: 800, color: C.text3, letterSpacing: "0.1em", textTransform: "uppercase" }}>ATK</div>
+            <div style={{ fontSize: "0.6rem", fontWeight: 800, color: C.text3, letterSpacing: "0.1em", textTransform: "uppercase" }}>1st Half</div>
             <div style={{ fontSize: "0.9rem", color: C.text }}>
               {m.attackRoundsWon}-{m.attackRoundsLost}
               {(m.attackRoundsWon + m.attackRoundsLost) > 0 && (
@@ -302,7 +319,7 @@ function MapPerformanceCard({ m, isBest, isWorst }: { m: any; isBest: boolean; i
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "0.6rem", fontWeight: 800, color: C.text3, letterSpacing: "0.1em", textTransform: "uppercase" }}>DEF</div>
+            <div style={{ fontSize: "0.6rem", fontWeight: 800, color: C.text3, letterSpacing: "0.1em", textTransform: "uppercase" }}>2nd Half</div>
             <div style={{ fontSize: "0.9rem", color: C.text }}>
               {m.defenseRoundsWon}-{m.defenseRoundsLost}
               {(m.defenseRoundsWon + m.defenseRoundsLost) > 0 && (
@@ -488,7 +505,7 @@ export default function TeamDetailPage() {
   }, [params.id, params.teamId]);
 
   const teamLogoMap = useMemo(() => {
-    const m: Record<string, string> = {};
+    const m: Record<string, string> = { ...(data?.teamLogos || {}) };
     if (!data) return m;
     if (data.analytics.team.logo) m[data.analytics.team.id] = data.analytics.team.logo;
     if (data.analytics.upcomingMatch?.opponent?.logo) m[data.analytics.upcomingMatch.opponent.teamId] = data.analytics.upcomingMatch.opponent.logo;
@@ -538,10 +555,15 @@ export default function TeamDetailPage() {
   const upcoming = a.upcomingMatch;
 
   const ranked = a.rank ? `Rank #${a.rank} of ${a.totalTeams || ""}`.trim() : null;
-  const winPct = s.played ? Math.round((s.wins / s.played) * 100) : 0;
+  const matchWinPct = s.played ? Math.round(((s.wins + 0.5 * (s.draws || 0)) / s.played) * 100) : 0;
   const roundDiff = (s.roundsWon || 0) - (s.roundsLost || 0);
-  const bestMap = mapStats[0];
-  const worstMap = mapStats[mapStats.length - 1];
+  const mapsWithData = mapStats.filter((mm: any) => mm.played >= 1);
+  const bestMap = mapsWithData.length
+    ? [...mapsWithData].sort((x, y) => (y.wins - y.losses) - (x.wins - x.losses) || y.roundDiff - x.roundDiff)[0]
+    : null;
+  const worstMap = mapsWithData.length
+    ? [...mapsWithData].sort((x, y) => (x.wins - x.losses) - (y.wins - y.losses) || x.roundDiff - y.roundDiff)[0]
+    : null;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
@@ -616,7 +638,7 @@ export default function TeamDetailPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
             <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", color: C.text3, textTransform: "uppercase" }}>Squad</div>
-            <div style={{ display: "flex", gap: -8, paddingRight: 8 }}>
+            <div style={{ display: "flex", paddingRight: 8 }}>
               {(t.members || []).slice(0, 5).map((m: any, i: number) => (
                 <div key={i} style={{ marginLeft: i ? -10 : 0, width: 36, height: 36, borderRadius: "50%", background: "#1a1a22", border: `2px solid ${C.bg}`, overflow: "hidden" }}>
                   {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> :
@@ -637,11 +659,15 @@ export default function TeamDetailPage() {
         )}
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(176px, 1fr))", gap: 14, marginBottom: 32 }}>
-          <StatCard label="Win Rate" value={`${winPct}%`} sub={`${s.played || 0} matches played`} accent={winPct >= 50 ? C.win : C.loss} icon={<Trophy size={16} />} />
+          <StatCard label="Match Win %" value={`${matchWinPct}%`} sub={`${s.wins || 0}W ${s.draws || 0}D ${s.losses || 0}L in ${s.played || 0}`} accent={matchWinPct >= 60 ? C.win : matchWinPct >= 40 ? C.amber : C.loss} icon={<Trophy size={16} />} />
           <StatCard label="Maps Won" value={`${s.mapsWon || 0}–${s.mapsLost || 0}`} sub={`${(s.mapsWon || 0) - (s.mapsLost || 0) >= 0 ? "+" : ""}${(s.mapsWon || 0) - (s.mapsLost || 0)} map diff`} icon={<MapIcon size={16} />} />
           <StatCard label="Round Diff" value={`${roundDiff >= 0 ? "+" : ""}${roundDiff}`} sub={`${s.roundsWon || 0} won / ${s.roundsLost || 0} lost`} accent={roundDiff >= 0 ? C.win : C.loss} icon={<BarChart3 size={16} />} />
-          <StatCard label="Pistol Win %" value={`${rounds.pistol?.winRate || 0}%`} sub={`${rounds.pistol?.won || 0} of ${rounds.pistol?.played || 0}`} accent={(rounds.pistol?.winRate || 0) >= 50 ? C.win : C.loss} icon={<Target size={16} />} />
-          <StatCard label="Attack RWR" value={`${sideStats.attack?.winRate || 0}%`} sub={`Defense ${sideStats.defense?.winRate || 0}%`} icon={<Swords size={16} />} />
+          {(rounds.pistol?.played || 0) > 0 ? (
+            <StatCard label="Pistol Win %" value={`${rounds.pistol.winRate}%`} sub={`${rounds.pistol.won} of ${rounds.pistol.played}`} accent={rounds.pistol.winRate >= 50 ? C.win : C.loss} icon={<Target size={16} />} />
+          ) : (
+            <StatCard label="Pistol Win %" value="—" sub="No round-level data" accent={C.text3} icon={<Target size={16} />} />
+          )}
+          <StatCard label="1st Half %" value={`${sideStats.attack?.winRate || 0}%`} sub={`2nd Half ${sideStats.defense?.winRate || 0}%`} icon={<Swords size={16} />} />
           <StatCard label="Opening Duels" value={`${od.openingWinRate || 0}%`} sub={`${od.firstKills || 0} FK / ${od.firstDeaths || 0} FD`} accent={(od.openingWinRate || 0) >= 50 ? C.win : C.loss} icon={<Crosshair size={16} />} />
         </section>
 
@@ -667,8 +693,13 @@ export default function TeamDetailPage() {
           <section style={{ marginBottom: 32 }}>
             <SectionHeader icon={<MapIcon size={16} />} title="Map Performance" subtitle="Per-map record + attack/defense split" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-              {mapStats.map((m: any, i: number) => (
-                <MapPerformanceCard key={m.map} m={m} isBest={m === bestMap && m.wins > 0} isWorst={m === worstMap && mapStats.length > 1 && m !== bestMap && m.losses > 0} />
+              {mapStats.map((m: any) => (
+                <MapPerformanceCard
+                  key={m.map}
+                  m={m}
+                  isBest={bestMap !== null && m.map === bestMap.map && (m.wins - m.losses) > 0}
+                  isWorst={worstMap !== null && m.map === worstMap.map && bestMap !== null && m.map !== bestMap.map && (m.wins - m.losses) < 0}
+                />
               ))}
             </div>
           </section>
@@ -678,38 +709,23 @@ export default function TeamDetailPage() {
           <SectionHeader icon={<Activity size={16} />} title="Round Dynamics" subtitle="Side splits, pistol rounds, opening duels" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 22px" }}>
-              <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3, marginBottom: 10 }}>Sides</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div>
-                  <div style={{ fontSize: "0.74rem", color: C.text2 }}>Attack</div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (sideStats.attack?.winRate || 0) >= 50 ? C.win : C.loss }}>{sideStats.attack?.winRate || 0}%</div>
-                  <div style={{ fontSize: "0.7rem", color: C.text3 }}>{sideStats.attack?.roundsWon || 0} / {sideStats.attack?.roundsPlayed || 0}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.74rem", color: C.text2 }}>Defense</div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (sideStats.defense?.winRate || 0) >= 50 ? C.win : C.loss }}>{sideStats.defense?.winRate || 0}%</div>
-                  <div style={{ fontSize: "0.7rem", color: C.text3 }}>{sideStats.defense?.roundsWon || 0} / {sideStats.defense?.roundsPlayed || 0}</div>
-                </div>
-              </div>
-            </div>
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 22px" }}>
               <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3, marginBottom: 10 }}>Halves</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div>
-                  <div style={{ fontSize: "0.74rem", color: C.text2 }}>1st Half</div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (rounds.halves.firstHalf.diff || 0) >= 0 ? C.win : C.loss }}>
-                    {(rounds.halves.firstHalf.diff || 0) >= 0 ? "+" : ""}{rounds.halves.firstHalf.diff || 0}
+              {(sideStats.attack?.roundsPlayed || 0) === 0 && (sideStats.defense?.roundsPlayed || 0) === 0 ? (
+                <div style={{ fontSize: "0.78rem", color: C.text3, padding: "4px 0" }}>No round-level data recorded.</div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: "0.74rem", color: C.text2 }}>1st Half</div>
+                    <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (sideStats.attack?.winRate || 0) >= 50 ? C.win : C.loss }}>{sideStats.attack?.winRate || 0}%</div>
+                    <div style={{ fontSize: "0.7rem", color: C.text3 }}>{sideStats.attack?.roundsWon || 0}–{(sideStats.attack?.roundsPlayed || 0) - (sideStats.attack?.roundsWon || 0)} ({sideStats.attack?.roundsPlayed || 0} rounds)</div>
                   </div>
-                  <div style={{ fontSize: "0.7rem", color: C.text3 }}>{rounds.halves.firstHalf.roundsWon || 0}–{rounds.halves.firstHalf.roundsLost || 0}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.74rem", color: C.text2 }}>2nd Half</div>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (rounds.halves.secondHalf.diff || 0) >= 0 ? C.win : C.loss }}>
-                    {(rounds.halves.secondHalf.diff || 0) >= 0 ? "+" : ""}{rounds.halves.secondHalf.diff || 0}
+                  <div>
+                    <div style={{ fontSize: "0.74rem", color: C.text2 }}>2nd Half</div>
+                    <div style={{ fontSize: "1.6rem", fontWeight: 900, color: (sideStats.defense?.winRate || 0) >= 50 ? C.win : C.loss }}>{sideStats.defense?.winRate || 0}%</div>
+                    <div style={{ fontSize: "0.7rem", color: C.text3 }}>{sideStats.defense?.roundsWon || 0}–{(sideStats.defense?.roundsPlayed || 0) - (sideStats.defense?.roundsWon || 0)} ({sideStats.defense?.roundsPlayed || 0} rounds)</div>
                   </div>
-                  <div style={{ fontSize: "0.7rem", color: C.text3 }}>{rounds.halves.secondHalf.roundsWon || 0}–{rounds.halves.secondHalf.roundsLost || 0}</div>
                 </div>
-              </div>
+              )}
             </div>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 22px" }}>
               <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3, marginBottom: 10 }}>Opening Duels</div>
