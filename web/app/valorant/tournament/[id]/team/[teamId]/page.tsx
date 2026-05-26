@@ -112,12 +112,12 @@ function StatCard({ label, value, sub, accent = C.accent, icon }: { label: strin
     <div className="vtd-team-stat-card" style={{
       background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px",
       display: "flex", flexDirection: "column", gap: 6, position: "relative", overflow: "hidden",
-      backdropFilter: "blur(10px)",
+      backdropFilter: "blur(10px)", minWidth: 0,
     }}>
       <div className="vtd-team-stat-icon" style={{ position: "absolute", top: 14, right: 14, color: accent, opacity: 0.6 }}>{icon}</div>
-      <div className="vtd-team-stat-label" style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3 }}>{label}</div>
-      <div className="vtd-team-stat-value" style={{ fontSize: "1.7rem", fontWeight: 900, color: C.text, lineHeight: 1.05 }}>{value}</div>
-      {sub && <div className="vtd-team-stat-sub" style={{ fontSize: "0.78rem", color: C.text2 }}>{sub}</div>}
+      <div className="vtd-team-stat-value" style={{ fontSize: "1.7rem", fontWeight: 900, color: C.text, lineHeight: 1.05, order: 2 }}>{value}</div>
+      <div className="vtd-team-stat-label" style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3, order: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      {sub && <div className="vtd-team-stat-sub" style={{ fontSize: "0.74rem", color: C.text2, order: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
     </div>
   );
 }
@@ -460,6 +460,116 @@ function UpcomingMatchPanel({ upcoming, myTeam, myForm, oppForm }: any) {
   );
 }
 
+function PreMatchTipsPanel({ analytics }: { analytics: any }) {
+  const insights = analytics.insights || [];
+  const weaknesses = insights.filter((i: any) => i.kind === "weakness").slice(0, 3);
+  const strengths = insights.filter((i: any) => i.kind === "strength").slice(0, 3);
+  const mapStats = analytics.mapStats || [];
+  const bestMap = [...mapStats].filter((m: any) => m.played >= 2).sort((a: any, b: any) => (b.wins - b.losses) - (a.wins - a.losses) || b.roundDiff - a.roundDiff)[0];
+  const worstMap = [...mapStats].filter((m: any) => m.played >= 2).sort((a: any, b: any) => (a.wins - a.losses) - (b.wins - b.losses) || a.roundDiff - b.roundDiff)[0];
+
+  const drills: Array<{ headline: string; detail: string }> = [];
+  if (worstMap && (worstMap.wins - worstMap.losses) < 0) {
+    drills.push({
+      headline: `Scrim ${worstMap.map}`,
+      detail: `${worstMap.wins}-${worstMap.losses} on ${worstMap.map} so far (${worstMap.roundDiff > 0 ? "+" : ""}${worstMap.roundDiff} round diff). The next bracket draw will not be kind here — drill defensive setups + a default exec until your win rate moves.`,
+    });
+  }
+  if ((analytics.rounds?.pistol?.played || 0) >= 4 && (analytics.rounds?.pistol?.winRate || 0) < 50) {
+    drills.push({
+      headline: "Lock in your pistol exec",
+      detail: `${analytics.rounds.pistol.won}/${analytics.rounds.pistol.played} pistols won (${analytics.rounds.pistol.winRate}%). A pistol loss snowballs into 3 free rounds for the opponent. Pick one fixed exec per map, drill it cold.`,
+    });
+  }
+  if ((analytics.openingDuels?.openingWinRate || 0) < 45 && (analytics.openingDuels?.duelsPlayed || 0) >= 30) {
+    drills.push({
+      headline: "Trade-ready setups",
+      detail: `Losing ${100 - analytics.openingDuels.openingWinRate}% of opening duels. Pair entry players so every first contact has a trade-ready angle. No more 4v5 entries.`,
+    });
+  }
+  const halves = analytics.rounds?.halves;
+  if (halves && (halves.firstHalf?.diff || 0) >= 3 && (halves.secondHalf?.diff || 0) <= 0) {
+    drills.push({
+      headline: "Close out, do not coast",
+      detail: `Average ${halves.firstHalf.diff > 0 ? "+" : ""}${halves.firstHalf.diff} 1st half vs ${halves.secondHalf.diff} 2nd half. You build leads then leak them. Drill 2nd-half adjustment calls + post-plant util.`,
+    });
+  }
+  const inconsistent = (analytics.players || []).filter((p: any) => p.gamesPlayed >= 3).sort((a: any, b: any) => b.consistency - a.consistency)[0];
+  if (inconsistent && inconsistent.consistency > 60) {
+    drills.push({
+      headline: `Stabilize ${inconsistent.name}`,
+      detail: `ACS swings by ${inconsistent.consistency} across games. Build a fixed util setup so they have a default contribution even in cold games.`,
+    });
+  }
+  while (drills.length < 3) {
+    if (bestMap) {
+      drills.push({
+        headline: `Run more reps on ${bestMap.map}`,
+        detail: `Your strongest map (${bestMap.wins}-${bestMap.losses}, ${bestMap.roundDiff > 0 ? "+" : ""}${bestMap.roundDiff} diff). When the bracket starts, you want to force this into every veto.`,
+      });
+    }
+    break;
+  }
+
+  return (
+    <div className="vtd-team-upcoming-panel vtd-team-tips-panel" style={{
+      background: `linear-gradient(135deg, rgba(245,158,11,0.10) 0%, rgba(20,20,40,0.9) 60%, rgba(60,203,255,0.08) 100%)`,
+      border: `1px solid rgba(245,158,11,0.32)`, borderRadius: 22, padding: "26px 28px", marginBottom: 28,
+      position: "relative", overflow: "hidden", minWidth: 0,
+    }}>
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top left, rgba(245,158,11,0.14), transparent 60%), radial-gradient(circle at bottom right, rgba(60,203,255,0.10), transparent 50%)", pointerEvents: "none" }} />
+      <div style={{ position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <Brain size={18} color={C.amber} />
+          <span style={{ fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.16em", textTransform: "uppercase", color: C.amber }}>Pre-Match Drills</span>
+        </div>
+        <div style={{ fontSize: "0.85rem", color: C.text2, marginBottom: 18, lineHeight: 1.45 }}>
+          No opponent scheduled yet. Until the next match draws, these are the highest-leverage things to drill based on your own data.
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 14 }}>
+          {drills.length === 0 ? (
+            <div style={{ background: "rgba(0,0,0,0.28)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.86rem", fontWeight: 800, color: C.text, marginBottom: 4 }}>You are tournament-fit</div>
+              <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.45 }}>No structural weaknesses showing in the data. Keep your scrim cadence, stay sharp on map veto, and you are ready for bracket play.</div>
+            </div>
+          ) : drills.map((d, i) => (
+            <div key={i} style={{ background: "rgba(0,0,0,0.28)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.86rem", fontWeight: 800, color: C.text, marginBottom: 4 }}>{d.headline}</div>
+              <div style={{ fontSize: "0.78rem", color: C.text2, lineHeight: 1.45 }}>{d.detail}</div>
+            </div>
+          ))}
+        </div>
+
+        {(strengths.length > 0 || weaknesses.length > 0) && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, paddingTop: 14, borderTop: `1px dashed ${C.border}` }}>
+            {strengths.length > 0 && (
+              <div>
+                <div style={{ fontSize: "0.62rem", fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: C.win, marginBottom: 6 }}>Lean Into</div>
+                {strengths.map((s: any, i: number) => (
+                  <div key={i} style={{ fontSize: "0.76rem", color: C.text, marginBottom: 4, display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    <span style={{ color: C.win, marginTop: 2, flexShrink: 0 }}>▸</span><span>{s.headline}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {weaknesses.length > 0 && (
+              <div>
+                <div style={{ fontSize: "0.62rem", fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", color: C.loss, marginBottom: 6 }}>Patch Up</div>
+                {weaknesses.map((w: any, i: number) => (
+                  <div key={i} style={{ fontSize: "0.76rem", color: C.text, marginBottom: 4, display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    <span style={{ color: C.loss, marginTop: 2, flexShrink: 0 }}>▸</span><span>{w.headline}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MatchHistoryRow({ h, teamLogos }: { h: any; teamLogos: Record<string, string> }) {
   const color = h.result === "W" ? C.win : h.result === "L" ? C.loss : C.draw;
   return (
@@ -610,11 +720,11 @@ export default function TeamDetailPage() {
 
           /* Stat cards: 3-column dense at mobile, bigger numbers, hide icon to save space */
           .vtd-team-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; margin-bottom: 24px !important; }
-          .vtd-team-stat-card { padding: 12px 10px !important; border-radius: 12px !important; }
-          .vtd-team-stat-card .vtd-team-stat-icon { display: none; }
-          .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.52rem !important; letter-spacing: 0.06em !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.35rem !important; }
-          .vtd-team-stat-card .vtd-team-stat-sub { font-size: 0.62rem !important; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .vtd-team-page-root .vtd-team-stat-card { padding: 14px 12px !important; border-radius: 14px !important; gap: 4px !important; align-items: flex-start !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-icon { display: none !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.55rem !important; letter-spacing: 0.06em !important; line-height: 1.1 !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.5rem !important; line-height: 1 !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-sub { font-size: 0.6rem !important; line-height: 1.2 !important; color: ${C.text3} !important; }
 
           /* Section headers: tighter on mobile */
           .vtd-team-section-header h2 { font-size: 1.1rem !important; }
@@ -654,12 +764,13 @@ export default function TeamDetailPage() {
         }
         @media (max-width: 420px) {
           .vtd-team-hero { padding: 24px 16px 20px !important; }
-          .vtd-team-hero h1 { font-size: 1.85rem !important; text-wrap: balance; }
-          .vtd-team-hero-roster > a { flex: 0 0 72%; }
-          .vtd-team-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
-          .vtd-team-stat-card { padding: 10px 8px !important; }
-          .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.15rem !important; }
-          .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.48rem !important; }
+          .vtd-team-hero h1 { font-size: 1.7rem !important; text-wrap: balance; }
+          .vtd-team-hero-roster > a { flex: 0 0 50%; min-width: 0; }
+          .vtd-team-page-root .vtd-team-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
+          .vtd-team-page-root .vtd-team-stat-card { padding: 11px 9px !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.25rem !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.5rem !important; }
+          .vtd-team-page-root .vtd-team-stat-card .vtd-team-stat-sub { font-size: 0.56rem !important; }
           .vtd-team-map-grid > div { flex: 0 0 84%; }
         }
         @media (max-width: 340px) {
@@ -679,13 +790,15 @@ export default function TeamDetailPage() {
           <ArrowLeft size={14} /> Back to tournament
         </button>
 
-        {upcoming && (
+        {upcoming ? (
           <UpcomingMatchPanel
             upcoming={upcoming}
             myTeam={t}
             myForm={upcoming.myForm}
             oppForm={upcoming.oppForm}
           />
+        ) : (
+          <PreMatchTipsPanel analytics={a} />
         )}
 
         <section className="vtd-team-hero" style={{
