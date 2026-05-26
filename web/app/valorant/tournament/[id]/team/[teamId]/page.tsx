@@ -338,10 +338,10 @@ function MapPerformanceCard({ m, isBest, isWorst }: { m: any; isBest: boolean; i
 function UpcomingMatchPanel({ upcoming, myTeam, myForm, oppForm }: any) {
   if (!upcoming) return null;
   return (
-    <div style={{
+    <div className="vtd-team-upcoming-panel" style={{
       background: `linear-gradient(135deg, rgba(60,203,255,0.10) 0%, rgba(20,20,40,0.9) 60%, rgba(245,158,11,0.06) 100%)`,
       border: `1px solid ${C.borderHi}`, borderRadius: 22, padding: "26px 28px", marginBottom: 28,
-      position: "relative", overflow: "hidden",
+      position: "relative", overflow: "hidden", minWidth: 0,
     }}>
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top left, rgba(60,203,255,0.18), transparent 60%), radial-gradient(circle at bottom right, rgba(245,158,11,0.10), transparent 50%)", pointerEvents: "none" }} />
       <div style={{ position: "relative" }}>
@@ -351,27 +351,27 @@ function UpcomingMatchPanel({ upcoming, myTeam, myForm, oppForm }: any) {
           {upcoming.scheduledTime && <span style={{ fontSize: "0.82rem", color: C.text2, marginLeft: "auto" }}>{fmtDateTime(upcoming.scheduledTime)}</span>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 24, alignItems: "center", marginBottom: 24 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 14 }}>
-              <div>
-                <div style={{ fontSize: "1.2rem", fontWeight: 900, color: C.text }}>{myTeam.name}</div>
+        <div className="vtd-team-upcoming-vs" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 24, alignItems: "center", marginBottom: 24 }}>
+          <div style={{ textAlign: "right", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 14, minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: C.text, overflowWrap: "anywhere" }}>{myTeam.name}</div>
                 <div style={{ fontSize: "0.7rem", color: C.text2, marginTop: 2 }}>Your team</div>
-                <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 6 }}>
+                <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 6, flexWrap: "wrap" }}>
                   {myForm.slice(0, 5).reverse().map((r: any, i: number) => <ResultPill key={i} r={r} size={18} />)}
                 </div>
               </div>
-              <TeamLogo src={myTeam.logo} name={myTeam.name} size={70} />
+              <TeamLogo src={myTeam.logo} name={myTeam.name} size={64} />
             </div>
           </div>
-          <div style={{ fontSize: "1.6rem", fontWeight: 900, color: C.text3, letterSpacing: "0.2em" }}>VS</div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <TeamLogo src={upcoming.opponent.logo} name={upcoming.opponent.teamName} size={70} />
-              <div>
-                <div style={{ fontSize: "1.2rem", fontWeight: 900, color: C.text }}>{upcoming.opponent.teamName}</div>
+          <div style={{ fontSize: "1.4rem", fontWeight: 900, color: C.text3, letterSpacing: "0.2em" }}>VS</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+              <TeamLogo src={upcoming.opponent.logo} name={upcoming.opponent.teamName} size={64} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: C.text, overflowWrap: "anywhere" }}>{upcoming.opponent.teamName}</div>
                 <div style={{ fontSize: "0.7rem", color: C.text2, marginTop: 2 }}>Opponent</div>
-                <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
                   {oppForm.slice(0, 5).reverse().map((r: any, i: number) => <ResultPill key={i} r={r} size={18} />)}
                 </div>
               </div>
@@ -463,23 +463,23 @@ function UpcomingMatchPanel({ upcoming, myTeam, myForm, oppForm }: any) {
 function MatchHistoryRow({ h, teamLogos }: { h: any; teamLogos: Record<string, string> }) {
   const color = h.result === "W" ? C.win : h.result === "L" ? C.loss : C.draw;
   return (
-    <div style={{
+    <div className="vtd-team-history-row" style={{
       background: C.card, border: `1px solid ${C.border}`, borderLeft: `4px solid ${color}`,
-      borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14,
+      borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, minWidth: 0,
     }}>
       <ResultPill r={h.result} size={26} />
       <TeamLogo src={teamLogos[h.opponentId]} name={h.opponentName} size={36} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "0.92rem", fontWeight: 800, color: C.text }}>{h.opponentName}</div>
+        <div style={{ fontSize: "0.92rem", fontWeight: 800, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.opponentName}</div>
         <div style={{ fontSize: "0.72rem", color: C.text2 }}>
           {h.completedAt ? fmtDateTime(h.completedAt) : h.scheduledTime ? fmtDateTime(h.scheduledTime) : "Day " + (h.matchDay || "?")}
         </div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: "1.15rem", fontWeight: 900, color, fontFamily: "monospace" }}>{h.myScore}<span style={{ color: C.text3, margin: "0 4px" }}>:</span>{h.oppScore}</div>
-        <div style={{ fontSize: "0.7rem", color: C.text3, display: "flex", gap: 6, justifyContent: "flex-end" }}>
+      <div style={{ textAlign: "right", flexShrink: 0, minWidth: 0, maxWidth: "55%" }}>
+        <div className="vtd-team-history-score" style={{ fontSize: "1.15rem", fontWeight: 900, color, fontFamily: "monospace" }}>{h.myScore}<span style={{ color: C.text3, margin: "0 4px" }}>:</span>{h.oppScore}</div>
+        <div className="vtd-team-history-maps" style={{ fontSize: "0.7rem", color: C.text3, display: "flex", gap: 6, justifyContent: "flex-end", whiteSpace: "nowrap" }}>
           {h.games.filter((g: any) => g.map).map((g: any, i: number) => (
-            <span key={i} style={{ color: g.result === "W" ? C.win : g.result === "L" ? C.loss : C.text2 }}>
+            <span key={i} style={{ color: g.result === "W" ? C.win : g.result === "L" ? C.loss : C.text2, flexShrink: 0 }}>
               {g.map} {g.roundsWon}-{g.roundsLost}
             </span>
           ))}
@@ -566,28 +566,48 @@ export default function TeamDetailPage() {
     : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, overflowX: "hidden" }}>
       <Navbar />
       <style>{`
         @keyframes vtdFadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes vtdPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+        html, body { overflow-x: hidden; max-width: 100vw; }
+        .vtd-team-page-root, .vtd-team-page-root * { box-sizing: border-box; }
+        .vtd-team-page-root img, .vtd-team-page-root svg { max-width: 100%; }
+        .vtd-team-page-root h1, .vtd-team-page-root h2 { overflow-wrap: anywhere; word-break: break-word; }
+        .vtd-team-history-maps { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .vtd-team-history-maps::-webkit-scrollbar { display: none; }
         @media (max-width: 880px) {
           .vtd-team-hero-roster { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         }
         @media (max-width: 680px) {
-          .vtd-team-hero-grid { grid-template-columns: 1fr !important; text-align: center; }
-          .vtd-team-hero-meta { justify-content: center !important; }
+          .vtd-team-page-shell { padding: 18px 14px 64px !important; }
+          .vtd-team-hero { padding: 22px 18px !important; }
+          .vtd-team-hero-grid { grid-template-columns: 1fr !important; text-align: center; gap: 16px !important; }
+          .vtd-team-hero-meta { justify-content: center !important; row-gap: 12px !important; }
           .vtd-team-hero-roster { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .vtd-team-upcoming-panel { padding: 20px 18px !important; }
           .vtd-team-upcoming-vs { grid-template-columns: 1fr !important; gap: 14px !important; }
           .vtd-team-upcoming-vs > div { text-align: center !important; }
           .vtd-team-upcoming-vs > div:nth-child(1) > div { justify-content: center !important; }
+          .vtd-team-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .vtd-team-stat-grid > div { padding: 14px 14px !important; }
+          .vtd-team-stat-grid > div > div:nth-child(2) { font-size: 1.35rem !important; }
+          .vtd-team-roster-grid { grid-template-columns: 1fr !important; }
+          .vtd-team-map-grid { grid-template-columns: 1fr !important; }
+          .vtd-team-round-grid { grid-template-columns: 1fr !important; }
+          .vtd-team-insight-grid { grid-template-columns: 1fr !important; }
+          .vtd-team-history-row { gap: 10px !important; padding: 10px 12px !important; }
+          .vtd-team-history-row > div:nth-child(3) { min-width: 0 !important; flex: 1 1 0 !important; }
+          .vtd-team-history-score { font-size: 1rem !important; }
+          .vtd-team-history-maps { font-size: 0.62rem !important; }
         }
         @media (max-width: 420px) {
           .vtd-team-hero-roster { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 22px 80px" }}>
+      <div className="vtd-team-page-root vtd-team-page-shell" style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 22px 80px" }}>
         <button
           onClick={() => router.push(`/valorant/tournament/${params.id}`)}
           style={{
@@ -598,15 +618,15 @@ export default function TeamDetailPage() {
           <ArrowLeft size={14} /> Back to tournament
         </button>
 
-        <section style={{
+        <section className="vtd-team-hero" style={{
           background: `radial-gradient(circle at 20% 0%, rgba(60,203,255,0.16), transparent 55%), linear-gradient(to bottom, rgba(60,203,255,0.05), rgba(10,15,42,0.6))`,
           border: `1px solid ${C.borderHi}`, borderRadius: 22, padding: "32px 28px", marginBottom: 28,
           display: "flex", flexDirection: "column", gap: 22,
-          animation: "vtdFadeUp 0.5s ease-out both",
+          animation: "vtdFadeUp 0.5s ease-out both", minWidth: 0,
         }}>
-        <div className="vtd-team-hero-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 26, alignItems: "center" }}>
+        <div className="vtd-team-hero-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 26, alignItems: "center", minWidth: 0 }}>
           <TeamLogo src={t.logo} name={t.name} size={120} />
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               {ranked && <span style={{
                 fontSize: "0.7rem", fontWeight: 900, letterSpacing: "0.14em", padding: "4px 10px",
@@ -684,7 +704,7 @@ export default function TeamDetailPage() {
           />
         )}
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(176px, 1fr))", gap: 14, marginBottom: 32 }}>
+        <section className="vtd-team-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(176px, 1fr))", gap: 14, marginBottom: 32 }}>
           <StatCard label="Match Win %" value={`${matchWinPct}%`} sub={`${s.wins || 0}W ${s.draws || 0}D ${s.losses || 0}L in ${s.played || 0}`} accent={matchWinPct >= 60 ? C.win : matchWinPct >= 40 ? C.amber : C.loss} icon={<Trophy size={16} />} />
           <StatCard label="Maps Won" value={`${s.mapsWon || 0}–${s.mapsLost || 0}`} sub={`${(s.mapsWon || 0) - (s.mapsLost || 0) >= 0 ? "+" : ""}${(s.mapsWon || 0) - (s.mapsLost || 0)} map diff`} icon={<MapIcon size={16} />} />
           <StatCard label="Round Diff" value={`${roundDiff >= 0 ? "+" : ""}${roundDiff}`} sub={`${s.roundsWon || 0} won / ${s.roundsLost || 0} lost`} accent={roundDiff >= 0 ? C.win : C.loss} icon={<BarChart3 size={16} />} />
@@ -700,7 +720,7 @@ export default function TeamDetailPage() {
         {insights.length > 0 && (
           <section style={{ marginBottom: 32 }}>
             <SectionHeader icon={<Brain size={16} />} title="Coach's Notebook" subtitle="Auto-generated from your match data" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
+            <div className="vtd-team-insight-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
               {insights.map((i: any, idx: number) => <InsightCard key={i.id} insight={i} index={idx} />)}
             </div>
           </section>
@@ -709,7 +729,7 @@ export default function TeamDetailPage() {
         {players.length > 0 && (
           <section style={{ marginBottom: 32 }}>
             <SectionHeader icon={<Users size={16} />} title="Roster" subtitle={`${players.length} players, sorted by ACS`} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+            <div className="vtd-team-roster-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
               {players.map((p: any, i: number) => <PlayerCard key={p.puuid} p={p} index={i} />)}
             </div>
           </section>
@@ -718,7 +738,7 @@ export default function TeamDetailPage() {
         {mapStats.length > 0 && (
           <section style={{ marginBottom: 32 }}>
             <SectionHeader icon={<MapIcon size={16} />} title="Map Performance" subtitle="Per-map record + attack/defense split" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+            <div className="vtd-team-map-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
               {mapStats.map((m: any) => (
                 <MapPerformanceCard
                   key={m.map}
@@ -733,7 +753,7 @@ export default function TeamDetailPage() {
 
         <section style={{ marginBottom: 32 }}>
           <SectionHeader icon={<Activity size={16} />} title="Round Dynamics" subtitle="Side splits, pistol rounds, opening duels" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+          <div className="vtd-team-round-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "20px 22px" }}>
               <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3, marginBottom: 10 }}>Halves</div>
               {(sideStats.attack?.roundsPlayed || 0) === 0 && (sideStats.defense?.roundsPlayed || 0) === 0 ? (
