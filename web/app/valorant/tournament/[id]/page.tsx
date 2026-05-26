@@ -1572,7 +1572,7 @@ function ValorantTournamentDetailInner() {
                               <div className="vtd-team-edit-actions"><button className="vtd-team-edit-save" onClick={() => handleUpdateTeamName(team.id)} disabled={teamNameLoading}>{teamNameLoading ? "Saving..." : "Save"}</button><button className="vtd-team-edit-cancel" onClick={() => { setEditingTeamId(null); setTeamNameError(""); }}>Cancel</button></div>
                             </div>
                           ) : (
-                            <><div className="vtd-team-box-name">{team.teamName}</div><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && canManageTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
+                            <><Link href={`/valorant/tournament/${id}/team/${team.id}`} style={{ color: "inherit", textDecoration: "none" }}><div className="vtd-team-box-name" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{team.teamName}<span style={{ fontSize: "0.7rem", color: "#3CCBFF", opacity: 0.7 }}>›</span></div></Link><div className="vtd-team-box-avg">Avg Tier: {team.members?.length ? Math.round((team.members.reduce((s: number, m: any) => s + (m.riotTier || 0), 0) / team.members.length) * 10) / 10 : team.avgSkillLevel}</div>{logoError && canManageTeam && <div style={{ fontSize: "0.62rem", color: "#d07070", marginTop: 4 }}>{logoError}</div>}</>
                           )}
                         </div>
                       </div>
@@ -1670,7 +1670,11 @@ function ValorantTournamentDetailInner() {
                           return (
                             <tr key={s.id} style={rowStyle}>
                               <td style={{ fontWeight: 800, color: rankColor }}>{i + 1}</td>
-                              <td style={{ fontWeight: 700, textTransform: "capitalize", color: nameColor }}>{s.teamName}</td>
+                              <td style={{ fontWeight: 700, textTransform: "capitalize", color: nameColor }}>
+                                <Link href={`/valorant/tournament/${id}/team/${s.id}`} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dashed rgba(60,203,255,0.35)", paddingBottom: 1 }}>
+                                  {s.teamName}
+                                </Link>
+                              </td>
                               <td>{s.played || 0}</td>
                               <td>{s.wins || 0}</td>
                               <td>{s.draws || 0}</td>
