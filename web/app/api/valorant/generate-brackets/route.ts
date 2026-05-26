@@ -73,12 +73,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No standings found. Complete group stage first." }, { status: 400 });
       }
 
+      // CRITICAL: tiebreaker must match the public standings page so the
+      // seeds in the bracket line up with the seeds shown in the standings
+      // table. Previously this used `buchholz → mapsWon-mapsLost` which
+      // disagreed with the page (`roundsWon-roundsLost`) and caused #3/#4
+      // and similar tied ranks to swap in the generated bracket. Order:
+      //   1. points desc
+      //   2. round diff desc (rw - rl)   — matches valorant/page sort
+      //   3. map diff desc                — secondary tiebreaker
+      //   4. wins desc                    — stable last-resort
       const allStandings = standingsSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a: any, b: any) => {
           if (b.points !== a.points) return b.points - a.points;
-          if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
-          return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost);
+          const rdA = (a.roundsWon ?? 0) - (a.roundsLost ?? 0);
+          const rdB = (b.roundsWon ?? 0) - (b.roundsLost ?? 0);
+          if (rdB !== rdA) return rdB - rdA;
+          const mdA = (a.mapsWon ?? 0) - (a.mapsLost ?? 0);
+          const mdB = (b.mapsWon ?? 0) - (b.mapsLost ?? 0);
+          if (mdB !== mdA) return mdB - mdA;
+          return (b.wins ?? 0) - (a.wins ?? 0);
         });
 
       const actualAdvancing = Math.min(numAdvancing, allStandings.length);
