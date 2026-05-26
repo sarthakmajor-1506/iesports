@@ -508,10 +508,7 @@ export function computePlayers(matches: MatchDoc[], team: TeamDocLite): PlayerAg
       acsByGame: a.acsByGame.map(x => Math.round(x * 10) / 10),
       isCoreSquad: coreSquadPuuids.has(a.puuid),
     };
-  }).sort((x, y) => {
-    if (x.isCoreSquad !== y.isCoreSquad) return x.isCoreSquad ? -1 : 1;
-    return y.acs - x.acs;
-  });
+  }).filter(p => p.isCoreSquad).sort((x, y) => y.acs - x.acs);
   return players;
 }
 

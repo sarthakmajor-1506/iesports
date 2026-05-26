@@ -571,12 +571,19 @@ export default function TeamDetailPage() {
       <style>{`
         @keyframes vtdFadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes vtdPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+        @media (max-width: 880px) {
+          .vtd-team-hero-roster { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
         @media (max-width: 680px) {
           .vtd-team-hero-grid { grid-template-columns: 1fr !important; text-align: center; }
           .vtd-team-hero-meta { justify-content: center !important; }
+          .vtd-team-hero-roster { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .vtd-team-upcoming-vs { grid-template-columns: 1fr !important; gap: 14px !important; }
           .vtd-team-upcoming-vs > div { text-align: center !important; }
           .vtd-team-upcoming-vs > div:nth-child(1) > div { justify-content: center !important; }
+        }
+        @media (max-width: 420px) {
+          .vtd-team-hero-roster { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -591,12 +598,13 @@ export default function TeamDetailPage() {
           <ArrowLeft size={14} /> Back to tournament
         </button>
 
-        <section className="vtd-team-hero-grid" style={{
+        <section style={{
           background: `radial-gradient(circle at 20% 0%, rgba(60,203,255,0.16), transparent 55%), linear-gradient(to bottom, rgba(60,203,255,0.05), rgba(10,15,42,0.6))`,
           border: `1px solid ${C.borderHi}`, borderRadius: 22, padding: "32px 28px", marginBottom: 28,
-          display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 26, alignItems: "center",
+          display: "flex", flexDirection: "column", gap: 22,
           animation: "vtdFadeUp 0.5s ease-out both",
         }}>
+        <div className="vtd-team-hero-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 26, alignItems: "center" }}>
           <TeamLogo src={t.logo} name={t.name} size={120} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -636,17 +644,35 @@ export default function TeamDetailPage() {
               )}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-            <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", color: C.text3, textTransform: "uppercase" }}>Squad</div>
-            <div style={{ display: "flex", paddingRight: 8 }}>
-              {(t.members || []).slice(0, 5).map((m: any, i: number) => (
-                <div key={i} style={{ marginLeft: i ? -10 : 0, width: 36, height: 36, borderRadius: "50%", background: "#1a1a22", border: `2px solid ${C.bg}`, overflow: "hidden" }}>
-                  {m.riotAvatar ? <img src={m.riotAvatar} alt={m.riotGameName} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> :
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.accent, fontSize: "0.7rem", fontWeight: 800 }}>{m.riotGameName?.[0] || "?"}</div>}
-                </div>
+        </div>
+        {(t.members || []).length > 0 && (
+          <div style={{ paddingTop: 18, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", color: C.text3, textTransform: "uppercase", marginBottom: 10 }}>Roster</div>
+            <div className="vtd-team-hero-roster" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10 }}>
+              {(t.members || []).slice(0, 5).map((m: any) => (
+                <Link key={m.uid || m.riotPuuid || m.riotGameName} href={`/player/${m.uid}?tab=valorant`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={{
+                    background: "rgba(0,0,0,0.22)", border: `1px solid ${C.border}`, borderRadius: 12,
+                    padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, minWidth: 0,
+                    transition: "border-color 0.15s, background 0.15s",
+                  }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.background = "rgba(60,203,255,0.06)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = "rgba(0,0,0,0.22)"; }}>
+                    {m.riotAvatar ? (
+                      <img src={m.riotAvatar} alt={m.riotGameName} style={{ width: 38, height: 38, borderRadius: 9, objectFit: "cover", border: `1px solid ${C.border}`, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 38, height: 38, borderRadius: 9, background: C.accentSoft, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "0.8rem", flexShrink: 0 }}>
+                        {(m.riotGameName || "?")[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: "0.84rem", fontWeight: 800, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.riotGameName}</div>
+                      <div style={{ fontSize: "0.66rem", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.riotRank || "Unranked"}</div>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </div>
+        )}
         </section>
 
         {upcoming && (
