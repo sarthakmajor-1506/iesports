@@ -32,6 +32,28 @@ interface StatePatch {
 const cfg = { lobbyName: null as string | null, password: null as string | null, region: null as string | null, gameMode: null as string | null, status: "idle" as LobbyStatus };
 let nameCache = new Map<string, string>(); // steam32 -> display name
 
+// Diff-suppression state. The 1.5s heartbeat was writing ~57.6K docs/day to
+// botLobbyControl/state regardless of whether anything changed — 99% of those
+// are no-op restamps of identical payloads while the bot sits idle. We hash
+// the would-be payload and only write when it differs, with a 5-minute floor
+// so the admin panel can still tell the bot is alive when nothing's moving.
+//
+// Tournament-day behaviour is intentionally unchanged: every GC mutation
+// (member join/leave, hero pick, lobbyState transition, match outcome) shifts
+// the hash, so the next 1.5s tick writes immediately. Suppression only kicks
+// in when there's literally nothing new to publish.
+let lastPayloadHash = "";
+let lastWriteAt = 0;
+const LIVENESS_FLOOR_MS = 5 * 60 * 1000;
+// matchId-mirror rate-limit: once we've mirrored a given matchId, we don't
+// need to re-query botQueues on every 1.5s tick — the 6h-cutoff guard inside
+// the mirror loop already makes repeats nearly-no-op, but skipping the read
+// cuts Firestore reads too. 30s is plenty for the post-Railway-redeploy
+// "re-adopt the lobby" recovery case the original code was added for.
+let lastMirroredMatchId: string | null = null;
+let lastMirrorRunAt = 0;
+const MIRROR_REPEAT_MS = 30 * 1000;
+
 async function resolveNames(db: Firestore, steam32s: string[]): Promise<void> {
   const missing = steam32s.filter(s => !nameCache.has(s));
   if (!missing.length) return;
@@ -79,7 +101,7 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
   const lobbyHeroes = (() => { try { return (bot as any).getLobbyHeroes?.() ?? {}; } catch { return {}; } })();
   const lastLobbyFields = (() => { try { return (bot as any).lastLobbyFields || ""; } catch { return ""; } })();
 
-  await db.collection("botLobbyControl").doc("state").set({
+  const payload = {
     status: cfg.status,
     gcReady: ready,
     lobbyName: cfg.lobbyName,
@@ -95,8 +117,19 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
     lastLobbyFields,
     lastError: patch.lastError ?? null,
     lastCommand: patch.lastCommand ?? null,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  };
+
+  const hash = JSON.stringify(payload);
+  const now = Date.now();
+  const stale = now - lastWriteAt >= LIVENESS_FLOOR_MS;
+  if (hash !== lastPayloadHash || stale) {
+    await db.collection("botLobbyControl").doc("state").set({
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    lastPayloadHash = hash;
+    lastWriteAt = now;
+  }
 
   // If the bot has captured a match_id, mirror it onto any in-flight
   // tournament botQueue + the linked match doc. This makes capture
@@ -105,44 +138,52 @@ export async function publishLobbyState(db: Firestore, patch: StatePatch = {}): 
   // populates Firestore on the next tick. Idempotent — re-writing the
   // same matchId is a no-op.
   if (lobbyMatchId) {
-    try {
-      // FIX: only write to queues that
-      //   (a) don't already have a dotaMatchId stamped (don't overwrite past
-      //       captures with the current lobby's matchId), AND
-      //   (b) were created in the last 6 hours (cuts off ancient stale
-      //       queues from weeks ago that would otherwise all get the same
-      //       current matchId).
-      //
-      // Previously: heartbeat wrote to every in_progress/open queue with a
-      // tournamentMatchId, which meant Domin8's stale March/May queues all
-      // got stamped with whatever test match the bot was running today.
-      // Same lobby's matchId ended up on r1-match-1, r1-match-2 across two
-      // different tournaments.
-      const cutoff = Date.now() - 6 * 3600 * 1000;
-      const qs = await db.collection("botQueues")
-        .where("status", "in", ["in_progress", "open"])
-        .get();
-      for (const qd of qs.docs) {
-        const q = qd.data() as any;
-        if (q.dotaMatchId) continue;                          // never overwrite
-        const createdMs = q.createdAt ? Date.parse(q.createdAt) : 0;
-        if (!createdMs || createdMs < cutoff) continue;        // skip stale queues
-        const updates: any = { dotaMatchId: lobbyMatchId, dotaMatchIdCapturedAt: new Date().toISOString(), dotaMatchIdSource: "heartbeat-sync" };
-        await qd.ref.set(updates, { merge: true });
-        if (q.tournamentId && q.tournamentMatchId) {
-          const tColl = q.tournamentCollection || "tournaments";
-          const gNum = Number(q.tournamentGameNumber || 1);
-          const gameKey = `game${gNum}`;
-          await db.collection(tColl).doc(q.tournamentId).collection("matches").doc(q.tournamentMatchId).set({
-            dotaMatchId: lobbyMatchId,
-            [gameKey]: { dotaMatchId: lobbyMatchId, status: "in_progress" },
-            lobbyStatus: "match-running",
-          }, { merge: true });
+    const matchIdChanged = lobbyMatchId !== lastMirroredMatchId;
+    const mirrorDue = now - lastMirrorRunAt >= MIRROR_REPEAT_MS;
+    if (matchIdChanged || mirrorDue) {
+      try {
+        // FIX: only write to queues that
+        //   (a) don't already have a dotaMatchId stamped (don't overwrite past
+        //       captures with the current lobby's matchId), AND
+        //   (b) were created in the last 6 hours (cuts off ancient stale
+        //       queues from weeks ago that would otherwise all get the same
+        //       current matchId).
+        //
+        // Previously: heartbeat wrote to every in_progress/open queue with a
+        // tournamentMatchId, which meant Domin8's stale March/May queues all
+        // got stamped with whatever test match the bot was running today.
+        // Same lobby's matchId ended up on r1-match-1, r1-match-2 across two
+        // different tournaments.
+        const cutoff = Date.now() - 6 * 3600 * 1000;
+        const qs = await db.collection("botQueues")
+          .where("status", "in", ["in_progress", "open"])
+          .get();
+        for (const qd of qs.docs) {
+          const q = qd.data() as any;
+          if (q.dotaMatchId) continue;                          // never overwrite
+          const createdMs = q.createdAt ? Date.parse(q.createdAt) : 0;
+          if (!createdMs || createdMs < cutoff) continue;        // skip stale queues
+          const updates: any = { dotaMatchId: lobbyMatchId, dotaMatchIdCapturedAt: new Date().toISOString(), dotaMatchIdSource: "heartbeat-sync" };
+          await qd.ref.set(updates, { merge: true });
+          if (q.tournamentId && q.tournamentMatchId) {
+            const tColl = q.tournamentCollection || "tournaments";
+            const gNum = Number(q.tournamentGameNumber || 1);
+            const gameKey = `game${gNum}`;
+            await db.collection(tColl).doc(q.tournamentId).collection("matches").doc(q.tournamentMatchId).set({
+              dotaMatchId: lobbyMatchId,
+              [gameKey]: { dotaMatchId: lobbyMatchId, status: "in_progress" },
+              lobbyStatus: "match-running",
+            }, { merge: true });
+          }
         }
+        lastMirroredMatchId = lobbyMatchId;
+        lastMirrorRunAt = now;
+      } catch (e: any) {
+        console.error("[BotLobby] heartbeat-sync matchId failed:", e?.message || e);
       }
-    } catch (e: any) {
-      console.error("[BotLobby] heartbeat-sync matchId failed:", e?.message || e);
     }
+  } else {
+    lastMirroredMatchId = null;
   }
 }
 
@@ -200,10 +241,12 @@ let processing = false;
 /** Wire into index.ts after the bot is up. Low-latency via onSnapshot. */
 export function startBotLobbyControl(db: Firestore): void {
   // Live-state heartbeat so the admin panel sees fresh GC status + members.
-  // Reduced from 5s → 1.5s so ambient updates (players joining the lobby,
-  // hero picks, lobbyState transitions to POSTGAME) reach the panel quickly.
-  // Command-triggered updates already publish immediately after runCommand,
-  // so this interval only matters for state Valve pushes us out-of-band.
+  // Ticks every 1.5s so ambient updates (players joining the lobby, hero
+  // picks, lobbyState transitions to POSTGAME) reach the panel quickly.
+  // publishLobbyState() is diff-suppressed: it only writes when the payload
+  // actually changes, with a 5-minute liveness floor. Tournament-day
+  // responsiveness is preserved (every real GC change → write within 1.5s)
+  // while idle days drop from ~57.6K writes/day to ~300.
   setInterval(() => { publishLobbyState(db).catch(() => {}); }, 1500);
   publishLobbyState(db, { status: cfg.status }).catch(() => {});
 
