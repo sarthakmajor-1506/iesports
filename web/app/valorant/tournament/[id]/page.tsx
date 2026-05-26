@@ -1751,7 +1751,70 @@ function ValorantTournamentDetailInner() {
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
                       <div className="vtd-section-header bracket">Playoffs</div>
-                      {(() => { const days = [...new Set(bracketMatches.map((m: any) => m.matchDay))].sort((a: number, b: number) => a - b); let bracketRoundNum = 0; let globalIdx = 0; return days.map((day: number) => { bracketRoundNum++; const dayMatches = bracketMatches.filter((m: any) => m.matchDay === day); return (<div key={day}><div className="vtd-match-day-header bracket-round"><span className="day-num">R{bracketRoundNum}</span><span>· {dayMatches.length}</span></div>{dayMatches.map((m: any) => { const idx = globalIdx++; return (<div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both` }}><MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} /></div>); })}</div>); }); })()}
+                      {(() => {
+                        // Group scheduled matches by IST calendar date, sort dates ascending,
+                        // sort matches within each date by scheduledTime. Unscheduled bracket
+                        // matches (TBD slots that depend on prior winners) render at the bottom
+                        // in canonical bracket order (UB → LB → GF).
+                        const scheduled = bracketMatches.filter((m: any) => m.scheduledTime);
+                        const unscheduled = bracketMatches.filter((m: any) => !m.scheduledTime);
+                        const dayBuckets = new Map<string, any[]>();
+                        scheduled.forEach((m: any) => {
+                          const utcMs = new Date(m.scheduledTime).getTime();
+                          const istDay = new Date(utcMs + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+                          if (!dayBuckets.has(istDay)) dayBuckets.set(istDay, []);
+                          dayBuckets.get(istDay)!.push(m);
+                        });
+                        const sortedDates = [...dayBuckets.keys()].sort();
+                        sortedDates.forEach(d => dayBuckets.get(d)!.sort((a: any, b: any) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime()));
+                        const bracketTypeOrder: Record<string, number> = { winners: 1, losers: 2, grand_final: 3 };
+                        unscheduled.sort((a: any, b: any) => {
+                          const ta = bracketTypeOrder[a.bracketType || ""] || 99;
+                          const tb = bracketTypeOrder[b.bracketType || ""] || 99;
+                          if (ta !== tb) return ta - tb;
+                          return (a.bracketRound || a.round || 0) - (b.bracketRound || b.round || 0);
+                        });
+                        let globalIdx = 0;
+                        const fmtIstDate = (iso: string) => {
+                          try { return new Date(iso + "T00:00:00+05:30").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }); } catch { return iso; }
+                        };
+                        return (
+                          <>
+                            {sortedDates.map((date) => (
+                              <div key={date}>
+                                <div className="vtd-match-day-header bracket-round">
+                                  <span className="day-num">{fmtIstDate(date)}</span>
+                                  <span>· {dayBuckets.get(date)!.length}</span>
+                                </div>
+                                {dayBuckets.get(date)!.map((m: any) => {
+                                  const idx = globalIdx++;
+                                  return (
+                                    <div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both` }}>
+                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                            {unscheduled.length > 0 && (
+                              <div>
+                                <div className="vtd-match-day-header bracket-round" style={{ opacity: 0.65 }}>
+                                  <span className="day-num">TBD</span>
+                                  <span>· {unscheduled.length} pending</span>
+                                </div>
+                                {unscheduled.map((m: any) => {
+                                  const idx = globalIdx++;
+                                  return (
+                                    <div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both`, opacity: 0.78 }}>
+                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </>
