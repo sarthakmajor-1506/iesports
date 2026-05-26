@@ -979,20 +979,6 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
 
       <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} teamLogos={teamLogos} />
 
-      {/* Annotations */}
-      <text x={ubR1[1].x + MATCH_W + 10} y={ubR1[1].y + MATCH_H / 2 + 4}
-        fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
-        Seeds 3-6 from group stage
-      </text>
-      <text x={ubSemi[0].x + MATCH_W / 2} y={Math.min(ubR1[0].y, ubSemi[0].y) - 12}
-        fill={C.live} fontSize={8.5} fontFamily="system-ui" fontStyle="italic" fontWeight={700}
-        textAnchor="middle">
-        Top 2 seeds (gold) get a bye to the Semis
-      </text>
-      <text x={lbR1[1].x + MATCH_W + 10} y={lbR1[1].y + MATCH_H / 2 + 4}
-        fill={C.textMuted} fontSize={8.5} fontFamily="system-ui" fontStyle="italic">
-        Seeds 7-10 from group stage
-      </text>
     </BracketWrapper>
   );
 }
