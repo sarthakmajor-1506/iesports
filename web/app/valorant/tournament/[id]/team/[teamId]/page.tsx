@@ -109,15 +109,15 @@ function TeamLogo({ src, name, size = 64 }: { src?: string; name: string; size?:
 
 function StatCard({ label, value, sub, accent = C.accent, icon }: { label: string; value: string | number; sub?: string; accent?: string; icon?: React.ReactNode }) {
   return (
-    <div style={{
+    <div className="vtd-team-stat-card" style={{
       background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px",
       display: "flex", flexDirection: "column", gap: 6, position: "relative", overflow: "hidden",
       backdropFilter: "blur(10px)",
     }}>
-      <div style={{ position: "absolute", top: 14, right: 14, color: accent, opacity: 0.6 }}>{icon}</div>
-      <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3 }}>{label}</div>
-      <div style={{ fontSize: "1.7rem", fontWeight: 900, color: C.text, lineHeight: 1.05 }}>{value}</div>
-      {sub && <div style={{ fontSize: "0.78rem", color: C.text2 }}>{sub}</div>}
+      <div className="vtd-team-stat-icon" style={{ position: "absolute", top: 14, right: 14, color: accent, opacity: 0.6 }}>{icon}</div>
+      <div className="vtd-team-stat-label" style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text3 }}>{label}</div>
+      <div className="vtd-team-stat-value" style={{ fontSize: "1.7rem", fontWeight: 900, color: C.text, lineHeight: 1.05 }}>{value}</div>
+      {sub && <div className="vtd-team-stat-sub" style={{ fontSize: "0.78rem", color: C.text2 }}>{sub}</div>}
     </div>
   );
 }
@@ -608,12 +608,13 @@ export default function TeamDetailPage() {
           .vtd-team-upcoming-vs > div:nth-child(3) > div { justify-content: center !important; flex-direction: column !important; gap: 8px !important; }
           .vtd-team-upcoming-vs > div:nth-child(2) { padding: 4px 0 !important; font-size: 1.1rem !important; opacity: 0.7; }
 
-          /* Stat cards: 3-column dense at mobile, bigger numbers */
+          /* Stat cards: 3-column dense at mobile, bigger numbers, hide icon to save space */
           .vtd-team-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; margin-bottom: 24px !important; }
-          .vtd-team-stat-grid > div { padding: 12px 10px !important; border-radius: 12px !important; }
-          .vtd-team-stat-grid > div > div:nth-child(2) { font-size: 1.4rem !important; }
-          .vtd-team-stat-grid > div > div:first-child { font-size: 0.56rem !important; letter-spacing: 0.08em !important; }
-          .vtd-team-stat-grid > div > div:nth-child(3) { display: none; }
+          .vtd-team-stat-card { padding: 12px 10px !important; border-radius: 12px !important; }
+          .vtd-team-stat-card .vtd-team-stat-icon { display: none; }
+          .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.52rem !important; letter-spacing: 0.06em !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.35rem !important; }
+          .vtd-team-stat-card .vtd-team-stat-sub { font-size: 0.62rem !important; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
           /* Section headers: tighter on mobile */
           .vtd-team-section-header h2 { font-size: 1.1rem !important; }
@@ -653,13 +654,17 @@ export default function TeamDetailPage() {
         }
         @media (max-width: 420px) {
           .vtd-team-hero { padding: 24px 16px 20px !important; }
-          .vtd-team-hero h1 { font-size: 1.9rem !important; }
+          .vtd-team-hero h1 { font-size: 1.85rem !important; text-wrap: balance; }
           .vtd-team-hero-roster > a { flex: 0 0 72%; }
           .vtd-team-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
-          .vtd-team-stat-grid > div { padding: 10px 8px !important; }
-          .vtd-team-stat-grid > div > div:nth-child(2) { font-size: 1.2rem !important; }
-          .vtd-team-roster-grid { grid-template-columns: 1fr !important; }
+          .vtd-team-stat-card { padding: 10px 8px !important; }
+          .vtd-team-stat-card .vtd-team-stat-value { font-size: 1.15rem !important; }
+          .vtd-team-stat-card .vtd-team-stat-label { font-size: 0.48rem !important; }
           .vtd-team-map-grid > div { flex: 0 0 84%; }
+        }
+        @media (max-width: 340px) {
+          /* Ultra-narrow phones only: stack roster 1-col */
+          .vtd-team-roster-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -673,6 +678,15 @@ export default function TeamDetailPage() {
           }}>
           <ArrowLeft size={14} /> Back to tournament
         </button>
+
+        {upcoming && (
+          <UpcomingMatchPanel
+            upcoming={upcoming}
+            myTeam={t}
+            myForm={upcoming.myForm}
+            oppForm={upcoming.oppForm}
+          />
+        )}
 
         <section className="vtd-team-hero" style={{
           background: `radial-gradient(circle at 20% 0%, rgba(60,203,255,0.16), transparent 55%), linear-gradient(to bottom, rgba(60,203,255,0.05), rgba(10,15,42,0.6))`,
@@ -765,15 +779,6 @@ export default function TeamDetailPage() {
           </div>
         )}
         </section>
-
-        {upcoming && (
-          <UpcomingMatchPanel
-            upcoming={upcoming}
-            myTeam={t}
-            myForm={upcoming.myForm}
-            oppForm={upcoming.oppForm}
-          />
-        )}
 
         <section className="vtd-team-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(176px, 1fr))", gap: 14, marginBottom: 32 }}>
           <StatCard label="Match Win %" value={`${matchWinPct}%`} sub={`${s.wins || 0}W ${s.draws || 0}D ${s.losses || 0}L in ${s.played || 0}`} accent={matchWinPct >= 60 ? C.win : matchWinPct >= 40 ? C.amber : C.loss} icon={<Trophy size={16} />} />
