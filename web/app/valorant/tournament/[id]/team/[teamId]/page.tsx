@@ -791,17 +791,6 @@ export default function TeamDetailPage() {
           <ArrowLeft size={14} /> Back to tournament
         </button>
 
-        {upcoming ? (
-          <UpcomingMatchPanel
-            upcoming={upcoming}
-            myTeam={t}
-            myForm={upcoming.myForm}
-            oppForm={upcoming.oppForm}
-          />
-        ) : (
-          <PreMatchTipsPanel analytics={a} />
-        )}
-
         <section className="vtd-team-hero" style={{
           background: `radial-gradient(circle at 20% 0%, rgba(60,203,255,0.16), transparent 55%), linear-gradient(to bottom, rgba(60,203,255,0.05), rgba(10,15,42,0.6))`,
           border: `1px solid ${C.borderHi}`, borderRadius: 22, padding: "32px 28px", marginBottom: 28,
@@ -893,6 +882,17 @@ export default function TeamDetailPage() {
           </div>
         )}
         </section>
+
+        {upcoming ? (
+          <UpcomingMatchPanel
+            upcoming={upcoming}
+            myTeam={t}
+            myForm={upcoming.myForm}
+            oppForm={upcoming.oppForm}
+          />
+        ) : (
+          <PreMatchTipsPanel analytics={a} />
+        )}
 
         <section className="vtd-team-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(176px, 1fr))", gap: 14, marginBottom: 32 }}>
           <StatCard label="Match Win %" value={`${matchWinPct}%`} sub={`${s.wins || 0}W ${s.draws || 0}D ${s.losses || 0}L in ${s.played || 0}`} accent={matchWinPct >= 60 ? C.win : matchWinPct >= 40 ? C.amber : C.loss} icon={<Trophy size={16} />} />
