@@ -681,7 +681,7 @@ function Bracket8({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, g
   const lbFinal = { x: colX(3), y: lbSemi.y };
 
   const gfY = ubFinal.y + (lbFinal.y - ubFinal.y) / 2;
-  const gf = { x: colX(3) + MATCH_W / 2, y: gfY };
+  const gf = { x: colX(4), y: gfY };
 
   const totalW = gf.x + MATCH_W + PAD;
   const totalH = lbR1[1].y + MATCH_H + PAD + 20;
@@ -823,7 +823,7 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
 
   // GF sits in its own column past UB Final + LB Final.
   const gfY = ubFinal.y + (lbFinal.y - ubFinal.y) / 2;
-  const gf = { x: colX(4) + MATCH_W / 2, y: gfY };
+  const gf = { x: colX(5), y: gfY };
 
   const totalW = gf.x + MATCH_W + PAD;
   const totalH = lbR1[1].y + MATCH_H + PAD + 20;
