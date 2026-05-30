@@ -91,25 +91,20 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // Brand convention: lowercase "iesports" everywhere. Defensively normalize
   // whatever's in DEFAULT_LOBBY_NAME so a stale env var with "IEsports" or
   // "Iesports" still produces the correct casing in Discord + Dota client.
-  //
-  // For tournament lobbies, override the generic brand name with the actual
-  // matchup (e.g. "Major vs iesportofficial"). Visible at the top of the
-  // lobby window in the Dota client + in the Custom Lobbies browser. Caps
-  // at 50 chars (Dota's effective lobby name limit).
+  // User explicitly wants the LOBBY NAME to stay as the brand default ("iesports
+  // Lobby") and only the in-slot team headings to change.
   const rawLobbyName = process.env.DEFAULT_LOBBY_NAME || "iesports Lobby";
-  const defaultLobbyName = rawLobbyName.replace(/I[Ee]sports/g, "iesports");
-  const queueTeam1Name = (queue as any).team1Name as string | undefined;
-  const queueTeam2Name = (queue as any).team2Name as string | undefined;
-  const matchupName = queueTeam1Name && queueTeam2Name
-    ? `${queueTeam1Name} vs ${queueTeam2Name}`.slice(0, 50)
-    : null;
-  const lobbyName = matchupName || defaultLobbyName;
+  const lobbyName = rawLobbyName.replace(/I[Ee]sports/g, "iesports");
   const password = String(Math.floor(100 + Math.random() * 900));
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
-  // Tier 2: ask the GC to label the in-slot team headings with our team
-  // names. The toss writes radiantTeamName/direTeamName onto the queue
-  // doc; if no toss happened, default Radiant=team1, Dire=team2.
+  // Tier 2: ask the GC to label the in-slot team headings ("The Radiant" /
+  // "The Dire" by default) with the actual team names from the toss. The
+  // toss writes radiantTeamName/direTeamName onto the queue doc; if no toss
+  // happened, default Radiant=team1, Dire=team2 so the lobby still shows
+  // the matchup in the slot headings.
+  const queueTeam1Name = (queue as any).team1Name as string | undefined;
+  const queueTeam2Name = (queue as any).team2Name as string | undefined;
   const queueRadiantTeamName = (queue as any).radiantTeamName as string | undefined;
   const queueDireTeamName = (queue as any).direTeamName as string | undefined;
   const radiantTeamName = queueRadiantTeamName || queueTeam1Name || undefined;
