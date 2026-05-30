@@ -91,11 +91,29 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // Brand convention: lowercase "iesports" everywhere. Defensively normalize
   // whatever's in DEFAULT_LOBBY_NAME so a stale env var with "IEsports" or
   // "Iesports" still produces the correct casing in Discord + Dota client.
+  //
+  // For tournament lobbies, override the generic brand name with the actual
+  // matchup (e.g. "Major vs iesportofficial"). Visible at the top of the
+  // lobby window in the Dota client + in the Custom Lobbies browser. Caps
+  // at 50 chars (Dota's effective lobby name limit).
   const rawLobbyName = process.env.DEFAULT_LOBBY_NAME || "iesports Lobby";
-  const lobbyName = rawLobbyName.replace(/I[Ee]sports/g, "iesports");
+  const defaultLobbyName = rawLobbyName.replace(/I[Ee]sports/g, "iesports");
+  const queueTeam1Name = (queue as any).team1Name as string | undefined;
+  const queueTeam2Name = (queue as any).team2Name as string | undefined;
+  const matchupName = queueTeam1Name && queueTeam2Name
+    ? `${queueTeam1Name} vs ${queueTeam2Name}`.slice(0, 50)
+    : null;
+  const lobbyName = matchupName || defaultLobbyName;
   const password = String(Math.floor(100 + Math.random() * 900));
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
+  // Tier 2: ask the GC to label the in-slot team headings with our team
+  // names. The toss writes radiantTeamName/direTeamName onto the queue
+  // doc; if no toss happened, default Radiant=team1, Dire=team2.
+  const queueRadiantTeamName = (queue as any).radiantTeamName as string | undefined;
+  const queueDireTeamName = (queue as any).direTeamName as string | undefined;
+  const radiantTeamName = queueRadiantTeamName || queueTeam1Name || undefined;
+  const direTeamName    = queueDireTeamName    || queueTeam2Name || undefined;
 
   // ── Step 1: Create GC Lobby ──────────────────────────────────
   let gcLobbyId: string | null = null;
@@ -127,8 +145,8 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
 
   if (bot.isReady()) {
     try {
-      console.log(`[Match] Creating Dota lobby... cmPick=${cmPick}`);
-      const result = await bot.createLobby(lobbyName, password, gameMode, region, cmPick);
+      console.log(`[Match] Creating Dota lobby... cmPick=${cmPick} radiantTeam="${radiantTeamName || "—"}" direTeam="${direTeamName || "—"}"`);
+      const result = await bot.createLobby(lobbyName, password, gameMode, region, cmPick, radiantTeamName, direTeamName);
       gcLobbyId = result.lobbyId;
       lobbyCreated = true;
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);
@@ -509,11 +527,25 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       const statusMsg = lobbyCreated
         ? `✅ Lobby created! Steam invites sent.`
         : `⚠️ **Auto-lobby failed** — join manually using the details below.\n_Reason:_ ${lobbyFailureReason || "unknown"}\n_How to fix:_ admin can click **Restart Bot** in the panel, then re-fire **Set Lobby & Notify**. Players can open Dota 2 and search the lobby name in Custom Lobbies in the meantime.`;
-      await ch.send(
+      const announceMsg = await ch.send(
         `🏟️ **Match Started!**\n${statusMsg}\n` +
         `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
         `Server: ${region} | Mode: ${gameMode}`
       );
+      // Track for cleanup-vcs so the announce gets swept at end of match.
+      const tid = (queue as any).tournamentId;
+      const tMatchId = (queue as any).tournamentMatchId;
+      const tColl = (queue as any).tournamentCollection || "tournaments";
+      if (tid && tMatchId && announceMsg?.id) {
+        try {
+          const { getDb } = await import("./firebase");
+          const mref = getDb().collection(tColl).doc(tid).collection("matches").doc(tMatchId);
+          const existing = ((await mref.get()).data()?.discordOpsMessageIds || []) as string[];
+          await mref.set({
+            discordOpsMessageIds: [...existing, announceMsg.id],
+          }, { merge: true });
+        } catch (e: any) { console.warn("[Match] track announce msg id:", e?.message || e); }
+      }
     } catch (err: any) { console.error("[Match] Queue announce error:", err.message); }
   }
 

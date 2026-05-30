@@ -582,6 +582,15 @@ export async function POST(req: NextRequest) {
         // default (random first pick); 1/2 = Radiant/Dire first pick lock.
         const vetoCmPick = Number(matchData.vetoState?.cmPick || 0);
         const cmPick = vetoCmPick === 1 || vetoCmPick === 2 ? vetoCmPick : 0;
+        // Derive Radiant/Dire labels for the Dota practice lobby. If the
+        // toss completed, use vetoState.radiantTeam / vetoState.direTeam to
+        // pick the actual playing-side team. Otherwise default Radiant=team1,
+        // Dire=team2 so the lobby still shows the matchup.
+        const vetoState = matchData.vetoState as any;
+        const radiantSlot: "team1" | "team2" = vetoState?.radiantTeam === "team2" ? "team2" : "team1";
+        const direSlot: "team1" | "team2" = radiantSlot === "team1" ? "team2" : "team1";
+        const radiantTeamName = radiantSlot === "team1" ? matchData.team1Name : matchData.team2Name;
+        const direTeamName    = direSlot    === "team1" ? matchData.team1Name : matchData.team2Name;
         await queueRef.set({
           id: queueId,
           name: lobbyName || `${matchData.team1Name} vs ${matchData.team2Name}`,
@@ -606,6 +615,10 @@ export async function POST(req: NextRequest) {
           source: "tournament",
           lobbyPassword: lobbyPassword || "",
           cmPick,
+          team1Name: matchData.team1Name || null,
+          team2Name: matchData.team2Name || null,
+          radiantTeamName: radiantTeamName || null,
+          direTeamName: direTeamName || null,
         }, { merge: true });
 
         updateData.botQueueId = queueId;

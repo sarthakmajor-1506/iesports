@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
     params.gameMode = String(params.gameMode || "AP");
     const cm = Number(params.cmPick || 0);
     params.cmPick = cm === 1 || cm === 2 ? cm : 0;
+    if (params.radiantTeamName) params.radiantTeamName = String(params.radiantTeamName).slice(0, 40);
+    if (params.direTeamName)    params.direTeamName    = String(params.direTeamName).slice(0, 40);
   }
   if ((action === "kick" || action === "invite") && !params.steam32) {
     return NextResponse.json({ error: "params.steam32 required" }, { status: 400 });

@@ -682,7 +682,9 @@ class DotaBot extends EventEmitter {
     password: string,
     gameMode = "AP",
     region = "India",
-    cmPick = 0
+    cmPick = 0,
+    radiantTeamName?: string,
+    direTeamName?: string
   ): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 16;
@@ -691,6 +693,15 @@ class DotaBot extends EventEmitter {
     // Set per match after the toss completes. Only meaningful in Captains Mode but
     // harmless in other modes.
     const cmPickValue = cmPick === 1 || cmPick === 2 ? cmPick : 0;
+    // Tier 2 (best effort): try to set the Radiant/Dire slot labels via the
+    // CMsgDOTASeriesTeam sub-message on fields 21 and 22 of SetDetails. Valve
+    // honors this when leagueid > 0 in tournament-context lobbies; on a free
+    // practice lobby the client may render "Radiant" / "Dire" anyway. The
+    // lobby name (Tier 1) already shows the matchup regardless. If proto
+    // encoding throws we drop the team names and create the lobby without
+    // them so the create call itself never fails.
+    const rTeam = radiantTeamName && radiantTeamName.trim() ? radiantTeamName.trim().slice(0, 40) : undefined;
+    const dTeam = direTeamName    && direTeamName.trim()    ? direTeamName.trim().slice(0, 40)    : undefined;
 
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
@@ -786,21 +797,22 @@ class DotaBot extends EventEmitter {
         reject(new Error("Lobby create timed out (90s)"));
       }, 90000);
 
-      const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue);
-      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}`);
+      const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue, rTeam, dTeam);
+      const labelInfo = rTeam || dTeam ? ` radiantTeam="${rTeam || "—"}" direTeam="${dTeam || "—"}"` : "";
+      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}${labelInfo}`);
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
 
-  private buildCreate(name: string, password: string, mode: number, region: number, cmPick: number): Buffer {
+  private buildCreate(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string): Buffer {
     return Buffer.concat([
       this.str(5, password),
       this.vi(6, this.gcVersion || 0),
-      this.sub(7, this.buildDetails(name, password, mode, region, cmPick)),
+      this.sub(7, this.buildDetails(name, password, mode, region, cmPick, radiantTeam, direTeam)),
     ]);
   }
 
-  private buildDetails(name: string, password: string, mode: number, region: number, cmPick: number): Buffer {
+  private buildDetails(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string): Buffer {
     // Field 14 is `cm_pick` in CMsgPracticeLobbySetDetails. Only emit when set
     // (1 = Radiant first pick, 2 = Dire first pick). When 0, omit so Valve
     // applies the default (random first pick).
@@ -814,6 +826,18 @@ class DotaBot extends EventEmitter {
     ];
     if (cmPick === 1 || cmPick === 2) parts.push(this.vi(14, cmPick));
     parts.push(this.str(15, password));
+    // Fields 21 / 22 = radiant_series_team / dire_series_team
+    // (CMsgDOTASeriesTeam sub-message, team_name at field 2). Encoded best
+    // effort — wrapped in try so any proto-version drift can't break the
+    // create call. The lobby name above already carries the matchup.
+    if (radiantTeam) {
+      try { parts.push(this.sub(21, this.str(2, radiantTeam))); }
+      catch (e: any) { console.warn(`[Dota2] radiantTeam proto encode failed: ${e?.message || e}`); }
+    }
+    if (direTeam) {
+      try { parts.push(this.sub(22, this.str(2, direTeam))); }
+      catch (e: any) { console.warn(`[Dota2] direTeam proto encode failed: ${e?.message || e}`); }
+    }
     parts.push(this.vi(33, 0));
     return Buffer.concat(parts);
   }
