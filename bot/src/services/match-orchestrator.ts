@@ -88,7 +88,11 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     steam32Id: p.steam32Id, steamName: p.steamName,
   }));
 
-  const lobbyName = process.env.DEFAULT_LOBBY_NAME || "iesports Lobby";
+  // Brand convention: lowercase "iesports" everywhere. Defensively normalize
+  // whatever's in DEFAULT_LOBBY_NAME so a stale env var with "IEsports" or
+  // "Iesports" still produces the correct casing in Discord + Dota client.
+  const rawLobbyName = process.env.DEFAULT_LOBBY_NAME || "iesports Lobby";
+  const lobbyName = rawLobbyName.replace(/I[Ee]sports/g, "iesports");
   const password = String(Math.floor(100 + Math.random() * 900));
   const gameMode = process.env.DEFAULT_GAME_MODE || "CM";
   const region = process.env.DEFAULT_SERVER_REGION || "India";
@@ -96,6 +100,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // ── Step 1: Create GC Lobby ──────────────────────────────────
   let gcLobbyId: string | null = null;
   let lobbyCreated = false;
+  let lobbyFailureReason: string | null = null;
 
   const bot = getDotaBot();
   console.log(`[Match] bot.isReady() = ${bot.isReady()}`);
@@ -109,6 +114,9 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 2000));
       if (bot.isReady()) { console.log(`[Match] ✅ GC became ready`); break; }
+    }
+    if (!bot.isReady()) {
+      lobbyFailureReason = "GC not ready after 30s wait (Steam/Dota Game Coordinator connection down). Try the Restart Bot button in the admin panel.";
     }
   }
 
@@ -126,6 +134,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);
     } catch (err: any) {
       console.error(`[Match] ❌ Lobby creation failed: ${err.message}`);
+      lobbyFailureReason = `createLobby threw: ${err?.message || String(err)}`;
 
       // FIX #1/#2: Even if createLobby timed out, check if the lobby
       // was actually created by looking at the bot's live lobby members.
@@ -135,6 +144,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
         console.log(`[Match] 🔄 Lobby appears to exist (${liveMembers.length} members detected) — treating as created`);
         gcLobbyId = "active";
         lobbyCreated = true;
+        lobbyFailureReason = null;
       }
     }
   } else {
@@ -493,7 +503,9 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   if (queueChannelId) {
     try {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
-      const statusMsg = lobbyCreated ? `✅ Lobby created! Steam invites sent.` : `⚠️ Bot lobby unavailable — join manually using the details below.`;
+      const statusMsg = lobbyCreated
+        ? `✅ Lobby created! Steam invites sent.`
+        : `⚠️ **Auto-lobby failed** — join manually using the details below.\n_Reason:_ ${lobbyFailureReason || "unknown"}\n_How to fix:_ admin can click **Restart Bot** in the panel, then re-fire **Set Lobby & Notify**. Players can open Dota 2 and search the lobby name in Custom Lobbies in the meantime.`;
       await ch.send(
         `🏟️ **Match Started!**\n${statusMsg}\n` +
         `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
