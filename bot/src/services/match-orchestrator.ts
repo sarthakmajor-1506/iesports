@@ -410,6 +410,8 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // ── Step 3: Post lobby embed to Discord ─────────────────────
   // Track the message IDs so the web's cleanup-vcs button can sweep them
   // alongside web-posted embeds (web only knew about its own posts before).
+  let lobbyEmbedPosted = false;
+  let lobbyEmbedError: string | null = null;
   if (lobbyChannelId) {
     try {
       const ch = (await client.channels.fetch(lobbyChannelId)) as TextChannel;
@@ -417,6 +419,8 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       if (lob) {
         const sent1 = await ch.send({ embeds: [lobbyEmbed(lob)], components: [inviteMeButton(firestoreLobbyId)] });
         const sent2 = await ch.send({ content: "**Admin Controls:**", components: [lobbyControlRow1(firestoreLobbyId), lobbyControlRow2(firestoreLobbyId), lobbyControlRow3(firestoreLobbyId)] });
+        lobbyEmbedPosted = true;
+        console.log(`[Match] ✅ Lobby embed posted to channel ${lobbyChannelId} (msg ids ${sent1.id}, ${sent2.id})`);
         // Stash on the tournament match doc (if this lobby is tied to one)
         // so cleanup-vcs sees them in discordOpsMessageIds.
         const tid = (queue as any).tournamentId;
@@ -432,9 +436,28 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
             }, { merge: true });
           } catch (e: any) { console.warn("[Match] track bot msg ids:", e?.message || e); }
         }
+      } else {
+        lobbyEmbedError = `Lobby doc ${firestoreLobbyId} not found in Firestore`;
+        console.error(`[Match] ❌ Lobby embed skipped: ${lobbyEmbedError}`);
       }
-    } catch (err: any) { console.error("[Match] Lobby embed error:", err.message); }
+    } catch (err: any) {
+      lobbyEmbedError = err?.message || String(err);
+      console.error(`[Match] ❌ Lobby embed failed: ${lobbyEmbedError}`);
+    }
+  } else {
+    lobbyEmbedError = "No lobbyChannelId resolved (queue.tournamentChannelId + LOBBY_CONTROL_CHANNEL_ID both empty)";
+    console.error(`[Match] ❌ Lobby embed skipped: ${lobbyEmbedError}`);
   }
+  // Write diagnostic back to the queue doc so the web admin panel can see
+  // whether the bot actually posted the lobby embed. Cleared on next run.
+  try {
+    await updateQueue(queue.id, {
+      lobbyEmbedPosted,
+      lobbyEmbedError,
+      lobbyChannelIdUsed: lobbyChannelId || null,
+      lobbyEmbedAt: new Date().toISOString(),
+    } as any);
+  } catch { /* best-effort diagnostic */ }
 
   // ── Step 4: Invite players ───────────────────────────────────
   // FIX #2: This now runs because lobbyCreated is true even on late confirmation

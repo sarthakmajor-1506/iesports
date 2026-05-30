@@ -460,6 +460,26 @@ export async function POST(req: NextRequest) {
         // Discord channel labels truncate hard; team-named VCs on Start
         // Match use the full names for clarity once the game starts.
         let waitingRoomVcIdDota: string | null = null;
+        // Diagnostic trail surfaced in the API response so the admin panel
+        // log shows exactly what failed when "Set Lobby" appears to do nothing.
+        // Was previously a silent try/catch.
+        const dotaSetLobbyDiag: any = {
+          notifyDiscord: !!notifyDiscord,
+          hasBotToken: !!botToken,
+          hasGuildId: !!guildId,
+          tournamentChannelId: null as string | null,
+          fallbackChannelId: notifyChannelId || null,
+          chosenChannelId: null as string | null,
+          waitingVcCreated: false,
+          waitingNotifyPosted: false,
+          waitingNotifyId: null as string | null,
+          error: null as string | null,
+          errorStack: null as string | null,
+        };
+        if (!notifyDiscord) dotaSetLobbyDiag.error = "notifyDiscord flag is false (admin panel didn't request notify)";
+        else if (!botToken) dotaSetLobbyDiag.error = "DISCORD_BOT_TOKEN env var missing on Vercel";
+        else if (!guildId) dotaSetLobbyDiag.error = "DISCORD_GUILD_ID / DISCORD_SERVER_ID env var missing on Vercel";
+
         if (notifyDiscord && botToken && guildId) {
           try {
             const { team1Players, team2Players } = await getTeamDiscordData(tournamentRef, matchData);
@@ -469,6 +489,7 @@ export async function POST(req: NextRequest) {
             if (wrId) {
               waitingRoomVcIdDota = wrId;
               updateData.waitingRoomVcId = wrId;
+              dotaSetLobbyDiag.waitingVcCreated = true;
               for (const did of allDiscordIds) {
                 await maybeMoveToVoice(guildId, did, wrId);
               }
@@ -477,6 +498,8 @@ export async function POST(req: NextRequest) {
             // tournament channel (or the env-configured notify channel).
             const tournamentChannelIdForMsg =
               (await tournamentRef.get()).data()?.discordChannelId || notifyChannelId;
+            dotaSetLobbyDiag.tournamentChannelId = (await tournamentRef.get()).data()?.discordChannelId || null;
+            dotaSetLobbyDiag.chosenChannelId = tournamentChannelIdForMsg || null;
             if (tournamentChannelIdForMsg) {
               const mentions = allDiscordIds.map(id => `<@${id}>`).join(" ");
               const vcLine = wrId
@@ -499,6 +522,11 @@ export async function POST(req: NextRequest) {
                   timestamp: new Date().toISOString(),
                 }],
               });
+              dotaSetLobbyDiag.waitingNotifyPosted = !!waitingNotifyId;
+              dotaSetLobbyDiag.waitingNotifyId = waitingNotifyId;
+              if (!waitingNotifyId) {
+                dotaSetLobbyDiag.error = `sendMessage to channel ${tournamentChannelIdForMsg} returned null — Discord API failed (likely permissions or invalid payload). Check Vercel function logs.`;
+              }
               // Track this notification message on the match doc so cleanup-vcs
               // can sweep it. Existing ids are preserved; new ones appended.
               if (waitingNotifyId) {
@@ -506,11 +534,18 @@ export async function POST(req: NextRequest) {
                   ? matchData.discordOpsMessageIds : [];
                 updateData.discordOpsMessageIds = [...existingOps, waitingNotifyId];
               }
+            } else {
+              dotaSetLobbyDiag.error = "No Discord channel configured (tournament.discordChannelId is null AND no notify fallback). Set tournament.discordChannelId in Firestore.";
             }
           } catch (e: any) {
+            dotaSetLobbyDiag.error = `Exception: ${e?.message || String(e)}`;
+            dotaSetLobbyDiag.errorStack = String(e?.stack || "").split("\n").slice(0, 5).join(" | ");
             console.error("[Dota set-lobby] waiting-room VC / notify failed:", e?.message || e);
           }
         }
+        // Stash the diagnostic on the match doc for visibility from any later
+        // inspection script too. Cleared on next set-lobby attempt.
+        updateData.lastSetLobbyDiag = dotaSetLobbyDiag;
         // Route the bot's lobby embed / announcements to this tournament's
         // private Discord channel (created per-tournament) instead of the
         // global queue channel. Falls back to bot env channels if unset.
@@ -561,6 +596,7 @@ export async function POST(req: NextRequest) {
           playersWithSteam: withSteam,
           message: `iesportsbot will create the Dota lobby & invite ${withSteam}/${players.length} players within ~1 minute.`
             + (withSteam < players.length ? ` (${players.length - withSteam} have no linked Steam — they'll get the Discord DM only.)` : ""),
+          discord: dotaSetLobbyDiag,
         });
       }
 
