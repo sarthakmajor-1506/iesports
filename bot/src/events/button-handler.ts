@@ -630,29 +630,124 @@ async function handleDotaTossClick(interaction: ButtonInteraction): Promise<void
       }
     }
 
-    // Call back to web admin API to record + re-render embed.
-    const baseUrl = process.env.WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://iesports.in";
-    const adminSecret = process.env.ADMIN_SECRET;
-    const action = kind === "dota_toss_side" ? "side_choice" : "pick_choice";
-    const payloadKey = kind === "dota_toss_side" ? "side" : "pick";
-    const body: any = { adminKey: adminSecret, action, tournamentId, matchId, tournamentCollection };
-    body[payloadKey] = choice;
+    // Update Firestore + edit Discord message directly from the bot.
+    // We used to call back to /api/admin/dota-toss with ADMIN_SECRET, but
+    // that requires shared-secret parity between Railway and Vercel which
+    // is fragile. The bot already has Admin SDK access to Firestore and a
+    // Discord client, so do it locally for resilience.
+    const teamName = (t: "team1" | "team2") => match[t + "Name"] as string;
+    const rivalOf = (t: "team1" | "team2"): "team1" | "team2" => t === "team1" ? "team2" : "team1";
 
-    const res = await fetch(`${baseUrl}/api/admin/dota-toss`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = (await res.json()) as { ok?: boolean; error?: string };
-    if (!res.ok || !data.ok) {
-      await interaction.editReply({ content: `Toss update failed: ${data.error || res.statusText}` });
+    const TOSS_COLOR = 0xff4655, RADIANT_COLOR = 0x3ae37d, DIRE_COLOR = 0xd84a4a;
+
+    const buildPickPromptEmbed = (winnerName: string, loserName: string, chosenSide: "radiant" | "dire") => {
+      const winnerSide = chosenSide === "radiant" ? "⚔️ Radiant" : "🔥 Dire";
+      const loserSide  = chosenSide === "radiant" ? "🔥 Dire"    : "⚔️ Radiant";
+      const L = loserName.toUpperCase();
+      return {
+        embeds: [{
+          title: `🎯 ${L} — PICK YOUR ORDER`,
+          description: [
+            `✅ **${winnerName}** took ${winnerSide}`,
+            `➡️ **${loserName}** plays ${loserSide}`,
+            ``,
+            `Now **${L}**, choose:`,
+            `🥇 **First Pick**  or  🥈 **Last Pick**`,
+            ``,
+            `**${winnerName}** gets the opposite.`,
+            ``,
+            `⏳ *Waiting for ${loserName} to click below…*`,
+          ].join("\n"),
+          color: chosenSide === "radiant" ? RADIANT_COLOR : DIRE_COLOR,
+          footer: { text: `Only ${loserName} can click. ${winnerName} takes the leftover slot.` },
+        }],
+        components: [{
+          type: 1, components: [
+            { type: 2, style: 1, label: "🥇 First Pick", custom_id: `dota_toss_pick:${tournamentId}:${matchId}:first` },
+            { type: 2, style: 2, label: "🥈 Last Pick",  custom_id: `dota_toss_pick:${tournamentId}:${matchId}:last` },
+          ],
+        }],
+      };
+    };
+
+    const buildCompleteEmbed = (winnerName: string, loserName: string, radiantName: string, direName: string, firstPickName: string) => {
+      const radiantOrder = firstPickName === radiantName ? "🥇 First Pick" : "🥈 Last Pick";
+      const direOrder    = firstPickName === direName    ? "🥇 First Pick" : "🥈 Last Pick";
+      return {
+        embeds: [{
+          title: `🏁 Toss locked in`,
+          description: [
+            `⚔️ **Radiant** — **${radiantName}** · ${radiantOrder}`,
+            `🔥 **Dire**    — **${direName}** · ${direOrder}`,
+            ``,
+            `Lobby first-pick is set. Wait for the admin to start the lobby.`,
+          ].join("\n"),
+          color: RADIANT_COLOR,
+          footer: { text: `${winnerName} chose side · ${loserName} chose pick order` },
+        }],
+        components: [],
+      };
+    };
+
+    const matchRef = db.collection(tournamentCollection).doc(tournamentId).collection("matches").doc(matchId);
+    const winnerName = teamName(veto.tossWinner as "team1" | "team2");
+    const loserName  = teamName(veto.tossLoser as "team1" | "team2");
+
+    try {
+      if (kind === "dota_toss_side") {
+        const sidePick = choice as "radiant" | "dire";
+        const radiantTeam: "team1" | "team2" = sidePick === "radiant" ? veto.tossWinner : veto.tossLoser;
+        const direTeam = rivalOf(radiantTeam);
+        const newVeto = {
+          ...veto,
+          status: "side_chosen",
+          sideChosenSide: sidePick,
+          radiantTeam,
+          direTeam,
+          sideChosenAt: new Date().toISOString(),
+        };
+        await matchRef.set({ vetoState: newVeto }, { merge: true });
+        // Edit the toss embed message in place.
+        try {
+          await interaction.message.edit(buildPickPromptEmbed(winnerName, loserName, sidePick) as any);
+        } catch (editErr: any) {
+          console.warn(`[dota toss] edit message failed: ${editErr?.message || editErr}`);
+        }
+      } else {
+        const pickOrder = choice as "first" | "last";
+        const firstPickTeam: "team1" | "team2" = pickOrder === "first" ? veto.tossLoser : veto.tossWinner;
+        const lastPickTeam = rivalOf(firstPickTeam);
+        // cm_pick: 1 = Radiant first pick, 2 = Dire first pick
+        const cmPick: 1 | 2 = firstPickTeam === veto.radiantTeam ? 1 : 2;
+        const radiantName = teamName(veto.radiantTeam as "team1" | "team2");
+        const direName    = teamName(veto.direTeam as "team1" | "team2");
+        const firstPickName = teamName(firstPickTeam);
+        const newVeto = {
+          ...veto,
+          status: "completed",
+          pickOrderChoice: pickOrder,
+          firstPickTeam,
+          lastPickTeam,
+          cmPick,
+          completedAt: new Date().toISOString(),
+        };
+        await matchRef.set({ vetoState: newVeto }, { merge: true });
+        try {
+          await interaction.message.edit(buildCompleteEmbed(winnerName, loserName, radiantName, direName, firstPickName) as any);
+        } catch (editErr: any) {
+          console.warn(`[dota toss] edit message failed: ${editErr?.message || editErr}`);
+        }
+      }
+    } catch (writeErr: any) {
+      console.error("[dota toss] firestore write failed:", writeErr?.message || writeErr);
+      await interaction.editReply({ content: `Recording your pick failed: ${writeErr?.message || "unknown"}. Try again.` });
       return;
     }
 
     const labelMap: Record<string, string> = {
-      radiant: "Radiant ⚔️", dire: "Dire 🔥", first: "First Pick", last: "Last Pick",
+      radiant: "⚔️ Radiant", dire: "🔥 Dire", first: "🥇 First Pick", last: "🥈 Last Pick",
     };
-    await interaction.editReply({ content: `Recorded: ${labelMap[choice] || choice}` });
+    await interaction.editReply({ content: `✅ Recorded your pick: ${labelMap[choice] || choice}` });
   } catch (e: any) {
     console.error("[dota toss click]", e?.message || e);
     try { await interaction.editReply({ content: `Error: ${e?.message || "unknown"}` }); } catch {}
