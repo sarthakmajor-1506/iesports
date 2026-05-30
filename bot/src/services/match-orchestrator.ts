@@ -349,14 +349,19 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       if (tournamentChannelIdForResult) {
         try {
           const loserName = winner === "team1" ? mdata.team2Name : mdata.team1Name;
-          const winnerSide = team1Side === (evt.radiantWin ? "radiant" : "dire") ? "radiant" : "dire";
-          const sideEmoji = winnerSide === "radiant" ? "🟢" : "🔴";
-          const sideLabel = winnerSide === "radiant" ? "Radiant" : "Dire";
+          // BUG FIX: was asking "is team1 on the winning side?" and assuming
+          // the answer is the side label, which inverted Radiant/Dire any
+          // time team1 was the losing side. The winner's side is simply the
+          // side stamp on whichever tournament team won — read it directly.
+          const winnerSideLabel: "radiant" | "dire" = winner === "team1" ? team1Side : team2Side;
+          const loserSideLabel:  "radiant" | "dire" = winnerSideLabel === "radiant" ? "dire" : "radiant";
+          const sideEmoji = winnerSideLabel === "radiant" ? "🟢" : "🔴";
+          const sideLabel = winnerSideLabel === "radiant" ? "Radiant" : "Dire";
           const resultMsg = {
             embeds: [{
               title: `🏆 Match Complete — ${winnerName} wins!`,
               description: [
-                `${sideEmoji} **${winnerName}** (${sideLabel}) defeated **${loserName}** (${winnerSide === "radiant" ? "Dire" : "Radiant"})`,
+                `${sideEmoji} **${winnerName}** (${sideLabel}) defeated **${loserName}** (${loserSideLabel === "radiant" ? "Radiant" : "Dire"})`,
                 ``,
                 `**Dota match ID:** [\`${evt.matchId}\`](https://www.dotabuff.com/matches/${evt.matchId})`,
                 `**Tournament:** ${mdata.team1Name} vs ${mdata.team2Name}`,
