@@ -33,6 +33,32 @@ const PERM_VIEW_CONNECT_SPEAK = String(
  * Fetches all discord IDs for players on both teams.
  * Returns structured data for both teams.
  */
+// Resolve a member entry into the cleanest possible display name. Members
+// might be Valorant (riotGameName), Dota (steamName / fullName), or thin
+// (only a uid). Falls back through the chain so the embed never shows a
+// raw "discord_1234…" UID to players. userDoc fields override member-cache
+// fields only when richer (e.g. team-cache has "—" but user doc has Steam
+// name, prefer the latter).
+function buildDisplayName(member: any, userData: any): string {
+  const pick = (...vals: any[]): string => {
+    for (const v of vals) {
+      if (typeof v === "string" && v.trim() && !v.startsWith("discord_") && !v.startsWith("steam_")) return v.trim();
+    }
+    return "";
+  };
+  return (
+    pick(member.riotGameName) ||       // Valorant
+    pick(member.steamName) ||          // Dota
+    pick(member.fullName) ||           // Any game
+    pick(member.discordUsername) ||    // From Discord link
+    pick(userData?.steamName) ||
+    pick(userData?.fullName) ||
+    pick(userData?.discordUsername) ||
+    pick(userData?.riotGameName) ||
+    "Player"
+  );
+}
+
 async function getTeamDiscordData(
   tournamentRef: FirebaseFirestore.DocumentReference,
   matchData: any
@@ -47,25 +73,22 @@ async function getTeamDiscordData(
   const team1Players: { uid: string; discordId: string; name: string }[] = [];
   const team2Players: { uid: string; discordId: string; name: string }[] = [];
 
-  for (const member of team1Members) {
-    try {
-      const userDoc = await adminDb.collection("users").doc(member.uid).get();
-      const discordId = userDoc.data()?.discordId || "";
-      team1Players.push({ uid: member.uid, discordId, name: member.riotGameName || member.uid });
-    } catch {
-      team1Players.push({ uid: member.uid, discordId: "", name: member.riotGameName || member.uid });
+  const resolve = async (members: any[]) => {
+    const out: { uid: string; discordId: string; name: string }[] = [];
+    for (const member of members) {
+      let userData: any = null;
+      try {
+        const userDoc = await adminDb.collection("users").doc(member.uid).get();
+        userData = userDoc.data() || null;
+      } catch { /* keep null */ }
+      const discordId = (userData?.discordId as string) || (member.discordId as string) || "";
+      out.push({ uid: member.uid, discordId, name: buildDisplayName(member, userData) });
     }
-  }
+    return out;
+  };
 
-  for (const member of team2Members) {
-    try {
-      const userDoc = await adminDb.collection("users").doc(member.uid).get();
-      const discordId = userDoc.data()?.discordId || "";
-      team2Players.push({ uid: member.uid, discordId, name: member.riotGameName || member.uid });
-    } catch {
-      team2Players.push({ uid: member.uid, discordId: "", name: member.riotGameName || member.uid });
-    }
-  }
+  team1Players.push(...await resolve(team1Members));
+  team2Players.push(...await resolve(team2Members));
 
   return { team1Players, team2Players };
 }
@@ -530,6 +553,11 @@ export async function POST(req: NextRequest) {
               const vcLine = wrId
                 ? `\n🎙️ **Join the waiting room:** <#${wrId}>`
                 : "";
+              // Render rosters as Discord @mentions when discordId is known,
+              // falling back to the resolved display name otherwise. Avoids
+              // ever showing the raw "discord_xxx" UID in the embed body.
+              const fmtPlayer = (p: { discordId: string; name: string }) =>
+                p.discordId ? `<@${p.discordId}>` : p.name;
               const waitingNotifyId = await sendMessage(tournamentChannelIdForMsg, {
                 content: mentions || undefined,
                 embeds: [{
@@ -537,8 +565,8 @@ export async function POST(req: NextRequest) {
                   description: [
                     `**Match starting!** ${withSteam}/${players.length} players will get auto-Steam-invites in Dota 2 in ~1 minute.${vcLine}`,
                     ``,
-                    `**${matchData.team1Name}:** ${team1Players.map(p => p.name).join(", ") || "—"}`,
-                    `**${matchData.team2Name}:** ${team2Players.map(p => p.name).join(", ") || "—"}`,
+                    `**${matchData.team1Name}:** ${team1Players.map(fmtPlayer).join(", ") || "—"}`,
+                    `**${matchData.team2Name}:** ${team2Players.map(fmtPlayer).join(", ") || "—"}`,
                     ``,
                     `If you don't get the Steam invite within 2 min, open Dota 2 → Play → Custom Lobbies and search for the lobby name the bot posts here next.`,
                   ].join("\n"),
@@ -871,7 +899,16 @@ export async function POST(req: NextRequest) {
           }
 
           // ── Announce team VCs ───────────────────────────────────────────
-          if (notifyChannelId) {
+          // For Dota tournaments, post to the per-tournament Discord channel
+          // (where every other ops message lives) so cleanup-vcs can find and
+          // sweep it. Was using notifyChannelId which is a different channel
+          // for tournaments that have a private discordChannelId set; result
+          // was the message lived in one channel but cleanup looked in another.
+          const tournDataForAnnounce = (await tournamentRef.get()).data() as any;
+          const startAnnounceChannel = isDotaTournament
+            ? (tournDataForAnnounce?.discordChannelId || notifyChannelId)
+            : notifyChannelId;
+          if (startAnnounceChannel) {
             const team1VcMention = team1VcId ? `<#${team1VcId}>` : "—";
             const team2VcMention = team2VcId ? `<#${team2VcId}>` : "—";
             const team1Mentions = team1DiscordIds.map(id => `<@${id}>`).join(", ") || "—";
@@ -880,7 +917,7 @@ export async function POST(req: NextRequest) {
             if (team1Subs.length) subLines.push(`🔄 **${matchData.team1Name} subs:** ${team1Subs.map(s => s.name).join(", ")}`);
             if (team2Subs.length) subLines.push(`🔄 **${matchData.team2Name} subs:** ${team2Subs.map(s => s.name).join(", ")}`);
 
-            const startMsgId = await sendMessage(notifyChannelId, {
+            const startMsgId = await sendMessage(startAnnounceChannel, {
               embeds: [{
                 title: `🏟️ Match Started — ${matchData.team1Name} vs ${matchData.team2Name}`,
                 description: [
@@ -1012,11 +1049,19 @@ export async function POST(req: NextRequest) {
         null;
       const allMsgIds = Array.from(new Set([...opsIds, ...(liveVetoMsgId ? [liveVetoMsgId] : [])])).filter(Boolean);
       let deletedMessages = 0;
-      if (opsChannelId && allMsgIds.length > 0) {
-        for (const mid of allMsgIds) {
-          await deleteMessage(opsChannelId, mid);
-          deletedMessages++;
+      // Try the primary channel first (tournament channel for Dota, notify
+      // channel for Valorant). If the message lived in the OTHER channel
+      // (older message from before we standardized channel routing), the
+      // 404 is swallowed and we retry against the fallback so historic ops
+      // chatter still gets swept.
+      const cleanupChannels = isDotaTournament
+        ? [opsChannelId, notifyChannelId].filter((c, i, arr): c is string => !!c && arr.indexOf(c) === i)
+        : [opsChannelId].filter((c): c is string => !!c);
+      for (const mid of allMsgIds) {
+        for (const ch of cleanupChannels) {
+          await deleteMessage(ch, mid);
         }
+        deletedMessages++;
       }
 
       await matchRef.update({
