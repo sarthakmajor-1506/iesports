@@ -442,12 +442,37 @@ export async function POST(req: NextRequest) {
         const queueId = `tournament_${tournamentId}_${matchId}_g${gameNumber || 1}`;
         const queueRef = adminDb.collection("botQueues").doc(queueId);
         const existing = await queueRef.get();
-        const existingStatus = existing.exists ? (existing.data()?.status as string) : null;
-        if (existingStatus === "in_progress") {
+        const existingData = existing.exists ? (existing.data() as any) : null;
+        const existingStatus = existingData?.status as string | null;
+        // A previous Set Lobby left this queue in_progress, but the bot may
+        // never have actually posted the lobby embed (cron skipped, bot was
+        // offline, channel mis-routed, GC dropped, etc.). Block re-fire only
+        // when the bot truly succeeded — otherwise drop through and re-create.
+        // Three signals we trust: lobbyEmbedPosted (set by match-orchestrator
+        // after successful ch.send), dotaMatchId (set after match starts),
+        // OR a very recent createdAt (< 2 min ago, still being processed).
+        const createdMs = existingData?.createdAt ? Date.parse(existingData.createdAt) : 0;
+        const ageSec = createdMs ? (Date.now() - createdMs) / 1000 : Infinity;
+        const botActuallyPosted = !!existingData?.lobbyEmbedPosted || !!existingData?.dotaMatchId;
+        const stillFreshlyProcessing = ageSec < 120 && !existingData?.lobbyEmbedError;
+        if (existingStatus === "in_progress" && (botActuallyPosted || stillFreshlyProcessing)) {
           return NextResponse.json({
             ok: true, mode: "bot-lobby", queueId,
-            message: "Lobby already being created by the bot for this match.",
+            message: botActuallyPosted
+              ? "Lobby already being created by the bot for this match."
+              : `Lobby create in progress (${Math.round(ageSec)}s ago). Wait a bit before re-firing.`,
+            existingQueue: {
+              status: existingStatus,
+              ageSec: Math.round(ageSec),
+              lobbyEmbedPosted: !!existingData?.lobbyEmbedPosted,
+              lobbyEmbedError: existingData?.lobbyEmbedError || null,
+              dotaMatchId: existingData?.dotaMatchId || null,
+            },
           });
+        }
+        // Stale or failed queue: log what we're stepping over and continue.
+        if (existing.exists) {
+          console.log(`[Dota set-lobby] previous queue ${queueId} status=${existingStatus} ageSec=${Math.round(ageSec)} lobbyEmbedPosted=${!!existingData?.lobbyEmbedPosted} — recreating`);
         }
 
         const players = await buildDotaQueuePlayers(tournamentRef, matchData);
