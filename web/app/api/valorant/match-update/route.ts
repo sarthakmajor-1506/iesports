@@ -482,7 +482,7 @@ export async function POST(req: NextRequest) {
               const vcLine = wrId
                 ? `\n🎙️ **Join the waiting room:** <#${wrId}>`
                 : "";
-              await sendMessage(tournamentChannelIdForMsg, {
+              const waitingNotifyId = await sendMessage(tournamentChannelIdForMsg, {
                 content: mentions || undefined,
                 embeds: [{
                   title: `🎮 ${matchData.team1Name} vs ${matchData.team2Name}`,
@@ -499,6 +499,13 @@ export async function POST(req: NextRequest) {
                   timestamp: new Date().toISOString(),
                 }],
               });
+              // Track this notification message on the match doc so cleanup-vcs
+              // can sweep it. Existing ids are preserved; new ones appended.
+              if (waitingNotifyId) {
+                const existingOps: string[] = Array.isArray(matchData.discordOpsMessageIds)
+                  ? matchData.discordOpsMessageIds : [];
+                updateData.discordOpsMessageIds = [...existingOps, waitingNotifyId];
+              }
             }
           } catch (e: any) {
             console.error("[Dota set-lobby] waiting-room VC / notify failed:", e?.message || e);
@@ -908,15 +915,32 @@ export async function POST(req: NextRequest) {
 
       // Also sweep the tournament-ops chatter: lobby/start/next-game embeds
       // we tracked, plus the latest active toss/veto/side-pick message. The
-      // match-result post is sent from /api/valorant/match-fetch and is NOT
-      // in this set, so it stays in the channel.
+      // match-result post is sent from /api/valorant/match-fetch (Valorant)
+      // or /api/admin/dota-result-job (Dota) and is stored separately on
+      // matchData.resultMessageId, so it stays in the channel.
+      //
+      // For Dota tournaments, all ops chatter (waiting-room notification,
+      // bot lobby embed + admin controls, toss embed) is posted to the
+      // tournament's private Discord channel, NOT the global notify channel.
+      // Try the tournament channel first, fall back to the notify channel
+      // if the tournament has no per-tournament channel configured.
+      const tournamentDataForCleanup = (await tournamentRef.get()).data() as any;
+      const dotaChannelId = tournamentDataForCleanup?.discordChannelId || null;
+      const opsChannelId = isDotaTournament ? (dotaChannelId || notifyChannelId) : notifyChannelId;
+
       const opsIds: string[] = Array.isArray(matchData.discordOpsMessageIds) ? matchData.discordOpsMessageIds : [];
-      const liveVetoMsgId: string | null = matchData.vetoState?.messageId || null;
+      // vetoState.messageId is the Valorant veto embed id; Dota's toss
+      // endpoint historically used a different field, but we now also write
+      // messageId for the same purpose. Both reads are defensive.
+      const liveVetoMsgId: string | null =
+        matchData.vetoState?.messageId ||
+        (matchData.vetoState as any)?.discordMessageId ||
+        null;
       const allMsgIds = Array.from(new Set([...opsIds, ...(liveVetoMsgId ? [liveVetoMsgId] : [])])).filter(Boolean);
       let deletedMessages = 0;
-      if (notifyChannelId && allMsgIds.length > 0) {
+      if (opsChannelId && allMsgIds.length > 0) {
         for (const mid of allMsgIds) {
-          await deleteMessage(notifyChannelId, mid);
+          await deleteMessage(opsChannelId, mid);
           deletedMessages++;
         }
       }

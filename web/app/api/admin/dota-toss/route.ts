@@ -191,16 +191,16 @@ export async function POST(req: NextRequest) {
     const loserName = teamName(match, tossLoser);
     const gameLabel = `${match.team1Name} vs ${match.team2Name}`;
 
-    let discordMessageId: string | null = null;
+    let messageId: string | null = null;
     if (channelId) {
-      discordMessageId = await postDiscordMessage(channelId, buildStartEmbed({ tournamentId, matchId, winnerName, loserName, gameLabel }));
+      messageId = await postDiscordMessage(channelId, buildStartEmbed({ tournamentId, matchId, winnerName, loserName, gameLabel }));
     }
     const vetoState = {
       status: "toss_started",
       tossWinner,
       tossLoser,
       startedAt: new Date().toISOString(),
-      discordMessageId,
+      messageId,
       team1Name: match.team1Name,
       team2Name: match.team2Name,
     };
@@ -223,8 +223,8 @@ export async function POST(req: NextRequest) {
     const winnerName = teamName(match, cur.tossWinner);
     const loserName = teamName(match, cur.tossLoser);
 
-    if (channelId && cur.discordMessageId) {
-      await editDiscordMessage(channelId, cur.discordMessageId, buildPickPromptEmbed({
+    if (channelId && cur.messageId) {
+      await editDiscordMessage(channelId, cur.messageId, buildPickPromptEmbed({
         tournamentId, matchId, winnerName, loserName, chosenSide: sidePick as "radiant" | "dire",
       }));
     }
@@ -260,8 +260,8 @@ export async function POST(req: NextRequest) {
     const firstPickName = teamName(match, firstPickTeam);
     const lastPickName = teamName(match, lastPickTeam);
 
-    if (channelId && cur.discordMessageId) {
-      await editDiscordMessage(channelId, cur.discordMessageId, buildCompleteEmbed({
+    if (channelId && cur.messageId) {
+      await editDiscordMessage(channelId, cur.messageId, buildCompleteEmbed({
         winnerName, loserName, radiantName, direName, firstPickName, lastPickName,
       }));
     }
