@@ -2348,13 +2348,23 @@ export default function AdminPanel() {
                         )}
                       </div>
 
-                      {/* ── Step 2: Toss (Dota = side + pick order, Valorant = map veto) ── */}
+                      {/* ── Step 2: Toss (Dota = side + pick order, Valorant = map veto) ──
+                          Detect Dota via game field OR [DOTA2] prefix on the name OR
+                          a Dota-only field on the match (defends against an
+                          unpopulated selectedTournament during initial render). */}
+                      {(() => {
+                      const isDotaToss =
+                        selectedTournament?.game === "dota2" ||
+                        selectedTournament?.name?.startsWith("[DOTA2]") ||
+                        (m as any).dotaMatchId !== undefined ||
+                        (m as any).botQueueId !== undefined;
+                      return (
                       <div style={stepBox(true, hasVeto)}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <span style={stepDone(hasVeto)}>{hasVeto ? "✓" : "2"}</span>
-                          <span style={stepTitle}>{selectedTournament?.game === "dota2" ? "Toss — Side & Pick Order" : "Coin Toss & Map Veto"}</span>
+                          <span style={stepTitle}>{isDotaToss ? "🎲 Dota Toss: Side + Pick Order" : "Coin Toss & Map Veto"}</span>
                         </div>
-                        {selectedTournament?.game === "dota2" ? (
+                        {isDotaToss ? (
                           <div style={{ marginTop: 10 }}>
                             {!vetoStatus && (
                               <div>
@@ -2441,6 +2451,8 @@ export default function AdminPanel() {
                           </>
                         )}
                       </div>
+                      );
+                      })()}
 
                       {/* ── Step 3: Start Match + VC Status ────────────────────── */}
                       {/* Manual-lobby support: Step 1 (Set Lobby & Notify) is

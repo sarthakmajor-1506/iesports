@@ -1076,6 +1076,17 @@ export async function POST(req: NextRequest) {
     // → Bot handles interactive veto from there (button-handler.ts)
     // ═══════════════════════════════════════════════════════════════════════
     } else if (action === "toss") {
+      // Server-side safety: this is the VALORANT toss + map-veto handler. If
+      // a stale browser bundle calls it for a Dota tournament, reject with a
+      // clear message pointing at the correct endpoint. Dota tournaments live
+      // in the `tournaments` collection; this endpoint serves the
+      // `valorantTournaments` collection (and shares CS2 paths). Anything
+      // that came in via the `tournaments` collection is Dota.
+      if (isDotaTournament) {
+        return NextResponse.json({
+          error: "This is the Valorant toss endpoint. Dota tournaments use /api/admin/dota-toss with action 'start' / 'side_choice' / 'pick_choice'. Hard-refresh your admin panel (Cmd+Shift+R) if you keep landing here.",
+        }, { status: 400 });
+      }
       const bo = bodyBo || matchData.bo || 3;
       const vetoMode: "veto" | "random" = bodyVetoMode === "random" ? "random" : "veto";
 
