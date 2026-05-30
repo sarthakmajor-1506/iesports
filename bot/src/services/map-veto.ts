@@ -8,9 +8,24 @@ import {
 import { getDb } from "./firebase";
 
 // ── Valorant Competitive Map Pool ────────────────────────────────
+// Group-stage default. Bracket matches use BRACKET_VALORANT_MAPS instead.
+// The active pool for a given veto is stored on vetoState.mapPool when set;
+// otherwise this is the fallback so historic veto state docs keep working.
 export const VALORANT_MAPS = [
   "Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split",
 ];
+
+// Bracket-stage pool. Picked per match in match-update toss handler when
+// matchData.isBracket === true and propagated to vetoState.mapPool so the
+// bot reads the same pool the toss embed advertised.
+export const BRACKET_VALORANT_MAPS = [
+  "Ascent", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split",
+];
+
+/** Resolve the active pool for a given veto state. */
+export function poolForState(state: { mapPool?: string[] }): string[] {
+  return Array.isArray(state.mapPool) && state.mapPool.length > 0 ? state.mapPool : VALORANT_MAPS;
+}
 
 // ── Veto Sequences ───────────────────────────────────────────────
 // "first" = team that bans first, "second" = other team
@@ -59,6 +74,9 @@ export interface SideAction {
 export interface VetoState {
   status: "toss_choice" | "veto" | "random" | "side_pick" | "complete";
   bo: number;
+  /** Map pool used by this veto. Set at toss start. When absent (historic
+   * states) the bot falls back to the legacy VALORANT_MAPS constant. */
+  mapPool?: string[];
   /** Populated when veto/random finishes. Each entry is one map in game
    * order, the captain who gets side pick, and their choice (null until
    * they've clicked). */
@@ -410,9 +428,10 @@ function buildMapButtons(
 ): ActionRowBuilder<ButtonBuilder>[] {
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   let currentRow = new ActionRowBuilder<ButtonBuilder>();
+  const pool = poolForState(state);
 
-  for (let i = 0; i < VALORANT_MAPS.length; i++) {
-    const map = VALORANT_MAPS[i];
+  for (let i = 0; i < pool.length; i++) {
+    const map = pool[i];
     const pastAction = state.actions.find(a => a.map === map);
 
     let style = ButtonStyle.Secondary;
@@ -439,9 +458,9 @@ function buildMapButtons(
     );
 
     // 4 buttons per row → 7 maps = row of 4 + row of 3
-    if (currentRow.components.length === 4 || i === VALORANT_MAPS.length - 1) {
+    if (currentRow.components.length === 4 || i === pool.length - 1) {
       rows.push(currentRow);
-      if (i < VALORANT_MAPS.length - 1) {
+      if (i < pool.length - 1) {
         currentRow = new ActionRowBuilder<ButtonBuilder>();
       }
     }
@@ -678,7 +697,8 @@ export async function handleVetoMap(
     return;
   }
 
-  const map = VALORANT_MAPS[mapIndex];
+  const pool = poolForState(state);
+  const map = pool[mapIndex];
   if (!map || !state.remainingMaps.includes(map)) {
     await interaction.followUp({ content: "❌ Map not available.", ephemeral: true });
     return;

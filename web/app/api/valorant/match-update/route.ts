@@ -1291,7 +1291,13 @@ export async function POST(req: NextRequest) {
       const winnerName = tossWinner === "team1" ? matchData.team1Name : matchData.team2Name;
       const winnerCaptainTag = tossWinner === "team1" ? team1CaptainDiscordId : team2CaptainDiscordId;
 
-      const VALORANT_MAPS = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split"];
+      // Map pool — bracket matches use the bracket-stage pool, group stage
+      // matches keep the legacy pool. The chosen pool is also persisted onto
+      // vetoState.mapPool so the bot uses the same pool when it renders
+      // buttons + resolves map clicks.
+      const VALORANT_MAPS_GROUP   = ["Abyss", "Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split"];
+      const VALORANT_MAPS_BRACKET = ["Ascent", "Breeze", "Fracture", "Haven", "Lotus", "Pearl", "Split"];
+      const VALORANT_MAPS = matchData.isBracket === true ? VALORANT_MAPS_BRACKET : VALORANT_MAPS_GROUP;
 
       // ── Post toss message, branching on the admin-selected mode ────
       const mapPoolLine = `🗺️ **Map pool:** ${VALORANT_MAPS.join(" · ")}`;
@@ -1338,6 +1344,7 @@ export async function POST(req: NextRequest) {
         vetoState = {
           status: "random",
           bo,
+          mapPool: [...VALORANT_MAPS],
           tossWinner,
           banFirst: null,
           sidePickOnDecider: tossWinner, // first reveal belongs to toss winner
@@ -1424,6 +1431,7 @@ export async function POST(req: NextRequest) {
         vetoState = {
           status: "toss_choice",
           bo,
+          mapPool: [...VALORANT_MAPS],
           tossWinner,
           banFirst: null,
           sidePickOnDecider: null,
