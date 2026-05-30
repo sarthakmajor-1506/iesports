@@ -510,6 +510,11 @@ export async function POST(req: NextRequest) {
         const tournamentChannelId =
           (await tournamentRef.get()).data()?.discordChannelId || null;
         const now = new Date().toISOString();
+        // If a Dota toss has completed on this match, propagate cm_pick so
+        // the bot sets it when it creates the practice lobby. 0 = Valve
+        // default (random first pick); 1/2 = Radiant/Dire first pick lock.
+        const vetoCmPick = Number(matchData.vetoState?.cmPick || 0);
+        const cmPick = vetoCmPick === 1 || vetoCmPick === 2 ? vetoCmPick : 0;
         await queueRef.set({
           id: queueId,
           name: lobbyName || `${matchData.team1Name} vs ${matchData.team2Name}`,
@@ -533,6 +538,7 @@ export async function POST(req: NextRequest) {
           tournamentGameNumber: gameNumber || 1,
           source: "tournament",
           lobbyPassword: lobbyPassword || "",
+          cmPick,
         }, { merge: true });
 
         updateData.botQueueId = queueId;

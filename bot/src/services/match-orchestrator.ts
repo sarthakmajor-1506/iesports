@@ -112,10 +112,15 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     }
   }
 
+  // cm_pick is stamped on the queue doc by the web set-lobby flow when a Dota
+  // toss has been completed. 0 = Valve default (random first pick); 1/2 are
+  // Radiant/Dire first-pick lock-ins from the toss result.
+  const cmPick = Number((queue as any).cmPick || 0);
+
   if (bot.isReady()) {
     try {
-      console.log(`[Match] Creating Dota lobby...`);
-      const result = await bot.createLobby(lobbyName, password, gameMode, region);
+      console.log(`[Match] Creating Dota lobby... cmPick=${cmPick}`);
+      const result = await bot.createLobby(lobbyName, password, gameMode, region, cmPick);
       gcLobbyId = result.lobbyId;
       lobbyCreated = true;
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);

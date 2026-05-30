@@ -50,10 +50,12 @@ export async function POST(req: NextRequest) {
   // Light validation / normalisation per action
   const params: any = body.params || {};
   if (action === "create") {
-    params.name = String(params.name || "IEsports Lobby").slice(0, 60);
+    params.name = String(params.name || "iesports Lobby").slice(0, 60);
     params.password = String(params.password || "ies").slice(0, 30);
     params.region = String(params.region || "India");
     params.gameMode = String(params.gameMode || "AP");
+    const cm = Number(params.cmPick || 0);
+    params.cmPick = cm === 1 || cm === 2 ? cm : 0;
   }
   if ((action === "kick" || action === "invite") && !params.steam32) {
     return NextResponse.json({ error: "params.steam32 required" }, { status: 400 });

@@ -26,6 +26,15 @@ import { queueEmbed } from "../utils/embeds";
 import { queueButtons } from "../utils/buttons";
 
 export async function handleButton(interaction: ButtonInteraction): Promise<void> {
+  // ── Dota 2 toss buttons (multi-part customId) ────────────────
+  if (
+    interaction.customId.startsWith("dota_toss_side:") ||
+    interaction.customId.startsWith("dota_toss_pick:")
+  ) {
+    await handleDotaTossClick(interaction);
+    return;
+  }
+
   // ── Valorant map veto buttons (multi-part customId) ──────────
   if (
     interaction.customId.startsWith("toss_") ||
@@ -542,4 +551,106 @@ async function refreshQueueEmbed(interaction: ButtonInteraction, queueId: string
     const msg = await ch.messages.fetch(queue.messageId);
     await msg.edit({ embeds: [queueEmbed(queue)], components: [queueButtons(queueId)] });
   } catch {}
+}
+// ─── Dota 2 toss click ──────────────────────────────────────────────
+// Custom ID shapes:
+//   dota_toss_side:<tournamentId>:<matchId>:<radiant|dire>
+//   dota_toss_pick:<tournamentId>:<matchId>:<first|last>
+//
+// Validates that the clicker is a member of the team that's allowed to act,
+// then calls back to the web admin API so the toss state machine + Discord
+// embed updates happen in one place. The web API also re-renders the embed.
+async function handleDotaTossClick(interaction: ButtonInteraction): Promise<void> {
+  const parts = interaction.customId.split(":");
+  const kind = parts[0]; // dota_toss_side | dota_toss_pick
+  const tournamentId = parts[1];
+  const matchId = parts[2];
+  const choice = parts[3];
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    // Find which tournament collection this match lives in. Tournaments now
+    // span dota (tournaments) and valorant (valorantTournaments), but Dota
+    // tosses only target Dota tournaments. Default to tournaments.
+    const tournamentCollection = "tournaments";
+
+    // Fetch match doc to validate the clicker's team membership.
+    const { getDb } = await import("../services/firebase");
+    const db = getDb();
+    const matchSnap = await db.collection(tournamentCollection).doc(tournamentId).collection("matches").doc(matchId).get();
+    if (!matchSnap.exists) {
+      await interaction.editReply({ content: "Match not found." });
+      return;
+    }
+    const match = matchSnap.data() as any;
+    const veto = match.vetoState || {};
+    const team1Id = match.team1Id, team2Id = match.team2Id;
+
+    // Identify the clicker's team.
+    const webUser = await findUserByDiscordId(interaction.user.id);
+    if (!webUser) {
+      await interaction.editReply({ content: "Link your Discord on iesports.in first." });
+      return;
+    }
+    const team1Snap = await db.collection(tournamentCollection).doc(tournamentId).collection("teams").doc(team1Id).get();
+    const team2Snap = await db.collection(tournamentCollection).doc(tournamentId).collection("teams").doc(team2Id).get();
+    const team1Members: string[] = team1Snap.exists ? ((team1Snap.data() as any)?.members || []) : [];
+    const team2Members: string[] = team2Snap.exists ? ((team2Snap.data() as any)?.members || []) : [];
+    let clickerTeam: "team1" | "team2" | null = null;
+    if (team1Members.includes(webUser.uid)) clickerTeam = "team1";
+    else if (team2Members.includes(webUser.uid)) clickerTeam = "team2";
+    if (!clickerTeam) {
+      await interaction.editReply({ content: "You are not on either team in this match." });
+      return;
+    }
+
+    // Permission check based on state.
+    if (kind === "dota_toss_side") {
+      if (veto.status !== "toss_started") {
+        await interaction.editReply({ content: `Toss is not awaiting a side choice (current state: ${veto.status || "none"}).` });
+        return;
+      }
+      if (clickerTeam !== veto.tossWinner) {
+        await interaction.editReply({ content: `Only ${match[veto.tossWinner + "Name"]} (toss winner) can choose side.` });
+        return;
+      }
+    } else {
+      if (veto.status !== "side_chosen") {
+        await interaction.editReply({ content: `Toss is not awaiting a pick-order choice (current state: ${veto.status || "none"}).` });
+        return;
+      }
+      if (clickerTeam !== veto.tossLoser) {
+        await interaction.editReply({ content: `Only ${match[veto.tossLoser + "Name"]} (toss loser) can choose pick order.` });
+        return;
+      }
+    }
+
+    // Call back to web admin API to record + re-render embed.
+    const baseUrl = process.env.WEB_APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://iesports.in";
+    const adminSecret = process.env.ADMIN_SECRET;
+    const action = kind === "dota_toss_side" ? "side_choice" : "pick_choice";
+    const payloadKey = kind === "dota_toss_side" ? "side" : "pick";
+    const body: any = { adminKey: adminSecret, action, tournamentId, matchId, tournamentCollection };
+    body[payloadKey] = choice;
+
+    const res = await fetch(`${baseUrl}/api/admin/dota-toss`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      await interaction.editReply({ content: `Toss update failed: ${data.error || res.statusText}` });
+      return;
+    }
+
+    const labelMap: Record<string, string> = {
+      radiant: "Radiant ⚔️", dire: "Dire 🔥", first: "First Pick", last: "Last Pick",
+    };
+    await interaction.editReply({ content: `Recorded: ${labelMap[choice] || choice}` });
+  } catch (e: any) {
+    console.error("[dota toss click]", e?.message || e);
+    try { await interaction.editReply({ content: `Error: ${e?.message || "unknown"}` }); } catch {}
+  }
 }

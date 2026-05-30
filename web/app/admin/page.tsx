@@ -2140,7 +2140,7 @@ export default function AdminPanel() {
                   if (!m) return <div style={{ textAlign: "center", padding: 40, color: "#444", fontSize: "0.82rem" }}>Select a match above to see the step-by-step flow</div>;
                   const bo = getMatchBo(m);
                   const hasLobby = !!m.lobbyName;
-                  const hasVeto = m.vetoState?.status === "complete";
+                  const hasVeto = m.vetoState?.status === "complete" || m.vetoState?.status === "completed";
                   const isLive = m.status === "live";
                   const isCompleted = m.status === "completed";
                   const hasWaitingRoom = !!m.waitingRoomVcId;
@@ -2348,12 +2348,56 @@ export default function AdminPanel() {
                         )}
                       </div>
 
-                      {/* ── Step 2: Toss & Map Veto ────────────────────────────── */}
-                      <div style={stepBox(hasLobby, hasVeto)}>
+                      {/* ── Step 2: Toss (Dota = side + pick order, Valorant = map veto) ── */}
+                      <div style={stepBox(true, hasVeto)}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <span style={stepDone(hasVeto)}>{hasVeto ? "✓" : "2"}</span>
-                          <span style={stepTitle}>Coin Toss & Map Veto</span>
+                          <span style={stepTitle}>{selectedTournament?.game === "dota2" ? "Toss — Side & Pick Order" : "Coin Toss & Map Veto"}</span>
                         </div>
+                        {selectedTournament?.game === "dota2" ? (
+                          <div style={{ marginTop: 10 }}>
+                            {!vetoStatus && (
+                              <div>
+                                <div style={stepHint("#888")}>Random coin toss. Winner picks side (Radiant or Dire). Loser picks pick order (First or Last). Lobby first-pick is set based on the result.</div>
+                                <button disabled={loading} style={{ ...btnStyle, marginTop: 8, width: "100%" }} onClick={() => apiCall("/api/admin/dota-toss", {
+                                  tournamentId, matchId: opsMatchId, action: "start", tournamentCollection: "tournaments",
+                                })}>🎲 Start Toss</button>
+                              </div>
+                            )}
+                            {vetoStatus === "toss_started" && m.vetoState && (
+                              <div>
+                                <div style={stepHint("#f59e0b")}>
+                                  {(m.vetoState.tossWinner === "team1" ? m.team1Name : m.team2Name)} won the toss. Waiting for side pick in Discord.
+                                </div>
+                                <button disabled={loading} style={{ ...btnStyle, marginTop: 8, background: "#2a2a2e", fontSize: "0.66rem", padding: "5px 10px" }} onClick={() => apiCall("/api/admin/dota-toss", {
+                                  tournamentId, matchId: opsMatchId, action: "reset", tournamentCollection: "tournaments",
+                                })}>Reset Toss</button>
+                              </div>
+                            )}
+                            {vetoStatus === "side_chosen" && m.vetoState && (
+                              <div>
+                                <div style={stepHint("#f59e0b")}>
+                                  {((m.vetoState as any).radiantTeam === "team1" ? m.team1Name : m.team2Name)} on Radiant, {((m.vetoState as any).direTeam === "team1" ? m.team1Name : m.team2Name)} on Dire. Waiting for pick order in Discord.
+                                </div>
+                                <button disabled={loading} style={{ ...btnStyle, marginTop: 8, background: "#2a2a2e", fontSize: "0.66rem", padding: "5px 10px" }} onClick={() => apiCall("/api/admin/dota-toss", {
+                                  tournamentId, matchId: opsMatchId, action: "reset", tournamentCollection: "tournaments",
+                                })}>Reset Toss</button>
+                              </div>
+                            )}
+                            {hasVeto && m.vetoState && (m.vetoState as any).radiantTeam && (
+                              <div style={{ marginTop: 6 }}>
+                                <div style={{ fontSize: "0.78rem", color: "#4ade80", fontWeight: 700 }}>
+                                  Radiant: {((m.vetoState as any).radiantTeam === "team1" ? m.team1Name : m.team2Name)}{(m.vetoState as any).firstPickTeam === (m.vetoState as any).radiantTeam ? " (First Pick)" : " (Last Pick)"}
+                                </div>
+                                <div style={{ fontSize: "0.78rem", color: "#f87171", fontWeight: 700 }}>
+                                  Dire: {((m.vetoState as any).direTeam === "team1" ? m.team1Name : m.team2Name)}{(m.vetoState as any).firstPickTeam === (m.vetoState as any).direTeam ? " (First Pick)" : " (Last Pick)"}
+                                </div>
+                                <div style={{ fontSize: "0.62rem", color: "#777", marginTop: 4 }}>cm_pick={(m.vetoState as any).cmPick} will be set on lobby create.</div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
                         {!hasLobby && !hasVeto && <div style={stepHint("#f59e0b")}>Set lobby first before starting the toss</div>}
                         {hasLobby && !hasVeto && !isCompleted && (
                           <div style={{ marginTop: 10 }}>
@@ -2377,7 +2421,7 @@ export default function AdminPanel() {
                             )}
                           </div>
                         )}
-                        {hasVeto && m.vetoState && (
+                        {hasVeto && m.vetoState && m.vetoState.actions && (
                           <div style={{ marginTop: 8 }}>
                             {m.vetoState.actions.filter((a: any) => a.action === "pick").map((a: any, i: number) => (
                               <div key={i} style={{ fontSize: "0.72rem", color: "#aaa", padding: "2px 0" }}>
@@ -2393,6 +2437,8 @@ export default function AdminPanel() {
                               Bans: {m.vetoState.actions.filter((a: any) => a.action === "ban").map((a: any) => a.map).join(", ")}
                             </div>
                           </div>
+                        )}
+                          </>
                         )}
                       </div>
 

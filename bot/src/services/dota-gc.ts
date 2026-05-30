@@ -681,11 +681,16 @@ class DotaBot extends EventEmitter {
     name: string,
     password: string,
     gameMode = "AP",
-    region = "India"
+    region = "India",
+    cmPick = 0
   ): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 16;
     const mode = GAME_MODES[gameMode] ?? 1;
+    // cm_pick: 0 = random (Valve default), 1 = Radiant first pick, 2 = Dire first pick.
+    // Set per match after the toss completes. Only meaningful in Captains Mode but
+    // harmless in other modes.
+    const cmPickValue = cmPick === 1 || cmPick === 2 ? cmPick : 0;
 
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers = [];
@@ -781,31 +786,36 @@ class DotaBot extends EventEmitter {
         reject(new Error("Lobby create timed out (90s)"));
       }, 90000);
 
-      const msg = this.buildCreate(name, password, mode, serverRegion);
-      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password}`);
+      const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue);
+      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}`);
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
 
-  private buildCreate(name: string, password: string, mode: number, region: number): Buffer {
+  private buildCreate(name: string, password: string, mode: number, region: number, cmPick: number): Buffer {
     return Buffer.concat([
       this.str(5, password),
       this.vi(6, this.gcVersion || 0),
-      this.sub(7, this.buildDetails(name, password, mode, region)),
+      this.sub(7, this.buildDetails(name, password, mode, region, cmPick)),
     ]);
   }
 
-  private buildDetails(name: string, password: string, mode: number, region: number): Buffer {
-    return Buffer.concat([
+  private buildDetails(name: string, password: string, mode: number, region: number, cmPick: number): Buffer {
+    // Field 14 is `cm_pick` in CMsgPracticeLobbySetDetails. Only emit when set
+    // (1 = Radiant first pick, 2 = Dire first pick). When 0, omit so Valve
+    // applies the default (random first pick).
+    const parts: Buffer[] = [
       this.str(2,  name),
       this.vi(4,   region),
       this.vi(5,   mode),
       this.bool(10, false),
       this.bool(11, false),
       this.bool(13, true),
-      this.str(15, password),
-      this.vi(33,  0),
-    ]);
+    ];
+    if (cmPick === 1 || cmPick === 2) parts.push(this.vi(14, cmPick));
+    parts.push(this.str(15, password));
+    parts.push(this.vi(33, 0));
+    return Buffer.concat(parts);
   }
 
   // ── Invite ────────────────────────────────────────────────────────────────

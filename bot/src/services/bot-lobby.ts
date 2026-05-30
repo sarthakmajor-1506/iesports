@@ -197,9 +197,10 @@ async function runCommand(db: Firestore, id: string, action: string, params: any
         const password = String(params?.password || "ies");
         const region = String(params?.region || "India");
         const gameMode = String(params?.gameMode || "AP");
+        const cmPick = Number(params?.cmPick || 0);
         cfg.status = "creating";
         await publishLobbyState(db, { status: "creating", lobbyName: name, password, region, gameMode, lastCommand: "create" });
-        const res = await bot.createLobby(name, password, gameMode, region);
+        const res = await bot.createLobby(name, password, gameMode, region, cmPick);
         cfg.status = "active";
         await publishLobbyState(db, { status: "active", lobbyName: name, password, region, gameMode, lastCommand: "create", lastError: null });
         return { ok: true, result: res };
