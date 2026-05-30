@@ -61,60 +61,19 @@ export function queueEmbed(q: QueueDoc): EmbedBuilder {
 // ─── Lobby Embed (like IDPL lobby status card) ───────────────
 
 export function lobbyEmbed(lobby: LobbyDoc): EmbedBuilder {
-  const embed = new EmbedBuilder()
-    .setTitle("🏟️ iesports Lobby")
-    .setDescription("Lobby created successfully!")
-    .setColor(Colors.Green);
-
-  embed.addFields(
-    { name: "Lobby ID", value: lobby.gcLobbyId || "N/A", inline: true },
-    { name: "Game Mode", value: lobby.gameMode, inline: true },
-    { name: "Region", value: lobby.serverRegion, inline: true }
-  );
-
-  // Radiant
-  const radiantList = lobby.radiant.length > 0
-    ? lobby.radiant.map((p) => `<@${p.discordId}>`).join("\n")
-    : "*Empty*";
-  embed.addFields({
-    name: `🟢 Radiant (${lobby.radiant.length}/5)`,
-    value: radiantList,
-    inline: true,
-  });
-
-  // Dire
-  const direList = lobby.dire.length > 0
-    ? lobby.dire.map((p) => `<@${p.discordId}>`).join("\n")
-    : "*Empty*";
-  embed.addFields({
-    name: `🔴 Dire (${lobby.dire.length}/5)`,
-    value: direList,
-    inline: true,
-  });
-
-  // Spectators
-  if (lobby.spectators.length > 0) {
-    embed.addFields({
-      name: `👁️ Spectators (${lobby.spectators.length})`,
-      value: lobby.spectators.map((p) => `<@${p.discordId}>`).join(", "),
-      inline: false,
-    });
-  }
-
-  embed.addFields({ name: "Password", value: `\`${lobby.password}\``, inline: false });
-
-  // Self-service re-invite instruction — the 🎮 Invite Me button below
-  // resolves the clicker's linked Steam and re-sends the Dota invite.
-  embed.addFields({
-    name: "📨 Didn't get the Steam invite in Dota 2?",
-    value:
-      "Click the **🎮 Invite Me** button below — it re-sends the invite to *your* Steam instantly.\n" +
-      "Make sure Dota 2 is open. Still nothing? Open Dota 2 → **Play → Custom Lobbies** and search the lobby name above.",
-    inline: false,
-  });
-  embed.setTimestamp();
-
-  return embed;
+  // Crisp tournament-channel card. Players need: password + 1-click
+  // re-invite. Mode/region as a single subtitle line. Roster + spectator
+  // lists are noise (Dota client shows them) so they live in the admin
+  // panel now, not in chat.
+  return new EmbedBuilder()
+    .setTitle(`🏟️ ${lobby.lobbyName || "iesports Lobby"}`)
+    .setDescription(
+      `**Password:** \`${lobby.password}\`\n` +
+      `${lobby.gameMode} · ${lobby.serverRegion}\n\n` +
+      `_No Steam invite? Tap_ **🎮 Invite Me** _below._`
+    )
+    .setColor(Colors.Green)
+    .setTimestamp();
 }
 
 // ─── Lobby Control Panel Embed ───────────────────────────────

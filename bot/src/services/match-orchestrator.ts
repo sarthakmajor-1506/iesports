@@ -427,12 +427,15 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
       const ch = (await client.channels.fetch(lobbyChannelId)) as TextChannel;
       const lob = await getLobby(firestoreLobbyId);
       if (lob) {
+        // Tournament channel gets the player-facing lobby card + Invite Me
+        // button only. Admin controls (Shuffle / Flip / Start / Destroy etc.)
+        // are NOT posted to Discord anymore — they live in the admin panel
+        // so tournament chat stays crisp.
         const sent1 = await ch.send({ embeds: [lobbyEmbed(lob)], components: [inviteMeButton(firestoreLobbyId)] });
-        const sent2 = await ch.send({ content: "**Admin Controls:**", components: [lobbyControlRow1(firestoreLobbyId), lobbyControlRow2(firestoreLobbyId), lobbyControlRow3(firestoreLobbyId)] });
         lobbyEmbedPosted = true;
-        console.log(`[Match] ✅ Lobby embed posted to channel ${lobbyChannelId} (msg ids ${sent1.id}, ${sent2.id})`);
+        console.log(`[Match] ✅ Lobby embed posted to channel ${lobbyChannelId} (msg id ${sent1.id})`);
         // Stash on the tournament match doc (if this lobby is tied to one)
-        // so cleanup-vcs sees them in discordOpsMessageIds.
+        // so cleanup-vcs sees it in discordOpsMessageIds.
         const tid = (queue as any).tournamentId;
         const tMatchId = (queue as any).tournamentMatchId;
         const tColl = (queue as any).tournamentCollection || "tournaments";
@@ -442,7 +445,7 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
             const mref = getDb().collection(tColl).doc(tid).collection("matches").doc(tMatchId);
             const existing = ((await mref.get()).data()?.discordOpsMessageIds || []) as string[];
             await mref.set({
-              discordOpsMessageIds: [...existing, sent1.id, sent2.id],
+              discordOpsMessageIds: [...existing, sent1.id],
             }, { merge: true });
           } catch (e: any) { console.warn("[Match] track bot msg ids:", e?.message || e); }
         }
