@@ -88,25 +88,30 @@ function computeCmPick(state: { radiantTeam: Team; firstPickTeam: Team }): 1 | 2
 
 function buildStartEmbed(args: { tournamentId: string; matchId: string; winnerName: string; loserName: string; gameLabel: string }) {
   const { tournamentId, matchId, winnerName, loserName, gameLabel } = args;
+  const W = winnerName.toUpperCase();
+  const L = loserName.toUpperCase();
   return {
     embeds: [{
-      title: `🎲 ${winnerName} won the toss`,
+      title: `🎲 ${W} — PICK YOUR SIDE`,
       description: [
-        `**Match:** ${gameLabel}`,
+        `${gameLabel}`,
         ``,
-        `**${winnerName}** picks **side** (Radiant or Dire).`,
-        `**${loserName}** then picks **pick order** (First Pick or Last Pick).`,
+        `**${W}** won the toss. Choose:`,
+        `⚔️ **Radiant**  or  🔥 **Dire**`,
         ``,
-        `Lobby first-pick will be set automatically based on these choices.`,
+        `Whichever you skip, **${L}** plays.`,
+        `Then **${L}** picks first or last pick.`,
+        ``,
+        `⏳ *Waiting for ${winnerName} to click below…*`,
       ].join("\n"),
       color: TOSS_COLOR,
-      footer: { text: `Any player on ${winnerName} can click below.` },
+      footer: { text: `Only ${winnerName} can click. ${loserName} picks next.` },
     }],
     components: [{
       type: 1,
       components: [
-        { type: 2, style: 3, label: "Radiant ⚔️", custom_id: `dota_toss_side:${tournamentId}:${matchId}:radiant` },
-        { type: 2, style: 4, label: "Dire 🔥",    custom_id: `dota_toss_side:${tournamentId}:${matchId}:dire` },
+        { type: 2, style: 3, label: "⚔️ Radiant", custom_id: `dota_toss_side:${tournamentId}:${matchId}:radiant` },
+        { type: 2, style: 4, label: "🔥 Dire",    custom_id: `dota_toss_side:${tournamentId}:${matchId}:dire` },
       ],
     }],
   };
@@ -114,23 +119,31 @@ function buildStartEmbed(args: { tournamentId: string; matchId: string; winnerNa
 
 function buildPickPromptEmbed(args: { tournamentId: string; matchId: string; winnerName: string; loserName: string; chosenSide: "radiant" | "dire" }) {
   const { tournamentId, matchId, winnerName, loserName, chosenSide } = args;
+  const winnerSide = chosenSide === "radiant" ? "⚔️ Radiant" : "🔥 Dire";
+  const loserSide  = chosenSide === "radiant" ? "🔥 Dire"    : "⚔️ Radiant";
+  const L = loserName.toUpperCase();
   return {
     embeds: [{
-      title: `✅ ${winnerName} chose ${chosenSide === "radiant" ? "Radiant ⚔️" : "Dire 🔥"}`,
+      title: `🎯 ${L} — PICK YOUR ORDER`,
       description: [
-        `**${loserName}**, now choose your pick order.`,
+        `✅ **${winnerName}** took ${winnerSide}`,
+        `➡️ **${loserName}** plays ${loserSide}`,
         ``,
-        `**First Pick** lets you ban and pick heroes before the opponent.`,
-        `**Last Pick** lets you counter-pick after the opponent reveals.`,
+        `Now **${L}**, choose:`,
+        `🥇 **First Pick**  or  🥈 **Last Pick**`,
+        ``,
+        `**${winnerName}** gets the opposite.`,
+        ``,
+        `⏳ *Waiting for ${loserName} to click below…*`,
       ].join("\n"),
       color: chosenSide === "radiant" ? RADIANT_COLOR : DIRE_COLOR,
-      footer: { text: `Any player on ${loserName} can click below.` },
+      footer: { text: `Only ${loserName} can click. ${winnerName} takes the leftover slot.` },
     }],
     components: [{
       type: 1,
       components: [
-        { type: 2, style: 1, label: "First Pick",  custom_id: `dota_toss_pick:${tournamentId}:${matchId}:first` },
-        { type: 2, style: 2, label: "Last Pick",   custom_id: `dota_toss_pick:${tournamentId}:${matchId}:last` },
+        { type: 2, style: 1, label: "🥇 First Pick",  custom_id: `dota_toss_pick:${tournamentId}:${matchId}:first` },
+        { type: 2, style: 2, label: "🥈 Last Pick",   custom_id: `dota_toss_pick:${tournamentId}:${matchId}:last` },
       ],
     }],
   };
@@ -138,17 +151,16 @@ function buildPickPromptEmbed(args: { tournamentId: string; matchId: string; win
 
 function buildCompleteEmbed(args: { winnerName: string; loserName: string; radiantName: string; direName: string; firstPickName: string; lastPickName: string }) {
   const { winnerName, loserName, radiantName, direName, firstPickName, lastPickName } = args;
+  const radiantOrder = firstPickName === radiantName ? "🥇 First Pick" : "🥈 Last Pick";
+  const direOrder    = firstPickName === direName    ? "🥇 First Pick" : "🥈 Last Pick";
   return {
     embeds: [{
-      title: `🏁 Toss complete`,
+      title: `🏁 Toss locked in`,
       description: [
-        `**Radiant ⚔️** ${radiantName}`,
-        `**Dire 🔥** ${direName}`,
+        `⚔️ **Radiant** — **${radiantName}** · ${radiantOrder}`,
+        `🔥 **Dire**    — **${direName}** · ${direOrder}`,
         ``,
-        `**First Pick:** ${firstPickName}`,
-        `**Last Pick:** ${lastPickName}`,
-        ``,
-        `Lobby will be created with these settings.`,
+        `Lobby first-pick is set. Wait for the admin to start the lobby.`,
       ].join("\n"),
       color: RADIANT_COLOR,
       footer: { text: `${winnerName} chose side · ${loserName} chose pick order` },

@@ -595,8 +595,12 @@ async function handleDotaTossClick(interaction: ButtonInteraction): Promise<void
     }
     const team1Snap = await db.collection(tournamentCollection).doc(tournamentId).collection("teams").doc(team1Id).get();
     const team2Snap = await db.collection(tournamentCollection).doc(tournamentId).collection("teams").doc(team2Id).get();
-    const team1Members: string[] = team1Snap.exists ? ((team1Snap.data() as any)?.members || []) : [];
-    const team2Members: string[] = team2Snap.exists ? ((team2Snap.data() as any)?.members || []) : [];
+    // Members are stored as objects with a .uid field on Dota tournaments
+    // and as plain UID strings on some legacy Valorant tournaments. Accept
+    // both shapes; otherwise validation rejects every Dota clicker.
+    const extractUids = (raw: any[]): string[] => raw.map((m: any) => typeof m === "string" ? m : m?.uid).filter((s: any): s is string => typeof s === "string" && s.length > 0);
+    const team1Members = team1Snap.exists ? extractUids(((team1Snap.data() as any)?.members || []) as any[]) : [];
+    const team2Members = team2Snap.exists ? extractUids(((team2Snap.data() as any)?.members || []) as any[]) : [];
     let clickerTeam: "team1" | "team2" | null = null;
     if (team1Members.includes(webUser.uid)) clickerTeam = "team1";
     else if (team2Members.includes(webUser.uid)) clickerTeam = "team2";
