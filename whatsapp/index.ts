@@ -8,10 +8,11 @@
  *
  *   whatsappOutbox/{id}: {
  *     action: "send-text" | "send-media" | "send-poll"
- *           | "create-group" | "add-participants" | "remove-participants",
+ *           | "create-group" | "add-participants" | "remove-participants"
+ *           | "rename-group" | "revoke-invite" | "reset-group",
  *     target: { type: "group"|"dm"|"broadcast", id?, phone?, phones? },
  *     text?, mediaUrl?, pollQuestion?, pollOptions?, pollAllowMultiple?,
- *     groupName?, participantPhones?,
+ *     groupName?, participantPhones?, parentGroupId?, sleep?, retainedPhones?,
  *     settleDocPath?, settleField?,
  *     status: "pending"|"sent"|"skipped"|"error",
  *     dedupeKey?, source?, createdAt, attempts?, error?, settled?,
@@ -221,8 +222,10 @@ async function handleCreateGroup(data: any): Promise<string> {
   if (!name) throw new Error("missing groupName");
   if (phones.length === 0) throw new Error("create-group needs at least one participant");
   const ids = phones.map(phoneToChatId);
+  const parentGroupId = data.parentGroupId ? String(data.parentGroupId) : undefined;
+  const options = parentGroupId ? { parentGroupId } : {};
   // createGroup returns either an object { gid: { _serialized }, missingParticipants } or a raw id; handle both.
-  const res: any = await client.createGroup(name, ids);
+  const res: any = await client.createGroup(name, ids, options);
   const gid = res?.gid?._serialized || res?.gid || res?.id?._serialized || res;
   if (!gid || typeof gid !== "string") throw new Error("createGroup returned no gid");
   if (res?.missingParticipants && Object.keys(res.missingParticipants).length > 0) {
@@ -238,8 +241,69 @@ async function handleAddParticipants(data: any): Promise<any> {
   const chat: any = await client.getChatById(groupId);
   if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
   const ids = phones.map(phoneToChatId);
-  const res = await chat.addParticipants(ids);
+  // Throttle adds with per-participant jitter so a burst doesn't get the number flagged.
+  const sleep = Array.isArray(data.sleep) ? data.sleep : [800, 1500];
+  const res = await chat.addParticipants(ids, { sleep });
   return res;
+}
+
+async function handleRenameGroup(data: any): Promise<string> {
+  const groupId = data.target?.id;
+  const name = String(data.groupName || data.name || "").trim();
+  if (!groupId) throw new Error("rename-group needs target.id");
+  if (!name) throw new Error("rename-group needs groupName");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  await chat.setSubject(name);
+  return name;
+}
+
+async function handleRevokeInvite(data: any): Promise<string> {
+  const groupId = data.target?.id;
+  if (!groupId) throw new Error("revoke-invite needs target.id");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  // Invalidates the current chat.whatsapp.com link; returns the new code.
+  const newCode = await chat.revokeInvite();
+  return typeof newCode === "string" ? newCode : "";
+}
+
+/**
+ * Release a pooled group back to the free pool: remove every member except the
+ * bot and the retained staff phones, rename to a neutral free name, and revoke
+ * the invite link so the previous cohort can't rejoin. This is the "reuse, don't
+ * delete" reset — the bot does it (not the web side) because only it knows the
+ * group's current membership.
+ */
+async function handleResetGroup(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  if (!groupId) throw new Error("reset-group needs target.id");
+  const freeName = String(data.groupName || data.freeName || "iesports • available").trim();
+  const retainedDigits = new Set(
+    (Array.isArray(data.retainedPhones) ? data.retainedPhones : [])
+      .map((p: string) => String(p).replace(/[^\d]/g, ""))
+      .filter(Boolean),
+  );
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const selfDigits = String(client.info?.wid?.user || "").replace(/[^\d]/g, "");
+  const toRemove: string[] = (chat.participants || [])
+    .map((p: any) => p.id?._serialized)
+    .filter(Boolean)
+    .filter((sid: string) => {
+      const digits = String(sid).split("@")[0].replace(/[^\d]/g, "");
+      return digits && digits !== selfDigits && !retainedDigits.has(digits);
+    });
+  let removed = 0;
+  if (toRemove.length > 0) {
+    await chat.removeParticipants(toRemove);
+    removed = toRemove.length;
+  }
+  await chat.setSubject(freeName);
+  let newInvite = "";
+  try { newInvite = await chat.revokeInvite(); }
+  catch (e: any) { console.warn("[WA] reset-group revokeInvite failed:", e?.message || e); }
+  return { removed, name: freeName, invite: newInvite };
 }
 
 async function handleRemoveParticipants(data: any): Promise<any> {
@@ -273,6 +337,9 @@ async function dispatch(data: any): Promise<any> {
     case "create-group":        return handleCreateGroup(data);
     case "add-participants":    return handleAddParticipants(data);
     case "remove-participants": return handleRemoveParticipants(data);
+    case "rename-group":        return handleRenameGroup(data);
+    case "revoke-invite":       return handleRevokeInvite(data);
+    case "reset-group":         return handleResetGroup(data);
     default: throw new Error(`unknown action: ${action}`);
   }
 }
