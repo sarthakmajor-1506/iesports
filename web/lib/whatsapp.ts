@@ -42,24 +42,48 @@ export type WhatsAppTarget =
  * special-case a fresh install.
  */
 export interface WhatsAppConfig {
-  /** WA group id of the iesports-wide announcement channel. */
-  iesportsGeneralGroupId?: string;
+  /** WA group id of the iesports-wide announcement channel (the permanent
+   *  "everyone registered" group). Defaults to the iesports community General
+   *  subgroup. */
+  iesportsGeneralGroupId: string;
+  /** Parent group id of the iesports WhatsApp community. New pooled shells are
+   *  created nested under this so they show up inside the community. */
+  iesportsCommunityParentGroupId: string;
+  /** Staff phone numbers (digits, no +) retained in every pooled group when it
+   *  is released between tournaments. The bot is always implicitly retained. */
+  staffPhones: string[];
   /** Only announce a match as "running late" once we're this many minutes
    *  past the scheduled time. Default 60. */
   lateMatchAnnounceMinutes: number;
 }
+
+/** iesports community defaults (discovered + verified 2026-05-31). Overridable
+ *  via the `config/whatsapp` Firestore doc. */
+const DEFAULT_GENERAL_GROUP_ID = "120363426480936486@g.us"; // community "General" subgroup
+const DEFAULT_COMMUNITY_PARENT_ID = "120363407941588357@g.us"; // iesports community parent
+const DEFAULT_STAFF_PHONES = ["919632866229"];
 
 export async function getWhatsAppConfig(): Promise<WhatsAppConfig> {
   try {
     const snap = await adminDb.collection("config").doc("whatsapp").get();
     const data = snap.exists ? (snap.data() as any) : {};
     return {
-      iesportsGeneralGroupId: data.iesportsGeneralGroupId || undefined,
+      iesportsGeneralGroupId: data.iesportsGeneralGroupId || DEFAULT_GENERAL_GROUP_ID,
+      iesportsCommunityParentGroupId:
+        data.iesportsCommunityParentGroupId || DEFAULT_COMMUNITY_PARENT_ID,
+      staffPhones: Array.isArray(data.staffPhones) && data.staffPhones.length
+        ? data.staffPhones.map((p: string) => String(p).replace(/[^\d]/g, "")).filter(Boolean)
+        : DEFAULT_STAFF_PHONES,
       lateMatchAnnounceMinutes:
         typeof data.lateMatchAnnounceMinutes === "number" ? data.lateMatchAnnounceMinutes : 60,
     };
   } catch {
-    return { lateMatchAnnounceMinutes: 60 };
+    return {
+      iesportsGeneralGroupId: DEFAULT_GENERAL_GROUP_ID,
+      iesportsCommunityParentGroupId: DEFAULT_COMMUNITY_PARENT_ID,
+      staffPhones: DEFAULT_STAFF_PHONES,
+      lateMatchAnnounceMinutes: 60,
+    };
   }
 }
 
@@ -211,7 +235,7 @@ export async function enqueueWhatsAppCreateGroup(
   participantPhones: string[],
   settleDocPath: string,
   settleField: string,
-  opts: Omit<EnqueueOpts, "settleDocPath" | "settleField"> = {},
+  opts: Omit<EnqueueOpts, "settleDocPath" | "settleField"> & { parentGroupId?: string } = {},
 ): Promise<void> {
   await writeOutbox({
     action: "create-group",
@@ -219,6 +243,7 @@ export async function enqueueWhatsAppCreateGroup(
     participantPhones,
     settleDocPath,
     settleField,
+    ...(opts.parentGroupId ? { parentGroupId: opts.parentGroupId } : {}),
     source: opts.source || "web",
     ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
   });
@@ -249,6 +274,58 @@ export async function enqueueWhatsAppRemoveParticipants(
     action: "remove-participants",
     target: { type: "group", id: groupId },
     participantPhones,
+    source: opts.source || "web",
+    ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
+  });
+}
+
+/** Rename an existing group (set its subject). Core of the group-reuse model. */
+export async function enqueueWhatsAppRenameGroup(
+  groupId: string,
+  name: string,
+  opts: EnqueueOpts = {},
+): Promise<void> {
+  await writeOutbox({
+    action: "rename-group",
+    target: { type: "group", id: groupId },
+    groupName: name,
+    source: opts.source || "web",
+    ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
+  });
+}
+
+/** Revoke a group's invite link so stale links stop working. Optionally settles
+ *  the new invite code back into Firestore. */
+export async function enqueueWhatsAppRevokeInvite(
+  groupId: string,
+  opts: EnqueueOpts = {},
+): Promise<void> {
+  await writeOutbox({
+    action: "revoke-invite",
+    target: { type: "group", id: groupId },
+    ...(opts.settleDocPath ? { settleDocPath: opts.settleDocPath } : {}),
+    ...(opts.settleField ? { settleField: opts.settleField } : {}),
+    source: opts.source || "web",
+    ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
+  });
+}
+
+/**
+ * Reset a pooled group back to "free": the bot removes every member except
+ * itself and `retainedPhones`, renames to `freeName`, and revokes the invite.
+ * One atomic bot-side action — the web side never needs the member list.
+ */
+export async function enqueueWhatsAppResetGroup(
+  groupId: string,
+  retainedPhones: string[],
+  freeName: string,
+  opts: EnqueueOpts = {},
+): Promise<void> {
+  await writeOutbox({
+    action: "reset-group",
+    target: { type: "group", id: groupId },
+    retainedPhones,
+    groupName: freeName,
     source: opts.source || "web",
     ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
   });
