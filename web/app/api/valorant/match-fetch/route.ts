@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendGameResult, sendTournamentComplete } from "@/lib/discord";
+import { releaseTournamentGroups } from "@/lib/whatsappLifecycle";
 
 /**
  * POST /api/valorant/match-fetch
@@ -1352,6 +1353,10 @@ export async function POST(req: NextRequest) {
           })),
           completedAt: new Date().toISOString(),
         });
+
+        // Release this tournament's pooled WhatsApp groups back to the free pool
+        // (gated by config.lifecycleEnabled; best-effort, never blocks results).
+        await releaseTournamentGroups(tournamentId);
       } catch (discordErr: any) {
         console.error("[Discord] Tournament completion error:", discordErr.message);
       }

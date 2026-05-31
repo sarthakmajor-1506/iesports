@@ -1,6 +1,7 @@
 import { isNotAdmin } from "@/lib/checkAdmin";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { provisionTeamGroups } from "@/lib/whatsappLifecycle";
 
 /**
  * POST /api/valorant/publish-teams
@@ -79,6 +80,10 @@ export async function POST(req: NextRequest) {
       currentMatchDay: 0,
     });
     await batch.commit();
+
+    // Provision per-team WhatsApp groups (gated by config.lifecycleEnabled;
+    // best-effort — never blocks team publishing).
+    await provisionTeamGroups(tournamentId);
 
     return NextResponse.json({
       success: true,

@@ -42,16 +42,19 @@ export type WhatsAppTarget =
  * special-case a fresh install.
  */
 export interface WhatsAppConfig {
-  /** WA group id of the iesports-wide announcement channel (the permanent
-   *  "everyone registered" group). Defaults to the iesports community General
-   *  subgroup. */
-  iesportsGeneralGroupId: string;
   /** Parent group id of the iesports WhatsApp community. New pooled shells are
-   *  created nested under this so they show up inside the community. */
+   *  created nested under this; the community's own Announcements group (this
+   *  parent) is where any broadcasts go — we do NOT manage a separate "general"
+   *  group. */
   iesportsCommunityParentGroupId: string;
   /** Staff phone numbers (digits, no +) retained in every pooled group when it
    *  is released between tournaments. The bot is always implicitly retained. */
   staffPhones: string[];
+  /** Master kill-switch for the tournament-lifecycle WhatsApp automation
+   *  (group provisioning, reminders, etc.). Default false so wired triggers stay
+   *  dormant until explicitly enabled. Does NOT gate the legacy Dota result
+   *  poster, which uses enqueueWhatsApp directly. */
+  lifecycleEnabled: boolean;
   /** Only announce a match as "running late" once we're this many minutes
    *  past the scheduled time. Default 60. */
   lateMatchAnnounceMinutes: number;
@@ -59,8 +62,7 @@ export interface WhatsAppConfig {
 
 /** iesports community defaults (discovered + verified 2026-05-31). Overridable
  *  via the `config/whatsapp` Firestore doc. */
-const DEFAULT_GENERAL_GROUP_ID = "120363426480936486@g.us"; // community "General" subgroup
-const DEFAULT_COMMUNITY_PARENT_ID = "120363407941588357@g.us"; // iesports community parent
+const DEFAULT_COMMUNITY_PARENT_ID = "120363407941588357@g.us"; // iesports community parent / Announcements
 const DEFAULT_STAFF_PHONES = ["919632866229"];
 
 export async function getWhatsAppConfig(): Promise<WhatsAppConfig> {
@@ -68,20 +70,20 @@ export async function getWhatsAppConfig(): Promise<WhatsAppConfig> {
     const snap = await adminDb.collection("config").doc("whatsapp").get();
     const data = snap.exists ? (snap.data() as any) : {};
     return {
-      iesportsGeneralGroupId: data.iesportsGeneralGroupId || DEFAULT_GENERAL_GROUP_ID,
       iesportsCommunityParentGroupId:
         data.iesportsCommunityParentGroupId || DEFAULT_COMMUNITY_PARENT_ID,
       staffPhones: Array.isArray(data.staffPhones) && data.staffPhones.length
         ? data.staffPhones.map((p: string) => String(p).replace(/[^\d]/g, "")).filter(Boolean)
         : DEFAULT_STAFF_PHONES,
+      lifecycleEnabled: data.lifecycleEnabled === true,
       lateMatchAnnounceMinutes:
         typeof data.lateMatchAnnounceMinutes === "number" ? data.lateMatchAnnounceMinutes : 60,
     };
   } catch {
     return {
-      iesportsGeneralGroupId: DEFAULT_GENERAL_GROUP_ID,
       iesportsCommunityParentGroupId: DEFAULT_COMMUNITY_PARENT_ID,
       staffPhones: DEFAULT_STAFF_PHONES,
+      lifecycleEnabled: false,
       lateMatchAnnounceMinutes: 60,
     };
   }
