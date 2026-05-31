@@ -875,11 +875,30 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <ColHeader x={colX(2) + MATCH_W / 2} y={PAD} text="UPPER FINAL" />
       <ColHeader x={gf.x + MATCH_W / 2} y={PAD} text="GRAND FINAL" accent />
 
-      {/* UB R1 → UB Semis (crossed: R1 M1 winner → Semi M2, R1 M2 winner → Semi M1) */}
-      <Connector color={FLOW_UPPER} x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2} x2={ubSemi[0].x} y2={ubSemi[0].y + 3 * MATCH_H / 4} />
-      <Connector color={FLOW_UPPER} x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2} x2={ubSemi[1].x} y2={ubSemi[1].y + MATCH_H / 4} />
-      <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
-      <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
+      {/* UB R1 → UB Semis. Routing is read from each R1 match's `winnerGoesTo`
+          field so an admin can override the default crossed feed by editing
+          the match docs (see scripts/ad-hoc/_swapAscensionUpperSemis.ts). */}
+      {(() => {
+        const r1m1SemiIdx = matchMap["wb-r1-m1"]?.winnerGoesTo === "wb-semi-m1" ? 0 : 1;
+        const r1m2SemiIdx = matchMap["wb-r1-m2"]?.winnerGoesTo === "wb-semi-m2" ? 1 : 0;
+        // For each line, pick the y-entry slot whose midpoint is closer to the
+        // source midpoint — keeps connectors visually tidy regardless of
+        // crossed vs straight routing.
+        const slotEntry = (srcMidY: number, target: { x: number; y: number }) =>
+          srcMidY > target.y + MATCH_H / 2 ? target.y + 3 * MATCH_H / 4 : target.y + MATCH_H / 4;
+        return (
+          <>
+            <Connector color={FLOW_UPPER}
+              x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2}
+              x2={ubSemi[r1m1SemiIdx].x} y2={slotEntry(ubR1[0].y + MATCH_H / 2, ubSemi[r1m1SemiIdx])} />
+            <Connector color={FLOW_UPPER}
+              x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2}
+              x2={ubSemi[r1m2SemiIdx].x} y2={slotEntry(ubR1[1].y + MATCH_H / 2, ubSemi[r1m2SemiIdx])} />
+            <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
+            <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
+          </>
+        );
+      })()}
 
       {/* UB Semis → UB Final */}
       <Connector color={FLOW_UPPER} x1={ubSemi[0].x + MATCH_W} y1={ubSemi[0].y + MATCH_H / 2} x2={ubFinal.x} y2={ubFinal.y + MATCH_H / 4} />
@@ -909,17 +928,28 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
         midY={ubR1[1].y + MATCH_H + 50} />
       <CDot x={ubR1[1].x + MATCH_W / 2} y={ubR1[1].y + MATCH_H} lower />
 
-      {/* UB Semi losers → LB R3 (crossed) — same staggered V-H-V technique */}
-      <Connector color={FLOW_DROP} dashed
-        x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H}
-        x2={lbR3[1].x + 8} y2={lbR3[1].y + MATCH_H / 2}
-        midY={ubSemi[0].y + MATCH_H + 18} />
-      <CDot x={ubSemi[0].x + MATCH_W / 2} y={ubSemi[0].y + MATCH_H} lower />
-      <Connector color={FLOW_DROP} dashed
-        x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H}
-        x2={lbR3[0].x + 32} y2={lbR3[0].y + MATCH_H / 2}
-        midY={ubSemi[1].y + MATCH_H + 50} />
-      <CDot x={ubSemi[1].x + MATCH_W / 2} y={ubSemi[1].y + MATCH_H} lower />
+      {/* UB Semi losers → LB R3. Routing is read from each semi's
+          `loserGoesTo` field. Default convention: crossed. When uncrossed
+          (semi-m1 → lb-r3-m1 directly above-each-other) the staggered V-H-V
+          midY isn't strictly needed but we keep it for visual consistency. */}
+      {(() => {
+        const sm1R3Idx = matchMap["wb-semi-m1"]?.loserGoesTo === "lb-r3-m1" ? 0 : 1;
+        const sm2R3Idx = matchMap["wb-semi-m2"]?.loserGoesTo === "lb-r3-m2" ? 1 : 0;
+        return (
+          <>
+            <Connector color={FLOW_DROP} dashed
+              x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H}
+              x2={lbR3[sm1R3Idx].x + 8} y2={lbR3[sm1R3Idx].y + MATCH_H / 2}
+              midY={ubSemi[0].y + MATCH_H + 18} />
+            <CDot x={ubSemi[0].x + MATCH_W / 2} y={ubSemi[0].y + MATCH_H} lower />
+            <Connector color={FLOW_DROP} dashed
+              x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H}
+              x2={lbR3[sm2R3Idx].x + 32} y2={lbR3[sm2R3Idx].y + MATCH_H / 2}
+              midY={ubSemi[1].y + MATCH_H + 50} />
+            <CDot x={ubSemi[1].x + MATCH_W / 2} y={ubSemi[1].y + MATCH_H} lower />
+          </>
+        );
+      })()}
 
       {/* UB Final loser → LB Final — only one drop here, no overlap risk */}
       <Connector color={FLOW_DROP} dashed
