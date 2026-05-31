@@ -68,6 +68,11 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: DATA_PATH }),
   puppeteer: {
     headless: true,
+    // On Railway/containers we point at the system Chromium (see Dockerfile);
+    // locally this is unset and puppeteer uses its bundled Chromium.
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH
+      ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }
+      : {}),
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--no-first-run"],
   },
 });
