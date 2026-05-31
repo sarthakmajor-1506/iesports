@@ -952,10 +952,11 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER SEMI" />
       <ColHeader x={colX(4) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER FINAL" />
 
-      {/* LB R1 → LB R2 */}
+      {/* LB R1 → LB R2. UB drops land in team2 (bottom) of each LB R2 cell,
+          so the LB R1 winner advancing in fills team1 (top, 1/4 height). */}
       {[0, 1].map(i => (
         <g key={`lbr1-lbr2-${i}`}>
-          <Connector color={FLOW_LOWER} x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + 3 * MATCH_H / 4} />
+          <Connector color={FLOW_LOWER} x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + MATCH_H / 4} />
           <CDot x={lbR1[i].x + MATCH_W} y={lbR1[i].y + MATCH_H / 2} lower />
         </g>
       ))}

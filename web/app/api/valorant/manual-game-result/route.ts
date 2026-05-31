@@ -103,15 +103,21 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Move loser into loserGoesTo match ──────────────────────────────────
+      // UB-drop convention: a team falling from UB into LB always lands in
+      // the receiving cell's team2 slot (bottom row). The other slot —
+      // team1 / top row — is reserved for the LB-advancing winner that
+      // arrives at this cell. This keeps the LB visualisation stable
+      // regardless of which feed (UB-drop vs LB-winner) finishes first.
+      // Fallback to team1 only if team2 is already occupied.
       if (existingMatch.loserGoesTo) {
         const loseMatchRef = tournamentRef.collection("matches").doc(existingMatch.loserGoesTo);
         const loseMatchDoc = await loseMatchRef.get();
         if (loseMatchDoc.exists) {
           const loseMatch = loseMatchDoc.data()!;
-          if (loseMatch.team1Id === "TBD") {
-            advanceBatch.update(loseMatchRef, { team1Id: loserId, team1Name: loserName });
-          } else if (loseMatch.team2Id === "TBD") {
+          if (loseMatch.team2Id === "TBD") {
             advanceBatch.update(loseMatchRef, { team2Id: loserId, team2Name: loserName });
+          } else if (loseMatch.team1Id === "TBD") {
+            advanceBatch.update(loseMatchRef, { team1Id: loserId, team1Name: loserName });
           }
         }
       }
