@@ -1,13 +1,26 @@
 /**
  * IEsports WhatsApp sender.
  *
- * Mirrors the Discord result flow for WhatsApp: result-fetch code (web/bot)
- * writes a doc to the `whatsappOutbox` Firestore collection; this persistent
- * service — logged into WhatsApp Web once via QR — consumes pending docs and
- * posts them to the configured group.
+ * Consumes typed action docs from the `whatsappOutbox` Firestore collection
+ * and runs them against the linked WhatsApp Web session. Mirrors the Discord
+ * notification stack — every tournament-lifecycle WhatsApp side effect goes
+ * through this queue, so a WhatsApp outage never blocks the rest of the app.
  *
- *   whatsappOutbox/{id}: { text, status:"pending"|"sent"|"error"|"skipped",
- *                          dedupeKey?, source?, createdAt, attempts?, error? }
+ *   whatsappOutbox/{id}: {
+ *     action: "send-text" | "send-media" | "send-poll"
+ *           | "create-group" | "add-participants" | "remove-participants",
+ *     target: { type: "group"|"dm"|"broadcast", id?, phone?, phones? },
+ *     text?, mediaUrl?, pollQuestion?, pollOptions?, pollAllowMultiple?,
+ *     groupName?, participantPhones?,
+ *     settleDocPath?, settleField?,
+ *     status: "pending"|"sent"|"skipped"|"error",
+ *     dedupeKey?, source?, createdAt, attempts?, error?, settled?,
+ *   }
+ *
+ * LEGACY COMPAT: an outbox doc with no `action` field (just `{ text }`) is
+ * treated as `send-text` to the env-configured group (the original Dota
+ * result post format). Don't remove this branch without migrating every
+ * existing producer.
  *
  * WhatsApp has no official group API, so this drives WhatsApp Web. Use a
  * DEDICATED number (unofficial automation can get a number limited). The
@@ -23,7 +36,7 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 // whatsapp-web.js is CommonJS; esModuleInterop makes this work.
 import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg as any;
+const { Client, LocalAuth, MessageMedia, Poll } = pkg as any;
 import qrcode from "qrcode-terminal";
 
 if (!getApps().length) {
@@ -73,10 +86,39 @@ client.on("disconnected", (r: string) => {
   setTimeout(() => client.initialize().catch((e: any) => console.error("[WA] re-init failed:", e?.message || e)), 5000);
 });
 
+// Inbound STOP/UNSUBSCRIBE → flip users.whatsappOptOut. Anything else we
+// ignore for now (the bot isn't a chatbot).
+client.on("message", async (msg: any) => {
+  try {
+    const body = String(msg?.body || "").trim().toUpperCase();
+    if (body !== "STOP" && body !== "UNSUBSCRIBE") return;
+    const from = String(msg?.from || ""); // "<digits>@c.us"
+    if (!from.endsWith("@c.us")) return;
+    const digits = from.replace("@c.us", "");
+    // Find the user by phone (stored as "+<digits>" in users.phone)
+    const e164 = "+" + digits;
+    const usersSnap = await db.collection("users").where("phone", "==", e164).limit(1).get();
+    if (usersSnap.empty) {
+      console.warn(`[WA] STOP from unknown phone ${e164}`);
+      return;
+    }
+    await usersSnap.docs[0].ref.set({ whatsappOptOut: true, whatsappOptOutAt: new Date().toISOString() }, { merge: true });
+    await client.sendMessage(from, "You've been unsubscribed from iesports WhatsApp messages. Reply START to re-subscribe.");
+    console.log(`[WA] opted out ${e164}`);
+  } catch (e: any) {
+    console.error("[WA] inbound STOP handler error:", e?.message || e);
+  }
+});
+
 let ready = false;
 let processing = false;
 
-async function resolveGroup(): Promise<{ id: string; name: string } | null> {
+/**
+ * Resolve the env-configured legacy group (used for outbox docs with no
+ * `action` field). Only runs once at startup. Returns null if no group
+ * configured — legacy docs will error out, but new typed docs still work.
+ */
+async function resolveLegacyGroup(): Promise<{ id: string; name: string } | null> {
   if (GROUP_ID) {
     try { const c = await client.getChatById(GROUP_ID); return { id: GROUP_ID, name: c?.name || GROUP_NAME }; }
     catch { console.warn(`[WA] WHATSAPP_GROUP_ID ${GROUP_ID} not found, falling back to name`); }
@@ -88,6 +130,151 @@ async function resolveGroup(): Promise<{ id: string; name: string } | null> {
   GROUP_ID = g.id._serialized;
   console.log(`[WA] resolved group "${GROUP_NAME}" -> ${GROUP_ID}  (pin this as WHATSAPP_GROUP_ID)`);
   return { id: GROUP_ID, name: g.name };
+}
+
+/** Convert E.164 ("+919876543210") to whatsapp-web.js contact id ("919876543210@c.us"). */
+function phoneToChatId(phone: string): string {
+  const digits = String(phone || "").replace(/[^\d]/g, "");
+  if (!digits) throw new Error(`invalid phone: ${phone}`);
+  return `${digits}@c.us`;
+}
+
+/**
+ * Resolve an action's target into a list of chat ids to send to.
+ * - group: target.id
+ * - dm:    target.phone normalized
+ * - broadcast: target.phones[] each normalized (sent to one at a time; we
+ *   intentionally don't use WhatsApp Broadcast Lists since the receiver
+ *   must have the sender in their contacts).
+ */
+function resolveTargets(target: any): string[] {
+  if (!target || typeof target !== "object") return GROUP_ID ? [GROUP_ID] : [];
+  if (target.type === "group" && target.id) return [String(target.id)];
+  if (target.type === "dm" && target.phone) return [phoneToChatId(target.phone)];
+  if (target.type === "broadcast" && Array.isArray(target.phones)) {
+    return target.phones.map((p: string) => phoneToChatId(p));
+  }
+  return [];
+}
+
+/** Write the result of a successful action back into Firestore. */
+async function settle(docPath: string | undefined, field: string | undefined, value: any) {
+  if (!docPath || !field) return;
+  try {
+    await db.doc(docPath).set({ [field]: value, [`${field}UpdatedAt`]: new Date().toISOString() }, { merge: true });
+  } catch (e: any) {
+    console.warn(`[WA] settle to ${docPath}.${field} failed:`, e?.message || e);
+  }
+}
+
+// ── Action handlers ─────────────────────────────────────────────────────────
+
+async function handleSendText(data: any): Promise<any> {
+  const chats = resolveTargets(data.target);
+  const text = String(data.text || "").trim();
+  if (!text) throw new Error("empty text");
+  if (chats.length === 0) throw new Error("no target resolved");
+  const results: string[] = [];
+  for (const chatId of chats) {
+    const msg = await client.sendMessage(chatId, text);
+    if (msg?.id?._serialized) results.push(msg.id._serialized);
+    // Tiny jitter between broadcast recipients to avoid bursty patterns.
+    if (chats.length > 1) await new Promise((r) => setTimeout(r, 250 + Math.random() * 500));
+  }
+  return results.length === 1 ? results[0] : results;
+}
+
+async function handleSendMedia(data: any): Promise<any> {
+  const chats = resolveTargets(data.target);
+  if (chats.length === 0) throw new Error("no target resolved");
+  if (!data.mediaUrl) throw new Error("missing mediaUrl");
+  const media = await MessageMedia.fromUrl(data.mediaUrl, { unsafeMime: true });
+  const caption = String(data.text || "").trim();
+  const results: string[] = [];
+  for (const chatId of chats) {
+    const msg = await client.sendMessage(chatId, media, caption ? { caption } : undefined);
+    if (msg?.id?._serialized) results.push(msg.id._serialized);
+    if (chats.length > 1) await new Promise((r) => setTimeout(r, 250 + Math.random() * 500));
+  }
+  return results.length === 1 ? results[0] : results;
+}
+
+async function handleSendPoll(data: any): Promise<any> {
+  const chats = resolveTargets(data.target);
+  if (chats.length === 0) throw new Error("no target resolved");
+  const question = String(data.pollQuestion || "").trim();
+  const options = Array.isArray(data.pollOptions) ? data.pollOptions.map(String).filter(Boolean) : [];
+  if (!question || options.length < 2) throw new Error("poll needs question + ≥2 options");
+  const results: string[] = [];
+  for (const chatId of chats) {
+    const poll = new Poll(question, options, { allowMultipleAnswers: !!data.pollAllowMultiple });
+    const msg = await client.sendMessage(chatId, poll);
+    if (msg?.id?._serialized) results.push(msg.id._serialized);
+    if (chats.length > 1) await new Promise((r) => setTimeout(r, 250 + Math.random() * 500));
+  }
+  return results.length === 1 ? results[0] : results;
+}
+
+async function handleCreateGroup(data: any): Promise<string> {
+  const name = String(data.groupName || "").trim();
+  const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
+  if (!name) throw new Error("missing groupName");
+  if (phones.length === 0) throw new Error("create-group needs at least one participant");
+  const ids = phones.map(phoneToChatId);
+  // createGroup returns either an object { gid: { _serialized }, missingParticipants } or a raw id; handle both.
+  const res: any = await client.createGroup(name, ids);
+  const gid = res?.gid?._serialized || res?.gid || res?.id?._serialized || res;
+  if (!gid || typeof gid !== "string") throw new Error("createGroup returned no gid");
+  if (res?.missingParticipants && Object.keys(res.missingParticipants).length > 0) {
+    console.warn(`[WA] createGroup ${name}: missing participants`, res.missingParticipants);
+  }
+  return gid;
+}
+
+async function handleAddParticipants(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
+  if (!groupId || phones.length === 0) throw new Error("add-participants needs target.id + participantPhones");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const ids = phones.map(phoneToChatId);
+  const res = await chat.addParticipants(ids);
+  return res;
+}
+
+async function handleRemoveParticipants(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
+  if (!groupId || phones.length === 0) throw new Error("remove-participants needs target.id + participantPhones");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const ids = phones.map(phoneToChatId);
+  const res = await chat.removeParticipants(ids);
+  return res;
+}
+
+/**
+ * Dispatch one outbox doc. Returns the settled value (or undefined) on
+ * success; throws on error. Legacy docs with no `action` field are treated
+ * as send-text to the env-configured group.
+ */
+async function dispatch(data: any): Promise<any> {
+  const action = data.action || (data.text ? "send-text" : null);
+  if (!action) throw new Error("no action and no text");
+  // Legacy: no action + text → send to env group.
+  if (!data.action && data.text && !data.target) {
+    if (!GROUP_ID) throw new Error("legacy outbox doc but no WHATSAPP_GROUP_ID resolved");
+    return handleSendText({ ...data, target: { type: "group", id: GROUP_ID } });
+  }
+  switch (action) {
+    case "send-text":           return handleSendText(data);
+    case "send-media":          return handleSendMedia(data);
+    case "send-poll":           return handleSendPoll(data);
+    case "create-group":        return handleCreateGroup(data);
+    case "add-participants":    return handleAddParticipants(data);
+    case "remove-participants": return handleRemoveParticipants(data);
+    default: throw new Error(`unknown action: ${action}`);
+  }
 }
 
 async function drainOutbox() {
@@ -110,12 +297,15 @@ async function drainOutbox() {
           continue;
         }
       }
-      const text = String(data.text || "").trim();
-      if (!text) { await d.ref.set({ status: "error", error: "empty text" }, { merge: true }); continue; }
       try {
-        await client.sendMessage(GROUP_ID, text);
-        await d.ref.set({ status: "sent", sentAt: new Date().toISOString() }, { merge: true });
-        console.log(`[WA] sent ${d.id} (${text.length} chars)`);
+        const settled = await dispatch(data);
+        await settle(data.settleDocPath, data.settleField, settled);
+        await d.ref.set({
+          status: "sent",
+          sentAt: new Date().toISOString(),
+          ...(settled !== undefined ? { settled } : {}),
+        }, { merge: true });
+        console.log(`[WA] sent ${d.id} (${data.action || "legacy"})`);
       } catch (e: any) {
         const attempts = (data.attempts || 0) + 1;
         const fatal = attempts >= 5;
@@ -125,7 +315,7 @@ async function drainOutbox() {
           error: String(e?.message || e),
           updatedAt: new Date().toISOString(),
         }, { merge: true });
-        console.error(`[WA] send ${d.id} failed (attempt ${attempts}): ${e?.message || e}`);
+        console.error(`[WA] ${data.action || "legacy"} ${d.id} failed (attempt ${attempts}): ${e?.message || e}`);
       }
     }
   } catch (e: any) {
@@ -136,11 +326,15 @@ async function drainOutbox() {
 }
 
 client.on("ready", async () => {
-  const g = await resolveGroup();
-  if (!g) { setStatus({ state: "ready_no_group", lastError: "group not found" }); console.error("[WA] no target group — set WHATSAPP_GROUP_NAME/ID"); return; }
+  const g = await resolveLegacyGroup();
+  if (g) {
+    console.log(`[WA] ✅ ready — legacy group "${g.name}" (${g.id})`);
+    setStatus({ state: "ready", groupId: g.id, groupName: g.name, lastError: null });
+  } else {
+    console.log(`[WA] ✅ ready — no legacy group configured (only typed outbox docs will dispatch)`);
+    setStatus({ state: "ready", lastError: null });
+  }
   ready = true;
-  console.log(`[WA] ✅ ready — posting to "${g.name}" (${g.id})`);
-  setStatus({ state: "ready", groupId: g.id, groupName: g.name, lastError: null });
 
   // Live listener for new pending messages + a safety poll every 15s.
   db.collection("whatsappOutbox").where("status", "==", "pending")
