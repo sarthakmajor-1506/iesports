@@ -840,7 +840,10 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
   const ubFinal = { x: colX(2), y: ubFinalY };
 
   // ── Lower bracket geometry — 4 columns (R1, R2, R3, Semi) + LB Final ────
-  const losersBaseY = ubSemi[1].y + MATCH_H + SECTION_GAP + 30;
+  // Extra +50 (was +30) of buffer above the LB row leaves room for both the
+  // column-header pill AND the UB→LB origin chip above each top-row LB cell
+  // without them overlapping.
+  const losersBaseY = ubSemi[1].y + MATCH_H + SECTION_GAP + 50;
   const lbR1 = [0, 1].map(i => ({ x: colX(0), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
   const lbR2 = [0, 1].map(i => ({ x: colX(1), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
   const lbR3 = [0, 1].map(i => ({ x: colX(2), y: losersBaseY + i * (MATCH_H + ROW_GAP) }));
@@ -903,23 +906,21 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
 
       {/* UB R1 → UB Semis. Routing is read from each R1 match's `winnerGoesTo`
           field so an admin can override the default crossed feed by editing
-          the match docs (see scripts/ad-hoc/_swapAscensionUpperSemis.ts). */}
+          the match docs (see scripts/ad-hoc/_swapAscensionUpperSemis.ts).
+          Each semi starts seeded with the bye team (#1 or #2) in team1, so
+          the R1 winner advancing in always fills team2 — point the connector
+          at the team2 row (3/4 of cell height) of the target semi. */}
       {(() => {
         const r1m1SemiIdx = matchMap["wb-r1-m1"]?.winnerGoesTo === "wb-semi-m1" ? 0 : 1;
         const r1m2SemiIdx = matchMap["wb-r1-m2"]?.winnerGoesTo === "wb-semi-m2" ? 1 : 0;
-        // For each line, pick the y-entry slot whose midpoint is closer to the
-        // source midpoint — keeps connectors visually tidy regardless of
-        // crossed vs straight routing.
-        const slotEntry = (srcMidY: number, target: { x: number; y: number }) =>
-          srcMidY > target.y + MATCH_H / 2 ? target.y + 3 * MATCH_H / 4 : target.y + MATCH_H / 4;
         return (
           <>
             <Connector color={FLOW_UPPER}
               x1={ubR1[0].x + MATCH_W} y1={ubR1[0].y + MATCH_H / 2}
-              x2={ubSemi[r1m1SemiIdx].x} y2={slotEntry(ubR1[0].y + MATCH_H / 2, ubSemi[r1m1SemiIdx])} />
+              x2={ubSemi[r1m1SemiIdx].x} y2={ubSemi[r1m1SemiIdx].y + 3 * MATCH_H / 4} />
             <Connector color={FLOW_UPPER}
               x1={ubR1[1].x + MATCH_W} y1={ubR1[1].y + MATCH_H / 2}
-              x2={ubSemi[r1m2SemiIdx].x} y2={slotEntry(ubR1[1].y + MATCH_H / 2, ubSemi[r1m2SemiIdx])} />
+              x2={ubSemi[r1m2SemiIdx].x} y2={ubSemi[r1m2SemiIdx].y + 3 * MATCH_H / 4} />
             <CDot x={ubR1[0].x + MATCH_W} y={ubR1[0].y + MATCH_H / 2} />
             <CDot x={ubR1[1].x + MATCH_W} y={ubR1[1].y + MATCH_H / 2} />
           </>
@@ -943,13 +944,13 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
           this. Routing is still read from each source match's `loserGoesTo`
           so admin overrides flow through. */}
 
-      <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
+      <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 50} label="↘ LOWER BRACKET" color={C.accent} />
 
-      <ColHeader x={colX(0) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R1" />
-      <ColHeader x={colX(1) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R2" />
-      <ColHeader x={colX(2) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER R3" />
-      <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER SEMI" />
-      <ColHeader x={colX(4) + MATCH_W / 2} y={losersBaseY - 14} text="LOWER FINAL" />
+      <ColHeader x={colX(0) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER R1" />
+      <ColHeader x={colX(1) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER R2" />
+      <ColHeader x={colX(2) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER R3" />
+      <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER SEMI" />
+      <ColHeader x={colX(4) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER FINAL" />
 
       {/* LB R1 → LB R2 */}
       {[0, 1].map(i => (
