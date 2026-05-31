@@ -356,17 +356,22 @@ const FLOW_UPPER = "rgba(59,130,246,0.65)";    // bright blue
 const FLOW_LOWER = "rgba(60,203,255,0.65)";    // bright cyan
 const FLOW_DROP  = "rgba(251,191,36,0.55)";    // amber for losers dropping to LB
 
-// Two routing modes:
+// Three routing modes:
 //  - default (H-V-H): horizontal out → vertical at midX → horizontal in. Used for
 //    "winner advances right" connectors where source/target sit at the same Y band.
-//  - V-H-V (when `midY` is provided): vertical down → horizontal at midY → vertical
-//    into target. Used for "loser drops down" connectors where multiple parallel
-//    drops from the same source column would otherwise share the same midX vertical
-//    and visually overlap. Each drop gets its OWN midY so its horizontal lane is
-//    distinct.
-function Connector({ x1, y1, x2, y2, color = C.connector, dashed = false, strokeWidth = 1.8, midX, midY }: { x1: number; y1: number; x2: number; y2: number; color?: string; dashed?: boolean; strokeWidth?: number; midX?: number; midY?: number }) {
+//  - V-H-V (when only `midY` is provided): vertical down → horizontal at midY →
+//    vertical into target. Kept for legacy callers that don't need column-gap routing.
+//  - V-H-V-H (when both `viaY` and `viaX` are provided): drop down to a lane just
+//    below the source row → cross horizontally to a vertical lane sitting in the
+//    COL_GAP between columns (so the long vertical never cuts through unrelated
+//    match cells) → drop down to the target row → enter the target cell from the
+//    left. This is the routing used by "UB loser drops down to LB" connectors,
+//    since they have to traverse multiple rows AND multiple columns.
+function Connector({ x1, y1, x2, y2, color = C.connector, dashed = false, strokeWidth = 1.8, midX, midY, viaX, viaY }: { x1: number; y1: number; x2: number; y2: number; color?: string; dashed?: boolean; strokeWidth?: number; midX?: number; midY?: number; viaX?: number; viaY?: number }) {
   let d: string;
-  if (midY !== undefined) {
+  if (viaX !== undefined && viaY !== undefined) {
+    d = `M ${x1} ${y1} V ${viaY} H ${viaX} V ${y2} H ${x2}`;
+  } else if (midY !== undefined) {
     d = `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`;
   } else {
     const mx = midX ?? (x1 + x2) / 2;
@@ -385,6 +390,27 @@ function SectionLine({ x1, x2, y, label, color }: { x1: number; x2: number; y: n
       <line x1={x1} y1={y} x2={x2} y2={y} stroke={color + "44"} strokeWidth={1} strokeDasharray="6 4" />
       <text x={x1} y={y - 8} fill={color} fontSize={11} fontWeight={800} letterSpacing="0.1em" fontFamily="system-ui">{label}</text>
     </>
+  );
+}
+
+// Origin chip — small amber pill that sits in the badge band above an LB
+// cell to communicate "the loser of [UB cell] drops in here". Replaces the
+// long dashed yellow drop lines that used to snake across the bracket.
+// A line for a "teleport" between two distant cells always looks worse than
+// a label on the destination — this matches how Liquipedia / VLR.gg / smash.gg
+// render double-elim drops.
+function OriginChip({ x, y, text }: { x: number; y: number; text: string }) {
+  const padX = 7;
+  const width = Math.max(78, text.length * 4.6 + padX * 2);
+  return (
+    <g pointerEvents="none">
+      <rect x={x - width / 2} y={y - 11} width={width} height={12} rx={3}
+            fill="rgba(251,191,36,0.10)" stroke="rgba(251,191,36,0.42)" strokeWidth={0.7} />
+      <text x={x} y={y - 2.5} fill="#fbbf24" fontSize={8} fontWeight={800}
+            textAnchor="middle" letterSpacing="0.06em" fontFamily="system-ui">
+        {text}
+      </text>
+    </g>
   );
 }
 
@@ -910,53 +936,12 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <Connector color={FLOW_UPPER} x1={ubFinal.x + MATCH_W} y1={ubFinal.y + MATCH_H / 2} x2={gf.x} y2={gf.y + MATCH_H / 4} />
       <CDot x={ubFinal.x + MATCH_W} y={ubFinal.y + MATCH_H / 2} />
 
-      {/* UB R1 losers → LB R2 (crossed). Two parallel drops from the same
-          source column. V-H-V routing alone isn't enough — both drops would
-          end with vertical segments at x=lbR2.x, overlapping for the entire
-          inner range. So we ALSO stagger the final x by an inset offset so
-          each drop's final vertical sits in a distinct lane. The first drop
-          enters its target card 8px from the left, the second drop 32px in
-          — visibly separate, both still well within their card. */}
-      <Connector color={FLOW_DROP} dashed
-        x1={ubR1[0].x + MATCH_W / 2} y1={ubR1[0].y + MATCH_H}
-        x2={lbR2[1].x + 8} y2={lbR2[1].y + MATCH_H / 2}
-        midY={ubR1[0].y + MATCH_H + 18} />
-      <CDot x={ubR1[0].x + MATCH_W / 2} y={ubR1[0].y + MATCH_H} lower />
-      <Connector color={FLOW_DROP} dashed
-        x1={ubR1[1].x + MATCH_W / 2} y1={ubR1[1].y + MATCH_H}
-        x2={lbR2[0].x + 32} y2={lbR2[0].y + MATCH_H / 2}
-        midY={ubR1[1].y + MATCH_H + 50} />
-      <CDot x={ubR1[1].x + MATCH_W / 2} y={ubR1[1].y + MATCH_H} lower />
-
-      {/* UB Semi losers → LB R3. Routing is read from each semi's
-          `loserGoesTo` field. Default convention: crossed. When uncrossed
-          (semi-m1 → lb-r3-m1 directly above-each-other) the staggered V-H-V
-          midY isn't strictly needed but we keep it for visual consistency. */}
-      {(() => {
-        const sm1R3Idx = matchMap["wb-semi-m1"]?.loserGoesTo === "lb-r3-m1" ? 0 : 1;
-        const sm2R3Idx = matchMap["wb-semi-m2"]?.loserGoesTo === "lb-r3-m2" ? 1 : 0;
-        return (
-          <>
-            <Connector color={FLOW_DROP} dashed
-              x1={ubSemi[0].x + MATCH_W / 2} y1={ubSemi[0].y + MATCH_H}
-              x2={lbR3[sm1R3Idx].x + 8} y2={lbR3[sm1R3Idx].y + MATCH_H / 2}
-              midY={ubSemi[0].y + MATCH_H + 18} />
-            <CDot x={ubSemi[0].x + MATCH_W / 2} y={ubSemi[0].y + MATCH_H} lower />
-            <Connector color={FLOW_DROP} dashed
-              x1={ubSemi[1].x + MATCH_W / 2} y1={ubSemi[1].y + MATCH_H}
-              x2={lbR3[sm2R3Idx].x + 32} y2={lbR3[sm2R3Idx].y + MATCH_H / 2}
-              midY={ubSemi[1].y + MATCH_H + 50} />
-            <CDot x={ubSemi[1].x + MATCH_W / 2} y={ubSemi[1].y + MATCH_H} lower />
-          </>
-        );
-      })()}
-
-      {/* UB Final loser → LB Final — only one drop here, no overlap risk */}
-      <Connector color={FLOW_DROP} dashed
-        x1={ubFinal.x + MATCH_W / 2} y1={ubFinal.y + MATCH_H}
-        x2={lbFinal.x} y2={lbFinal.y + MATCH_H / 2}
-        midY={ubFinal.y + MATCH_H + 24} />
-      <CDot x={ubFinal.x + MATCH_W / 2} y={ubFinal.y + MATCH_H} lower />
+      {/* UB → LB drops are shown as amber origin chips on the receiving LB
+          cell rather than drawn as lines. Long dashed paths spanning rows
+          AND columns always read as noise; a label on the destination is
+          how every major bracket UI (Liquipedia, VLR.gg, smash.gg) handles
+          this. Routing is still read from each source match's `loserGoesTo`
+          so admin overrides flow through. */}
 
       <SectionLine x1={PAD} x2={totalW - PAD} y={losersBaseY - 30} label="↘ LOWER BRACKET" color={C.accent} />
 
@@ -1008,6 +993,26 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <MatchCard match={mLBF} x={lbFinal.x} y={lbFinal.y} bestOf={lbFinalBestOf} tournamentId={tournamentId} teams={teams} teamLogos={teamLogos} />
 
       <MatchCard match={mGF} x={gf.x} y={gf.y} bestOf={grandFinalBestOf} tournamentId={tournamentId} teams={teams} teamLogos={teamLogos} />
+
+      {/* UB→LB drop origin chips. Sit in the badge band directly above each
+          LB cell that receives a UB loser. Index lookup honours each source
+          match's `loserGoesTo` so admin overrides of the default routing are
+          reflected accurately. */}
+      {(() => {
+        const r1m1LbIdx = matchMap["wb-r1-m1"]?.loserGoesTo === "lb-r2-m1" ? 0 : 1;
+        const r1m2LbIdx = matchMap["wb-r1-m2"]?.loserGoesTo === "lb-r2-m2" ? 1 : 0;
+        const sm1R3Idx  = matchMap["wb-semi-m1"]?.loserGoesTo === "lb-r3-m1" ? 0 : 1;
+        const sm2R3Idx  = matchMap["wb-semi-m2"]?.loserGoesTo === "lb-r3-m2" ? 1 : 0;
+        return (
+          <>
+            <OriginChip x={lbR2[r1m1LbIdx].x + MATCH_W / 2} y={lbR2[r1m1LbIdx].y - 3} text="↓ LOSER OF UPPER R1 M0" />
+            <OriginChip x={lbR2[r1m2LbIdx].x + MATCH_W / 2} y={lbR2[r1m2LbIdx].y - 3} text="↓ LOSER OF UPPER R1 M1" />
+            <OriginChip x={lbR3[sm1R3Idx].x  + MATCH_W / 2} y={lbR3[sm1R3Idx].y  - 3} text="↓ LOSER OF UPPER SEMI M0" />
+            <OriginChip x={lbR3[sm2R3Idx].x  + MATCH_W / 2} y={lbR3[sm2R3Idx].y  - 3} text="↓ LOSER OF UPPER SEMI M1" />
+            <OriginChip x={lbFinal.x + MATCH_W / 2} y={lbFinal.y - 3} text="↓ LOSER OF UPPER FINAL" />
+          </>
+        );
+      })()}
 
     </BracketWrapper>
   );
