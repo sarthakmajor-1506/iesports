@@ -20,7 +20,7 @@ function loadLocalImage(filename: string): string {
 
 let cachedIeLogo = "";
 let cachedValLogo = "";
-function getIeLogo() { if (!cachedIeLogo) cachedIeLogo = loadLocalImage("ielogo.png"); return cachedIeLogo; }
+function getIeLogo() { if (!cachedIeLogo) cachedIeLogo = loadLocalImage("logo6.png"); return cachedIeLogo; }
 function getValLogo() { if (!cachedValLogo) cachedValLogo = loadLocalImage("valorantlogo.png"); return cachedValLogo; }
 
 function fmtDate(iso?: string) {

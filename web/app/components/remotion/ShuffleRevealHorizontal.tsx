@@ -1035,7 +1035,7 @@ export const ShuffleRevealHorizontalComposition: React.FC<ShuffleRevealProps> = 
             display: "flex", alignItems: "center", gap: 12,
             opacity: interpolate(frame, [14, 30], [0, 0.75], clamp),
           }}>
-            <Img src="/ielogo.png" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover" }} />
+            <Img src="/logo6.png" style={{ width: 56, height: 56, objectFit: "cover", mixBlendMode: "screen" }} />
             <div style={{ fontSize: 18, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 4, textTransform: "uppercase" }}>IEsports</div>
           </div>
           <div style={{
@@ -1064,7 +1064,7 @@ export const ShuffleRevealHorizontalComposition: React.FC<ShuffleRevealProps> = 
           background: "linear-gradient(180deg, rgba(0,0,0,0.45), transparent)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Img src="/ielogo.png" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+            <Img src="/logo6.png" style={{ width: 36, height: 36, objectFit: "cover", mixBlendMode: "screen" }} />
             <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 3, textTransform: "uppercase" }}>IEsports</div>
           </div>
           <div style={{ flex: 1, margin: "0 20px", textAlign: "center", fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: 4, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
