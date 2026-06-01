@@ -198,8 +198,8 @@ export default function Navbar() {
         .ie-nav-accent { height: 3px; transition: background 0.3s; }
         .ie-nav-row { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 62px; gap: 12px; }
         .ie-nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
-        .ie-nav-logo-name { font-size: 1.35rem; font-weight: 900; color: #F0EEEA; line-height: 1; letter-spacing: -0.02em; text-shadow: 0 0 20px rgba(59,130,246,0.3); }
-        .ie-nav-logo-name span { color: #3B82F6; text-shadow: 0 0 24px rgba(59,130,246,0.5); }
+        .ie-nav-logo-name { font-size: 1.35rem; font-weight: 900; color: #F0EEEA; line-height: 1; letter-spacing: -0.02em; text-shadow: 0 0 20px rgba(239,68,68,0.3); }
+        .ie-nav-logo-name span { color: #EF4444; text-shadow: 0 0 24px rgba(239,68,68,0.5); }
         .ie-nav-logo-sub { font-size: 0.6rem; color: #6B6B65; letter-spacing: 0.16em; font-weight: 700; text-transform: uppercase; margin-top: 3px; }
         .ie-nav-tabs { display: flex; align-items: center; gap: 2px; flex: 1; justify-content: center; }
         .ie-nav-tab { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #8A8880; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
@@ -223,8 +223,8 @@ export default function Navbar() {
         .ie-dd-btn:hover { background: #1a1a1f; }
         .ie-dd-btn.discord { color: #818cf8; }
         .ie-dd-btn.discord:hover { background: rgba(99,102,241,0.1); }
-        .ie-dd-btn.profile { color: #60a5fa; }
-        .ie-dd-btn.profile:hover { background: rgba(96,165,250,0.1); }
+        .ie-dd-btn.profile { color: #EF4444; }
+        .ie-dd-btn.profile:hover { background: rgba(239,68,68,0.1); }
         .ie-dd-btn.logout { color: #f87171; }
         .ie-dd-btn.logout:hover { background: rgba(239,68,68,0.1); }
         .ie-verified-badge { font-size: 0.62rem; color: #4ade80; font-weight: 800; background: rgba(22,163,74,0.15); padding: 2px 7px; border-radius: 20px; border: 1px solid rgba(34,197,94,0.3); }
@@ -293,26 +293,26 @@ export default function Navbar() {
         .ph-row { display: flex; gap: 10px; margin-bottom: 16px; }
         .ph-select { flex: 0 0 96px; padding: 12px 8px; border: 1.5px solid #2A2A30; border-radius: 10px; font-family: inherit; font-size: .9rem; background: #121215; color: #F0EEEA; }
         .ph-input { flex: 1; padding: 12px 14px; border: 1.5px solid #2A2A30; border-radius: 10px; font-family: inherit; font-size: .95rem; outline: none; transition: border-color .2s; background: #121215; color: #F0EEEA; }
-        .ph-input:focus { border-color: #3B82F6; }
+        .ph-input:focus { border-color: #EF4444; }
         .ph-error { font-size: .8rem; color: #f87171; min-height: 18px; margin-bottom: 8px; }
-        .ph-btn { width: 100%; background: #3B82F6; color: #fff; border: none; border-radius: 100px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .ph-btn:hover { background: #2563EB; }
+        .ph-btn { width: 100%; background: #EF4444; color: #fff; border: none; border-radius: 100px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .ph-btn:hover { background: #DC2626; }
         .ph-btn:disabled { opacity: .6; cursor: not-allowed; }
-        .ph-btn-back { background: none; border: none; color: #3B82F6; font-size: .86rem; font-weight: 600; cursor: pointer; font-family: inherit; margin-bottom: 18px; padding: 0; display: flex; align-items: center; gap: 4px; }
+        .ph-btn-back { background: none; border: none; color: #EF4444; font-size: .86rem; font-weight: 600; cursor: pointer; font-family: inherit; margin-bottom: 18px; padding: 0; display: flex; align-items: center; gap: 4px; }
         .ph-otp-wrap { display: flex; gap: 8px; justify-content: space-between; margin-bottom: 4px; }
         .ph-otp-input { width: 44px; height: 52px; text-align: center; border: 1.5px solid #2A2A30; border-radius: 10px; font-size: 1.3rem; font-weight: 700; font-family: inherit; background: #121215; color: #F0EEEA; outline: none; transition: border-color .2s; }
-        .ph-otp-input:focus { border-color: #3B82F6; }
+        .ph-otp-input:focus { border-color: #EF4444; }
         .ph-resend-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-        .ph-resend-btn { background: none; border: none; color: #3B82F6; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .ph-resend-btn { background: none; border: none; color: #EF4444; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
         .ph-resend-btn:disabled { color: #555550; cursor: default; }
       `}</style>
 
       <nav className="ie-navbar">
-        <div className="ie-nav-accent" style={{ background: activeGame?.color || "#3B82F6" }} />
+        <div className="ie-nav-accent" style={{ background: activeGame?.color || "#EF4444" }} />
         <div className="ie-nav-row">
 
           <div className="ie-nav-logo" onClick={() => router.push("/")}>
-            <Image className="ie-logo-img" src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
+            <Image className="ie-logo-img" src="/logo6.png" alt="Indian Esports" width={42} height={42} style={{ objectFit: "contain" }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
               <div className="ie-nav-logo-sub">Competitive Gaming</div>
@@ -346,7 +346,7 @@ export default function Navbar() {
                 {profilePhoto ? (
                   <img src={profilePhoto} alt="" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30" }} />
                 ) : (
-                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#EF4444,#DC2626)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
                     {profileName[0]?.toUpperCase()}
                   </div>
                 )}
@@ -364,7 +364,7 @@ export default function Navbar() {
                     {profilePhoto ? (
                       <img src={profilePhoto} alt="" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30", flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#EF4444,#DC2626)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
                         {profileName[0]?.toUpperCase()}
                       </div>
                     )}
@@ -377,7 +377,7 @@ export default function Navbar() {
                   <div className="ie-dd-section" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 4, borderTop: "1px solid #1e1e22" }}>
                     <button className="ie-dd-btn profile"
                       onClick={() => { router.push(`/player/${user?.uid}`); setDropdownOpen(false); }}
-                      style={{ justifyContent: "center", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 100, padding: "10px 0" }}>
+                      style={{ justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 100, padding: "10px 0" }}>
                       Profile
                     </button>
                     <button className="ie-dd-btn logout"
@@ -455,7 +455,7 @@ export default function Navbar() {
             {profilePhoto ? (
               <img src={profilePhoto} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", border: "2px solid #2A2A30" }} />
             ) : (
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#3B82F6,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#EF4444,#DC2626)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
                 {profileName[0]?.toUpperCase()}
               </div>
             )}
