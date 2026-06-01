@@ -5,6 +5,7 @@ import {
   enqueueWhatsAppAddParticipants,
   enqueueWhatsAppCreateGroup,
   enqueueWhatsAppResetGroup,
+  enqueueWhatsAppSetMessagesAdminsOnly,
 } from "@/lib/whatsapp";
 
 /**
@@ -84,6 +85,10 @@ interface CheckoutOpts {
    *  it immediately; on lazy-create the bot settles it here. */
   settleDocPath: string;
   settleField: string;
+  /** Lock the group to admins-only messaging (announcement-style). On reuse the
+   *  lock is applied before members are added (zero open window); on lazy-create
+   *  it's applied at reconcile (brief window while the create settles). */
+  adminsOnly?: boolean;
 }
 
 /**
@@ -118,8 +123,12 @@ export async function checkoutGroup(
   });
 
   if (reservedId) {
-    // Reuse path: rename, then add members, then record the handle on the caller doc.
+    // Reuse path: rename, lock (before members join → zero open window), add, then
+    // record the handle on the caller doc.
     await enqueueWhatsAppRenameGroup(reservedId, opts.name, { source: "pool" });
+    if (opts.adminsOnly) {
+      await enqueueWhatsAppSetMessagesAdminsOnly(reservedId, true, { source: "pool" });
+    }
     if (opts.participantPhones.length) {
       await enqueueWhatsAppAddParticipants(reservedId, opts.participantPhones, { source: "pool" });
     }
@@ -145,6 +154,7 @@ export async function checkoutGroup(
     teamId: opts.teamId ?? null,
     settleDocPath: opts.settleDocPath,
     settleField: opts.settleField,
+    adminsOnly: !!opts.adminsOnly,
     createdAt: now,
   });
   return { groupId: null, reused: false, pending: true };
@@ -193,6 +203,9 @@ export async function reconcilePendingPool(): Promise<number> {
         assignedTournamentId: p.tournamentId ?? null,
         assignedTeamId: p.teamId ?? null,
       });
+      if (p.adminsOnly) {
+        await enqueueWhatsAppSetMessagesAdminsOnly(groupId, true, { source: "pool" });
+      }
       await d.ref.delete();
       registered++;
     } catch (e: any) {

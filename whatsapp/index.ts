@@ -9,10 +9,12 @@
  *   whatsappOutbox/{id}: {
  *     action: "send-text" | "send-media" | "send-poll"
  *           | "create-group" | "add-participants" | "remove-participants"
- *           | "rename-group" | "revoke-invite" | "reset-group",
+ *           | "rename-group" | "revoke-invite" | "reset-group"
+ *           | "set-messages-admins-only",
  *     target: { type: "group"|"dm"|"broadcast", id?, phone?, phones? },
  *     text?, mediaUrl?, pollQuestion?, pollOptions?, pollAllowMultiple?,
  *     groupName?, participantPhones?, parentGroupId?, sleep?, retainedPhones?,
+ *     adminsOnly?,
  *     settleDocPath?, settleField?,
  *     status: "pending"|"sent"|"skipped"|"error",
  *     dedupeKey?, source?, createdAt, attempts?, error?, settled?,
@@ -311,6 +313,21 @@ async function handleResetGroup(data: any): Promise<any> {
   return { removed, name: freeName, invite: newInvite };
 }
 
+/**
+ * Lock a group so only admins can send messages (announcement-style). The bot
+ * (group creator) stays an admin and can still post. data.adminsOnly defaults
+ * to true; pass false to re-open the group.
+ */
+async function handleSetMessagesAdminsOnly(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  if (!groupId) throw new Error("set-messages-admins-only needs target.id");
+  const adminsOnly = data.adminsOnly !== false;
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  await chat.setMessagesAdminsOnly(adminsOnly);
+  return { adminsOnly };
+}
+
 async function handleRemoveParticipants(data: any): Promise<any> {
   const groupId = data.target?.id;
   const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
@@ -345,6 +362,7 @@ async function dispatch(data: any): Promise<any> {
     case "rename-group":        return handleRenameGroup(data);
     case "revoke-invite":       return handleRevokeInvite(data);
     case "reset-group":         return handleResetGroup(data);
+    case "set-messages-admins-only": return handleSetMessagesAdminsOnly(data);
     default: throw new Error(`unknown action: ${action}`);
   }
 }

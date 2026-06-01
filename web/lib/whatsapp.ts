@@ -312,6 +312,22 @@ export async function enqueueWhatsAppRevokeInvite(
   });
 }
 
+/** Lock a group to admins-only messaging (announcement-style) or re-open it.
+ *  The bot stays admin and can still post. */
+export async function enqueueWhatsAppSetMessagesAdminsOnly(
+  groupId: string,
+  adminsOnly = true,
+  opts: EnqueueOpts = {},
+): Promise<void> {
+  await writeOutbox({
+    action: "set-messages-admins-only",
+    target: { type: "group", id: groupId },
+    adminsOnly,
+    source: opts.source || "web",
+    ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
+  });
+}
+
 /**
  * Reset a pooled group back to "free": the bot removes every member except
  * itself and `retainedPhones`, renames to `freeName`, and revokes the invite.

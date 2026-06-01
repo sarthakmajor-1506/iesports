@@ -66,6 +66,7 @@ export async function provisionTournamentGroup(
       tournamentId,
       settleDocPath: `valorantTournaments/${tournamentId}`,
       settleField: "whatsappTournamentGroupId",
+      adminsOnly: true,
     });
     await tRef.set(
       { whatsappProvisioned: true, whatsappProvisionedAt: new Date().toISOString() },
@@ -107,6 +108,7 @@ export async function provisionTeamGroups(
         teamId: teamDoc.id,
         settleDocPath: `valorantTournaments/${tournamentId}/teams/${teamDoc.id}`,
         settleField: "whatsappTeamGroupId",
+        adminsOnly: true,
       });
       count++;
     }
