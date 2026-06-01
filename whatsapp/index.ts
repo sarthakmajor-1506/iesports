@@ -10,7 +10,7 @@
  *     action: "send-text" | "send-media" | "send-poll"
  *           | "create-group" | "add-participants" | "remove-participants"
  *           | "rename-group" | "revoke-invite" | "reset-group"
- *           | "set-messages-admins-only",
+ *           | "set-messages-admins-only" | "promote-participants",
  *     target: { type: "group"|"dm"|"broadcast", id?, phone?, phones? },
  *     text?, mediaUrl?, pollQuestion?, pollOptions?, pollAllowMultiple?,
  *     groupName?, participantPhones?, parentGroupId?, sleep?, retainedPhones?,
@@ -328,6 +328,18 @@ async function handleSetMessagesAdminsOnly(data: any): Promise<any> {
   return { adminsOnly };
 }
 
+/** Promote participants to group admin (they must already be members). Used to
+ *  keep iesports staff as admins in every group alongside the bot. */
+async function handlePromoteParticipants(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
+  if (!groupId || phones.length === 0) throw new Error("promote-participants needs target.id + participantPhones");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const res = await chat.promoteParticipants(phones.map(phoneToChatId));
+  return res;
+}
+
 async function handleRemoveParticipants(data: any): Promise<any> {
   const groupId = data.target?.id;
   const phones: string[] = Array.isArray(data.participantPhones) ? data.participantPhones : [];
@@ -363,6 +375,7 @@ async function dispatch(data: any): Promise<any> {
     case "revoke-invite":       return handleRevokeInvite(data);
     case "reset-group":         return handleResetGroup(data);
     case "set-messages-admins-only": return handleSetMessagesAdminsOnly(data);
+    case "promote-participants": return handlePromoteParticipants(data);
     default: throw new Error(`unknown action: ${action}`);
   }
 }

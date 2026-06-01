@@ -312,6 +312,23 @@ export async function enqueueWhatsAppRevokeInvite(
   });
 }
 
+/** Promote participants to group admin (must already be members). Keeps staff
+ *  as admins in every group alongside the bot. */
+export async function enqueueWhatsAppPromoteParticipants(
+  groupId: string,
+  participantPhones: string[],
+  opts: EnqueueOpts = {},
+): Promise<void> {
+  if (!participantPhones.length) return;
+  await writeOutbox({
+    action: "promote-participants",
+    target: { type: "group", id: groupId },
+    participantPhones,
+    source: opts.source || "web",
+    ...(opts.dedupeKey ? { dedupeKey: opts.dedupeKey } : {}),
+  });
+}
+
 /** Lock a group to admins-only messaging (announcement-style) or re-open it.
  *  The bot stays admin and can still post. */
 export async function enqueueWhatsAppSetMessagesAdminsOnly(

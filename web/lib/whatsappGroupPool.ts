@@ -6,6 +6,7 @@ import {
   enqueueWhatsAppCreateGroup,
   enqueueWhatsAppResetGroup,
   enqueueWhatsAppSetMessagesAdminsOnly,
+  enqueueWhatsAppPromoteParticipants,
 } from "@/lib/whatsapp";
 
 /**
@@ -101,6 +102,10 @@ export async function checkoutGroup(
   opts: CheckoutOpts,
 ): Promise<{ groupId: string | null; reused: boolean; pending: boolean }> {
   const now = new Date().toISOString();
+  const cfg = await getWhatsAppConfig();
+  const staff = cfg.staffPhones || [];
+  // Staff are members + admins of every group, alongside the bot.
+  const members = [...new Set([...staff, ...opts.participantPhones])];
 
   // 1. Try to atomically reserve a free shell of this type.
   const reservedId = await adminDb.runTransaction(async (tx) => {
@@ -129,8 +134,11 @@ export async function checkoutGroup(
     if (opts.adminsOnly) {
       await enqueueWhatsAppSetMessagesAdminsOnly(reservedId, true, { source: "pool" });
     }
-    if (opts.participantPhones.length) {
-      await enqueueWhatsAppAddParticipants(reservedId, opts.participantPhones, { source: "pool" });
+    if (members.length) {
+      await enqueueWhatsAppAddParticipants(reservedId, members, { source: "pool" });
+    }
+    if (staff.length) {
+      await enqueueWhatsAppPromoteParticipants(reservedId, staff, { source: "pool" });
     }
     await adminDb.doc(opts.settleDocPath).set({ [opts.settleField]: reservedId }, { merge: true });
     return { groupId: reservedId, reused: true, pending: false };
@@ -139,10 +147,9 @@ export async function checkoutGroup(
   // 2. No free shell — lazily create one nested in the community, with members
   //    added at creation. The bot settles the new id into the caller doc; a
   //    pending marker lets reconcilePendingPool() register it into the pool.
-  const cfg = await getWhatsAppConfig();
   await enqueueWhatsAppCreateGroup(
     opts.name,
-    opts.participantPhones,
+    members,
     opts.settleDocPath,
     opts.settleField,
     { parentGroupId: cfg.iesportsCommunityParentGroupId, source: "pool" },
@@ -155,6 +162,7 @@ export async function checkoutGroup(
     settleDocPath: opts.settleDocPath,
     settleField: opts.settleField,
     adminsOnly: !!opts.adminsOnly,
+    adminPhones: staff,
     createdAt: now,
   });
   return { groupId: null, reused: false, pending: true };
@@ -205,6 +213,9 @@ export async function reconcilePendingPool(): Promise<number> {
       });
       if (p.adminsOnly) {
         await enqueueWhatsAppSetMessagesAdminsOnly(groupId, true, { source: "pool" });
+      }
+      if (Array.isArray(p.adminPhones) && p.adminPhones.length) {
+        await enqueueWhatsAppPromoteParticipants(groupId, p.adminPhones, { source: "pool" });
       }
       await d.ref.delete();
       registered++;
