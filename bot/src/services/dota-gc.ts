@@ -799,7 +799,9 @@ class DotaBot extends EventEmitter {
 
       const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue, rTeam, dTeam);
       const labelInfo = rTeam || dTeam ? ` radiantTeam="${rTeam || "—"}" direTeam="${dTeam || "—"}"` : "";
-      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}${labelInfo}`);
+      const lid = parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
+      const leagueInfo = lid > 0 ? ` league=${lid}` : "";
+      console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}${leagueInfo}${labelInfo}`);
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
@@ -826,6 +828,13 @@ class DotaBot extends EventEmitter {
     ];
     if (cmPick === 1 || cmPick === 2) parts.push(this.vi(14, cmPick));
     parts.push(this.str(15, password));
+    // leagueid (field 16 in CMsgPracticeLobbySetDetails, verified against the
+    // current Valve proto). Tagging a practice lobby with a registered league
+    // makes the resulting match public + indexed (Steam Web API / OpenDota /
+    // Stratz), which is what unlocks per-player stats. Opt-in via DOTA_LEAGUE_ID;
+    // when unset/0 we omit it and the lobby stays an untagged practice lobby.
+    const leagueId = parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
+    if (leagueId > 0) parts.push(this.vi(16, leagueId));
     // Fields 21 / 22 = radiant_series_team / dire_series_team
     // (CMsgDOTASeriesTeam sub-message, team_name at field 2). Encoded best
     // effort — wrapped in try so any proto-version drift can't break the
