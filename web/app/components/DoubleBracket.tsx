@@ -896,6 +896,19 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
   const mLBF = getM("lb-final", mNum++, TBD_TEAM, TBD_TEAM);
   const mGF = getM("grand-final", mNum++, TBD_TEAM, TBD_TEAM);
 
+  // A "winner advances" line into an LB cell that ALSO receives a UB drop must
+  // land in the EMPTY slot, not the one the dropped team already occupies. The
+  // generator seeds the UB drop into team1, so the advancing winner feeds team2
+  // (bottom). Driven off the match data so it stays correct if a cell ever flips:
+  // feed whichever slot is still TBD when the other is already filled.
+  const feedSlotY = (cellY: number, m: BracketMatch) => {
+    const t1Filled = !!m.team1Name && m.team1Name !== "TBD";
+    const t2Filled = !!m.team2Name && m.team2Name !== "TBD";
+    if (t1Filled && !t2Filled) return cellY + (3 * MATCH_H) / 4; // drop in team1 → feed team2
+    if (t2Filled && !t1Filled) return cellY + MATCH_H / 4;        // drop in team2 → feed team1
+    return cellY + (3 * MATCH_H) / 4;                             // default: feed team2 (bottom)
+  };
+
   return (
     <BracketWrapper width={totalW} height={totalH} teamCount={teams.length || 10}>
       {/* Upper bracket column headers */}
@@ -952,19 +965,20 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <ColHeader x={colX(3) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER SEMI" />
       <ColHeader x={colX(4) + MATCH_W / 2} y={losersBaseY - 32} text="LOWER FINAL" />
 
-      {/* LB R1 → LB R2. UB drops land in team2 (bottom) of each LB R2 cell,
-          so the LB R1 winner advancing in fills team1 (top, 1/4 height). */}
+      {/* LB R1 → LB R2. The UB drop occupies team1 (top) of each LB R2 cell, so
+          the advancing LB R1 winner must land in the EMPTY slot (team2, bottom). */}
       {[0, 1].map(i => (
         <g key={`lbr1-lbr2-${i}`}>
-          <Connector color={FLOW_LOWER} x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={lbR2[i].y + MATCH_H / 4} />
+          <Connector color={FLOW_LOWER} x1={lbR1[i].x + MATCH_W} y1={lbR1[i].y + MATCH_H / 2} x2={lbR2[i].x} y2={feedSlotY(lbR2[i].y, mLBR2[i])} />
           <CDot x={lbR1[i].x + MATCH_W} y={lbR1[i].y + MATCH_H / 2} lower />
         </g>
       ))}
 
-      {/* LB R2 → LB R3 */}
+      {/* LB R2 → LB R3. Same as above — the UB drop sits in team1 (top), so the
+          advancing LB R2 winner lands in the EMPTY slot (team2, bottom). */}
       {[0, 1].map(i => (
         <g key={`lbr2-lbr3-${i}`}>
-          <Connector color={FLOW_LOWER} x1={lbR2[i].x + MATCH_W} y1={lbR2[i].y + MATCH_H / 2} x2={lbR3[i].x} y2={lbR3[i].y + MATCH_H / 4} />
+          <Connector color={FLOW_LOWER} x1={lbR2[i].x + MATCH_W} y1={lbR2[i].y + MATCH_H / 2} x2={lbR3[i].x} y2={feedSlotY(lbR3[i].y, mLBR3[i])} />
           <CDot x={lbR2[i].x + MATCH_W} y={lbR2[i].y + MATCH_H / 2} lower />
         </g>
       ))}
@@ -975,8 +989,9 @@ function Bracket10({ matchMap, teams, hasMatches, bracketBestOf, lbFinalBestOf, 
       <CDot x={lbR3[0].x + MATCH_W} y={lbR3[0].y + MATCH_H / 2} lower />
       <CDot x={lbR3[1].x + MATCH_W} y={lbR3[1].y + MATCH_H / 2} lower />
 
-      {/* LB Semi → LB Final */}
-      <Connector color={FLOW_LOWER} x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={lbFinal.y + MATCH_H / 4} />
+      {/* LB Semi → LB Final. LB Final also takes a UB drop (loser of UB Final) in
+          team1 (top), so the LB Semi winner feeds the EMPTY slot (team2, bottom). */}
+      <Connector color={FLOW_LOWER} x1={lbSemi.x + MATCH_W} y1={lbSemi.y + MATCH_H / 2} x2={lbFinal.x} y2={feedSlotY(lbFinal.y, mLBF)} />
       <CDot x={lbSemi.x + MATCH_W} y={lbSemi.y + MATCH_H / 2} lower />
 
       {/* LB Final → GF */}
