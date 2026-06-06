@@ -11,6 +11,7 @@ import RegisterModal from "@/app/components/RegisterModal";
 import RolePreferenceModal from "@/app/components/RolePreferenceModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
+import DotaLiveScoreboard from "@/app/components/DotaLiveScoreboard";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
@@ -250,6 +251,10 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
         </div>
         <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", color: isExpanded ? (isBracket ? bracketAccent : "#A12B1F") : "#555550", fontSize: 12, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>▼</div>
       </div>
+
+      {isLive && m.dotaMatchId && (
+        <DotaLiveScoreboard dotaMatchId={String(m.dotaMatchId)} team1Name={m.team1Name} team2Name={m.team2Name} />
+      )}
 
       {isExpanded && (() => {
         const t1Sorted = [...(t1Members.length > 0 ? t1Members : Array.from({ length: 5 }, (_, i) => ({ steamName: `Player ${i + 1}`, steamAvatar: "", dotaMMR: 0 })))].sort((a: any, b: any) => (b.dotaMMR || 0) - (a.dotaMMR || 0));
