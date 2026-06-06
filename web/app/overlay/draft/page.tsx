@@ -18,30 +18,43 @@ export default function DraftOverlayPage() {
 
 function DraftOverlay() {
   const sp = useSearchParams();
+  const tournamentId = sp.get("tournamentId") || "";
+  const matchId = sp.get("matchId") || "";
   const dotaMatchId = sp.get("dotaMatchId") || "";
-  const t1 = sp.get("t1") || "Radiant";
-  const t2 = sp.get("t2") || "Dire";
-  const bo = sp.get("bo") || "1";
-  const logo1 = sp.get("logo1") || "";
-  const logo2 = sp.get("logo2") || "";
+  // manual fallbacks when not resolving from a tournament match
+  const t1m = sp.get("t1") || "Radiant";
+  const t2m = sp.get("t2") || "Dire";
+  const bom = sp.get("bo") || "1";
+  const logo1m = sp.get("logo1") || "";
+  const logo2m = sp.get("logo2") || "";
 
-  const [data, setData] = useState<LiveMatch | null>(null);
+  const [data, setData] = useState<(LiveMatch & { meta?: any }) | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const query = tournamentId && matchId
+    ? `tournamentId=${encodeURIComponent(tournamentId)}&matchId=${encodeURIComponent(matchId)}`
+    : `dotaMatchId=${encodeURIComponent(dotaMatchId)}`;
+
   useEffect(() => {
-    if (!dotaMatchId) return;
     let alive = true;
     const poll = async () => {
       try {
-        const r = await fetch(`/api/dota/live?dotaMatchId=${dotaMatchId}`, { cache: "no-store" });
-        const j = (await r.json()) as LiveMatch;
+        const r = await fetch(`/api/dota/live?${query}`, { cache: "no-store" });
+        const j = (await r.json()) as LiveMatch & { meta?: any };
         if (alive) setData(j);
       } catch { /* keep last */ }
     };
     poll();
     timer.current = setInterval(poll, 8000); // overlay refresh; server caches 25s
     return () => { alive = false; if (timer.current) clearInterval(timer.current); };
-  }, [dotaMatchId]);
+  }, [query]);
+
+  const meta = data?.meta;
+  const t1 = meta?.radiantName || t1m;
+  const t2 = meta?.direName || t2m;
+  const bo = String(meta?.bestOf || bom);
+  const logo1 = meta?.radiantLogo || logo1m;
+  const logo2 = meta?.direLogo || logo2m;
 
   const d = data?.draft;
   const radiant = d?.radiant || { picks: [], bans: [] };
@@ -49,8 +62,9 @@ function DraftOverlay() {
   const totalPicks = radiant.picks.length + dire.picks.length;
   const inGame = (data?.durationSec || 0) > 0;
   const status = inGame ? "LIVE" : totalPicks >= 10 ? "DRAFT COMPLETE" : "DRAFTING";
-  const rScore = data?.radiant?.score ?? 0;
-  const dScore = data?.dire?.score ?? 0;
+  // series score when resolved from a tournament match; else live kills
+  const rScore = meta ? meta.radiantSeriesScore : (data?.radiant?.score ?? 0);
+  const dScore = meta ? meta.direSeriesScore : (data?.dire?.score ?? 0);
 
   return (
     <div style={{ position: "fixed", inset: 0, fontFamily: "'Inter',system-ui,sans-serif", color: "#fff", pointerEvents: "none" }}>
