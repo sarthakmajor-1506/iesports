@@ -421,9 +421,12 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             const second = secondPool.sort((a, b) => (b.heroDamage || 0) - (a.heroDamage || 0))[0];
             const renderRow = (p: any, idx: number) => (
               <div key={(p.uid || p.name) + idx} className="dtd-mc-stat-row">
-                <div className="dtd-mc-stat-name" title={p.name}>
-                  <span className="dtd-mc-stat-hero">{p.hero || "?"}</span>
-                  <span className="dtd-mc-stat-player">{p.steamName || p.name}</span>
+                <div className="dtd-mc-stat-name" title={p.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {p.heroIcon && <img src={p.heroIcon} alt={p.hero} width={28} height={16} style={{ borderRadius: 3, flexShrink: 0 }} />}
+                  <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                    <span className="dtd-mc-stat-hero">{p.hero || "?"}</span>
+                    <span className="dtd-mc-stat-player">{p.steamName || p.name}</span>
+                  </span>
                 </div>
                 <div className="dtd-mc-stat-kda">
                   <span style={{ color: "#4ade80" }}>{p.kills}</span>

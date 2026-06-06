@@ -172,11 +172,24 @@ export default function DotaMatchDetail() {
     return (
       <div key={(p.uid || p.name) + i} className="dmd-trow">
         <div className="dmd-td player">
-          {p.uid ? (
-            <Link href={`/player/${p.uid}?tab=dota`} style={{ color: "inherit", textDecoration: "none" }}>{p.steamName || p.name}</Link>
-          ) : (p.steamName || p.name)}
+          <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {p.uid ? (
+              <Link href={`/player/${p.uid}?tab=dota`} style={{ color: "inherit", textDecoration: "none" }}>{p.steamName || p.name}</Link>
+            ) : (p.steamName || p.name)}
+          </div>
+          {Array.isArray(p.items) && p.items.some(Boolean) && (
+            <div style={{ display: "flex", gap: 2, marginTop: 3, alignItems: "center" }}>
+              {p.items.map((it: any, ix: number) => it
+                ? <img key={ix} src={it.icon} alt={it.name} title={it.name} width={23} height={17} style={{ borderRadius: 2, flexShrink: 0 }} />
+                : <span key={ix} style={{ width: 23, height: 17, borderRadius: 2, background: "rgba(255,255,255,0.04)", flexShrink: 0 }} />)}
+              {p.neutralItem && <img src={p.neutralItem.icon} alt={p.neutralItem.name} title={p.neutralItem.name} width={18} height={18} style={{ borderRadius: "50%", marginLeft: 3, border: "1px solid rgba(255,200,80,0.5)" }} />}
+            </div>
+          )}
         </div>
-        <div className="dmd-td hero">{p.hero || "?"}</div>
+        <div className="dmd-td hero" style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          {p.heroIcon && <img src={p.heroIcon} alt={p.hero} width={30} height={17} style={{ borderRadius: 3, flexShrink: 0 }} />}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.hero || "?"}</span>
+        </div>
         <div className="dmd-td num" style={{ color: "#4ade80", fontWeight: 800 }}>{p.kills || 0}</div>
         <div className="dmd-td num" style={{ color: "#ef4444", fontWeight: 800 }}>{p.deaths || 0}</div>
         <div className="dmd-td num" style={{ color: "#3CCBFF", fontWeight: 800 }}>{p.assists || 0}</div>
@@ -339,6 +352,37 @@ export default function DotaMatchDetail() {
             </div>
           </div>
 
+          {/* ── DRAFT (picks / bans) ── */}
+          {g1.draft && (g1.draft.radiant?.picks?.length || g1.draft.dire?.picks?.length) ? (
+            <div className="dmd-draft">
+              {([["radiant", radiantName, "#4ade80"], ["dire", direName, "#ef4444"]] as const).map(([side, name, accent]) => {
+                const d = g1.draft[side] || { picks: [], bans: [] };
+                return (
+                  <div key={side} className="dmd-draft-side">
+                    <div className="dmd-draft-team" style={{ color: accent }}>{name}</div>
+                    <div className="dmd-draft-row">
+                      <span className="dmd-draft-lbl">PICKS</span>
+                      {d.picks.map((h: any, i: number) => (
+                        <span key={i} className="dmd-draft-hero" title={h.name}>
+                          {h.icon && <img src={h.icon} alt={h.name} width={34} height={19} style={{ borderRadius: 3, border: `1px solid ${accent}66` }} />}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="dmd-draft-row">
+                      <span className="dmd-draft-lbl ban">BANS</span>
+                      {d.bans.map((h: any, i: number) => (
+                        <span key={i} className="dmd-draft-hero ban" title={h.name}>
+                          {h.icon && <img src={h.icon} alt={h.name} width={30} height={17} style={{ borderRadius: 3, filter: "grayscale(1) brightness(0.55)" }} />}
+                          <span className="dmd-draft-x">✕</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
           {/* Radiant table */}
           <div className="dmd-table-wrap" style={{ borderColor: radWon ? "rgba(74,222,128,0.35)" : "rgba(74,222,128,0.12)" }}>
             <div className="dmd-table-head" style={{ background: radWon ? "linear-gradient(90deg, rgba(74,222,128,0.10), transparent)" : "transparent" }}>
@@ -488,6 +532,15 @@ const styles = `
   .dmd-table-head { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
   .dmd-table-head .dmd-table-kills { margin-left: auto; font-size: 0.7rem; color: #8A8880; font-weight: 700; }
   .dmd-table { overflow-x: auto; }
+  .dmd-draft { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .dmd-draft-side { background: rgba(18,18,21,0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px 14px; }
+  .dmd-draft-team { font-weight: 800; font-size: 0.9rem; margin-bottom: 8px; }
+  .dmd-draft-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+  .dmd-draft-lbl { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.08em; color: #6f6d66; width: 38px; }
+  .dmd-draft-lbl.ban { color: #ef4444; }
+  .dmd-draft-hero { position: relative; display: inline-flex; line-height: 0; }
+  .dmd-draft-hero.ban .dmd-draft-x { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #f43f5e; font-weight: 900; font-size: 13px; text-shadow: 0 0 4px #000; }
+  @media (max-width: 640px) { .dmd-draft { grid-template-columns: 1fr; } }
   .dmd-thead, .dmd-trow {
     display: grid;
     grid-template-columns: 1.4fr 1.2fr 0.5fr 0.5fr 0.5fr 0.7fr 0.9fr 0.7fr 0.7fr 0.6fr 0.5fr 1fr 0.9fr 0.8fr;
