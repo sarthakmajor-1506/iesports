@@ -684,7 +684,8 @@ class DotaBot extends EventEmitter {
     region = "India",
     cmPick = 0,
     radiantTeamName?: string,
-    direTeamName?: string
+    direTeamName?: string,
+    leagueId?: number
   ): Promise<SteamLobbyResult> {
     if (!this.isReady()) throw new Error("GC not ready");
     const serverRegion = REGIONS[region] ?? 16;
@@ -797,24 +798,24 @@ class DotaBot extends EventEmitter {
         reject(new Error("Lobby create timed out (90s)"));
       }, 90000);
 
-      const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue, rTeam, dTeam);
+      const msg = this.buildCreate(name, password, mode, serverRegion, cmPickValue, rTeam, dTeam, leagueId);
       const labelInfo = rTeam || dTeam ? ` radiantTeam="${rTeam || "—"}" direTeam="${dTeam || "—"}"` : "";
-      const lid = parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
+      const lid = (leagueId && leagueId > 0) ? leagueId : parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
       const leagueInfo = lid > 0 ? ` league=${lid}` : "";
       console.log(`[Dota2] -> Create: "${name}" ${gameMode}(${mode}) ${region}(${serverRegion}) pw=${password} cmPick=${cmPickValue}${leagueInfo}${labelInfo}`);
       this.client.sendToGC(DOTA2_APP_ID, EDOTAGCMsg.k_EMsgGCPracticeLobbyCreate, {}, msg);
     });
   }
 
-  private buildCreate(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string): Buffer {
+  private buildCreate(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string, leagueId?: number): Buffer {
     return Buffer.concat([
       this.str(5, password),
       this.vi(6, this.gcVersion || 0),
-      this.sub(7, this.buildDetails(name, password, mode, region, cmPick, radiantTeam, direTeam)),
+      this.sub(7, this.buildDetails(name, password, mode, region, cmPick, radiantTeam, direTeam, leagueId)),
     ]);
   }
 
-  private buildDetails(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string): Buffer {
+  private buildDetails(name: string, password: string, mode: number, region: number, cmPick: number, radiantTeam?: string, direTeam?: string, leagueIdOverride?: number): Buffer {
     // Field 14 is `cm_pick` in CMsgPracticeLobbySetDetails. Only emit when set
     // (1 = Radiant first pick, 2 = Dire first pick). When 0, omit so Valve
     // applies the default (random first pick).
@@ -833,8 +834,14 @@ class DotaBot extends EventEmitter {
     // makes the resulting match public + indexed (Steam Web API / OpenDota /
     // Stratz), which is what unlocks per-player stats. Opt-in via DOTA_LEAGUE_ID;
     // when unset/0 we omit it and the lobby stays an untagged practice lobby.
-    const leagueId = parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
-    if (leagueId > 0) parts.push(this.vi(16, leagueId));
+    // Precedence: explicit per-tournament override (sourced from the
+    // tournament doc's `dotaLeagueId`, threaded through the queue/command) wins;
+    // otherwise fall back to the global DOTA_LEAGUE_ID env. When both are 0/unset
+    // we omit field 16 and the lobby stays an untagged practice lobby.
+    const effectiveLeagueId = (leagueIdOverride && leagueIdOverride > 0)
+      ? leagueIdOverride
+      : parseInt(process.env.DOTA_LEAGUE_ID || "0", 10);
+    if (effectiveLeagueId > 0) parts.push(this.vi(16, effectiveLeagueId));
     // Fields 21 / 22 = radiant_series_team / dire_series_team
     // (CMsgDOTASeriesTeam sub-message, team_name at field 2). Encoded best
     // effort — wrapped in try so any proto-version drift can't break the

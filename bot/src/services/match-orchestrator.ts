@@ -138,10 +138,17 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   // Radiant/Dire first-pick lock-ins from the toss result.
   const cmPick = Number((queue as any).cmPick || 0);
 
+  // Per-tournament Dota league tag: the web set-lobby flow stamps `leagueId`
+  // on the queue doc from the tournament's `dotaLeagueId`. When >0 the lobby is
+  // created as a registered-league match (public via Steam Web API / OpenDota,
+  // which unlocks per-player stats). When absent, dota-gc falls back to the
+  // global DOTA_LEAGUE_ID env, preserving prior behavior.
+  const leagueId = Number((queue as any).leagueId || 0) || undefined;
+
   if (bot.isReady()) {
     try {
-      console.log(`[Match] Creating Dota lobby... cmPick=${cmPick} radiantTeam="${radiantTeamName || "—"}" direTeam="${direTeamName || "—"}"`);
-      const result = await bot.createLobby(lobbyName, password, gameMode, region, cmPick, radiantTeamName, direTeamName);
+      console.log(`[Match] Creating Dota lobby... cmPick=${cmPick} league=${leagueId || "(env)"} radiantTeam="${radiantTeamName || "—"}" direTeam="${direTeamName || "—"}"`);
+      const result = await bot.createLobby(lobbyName, password, gameMode, region, cmPick, radiantTeamName, direTeamName, leagueId);
       gcLobbyId = result.lobbyId;
       lobbyCreated = true;
       console.log(`[Match] ✅ Dota lobby created (gcId=${gcLobbyId})`);

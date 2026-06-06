@@ -200,9 +200,11 @@ async function runCommand(db: Firestore, id: string, action: string, params: any
         const cmPick = Number(params?.cmPick || 0);
         const radiantTeamName = params?.radiantTeamName ? String(params.radiantTeamName) : undefined;
         const direTeamName = params?.direTeamName ? String(params.direTeamName) : undefined;
+        // Optional per-command league tag (falls back to DOTA_LEAGUE_ID env in dota-gc).
+        const leagueId = params?.leagueId != null ? Number(params.leagueId) || undefined : undefined;
         cfg.status = "creating";
         await publishLobbyState(db, { status: "creating", lobbyName: name, password, region, gameMode, lastCommand: "create" });
-        const res = await bot.createLobby(name, password, gameMode, region, cmPick, radiantTeamName, direTeamName);
+        const res = await bot.createLobby(name, password, gameMode, region, cmPick, radiantTeamName, direTeamName, leagueId);
         cfg.status = "active";
         await publishLobbyState(db, { status: "active", lobbyName: name, password, region, gameMode, lastCommand: "create", lastError: null });
         return { ok: true, result: res };

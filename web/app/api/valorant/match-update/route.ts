@@ -602,8 +602,14 @@ export async function POST(req: NextRequest) {
         // Route the bot's lobby embed / announcements to this tournament's
         // private Discord channel (created per-tournament) instead of the
         // global queue channel. Falls back to bot env channels if unset.
-        const tournamentChannelId =
-          (await tournamentRef.get()).data()?.discordChannelId || null;
+        const _tournamentDoc = (await tournamentRef.get()).data();
+        const tournamentChannelId = _tournamentDoc?.discordChannelId || null;
+        // Per-tournament Dota league tag. When set, the bot creates the lobby as
+        // a registered-league match (public via Steam Web API / OpenDota), which
+        // unlocks per-player stats without relying on the GC. Null → bot falls
+        // back to its DOTA_LEAGUE_ID env.
+        const dotaLeagueId =
+          _tournamentDoc?.dotaLeagueId != null ? Number(_tournamentDoc.dotaLeagueId) || null : null;
         const now = new Date().toISOString();
         // If a Dota toss has completed on this match, propagate cm_pick so
         // the bot sets it when it creates the practice lobby. 0 = Valve
@@ -647,6 +653,7 @@ export async function POST(req: NextRequest) {
           team2Name: matchData.team2Name || null,
           radiantTeamName: radiantTeamName || null,
           direTeamName: direTeamName || null,
+          leagueId: dotaLeagueId,
         }, { merge: true });
 
         updateData.botQueueId = queueId;
