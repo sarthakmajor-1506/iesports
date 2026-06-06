@@ -10,8 +10,9 @@
  */
 
 const HERO_CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes";
+const PORTRAIT_CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes";
 
-type HeroInfo = { name: string; icon: string };
+type HeroInfo = { name: string; icon: string; portrait: string };
 let heroMap: Record<number, HeroInfo> | null = null;
 let heroMapAt = 0;
 
@@ -24,7 +25,7 @@ async function getHeroMap(): Promise<Record<number, HeroInfo>> {
     const map: Record<number, HeroInfo> = {};
     for (const h of arr) {
       const short = String(h.name || "").replace("npc_dota_hero_", "");
-      map[h.id] = { name: h.localized_name || short, icon: `${HERO_CDN}/${short}.png` };
+      map[h.id] = { name: h.localized_name || short, icon: `${HERO_CDN}/${short}.png`, portrait: `${PORTRAIT_CDN}/${short}_vert.jpg` };
     }
     heroMap = map;
     heroMapAt = Date.now();
@@ -49,6 +50,9 @@ export type LivePlayer = {
   x: number | null; y: number | null;
 };
 
+export type HeroRef = { heroId: number; name: string; icon: string | null; portrait: string | null };
+export type DraftSide = { picks: HeroRef[]; bans: HeroRef[] };
+
 export type LiveMatch = {
   found: boolean;
   dotaMatchId: string;
@@ -59,6 +63,7 @@ export type LiveMatch = {
   roshanRespawnSec?: number;
   radiant?: { score: number; players: LivePlayer[] };
   dire?: { score: number; players: LivePlayer[] };
+  draft?: { radiant: DraftSide; dire: DraftSide };
   fetchedAt: string;
 };
 
@@ -101,6 +106,17 @@ export async function getLiveLeagueMatch(dotaMatchId: string, steamKey: string):
   const names: Record<string, string> = {};
   for (const p of g.players || []) if (p.account_id != null) names[String(p.account_id)] = p.name || "";
   const sb = g.scoreboard || {};
+
+  const heroRef = (id: number): HeroRef => {
+    const h = heroes[id];
+    return { heroId: id, name: h?.name || `Hero ${id}`, icon: h?.icon || null, portrait: h?.portrait || null };
+  };
+  const refs = (arr: any[]): HeroRef[] => (arr || []).map((o) => heroRef(o.hero_id)).filter((r) => r.heroId > 0);
+  const draft = {
+    radiant: { picks: refs(sb.radiant?.picks), bans: refs(sb.radiant?.bans) },
+    dire: { picks: refs(sb.dire?.picks), bans: refs(sb.dire?.bans) },
+  };
+
   return {
     found: true,
     dotaMatchId: String(g.match_id),
@@ -111,6 +127,7 @@ export async function getLiveLeagueMatch(dotaMatchId: string, steamKey: string):
     roshanRespawnSec: Math.round(sb.roshan_respawn_timer || 0),
     radiant: { score: sb.radiant?.score || 0, players: mapPlayers(sb.radiant?.players, names, heroes) },
     dire: { score: sb.dire?.score || 0, players: mapPlayers(sb.dire?.players, names, heroes) },
+    draft,
     fetchedAt,
   };
 }
