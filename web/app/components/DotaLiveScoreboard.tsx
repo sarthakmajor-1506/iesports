@@ -56,12 +56,68 @@ export default function DotaLiveScoreboard({
         </span>
       </div>
 
+      <LiveMinimap
+        radiant={data.radiant?.players || []}
+        dire={data.dire?.players || []}
+        roshanSec={data.roshanRespawnSec || 0}
+      />
+
       <Side label={team1Name ? `${team1Name} · Radiant` : "Radiant"} score={data.radiant?.score || 0} players={data.radiant?.players || []} accent="#4ade80" />
       <div style={{ height: 8 }} />
       <Side label={team2Name ? `${team2Name} · Dire` : "Dire"} score={data.dire?.score || 0} players={data.dire?.players || []} accent="#f87171" />
 
       <div style={{ textAlign: "right", fontSize: "0.58rem", color: "#56544e", marginTop: 6 }}>
         league {data.leagueId} · updates every 60s
+      </div>
+    </div>
+  );
+}
+
+// Project Dota world coords (~ -8000..8000, Radiant bottom-left, Dire top-right)
+// onto a 0..100% minimap. y is inverted for screen space (top = 0).
+const MAP_MIN = -8000, MAP_SPAN = 16000;
+const projX = (x: number) => Math.max(0, Math.min(100, ((x - MAP_MIN) / MAP_SPAN) * 100));
+const projY = (y: number) => Math.max(0, Math.min(100, (1 - (y - MAP_MIN) / MAP_SPAN) * 100));
+
+function LiveMinimap({ radiant, dire, roshanSec }: { radiant: LivePlayer[]; dire: LivePlayer[]; roshanSec: number }) {
+  const dots: { p: LivePlayer; color: string }[] = [
+    ...radiant.filter((p) => p.x != null && p.y != null).map((p) => ({ p, color: "#4ade80" })),
+    ...dire.filter((p) => p.x != null && p.y != null).map((p) => ({ p, color: "#f87171" })),
+  ];
+  return (
+    <div style={{ margin: "2px 0 10px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <span style={{ fontSize: "0.58rem", color: "#56544e", textTransform: "uppercase", letterSpacing: 0.5 }}>Live map</span>
+        {roshanSec > 0 && <span style={{ fontSize: "0.6rem", color: "#fbbf24" }}>🛡 Roshan {Math.floor(roshanSec / 60)}:{String(roshanSec % 60).padStart(2, "0")}</span>}
+      </div>
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 240, aspectRatio: "1 / 1", margin: "0 auto",
+        borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)",
+        // stylized Dota board: Radiant base bottom-left (green), Dire top-right (red), river diagonal
+        background:
+          "linear-gradient(135deg, rgba(74,222,128,0.14) 0%, rgba(74,222,128,0.04) 22%, rgba(20,20,18,1) 45%, rgba(20,20,18,1) 55%, rgba(248,113,113,0.04) 78%, rgba(248,113,113,0.14) 100%)",
+      }}>
+        {/* river diagonal hint */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(45deg, transparent 47%, rgba(56,140,160,0.25) 49.5%, rgba(56,140,160,0.25) 50.5%, transparent 53%)" }} />
+        {/* base markers */}
+        <span style={{ position: "absolute", left: "8%", bottom: "8%", fontSize: 9, color: "#4ade80" }}>◆</span>
+        <span style={{ position: "absolute", right: "8%", top: "8%", fontSize: 9, color: "#f87171" }}>◆</span>
+        {dots.map(({ p, color }, i) => (
+          <div key={p.accountId ?? i} title={`${p.name} · ${p.heroName}`} style={{
+            position: "absolute", left: `${projX(p.x as number)}%`, top: `${projY(p.y as number)}%`,
+            transform: "translate(-50%, -50%)", width: 16, height: 16, borderRadius: "50%",
+            border: `1.5px solid ${color}`, background: "#111", overflow: "hidden", boxShadow: `0 0 4px ${color}`,
+          }}>
+            {p.heroIcon
+              ? <img src={p.heroIcon} alt={p.heroName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <span style={{ display: "block", width: "100%", height: "100%", background: color }} />}
+          </div>
+        ))}
+        {dots.length === 0 && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", color: "#56544e" }}>
+            heroes not on map yet
+          </div>
+        )}
       </div>
     </div>
   );

@@ -44,6 +44,9 @@ export type LivePlayer = {
   lastHits: number; denies: number;
   netWorth: number; level: number;
   gpm: number; xpm: number;
+  // Live world position (Dota coords, roughly -8000..8000). null until the hero
+  // is on the map. Projected to the minimap client-side.
+  x: number | null; y: number | null;
 };
 
 export type LiveMatch = {
@@ -53,6 +56,7 @@ export type LiveMatch = {
   durationSec?: number;
   spectators?: number;
   streamDelaySec?: number;
+  roshanRespawnSec?: number;
   radiant?: { score: number; players: LivePlayer[] };
   dire?: { score: number; players: LivePlayer[] };
   fetchedAt: string;
@@ -71,6 +75,8 @@ function mapPlayers(list: any[], names: Record<string, string>, heroes: Record<n
       lastHits: p.last_hits || 0, denies: p.denies || 0,
       netWorth: p.net_worth || 0, level: p.level || 0,
       gpm: p.gold_per_min || 0, xpm: p.xp_per_min || 0,
+      x: typeof p.position_x === "number" ? p.position_x : null,
+      y: typeof p.position_y === "number" ? p.position_y : null,
     };
   });
 }
@@ -102,6 +108,7 @@ export async function getLiveLeagueMatch(dotaMatchId: string, steamKey: string):
     durationSec: Math.round(sb.duration || 0),
     spectators: g.spectators || 0,
     streamDelaySec: g.stream_delay_s || 0,
+    roshanRespawnSec: Math.round(sb.roshan_respawn_timer || 0),
     radiant: { score: sb.radiant?.score || 0, players: mapPlayers(sb.radiant?.players, names, heroes) },
     dire: { score: sb.dire?.score || 0, players: mapPlayers(sb.dire?.players, names, heroes) },
     fetchedAt,
