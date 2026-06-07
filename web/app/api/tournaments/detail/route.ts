@@ -69,8 +69,9 @@ export async function GET(req: NextRequest) {
     // server-side on load (idempotent, bounded), so details appear automatically.
     if (game === "dota2") {
       try {
-        const { enrichDotaMatches } = await import("@/lib/dotaEnrich");
-        matches = await enrichDotaMatches(adminDb, id, matches);
+        const { reconcileDotaMatches } = await import("@/lib/dotaEnrich");
+        // Auto-settle ended-but-live matches (live-feed gated) + enrich completed ones.
+        matches = await reconcileDotaMatches(adminDb, id, matches);
       } catch { /* never break the response over enrichment */ }
     }
 
