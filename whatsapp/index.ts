@@ -68,6 +68,17 @@ async function setStatus(patch: Record<string, any>) {
 
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: DATA_PATH }),
+  // Pin WhatsApp Web to the earliest build still hosted, closest to the version
+  // whatsapp-web.js 1.34.7 supports — the live "latest" build broke create/add.
+  ...(process.env.WA_WEB_VERSION
+    ? {
+        webVersion: process.env.WA_WEB_VERSION,
+        webVersionCache: {
+          type: "remote",
+          remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${process.env.WA_WEB_VERSION}.html`,
+        },
+      }
+    : {}),
   puppeteer: {
     headless: true,
     // On Railway/containers we point at the system Chromium (see Dockerfile);
@@ -251,7 +262,25 @@ async function handleAddParticipants(data: any): Promise<any> {
   // Throttle adds with per-participant jitter so a burst doesn't get the number flagged.
   const sleep = Array.isArray(data.sleep) ? data.sleep : [800, 1500];
   const res = await chat.addParticipants(ids, { sleep });
-  return res;
+  // Per-player result logging. WhatsApp returns a code per participant:
+  //   200 = added · 404 = not on WhatsApp · 403/inviteV4 = invite sent (privacy)
+  //   409 = already in · 400/other = not addable (most commonly: NOT a community
+  //   member, so they must join the community first). Summarise to the terminal and
+  //   return a structured result so the outbox `settled` shows exactly who landed.
+  const label = (c: number, inv: boolean) =>
+    c === 200 ? "added" : c === 404 ? "not-on-whatsapp" : (c === 403 || inv) ? "invite-sent" :
+    c === 409 ? "already-in" : "failed(not-in-community?)";
+  const perPlayer: Record<string, { code: number; status: string; message?: string }> = {};
+  let added = 0, failed = 0;
+  for (const [id, r] of Object.entries((res || {}) as Record<string, any>)) {
+    const code = Number(r?.code ?? 0);
+    const status = label(code, !!r?.isInviteV4Sent);
+    perPlayer[id] = { code, status, message: r?.message };
+    if (status === "added") added++; else failed++;
+  }
+  console.log(`[WA] add-participants ${groupId}: ${added} added, ${failed} not added`);
+  for (const [id, r] of Object.entries(perPlayer)) console.log(`     ${id}: ${r.status} (code ${r.code})`);
+  return { added, failed, perPlayer };
 }
 
 async function handleRenameGroup(data: any): Promise<string> {
@@ -328,6 +357,17 @@ async function handleSetMessagesAdminsOnly(data: any): Promise<any> {
   return { adminsOnly };
 }
 
+/** Return the group's invite link (https://chat.whatsapp.com/<code>). Uses the
+ *  Mex getInviteCode path, which works (unlike revokeInvite). */
+async function handleGetInvite(data: any): Promise<string> {
+  const groupId = data.target?.id;
+  if (!groupId) throw new Error("get-invite needs target.id");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const code = await chat.getInviteCode();
+  return code ? `https://chat.whatsapp.com/${code}` : "";
+}
+
 /** Promote participants to group admin (they must already be members). Used to
  *  keep iesports staff as admins in every group alongside the bot. */
 async function handlePromoteParticipants(data: any): Promise<any> {
@@ -376,6 +416,7 @@ async function dispatch(data: any): Promise<any> {
     case "reset-group":         return handleResetGroup(data);
     case "set-messages-admins-only": return handleSetMessagesAdminsOnly(data);
     case "promote-participants": return handlePromoteParticipants(data);
+    case "get-invite":          return handleGetInvite(data);
     default: throw new Error(`unknown action: ${action}`);
   }
 }
@@ -438,6 +479,17 @@ client.on("ready", async () => {
     setStatus({ state: "ready", lastError: null });
   }
   ready = true;
+
+  // DEBUG: dump all groups so we can identify/reuse them. Remove after cleanup.
+  try {
+    const chats = await client.getChats();
+    const groups = chats.filter((c: any) => c.isGroup).map((c: any) => ({
+      id: c.id?._serialized || null, name: c.name || null,
+      participants: (c.groupMetadata?.participants || c.participants || []).length,
+    }));
+    await db.doc("whatsappStatus/debugGroups").set({ groups, count: groups.length, updatedAt: new Date().toISOString() });
+    console.log(`[WA] debug: ${groups.length} groups dumped`);
+  } catch (e: any) { console.warn("[WA] group dump failed:", e?.message || e); }
 
   // Live listener for new pending messages + a safety poll every 15s.
   db.collection("whatsappOutbox").where("status", "==", "pending")
