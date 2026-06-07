@@ -15,6 +15,7 @@ dotenv.config();
 import { initFirebase, getDb } from "./services/firebase";
 import { getDotaBot } from "./services/dota-gc";
 import { resolveDotaResults } from "./services/dota-results";
+import { announceResults } from "./services/result-announcer";
 import { startBotLobbyControl } from "./services/bot-lobby";
 import { sendPreMatchWarning, startMatchLobby } from "./services/match-orchestrator";
 import { handleButton } from "./events/button-handler";
@@ -227,6 +228,13 @@ client.once(Events.ClientReady, async (readyClient) => {
   // The bot already holds the GC session, so it resolves bot-hosted
   // practice/custom lobbies (which no public API can serve) with no
   // Steam single-session conflict, then writes results + a report.
+  // Result announcer: posts result + next-game-today to Discord (and WhatsApp when
+  // a tournament group is configured) for any newly-completed Dota match, regardless
+  // of how it settled. Idempotent + anti-backblast (see result-announcer.ts).
+  cron.schedule("* * * * *", () => {
+    announceResults(client).catch((e) => console.error("[Announcer] tick failed:", e?.message || e));
+  });
+
   const jobsRunning = new Set<string>();
   cron.schedule("* * * * *", async () => {
     try {
