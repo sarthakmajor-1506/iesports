@@ -60,8 +60,19 @@ export async function GET(req: NextRequest) {
     const tournament = { id: tDoc.id, ...tournamentRest };
     const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const standings = standingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
     const leaderboard = lbSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Auto-enrich completed Dota matches with full per-player stats + draft from
+    // the public league record (OpenDota). League-tagged matches expose this; the
+    // GC postgame only gave the winner, which is why detail/MVP were blank. Runs
+    // server-side on load (idempotent, bounded), so details appear automatically.
+    if (game === "dota2") {
+      try {
+        const { enrichDotaMatches } = await import("@/lib/dotaEnrich");
+        matches = await enrichDotaMatches(adminDb, id, matches);
+      } catch { /* never break the response over enrichment */ }
+    }
 
     // Rank refresh via ?refreshRank=1 query param (opt-in, NOT run on polled fetches).
     // The polled tournament detail calls must NOT trigger this — it's an N-read scan

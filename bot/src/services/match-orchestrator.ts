@@ -171,6 +171,32 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
     console.log(`[Match] ⚠️  Bot still not GC-ready after 30s — falling to manual mode`);
   }
 
+  // ── Pre-flight recovery: never notify players for a lobby that doesn't exist ──
+  // If the lobby wasn't created (e.g. "Lobby create timed out (90s)" because the
+  // GC session went stale), auto-reconnect the GC and retry ONCE before giving up.
+  // This is the "check that the lobby is actually active, otherwise fix it, THEN
+  // notify" behaviour — players are only invited below when lobbyCreated === true.
+  if (!lobbyCreated) {
+    console.log("[Match] ⚠️ Lobby not created — auto-reconnecting GC and retrying once...");
+    try { bot.disconnect(); await bot.connect(); } catch (e: any) { console.error("[Match] reconnect failed:", e?.message || e); }
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline && !bot.isReady()) { await new Promise(r => setTimeout(r, 2000)); }
+    if (bot.isReady()) {
+      try {
+        console.log("[Match] Retrying createLobby after reconnect...");
+        const retry = await bot.createLobby(lobbyName, password, gameMode, region, cmPick, radiantTeamName, direTeamName, leagueId);
+        gcLobbyId = retry.lobbyId; lobbyCreated = true; lobbyFailureReason = null;
+        console.log("[Match] ✅ Lobby created on retry");
+      } catch (err: any) {
+        const lm = bot.getLobbyMembers();
+        if (lm.length > 0) { gcLobbyId = "active"; lobbyCreated = true; lobbyFailureReason = null; }
+        else { lobbyFailureReason = `createLobby retry failed: ${err?.message || String(err)}`; }
+      }
+    } else {
+      lobbyFailureReason = `${lobbyFailureReason || "lobby create failed"} | GC still not ready after reconnect`;
+    }
+  }
+
   // ── Step 2: Save to Firestore ────────────────────────────────
   const firestoreLobbyId = await saveLobby({
     queueId: queue.id, gcLobbyId, lobbyName, password, gameMode, serverRegion: region,
@@ -510,20 +536,22 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   }
 
   // ── Step 5: DM every player ──────────────────────────────────
-  for (const player of allPlayers) {
-    try {
-      const member = await guild.members.fetch(player.discordId);
-      const modeMsg = lobbyCreated
-        ? `A Dota 2 invite has been sent to your Steam account.\nIf you don't see it, join manually:`
-        : `Please join the lobby manually:`;
-      await member.send(
-        `🎮 **iesports Match Starting!**\n\n` +
-        `${modeMsg}\n` +
-        `Lobby: \`${lobbyName}\`\nPassword: \`${password}\`\n` +
-        `Server: ${region} | Mode: ${gameMode}\n\n` +
-        `Open Dota 2 → Play → Custom Lobbies → Search for lobby name`
-      );
-    } catch { /* DMs closed */ }
+  // Only notify players when the lobby is CONFIRMED created. We never tell players
+  // to "join manually" a lobby the bot failed to create — that's the bug that sent
+  // people searching for a non-existent lobby. On failure the admin is alerted (below).
+  if (lobbyCreated) {
+    for (const player of allPlayers) {
+      try {
+        const member = await guild.members.fetch(player.discordId);
+        await member.send(
+          `🎮 **iesports Match Starting!**\n\n` +
+          `A Dota 2 invite has been sent to your Steam account.\nIf you don't see it, join manually:\n` +
+          `Lobby: \`${lobbyName}\`\nPassword: \`${password}\`\n` +
+          `Server: ${region} | Mode: ${gameMode}\n\n` +
+          `Open Dota 2 → Play → Custom Lobbies → Search for lobby name`
+        );
+      } catch { /* DMs closed */ }
+    }
   }
 
   // ── Step 6: Announce in #queue ───────────────────────────────
@@ -531,14 +559,16 @@ export async function startMatchLobby(client: Client, queue: QueueDoc): Promise<
   if (queueChannelId) {
     try {
       const ch = (await client.channels.fetch(queueChannelId)) as TextChannel;
-      const statusMsg = lobbyCreated
-        ? `✅ Lobby created! Steam invites sent.`
-        : `⚠️ **Auto-lobby failed** — join manually using the details below.\n_Reason:_ ${lobbyFailureReason || "unknown"}\n_How to fix:_ admin can click **Restart Bot** in the panel, then re-fire **Set Lobby & Notify**. Players can open Dota 2 and search the lobby name in Custom Lobbies in the meantime.`;
-      const announceMsg = await ch.send(
-        `🏟️ **Match Started!**\n${statusMsg}\n` +
-        `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
-        `Server: ${region} | Mode: ${gameMode}`
-      );
+      const announceText = lobbyCreated
+        ? `🏟️ **Match Started!**\n✅ Lobby created! Steam invites sent.\n` +
+          `Name: \`${lobbyName}\` | Password: \`${password}\`\n` +
+          `Server: ${region} | Mode: ${gameMode}`
+        // Lobby NOT created even after reconnect+retry: alert the ADMIN, do NOT
+        // send players chasing a lobby that doesn't exist. Players were not DM'd.
+        : `🛑 **Lobby auto-create FAILED** (even after reconnect + retry) — **players were NOT notified.**\n` +
+          `_Reason:_ ${lobbyFailureReason || "unknown"}\n` +
+          `**Admin action:** click **Restart Bot** in the panel, then re-fire **Set Lobby & Notify**. No invitation has gone out.`;
+      const announceMsg = await ch.send(announceText);
       // Track for cleanup-vcs so the announce gets swept at end of match.
       const tid = (queue as any).tournamentId;
       const tMatchId = (queue as any).tournamentMatchId;
