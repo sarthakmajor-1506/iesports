@@ -391,6 +391,29 @@ async function handleRemoveParticipants(data: any): Promise<any> {
   return res;
 }
 
+// Diagnostic: report a group's metadata — whether the bot is admin (needed to add
+// people), the parent community it's linked to, member count, and (optionally)
+// whether a specific phone is already a participant. Used to diagnose failed adds.
+async function handleGroupInfo(data: any): Promise<any> {
+  const groupId = data.target?.id;
+  if (!groupId) throw new Error("group-info needs target.id");
+  const chat: any = await client.getChatById(groupId);
+  if (!chat?.isGroup) throw new Error(`${groupId} is not a group`);
+  const meta = chat.groupMetadata || {};
+  const me = (client as any).info?.wid?._serialized;
+  const parts = (chat.participants || []).map((p: any) => ({ id: p.id?._serialized || String(p.id), isAdmin: !!(p.isAdmin || p.isSuperAdmin) }));
+  const botPart = parts.find((p: any) => p.id === me);
+  const checkId = data.checkPhone ? phoneToChatId(String(data.checkPhone)) : null;
+  return {
+    name: chat.name,
+    memberCount: parts.length,
+    botIsAdmin: !!botPart?.isAdmin,
+    parentGroup: meta.parentGroup?._serialized || (meta as any).parentGroupId || null,
+    isParentGroup: !!(meta as any).isParentGroup,
+    checkPhone: checkId ? { id: checkId, present: parts.some((p: any) => p.id === checkId) } : null,
+  };
+}
+
 /**
  * Dispatch one outbox doc. Returns the settled value (or undefined) on
  * success; throws on error. Legacy docs with no `action` field are treated
@@ -417,6 +440,7 @@ async function dispatch(data: any): Promise<any> {
     case "set-messages-admins-only": return handleSetMessagesAdminsOnly(data);
     case "promote-participants": return handlePromoteParticipants(data);
     case "get-invite":          return handleGetInvite(data);
+    case "group-info":          return handleGroupInfo(data);
     default: throw new Error(`unknown action: ${action}`);
   }
 }
