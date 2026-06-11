@@ -1785,7 +1785,9 @@ function DotaTournamentDetailInner() {
                             {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="dtd-team-box-name">{team.teamName}</div>
+                            <Link href={`/tournament/${id}/team/${team.id}`} className="dtd-team-box-name" style={{ textDecoration: "none", color: "inherit", display: "inline-block" }}>
+                              {team.teamName} <span style={{ fontSize: "0.6rem", color: "#A12B1F", fontWeight: 800 }}>›</span>
+                            </Link>
                             {avgTier > 0 && (
                               <div className="dtd-team-box-meta">
                                 <span style={{ color: "#8A8880" }}>Avg T{avgTier}</span>
