@@ -1780,21 +1780,21 @@ function DotaTournamentDetailInner() {
                       <div key={team.id} className="dtd-team-box" style={{ borderColor: bColors.border }}>
                         <div className="dtd-team-box-accent" style={{ background: `linear-gradient(90deg, ${bColors.gStart} 0%, ${bColors.gEnd} 100%)` }} />
                         <span className="dtd-team-box-num" style={{ color: bColors.text, background: bColors.bg, borderColor: bColors.border }}>#{team.teamIndex}</span>
-                        <div className="dtd-team-box-header">
+                        <Link href={`/tournament/${id}/team/${team.id}`} className="dtd-team-box-header" style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }} title={`View ${team.teamName} analytics`}>
                           <div className="dtd-team-logo" style={{ background: `linear-gradient(135deg, ${bColors.gStart} 0%, ${bColors.gEnd} 100%)` }}>
                             {team.teamLogo ? <img src={team.teamLogo} alt={team.teamName} /> : getTeamInitials(team.teamName)}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <Link href={`/tournament/${id}/team/${team.id}`} className="dtd-team-box-name" style={{ textDecoration: "none", color: "inherit", display: "inline-block" }}>
-                              {team.teamName} <span style={{ fontSize: "0.6rem", color: "#A12B1F", fontWeight: 800 }}>›</span>
-                            </Link>
+                            <div className="dtd-team-box-name">
+                              {team.teamName} <span style={{ fontSize: "0.62rem", color: "#A12B1F", fontWeight: 800 }}>View ›</span>
+                            </div>
                             {avgTier > 0 && (
                               <div className="dtd-team-box-meta">
-                                <span style={{ color: "#8A8880" }}>Avg T{avgTier}</span>
+                                <span style={{ color: "#8A8880" }}>Avg T{avgTier} · tap for analytics</span>
                               </div>
                             )}
                           </div>
-                        </div>
+                        </Link>
                         <div className="dtd-team-box-members">
                           {orderedMembers.map((m: any, i: number) => {
                             const isMeMember = user?.uid === m.uid;
