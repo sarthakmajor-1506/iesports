@@ -739,7 +739,7 @@ function DotaTournamentDetailInner() {
           setStandings(sorted);
         }
         if (data.matches) {
-          const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
+          const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const FAR = Number.MAX_SAFE_INTEGER; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : FAR; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : FAR; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
           setMatches(sorted);
         }
         if (data.leaderboard) {
