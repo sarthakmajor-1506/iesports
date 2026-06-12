@@ -12,6 +12,7 @@ import RolePreferenceModal from "@/app/components/RolePreferenceModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
 import CommentSection from "@/app/components/CommentSection";
 import DotaLiveScoreboard from "@/app/components/DotaLiveScoreboard";
+import { readCache, writeCache } from "@/lib/pageCache";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
@@ -725,29 +726,33 @@ function DotaTournamentDetailInner() {
       .catch(() => {});
   };
 
+  // Apply a /api/tournaments/detail payload to state (shared by the cache-hit
+  // instant render and the live fetch).
+  const applyData = (data: any) => {
+    if (data.tournament) setTournament(data.tournament);
+    if (data.players) setPlayers(data.players);
+    if (data.teams) setTeams(data.teams);
+    if (data.standings) {
+      const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
+      setStandings(sorted);
+    }
+    if (data.matches) {
+      const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const FAR = Number.MAX_SAFE_INTEGER; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : FAR; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : FAR; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
+      setMatches(sorted);
+    }
+    if (data.leaderboard) {
+      const sorted = [...data.leaderboard].sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0));
+      setLeaderboard(sorted);
+    }
+    setTLoading(false);
+  };
+
   const refetchData = (refreshRank = false) => {
     if (!id) return;
     const qs = refreshRank ? `&refreshRank=1` : "";
     fetch(`/api/tournaments/detail?id=${id}&game=dota2${qs}`)
       .then(r => r.json())
-      .then(data => {
-        if (data.tournament) setTournament(data.tournament);
-        if (data.players) setPlayers(data.players);
-        if (data.teams) setTeams(data.teams);
-        if (data.standings) {
-          const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
-          setStandings(sorted);
-        }
-        if (data.matches) {
-          const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const FAR = Number.MAX_SAFE_INTEGER; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : FAR; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : FAR; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
-          setMatches(sorted);
-        }
-        if (data.leaderboard) {
-          const sorted = [...data.leaderboard].sort((a: any, b: any) => (b.totalScore || 0) - (a.totalScore || 0));
-          setLeaderboard(sorted);
-        }
-        setTLoading(false);
-      })
+      .then(data => { writeCache(`tdetail:${id}:dota2`, data); applyData(data); })
       .catch(() => setTLoading(false));
   };
 
@@ -762,6 +767,12 @@ function DotaTournamentDetailInner() {
     // rank — so player rank flipped between mount and the first poll,
     // reshuffling positions every 60s. Stay consistent: never refresh from
     // the page. Admins can re-sync ranks via a script when needed.
+    // Instant render from cache (stale-while-revalidate): if we have this
+    // tournament cached from a previous visit, paint it immediately so the
+    // back-button / re-navigation shows content with no loading screen, then
+    // refresh in the background below.
+    const cached = readCache(`tdetail:${id}:dota2`);
+    if (cached) applyData(cached);
     refetchData(false); fetchRankReports();
     const tick = () => { if (!document.hidden) refetchData(false); };
     const interval = setInterval(tick, 60_000);

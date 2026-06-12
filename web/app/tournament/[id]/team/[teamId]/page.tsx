@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/app/components/Navbar";
+import { readCache, writeCache } from "@/lib/pageCache";
 
 // Dota team-analytics page — mirrors the Valorant team detail page. Shows how a
 // team is playing: record + form, per-player form & signature heroes, the team's
@@ -25,8 +26,13 @@ export default function DotaTeamPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Shares the `tdetail:<id>:dota2` cache with the tournament page, so
+    // navigating tournament <-> team renders instantly (stale-while-revalidate).
+    const key = `tdetail:${params.id}:dota2`;
+    const cached = readCache(key);
+    if (cached) { setData(cached); setLoading(false); }
     fetch(`/api/tournaments/detail?id=${encodeURIComponent(params.id)}&game=dota2`)
-      .then(r => r.json()).then(setData).catch(() => {}).finally(() => setLoading(false));
+      .then(r => r.json()).then(d => { writeCache(key, d); setData(d); }).catch(() => {}).finally(() => setLoading(false));
   }, [params.id, params.teamId]);
 
   const a = useMemo(() => data ? computeAnalytics(data, params.teamId) : null, [data, params.teamId]);

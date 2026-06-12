@@ -14,6 +14,7 @@ import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import WallOfShame from "@/app/components/WallOfShame";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
+import { readCache, writeCache } from "@/lib/pageCache";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -535,34 +536,38 @@ function ValorantTournamentDetailInner() {
       .catch(() => {});
   };
 
+  // Apply a /api/tournaments/detail payload to state (shared by the cache-hit
+  // instant render and the live fetch).
+  const applyData = (data: any) => {
+    if (data.tournament) setTournament(data.tournament);
+    if (data.players) { setPlayers(data.players); if (user) setIsRegistered(data.players.some((p: any) => p.uid === user?.uid)); }
+    if (data.teams) setTeams(data.teams);
+    if (data.standings) {
+      const sorted = [...data.standings].sort((a: any, b: any) => {
+        if (b.points !== a.points) return b.points - a.points;
+        // Tie-break: higher round differential (RW − RL) ranks above.
+        const diffA = (a.roundsWon || 0) - (a.roundsLost || 0);
+        const diffB = (b.roundsWon || 0) - (b.roundsLost || 0);
+        return diffB - diffA;
+      });
+      setStandings(sorted);
+    }
+    if (data.matches) {
+      const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const FAR = Number.MAX_SAFE_INTEGER; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : FAR; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : FAR; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
+      setMatches(sorted);
+    }
+    if (data.leaderboard) {
+      const sorted = [...data.leaderboard].sort((a: any, b: any) => { const kdA = a.kd || 0; const kdB = b.kd || 0; if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA; const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); return acsB - acsA; });
+      setLeaderboard(sorted);
+    }
+    setTLoading(false);
+  };
+
   const refetchData = () => {
     if (!id) return;
     fetch(`/api/tournaments/detail?id=${id}&game=valorant`)
       .then(r => r.json())
-      .then(data => {
-        if (data.tournament) setTournament(data.tournament);
-        if (data.players) { setPlayers(data.players); if (user) setIsRegistered(data.players.some((p: any) => p.uid === user?.uid)); }
-        if (data.teams) setTeams(data.teams);
-        if (data.standings) {
-          const sorted = [...data.standings].sort((a: any, b: any) => {
-            if (b.points !== a.points) return b.points - a.points;
-            // Tie-break: higher round differential (RW − RL) ranks above.
-            const diffA = (a.roundsWon || 0) - (a.roundsLost || 0);
-            const diffB = (b.roundsWon || 0) - (b.roundsLost || 0);
-            return diffB - diffA;
-          });
-          setStandings(sorted);
-        }
-        if (data.matches) {
-          const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
-          setMatches(sorted);
-        }
-        if (data.leaderboard) {
-          const sorted = [...data.leaderboard].sort((a: any, b: any) => { const kdA = a.kd || 0; const kdB = b.kd || 0; if (Math.abs(kdB - kdA) > 0.01) return kdB - kdA; const acsA = (a.totalScore || 0) / Math.max(1, a.totalRoundsPlayed || 1); const acsB = (b.totalScore || 0) / Math.max(1, b.totalRoundsPlayed || 1); return acsB - acsA; });
-          setLeaderboard(sorted);
-        }
-        setTLoading(false);
-      })
+      .then(data => { writeCache(`tdetail:${id}:valorant`, data); applyData(data); })
       .catch(() => setTLoading(false));
   };
 
@@ -570,6 +575,10 @@ function ValorantTournamentDetailInner() {
   // immediately on visibility change so the view is current when the user
   // returns. Replaces the old 30s always-on polling.
   useEffect(() => {
+    // Instant render from cache (stale-while-revalidate) so back-button /
+    // re-navigation paints immediately, then refresh in the background.
+    const cached = readCache(`tdetail:${id}:valorant`);
+    if (cached) applyData(cached);
     refetchData(); fetchRankReports(); fetchWaitlist();
     const tick = () => { if (!document.hidden) refetchData(); };
     const interval = setInterval(tick, 60_000);
