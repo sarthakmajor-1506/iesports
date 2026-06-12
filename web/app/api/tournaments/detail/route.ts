@@ -180,7 +180,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ tournament, players, teams, standings, matches, leaderboard });
+    const res = NextResponse.json({ tournament, players, teams, standings, matches, leaderboard });
+    // Edge/CDN caching for faster first loads + fewer Firestore reads. The detail
+    // response is identical for every viewer (no per-user data), so it's safe to
+    // cache publicly for a short window. Vercel's CDN honours s-maxage; stale-
+    // while-revalidate serves the cached copy instantly while a fresh one is
+    // fetched in the background. The on-demand ?refreshRank=1 variant is never
+    // cached so an explicit rank re-sync always runs live.
+    if (!refreshRank) {
+      res.headers.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
+    } else {
+      res.headers.set("Cache-Control", "no-store");
+    }
+    return res;
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
