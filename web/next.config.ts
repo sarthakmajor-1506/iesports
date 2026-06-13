@@ -17,6 +17,24 @@ const nextConfig: NextConfig = {
     ],
   },
   poweredByHeader: false,
+  async headers() {
+    // Baseline security headers (HSTS is already added by Vercel). No strict CSP
+    // here yet — the app loads many third-party scripts (Firebase, gtag, Razorpay,
+    // Discord/Steam/Valorant CDNs), so a CSP needs a careful allowlist pass to
+    // avoid breaking things; these headers are the safe, high-value subset.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },              // clickjacking
+          { key: "X-Content-Type-Options", value: "nosniff" },          // MIME sniffing
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "X-DNS-Prefetch-Control", value: "on" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

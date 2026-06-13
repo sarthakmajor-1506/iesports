@@ -28,6 +28,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       riotAvatar: d.riotAvatar || null,
       riotRank: d.riotRank || null,
       riotTier: d.riotTier || 0,
+      // TODO(security): stop exposing riotPuuid publicly (Riot policy = no PUUID
+      // de-anonymization). Blocked on moving the globalLeaderboard lookup in
+      // app/player/[uid]/page.tsx server-side so the PUUID never leaves the server.
       riotPuuid: d.riotPuuid || null,
       riotVerified: d.riotVerified || null,
       riotPeakRank: d.riotPeakRank || null,

@@ -1,0 +1,94 @@
+rules_version = '2';
+// iesports Firestore security rules — now version-controlled (review in PRs).
+// Deploy: paste into Firebase Console → Firestore → Rules → Publish (or
+// `firebase deploy --only firestore:rules`). Unlisted collections are DENIED by
+// default (no recursive wildcard), so the message-bus collections
+// (whatsappOutbox, botLobbyCommands, dotaResultJobs, botQueues, comments,
+// rankReports, waitlist, *PlayerSnapshots, …) are server-only via the Admin SDK.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Fields a user must NEVER be able to set on their own doc. These grant
+    // privilege or bypass server-controlled state, so they are written ONLY by
+    // the Admin SDK (server). Without this, a logged-in user could
+    // `updateDoc(users/{me}, {role:'super_admin'})` and take over admin, or
+    // self-set rank / register without paying.
+    function lockedUserFields() {
+      return [
+        'role',                                   // ← admin gate (checkAdmin reads this)
+        'registeredTournaments', 'registeredValorantTournaments',
+        'registeredCS2Tournaments', 'registeredSoloTournaments',
+        'iesportsRating', 'iesportsTier', 'iesportsRank',
+        'dotaMMR', 'dotaRankTier', 'dotaBracket', 'smurfRiskScore',
+        'steamId', 'discordId'                    // identity linkage = server-set
+      ];
+    }
+    function touchesLocked() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(lockedUserFields());
+    }
+
+    match /users/{userId} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Self-update allowed only when it does NOT touch a locked/privileged field.
+      allow update: if request.auth != null && request.auth.uid == userId && !touchesLocked();
+      allow delete: if false;
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /teams/{teamId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /soloPool/{docId} {
+      allow read, write: if false;
+    }
+    match /soloTournaments/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /soloTournaments/{id}/players/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/soloPlayers/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTeams/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/teams/{teamId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/matches/{matchId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/standings/{teamId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/substitutions/{subId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /valorantTournaments/{id}/leaderboard/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /globalLeaderboard/{puuid} {
+      allow read: if request.auth != null;
+      allow write: if false; // server-only writes via Admin SDK
+    }
+  }
+}
