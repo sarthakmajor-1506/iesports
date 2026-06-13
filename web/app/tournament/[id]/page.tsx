@@ -775,7 +775,7 @@ function DotaTournamentDetailInner() {
     if (cached) applyData(cached);
     refetchData(false); fetchRankReports();
     const tick = () => { if (!document.hidden) refetchData(false); };
-    const interval = setInterval(tick, 60_000);
+    const interval = setInterval(tick, 180_000); // 3 min: edge cache serves most polls; cuts Vercel invocations + Firestore reads
     const onVis = () => { if (!document.hidden) refetchData(false); };
     document.addEventListener("visibilitychange", onVis);
     return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };

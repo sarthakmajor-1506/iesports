@@ -42,15 +42,25 @@ function winnerOf(m: any): { w: string; l: string } | null {
 
 async function announceForTournament(client: Client, db: any, cfg: GameCfg, tdoc: any): Promise<void> {
   const t: any = tdoc.data();
-  const matches = (await db.collection(cfg.coll).doc(tdoc.id).collection("matches").get()).docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
   const nowMs = Date.now();
+  const matchesCol = db.collection(cfg.coll).doc(tdoc.id).collection("matches");
 
-  const todo = matches.filter((m: any) =>
+  // Cheap path: read only the most-recently-completed matches (completedAt only
+  // exists on finished games, so this single-field orderBy returns recent
+  // results without scanning the whole collection). Almost every tick has
+  // nothing new to announce, so this avoids reading all matches every minute.
+  const recent = (await matchesCol.orderBy("completedAt", "desc").limit(15).get()).docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+  const todo = recent.filter((m: any) =>
     m.status === "completed" && !m[FIELD] &&
     m.completedAt && (nowMs - Date.parse(m.completedAt)) < WINDOW_MS &&
     (!cfg.requireMatchId || m.dotaMatchId || m.game1?.dotaMatchId) &&
     !!winnerOf(m)
   );
+  if (!todo.length) return; // nothing new — done in 15 reads
+
+  // Only when there IS something to announce do we read all matches, for the
+  // "next game today" line. This is rare (a few times per tournament night).
+  const matches = (await matchesCol.get()).docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
 
   for (const m of todo) {
     try {

@@ -231,7 +231,10 @@ client.once(Events.ClientReady, async (readyClient) => {
   // Result announcer: posts result + next-game-today to Discord (and WhatsApp when
   // a tournament group is configured) for any newly-completed Dota match, regardless
   // of how it settled. Idempotent + anti-backblast (see result-announcer.ts).
-  cron.schedule("* * * * *", () => {
+  // Every 5 min (not every minute): results don't need sub-minute announcement,
+  // and each run now reads only recently-completed matches (see result-announcer),
+  // so this slashes the constant 24/7 Firestore read baseline.
+  cron.schedule("*/5 * * * *", () => {
     announceResults(client).catch((e) => console.error("[Announcer] tick failed:", e?.message || e));
   });
 

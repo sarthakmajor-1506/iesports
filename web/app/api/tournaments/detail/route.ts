@@ -188,7 +188,12 @@ export async function GET(req: NextRequest) {
     // fetched in the background. The on-demand ?refreshRank=1 variant is never
     // cached so an explicit rank re-sync always runs live.
     if (!refreshRank) {
-      res.headers.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
+      // Longer edge cache = far fewer function invocations (Vercel Fluid CPU) and
+      // Firestore reads: the function only re-runs ~once per 90s per tournament,
+      // and stale-while-revalidate serves the cached copy instantly for up to 10
+      // min. Tournament standings/results tolerate this staleness; the live match
+      // scoreboard is a separate, uncached endpoint.
+      res.headers.set("Cache-Control", "public, s-maxage=90, stale-while-revalidate=600");
     } else {
       res.headers.set("Cache-Control", "no-store");
     }
