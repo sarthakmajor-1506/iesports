@@ -19,6 +19,12 @@ import { adminDb } from "@/lib/firebaseAdmin";
 
 const HENRIK_BASE = "https://api.henrikdev.xyz/valorant";
 
+// In-memory result cache keyed by riotId:region. Caps calls to the metered Henrik
+// API: a bot (or impatient user) re-looking-up the same Riot ID is served from
+// cache instead of burning quota. 10-min TTL — rank data barely changes.
+const lookupCache = new Map<string, { at: number; data: any }>();
+const LOOKUP_TTL = 10 * 60 * 1000;
+
 function henrikFetch(path: string): Promise<Response> {
   const apiKey = process.env.HENRIK_API_KEY || "";
   // Accepts auth via Authorization header (raw key, NOT Bearer)
@@ -64,6 +70,21 @@ export async function POST(req: NextRequest) {
 
     const encodedName = encodeURIComponent(gameName);
     const encodedTag = encodeURIComponent(tagLine);
+
+    // ── Cache check: serve a recent identical lookup without touching Henrik ──
+    const cacheKey = `${gameName}#${tagLine}:${region}`.toLowerCase();
+    const cachedHit = lookupCache.get(cacheKey);
+    if (cachedHit && Date.now() - cachedHit.at < LOOKUP_TTL) {
+      const payload = cachedHit.data;
+      // Still enforce the per-user uniqueness check (uid-dependent, not cacheable).
+      if (uid && payload.puuid) {
+        const existing = await adminDb.collection("users").where("riotPuuid", "==", payload.puuid).limit(1).get();
+        if (!existing.empty && existing.docs[0].id !== uid) {
+          return NextResponse.json({ error: "This Riot ID is already linked to another iEsports account. Each Riot ID can only be used once." }, { status: 409 });
+        }
+      }
+      return NextResponse.json(payload);
+    }
 
     // ── 1. Fetch account data ────────────────────────────────────────────
     // Using v1 endpoint: /valorant/v1/account/{name}/{tag}
@@ -142,7 +163,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 3. Return combined player card ───────────────────────────────────
-    return NextResponse.json({
+    const payload = {
       gameName: account.name,
       tagLine: account.tag,
       region: account.region || region,
@@ -151,7 +172,10 @@ export async function POST(req: NextRequest) {
       puuid: account.puuid || "",
       rank,       // e.g. "Diamond 3" or "Unranked"
       tier,       // e.g. 20 (currenttier integer)
-    });
+    };
+    lookupCache.set(cacheKey, { at: Date.now(), data: payload });
+    if (lookupCache.size > 2000) for (const [k, v] of lookupCache) if (Date.now() - v.at > LOOKUP_TTL) lookupCache.delete(k);
+    return NextResponse.json(payload);
   } catch (e: any) {
     console.error("Riot lookup error:", e.message);
     return NextResponse.json(
