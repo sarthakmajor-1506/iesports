@@ -53,9 +53,18 @@ export default function MatchDetail() {
       <><style>{styles}</style><div className="md-page"><Navbar /><div className="md-content"><div className="md-loading">Match not found.</div></div></div></>
     );
   }
-  const bestOf = match.isBracket
-    ? (match.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : (tournament?.bracketBestOf || 2))
-    : (tournament?.matchesPerRound || 2);
+  // Prefer the match's own bestOf (set per-match), then the LB-final / grand-final
+  // overrides, then the bracket/round default. Previously this ignored
+  // lbFinalBestOf so a BO5 lower-bracket final still rendered as BO3.
+  const bestOf = match.bestOf
+    ? match.bestOf
+    : match.isBracket
+      ? (match.bracketType === "grand_final"
+          ? (tournament?.grandFinalBestOf || 3)
+          : (match.id === "lb-final" && tournament?.lbFinalBestOf
+              ? tournament.lbFinalBestOf
+              : (tournament?.bracketBestOf || 2)))
+      : (tournament?.matchesPerRound || 2);
   const games: any[] = [];
   for (let i = 1; i <= bestOf; i++) {
     games.push(match[`game${i}`] || match.games?.[`game${i}`] || null);

@@ -331,7 +331,7 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
             <div style={{ textAlign: "center", padding: "10px 0 0", color: "#555550", fontSize: "0.72rem" }}>Match hasn&apos;t been played yet</div>
           ) : (
             <>
-              <div className="vtd-mc-game-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 3)}, 1fr)`, gap: 12, marginTop: 14 }}>
+              <div className="vtd-mc-game-grid" style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(bestOf, 5)}, 1fr)`, gap: 12, marginTop: 14 }}>
                 {games.map((g, i) => (
                   <Link key={i} href={`/valorant/match/${tournamentId}/${m.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                     <GameDetailCard game={g} gameNum={i + 1} team1Name={m.team1Name} team2Name={m.team2Name} team1Id={m.team1Id} team2Id={m.team2Id} teamMembers={teamMembers} />
@@ -1799,7 +1799,7 @@ function ValorantTournamentDetailInner() {
                                   const idx = globalIdx++;
                                   return (
                                     <div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both` }}>
-                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
+                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bestOf ? m.bestOf : m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
                                     </div>
                                   );
                                 })}
@@ -1815,7 +1815,7 @@ function ValorantTournamentDetailInner() {
                                   const idx = globalIdx++;
                                   return (
                                     <div key={m.id} style={{ animation: `vtd-slideInLeft 0.4s cubic-bezier(0.16,1,0.3,1) ${idx * 0.07}s both`, opacity: 0.78 }}>
-                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
+                                      <MatchCard m={m} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={m.bestOf ? m.bestOf : m.bracketType === "grand_final" ? (tournament?.grandFinalBestOf || 3) : m.id === "lb-final" && tournament?.lbFinalBestOf ? tournament.lbFinalBestOf : (tournament?.bracketBestOf || 2)} />
                                     </div>
                                   );
                                 })}
