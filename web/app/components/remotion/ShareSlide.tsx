@@ -286,12 +286,12 @@ function AnimatedTopBar({
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* iEsports shield logo */}
         <Img
-          src="/ielogo.png"
+          src="/logo6.png"
           style={{
             width: 48,
             height: 48,
-            borderRadius: 10,
             objectFit: "contain",
+            mixBlendMode: "screen",
           }}
         />
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -378,12 +378,12 @@ function AnimatedBottomBar({
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* Logo in bottom bar */}
         <Img
-          src="/ielogo.png"
+          src="/logo6.png"
           style={{
             width: 34,
             height: 34,
-            borderRadius: 8,
             objectFit: "contain",
+            mixBlendMode: "screen",
           }}
         />
         <div style={{ display: "flex", flexDirection: "column" }}>

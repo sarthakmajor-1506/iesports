@@ -11,8 +11,9 @@ export async function GET() {
       adminDb.collection("cs2Tournaments").get(),
     ]);
     const dotaAll = dotaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const isDotaTest = (t: any) => t.isTestTournament || /internal.?test/i.test(t.name || "");
     const dotaFeatured = dotaAll
-      .filter((t: any) => t.status === "upcoming" || t.status === "active" || t.status === "ongoing")
+      .filter((t: any) => !isDotaTest(t) && (t.status === "upcoming" || t.status === "active" || t.status === "ongoing"))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -48,7 +49,7 @@ export async function GET() {
     // ── Completed tournaments for "Recent Results" section ──
     const dotaIsEnded = (t: any) => t.status === "ended" || t.status === "completed" || (t.endDate && now > new Date(t.endDate));
     const dotaCompleted = dotaAll
-      .filter((t: any) => dotaIsEnded(t))
+      .filter((t: any) => !isDotaTest(t) && dotaIsEnded(t))
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     const valCompleted = valAll
       .filter((t: any) => !t.isTestTournament && !isBangalore(t) && valIsEnded(t))

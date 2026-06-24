@@ -1089,7 +1089,7 @@ export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournam
       {!inDraft && (
         <>
           <div style={{ position: "absolute", top: SAFE_TOP + 16, left: 28, zIndex: 50, display: "flex", alignItems: "center", gap: 10, opacity: interpolate(frame, [10, 25], [0, 0.7], clamp) }}>
-            <Img src="/ielogo.png" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
+            <Img src="/logo6.png" style={{ width: 44, height: 44, objectFit: "cover", mixBlendMode: "screen" }} />
             <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.5)", letterSpacing: 3, textTransform: "uppercase" }}>IEsports</div>
           </div>
           <div style={{ position: "absolute", top: SAFE_TOP + 16, right: 28, zIndex: 50, opacity: interpolate(frame, [10, 25], [0, 0.5], clamp) }}>
@@ -1105,7 +1105,7 @@ export const ShuffleRevealComposition: React.FC<ShuffleRevealProps> = ({ tournam
       {inDraft && (
         <div style={{ position: "absolute", left: 0, right: 0, top: HEADER_Y, height: HEADER_H, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 32px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Img src="/ielogo.png" style={{ width: 40, height: 40, borderRadius: 9, objectFit: "cover" }} />
+            <Img src="/logo6.png" style={{ width: 40, height: 40, objectFit: "cover", mixBlendMode: "screen" }} />
             <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 3, textTransform: "uppercase" }}>IEsports</div>
           </div>
           <div style={{ flex: 1, margin: "0 16px", textAlign: "center", fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: 3, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -31,12 +31,6 @@ const HOW_IT_WORKS = [
   { icon: "🏆", title: "Get Rewarded",      desc: "Once a tournament ends you are rewarded based on your score. Prizes paid instantly via UPI.", color: "#22c55e" },
 ];
 
-const HERO_IMAGES = [
-  "/dota2poster3.jpg",
-  "/valorantimg3.jpg",
-  "/dota2poster3.jpg",
-  "/valorant-agents.jpg",
-  ];
 
 const SteamIcon = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 256 259" fill="currentColor" style={{ display: "block" }}>
@@ -57,8 +51,25 @@ export default function Home() {
   const [tournamentLoading,  setTournamentLoading]  = useState(true);
   const [riotModalOpen, setRiotModalOpen] = useState(false);
 
-  // Hero image rotation state
-  const [heroImageIndex, setHeroImageIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const VIDEO_START = 17.18;
+  const VIDEO_END   = 72.0; // 1:12
+
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const onMeta  = () => { vid.currentTime = VIDEO_START; vid.volume = 0.5; vid.play(); };
+    const onTick  = () => { if (vid.currentTime >= VIDEO_END) vid.currentTime = VIDEO_START; };
+    const onEnded = () => { vid.currentTime = VIDEO_START; vid.play(); };
+    vid.addEventListener("loadedmetadata", onMeta);
+    vid.addEventListener("timeupdate", onTick);
+    vid.addEventListener("ended", onEnded);
+    return () => {
+      vid.removeEventListener("loadedmetadata", onMeta);
+      vid.removeEventListener("timeupdate", onTick);
+      vid.removeEventListener("ended", onEnded);
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && user) router.replace("/valorant");
@@ -92,13 +103,6 @@ export default function Home() {
     fetchTournaments();
   }, []);
 
-  // Rotate hero images every 3 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setHeroImageIndex((prev) => (prev + 3) % HERO_IMAGES.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const sections = ["home", "games", "how-it-works", "tournament"];
@@ -153,8 +157,8 @@ export default function Home() {
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         html, body { overflow-x:hidden; width:100%; }
         :root {
-          --accent:#3B82F6; --accent-dark:#2563EB; --accent-light:#60A5FA;
-          --orange:#3B82F6; --orange-dark:#2563EB;
+          --accent:#EF4444; --accent-dark:#DC2626; --accent-light:#FCA5A5;
+          --orange:#EF4444; --orange-dark:#DC2626;
           --text-primary:#F0EEEA; --text-secondary:#8A8880; --text-muted:#555550;
           --border:#2A2A30; --surface2:#121215; --off-white:#0A0A0C;
           --radius:16px; --radius-sm:10px;
@@ -178,23 +182,19 @@ export default function Home() {
 
         /* Hero */
         .ie-hero { position:relative; overflow:hidden; width:100%; min-height:580px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:80px 20px 60px; }
-        .ie-hero-bg-wrap { position:absolute; inset:-8%; width:116%; height:116%; z-index:0; pointer-events:none; transition:opacity 1.2s ease-in-out; }
-        .ie-hero-bg-wrap.active { opacity:1; animation:ie-hero-kb 12s ease-in-out infinite alternate; }
-        .ie-hero-bg-wrap.inactive { opacity:0; animation:none; }
-        .ie-hero-bg-wrap img { object-fit:cover; object-position:center 20%; }
-        @keyframes ie-hero-kb { 0% { transform:scale(1) translate(0,0); } 50% { transform:scale(1.06) translate(-1.5%,-1%); } 100% { transform:scale(1.03) translate(1%,-0.5%); } }
-        .ie-hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; pointer-events:none; display:none; }
-        .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.82) 0%,rgba(0,0,0,.58) 45%,rgba(0,0,0,.9) 100%); }
-        .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 70%); pointer-events:none; z-index:2; animation:ie-glow-breathe 6s ease-in-out infinite; }
+        .ie-hero-vid-wrap { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; overflow:hidden; }
+        .ie-hero-vid-wrap video { position:absolute; top:50%; left:50%; width:177.78vh; height:100vh; min-width:100%; min-height:56.25vw; transform:translate(-50%,-50%); object-fit:cover; filter:brightness(1.6); }
+        .ie-hero-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(to bottom,rgba(0,0,0,.55) 0%,rgba(0,0,0,.3) 45%,rgba(0,0,0,.7) 100%); }
+        .ie-hero-glow { position:absolute; top:-60px; left:50%; transform:translateX(-50%); width:560px; height:560px; background:radial-gradient(circle,rgba(239,68,68,.22) 0%,transparent 70%); pointer-events:none; z-index:2; animation:ie-glow-breathe 6s ease-in-out infinite; }
         @keyframes ie-glow-breathe { 0%,100% { opacity:0.7; transform:translateX(-50%) scale(1); } 50% { opacity:1; transform:translateX(-50%) scale(1.12); } }
-        .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; }
+        .ie-hero-content { position:relative; z-index:3; max-width:700px; width:100%; text-align:center; display:flex; flex-direction:column; align-items:center; }
         .ie-hero-logo { margin-bottom:12px; display:flex; justify-content:center; }
-        .ie-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(59,130,246,.16); border:1px solid rgba(59,130,246,.38); color:var(--accent-light); font-size:.72rem; font-weight:700; padding:5px 14px; border-radius:100px; margin-bottom:12px; letter-spacing:.06em; text-transform:uppercase; }
+        .ie-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(239,68,68,.16); border:1px solid rgba(239,68,68,.38); color:var(--accent-light); font-size:.72rem; font-weight:700; padding:5px 14px; border-radius:100px; margin-bottom:12px; letter-spacing:.06em; text-transform:uppercase; }
         .ie-pulse { width:6px; height:6px; background:var(--accent); border-radius:50%; animation:ie-pulse 1.8s infinite; flex-shrink:0; }
         @keyframes ie-pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
         .ie-hero h1 { font-size:clamp(1.7rem,5.5vw,3.6rem); font-weight:900; line-height:1.02; color:#fff; letter-spacing:-.02em; margin-bottom:10px; }
         .ie-hero h1 .accent { color:var(--accent); }
-        .ie-hero-sub { font-size:clamp(.82rem,1.8vw,.95rem); color:rgba(255,255,255,.64); line-height:1.7; max-width:520px; margin:0 auto 20px; }
+        .ie-hero-sub { font-size:clamp(.9rem,1.8vw,1.05rem); color:#fff; font-weight:700; line-height:1.3; max-width:520px; margin:0 auto 20px; text-align:center; text-shadow:0 1px 8px rgba(0,0,0,.8); }
         .ie-hero-cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
         .ie-btn-primary { background:linear-gradient(135deg,#1b2838,#2a475e); color:#fff; border:1px solid #3d6b8c; border-radius:100px; padding:13px 28px; font-size:1rem; font-weight:700; cursor:pointer; font-family:inherit; min-height:50px; display:inline-flex; align-items:center; gap:10px; box-shadow:0 4px 22px rgba(27,40,56,.5); transition:opacity .2s,transform .1s; }
         .ie-btn-primary:hover { opacity:.88; }
@@ -325,7 +325,7 @@ export default function Home() {
       {/* NAVBAR */}
       <nav className="ie-nav">
         <a className="ie-nav-brand" href="/">
-          <Image src="/ielogo.png" alt="Indian Esports" width={38} height={38} priority style={{ borderRadius: 7 }} />
+          <Image src="/logo6.png" alt="Indian Esports" width={38} height={38} priority style={{ objectFit: "contain" }} />
           <span className="ie-nav-name">Indian <span>Esports</span></span>
         </a>
         <div className="ie-nav-links">
@@ -347,38 +347,29 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* HERO — rotating background images (video kept hidden for future use) */}
+      {/* HERO — background video */}
       <section className="ie-hero" id="home">
-        {HERO_IMAGES.map((src, i) => (
-          <div
-            key={src + i}
-            className={`ie-hero-bg-wrap ${i === heroImageIndex ? "active" : "inactive"}`}
-            aria-hidden="true"
+        <div className="ie-hero-vid-wrap" aria-hidden="true">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            preload="auto"
           >
-            <Image
-              src={src}
-              alt=""
-              fill
-              sizes="100vw"
-              priority={i === 0}
-              loading={i === 0 ? "eager" : "lazy"}
-              quality={75}
-            />
-          </div>
-        ))}
-        {/* Video element kept for future use, hidden via CSS display:none */}
-        {/* <video className="ie-hero-video" src="/Dota2teaser.mp4" autoPlay muted loop playsInline preload="auto" poster="/dota2-poster.jpg" aria-hidden="true" /> */}
+            <source src="/hero-bg.mp4" type="video/mp4" />
+          </video>
+        </div>
         <div className="ie-hero-overlay" />
         <div className="ie-hero-glow" />
         <div className="ie-hero-content">
           <div className="ie-hero-logo">
-            <Image src="/ielogo.png" alt="Indian Esports" width={144} height={144} priority style={{ borderRadius: 22, filter: "drop-shadow(0 8px 32px rgba(240,90,40,.6))" }} />
+            <Image src="/logo6.png" alt="Indian Esports" width={144} height={144} priority style={{ objectFit: "contain" }} />
           </div>
           <div className="ie-hero-badge"><span className="ie-pulse" /> Now Live – Valorant Ascension Tournament</div>
-          <h1>Compete on<br /><span className="accent">Indian Esports</span></h1>
-          <p className="ie-hero-sub">Play what you love. Compete in your rank bracket in totally free community events. Win with skills.</p>
+          <h1>Compete.<br /><span className="accent">Win Real Money.</span></h1>
+          <p className="ie-hero-sub">Free entry tournaments for Indian gamers. Win cash prizes via UPI instantly.</p>
           <div className="ie-hero-cta">
-            <button className="ie-btn-primary" onClick={() => router.push("/valorant")} style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)", borderColor: "rgba(59,130,246,0.5)", boxShadow: "0 4px 22px rgba(59,130,246,.4)" }}>
+            <button className="ie-btn-primary" onClick={() => router.push("/valorant")} style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               Browse Tournaments
             </button>
@@ -486,125 +477,162 @@ export default function Home() {
             <div style={{ textAlign:"center", padding:"60px 0", color:"var(--text-muted)", fontSize:".95rem" }}>No upcoming tournaments right now. Check back soon!</div>
           ) : (
             <div className="ie-tourn-grid">
-              {/* Dota 2 Tournament */}
-              {featuredTournament && (() => {
-                const dotaBadge = getRegBadge(featuredTournament);
-                return (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${featuredTournament.id}`)} style={{ cursor: "pointer" }}>
-                  <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge">{dotaBadge.isOpen && <span className="ie-pulse" style={{ background: "#A12B1F" }} />} {dotaBadge.label}</div>
-                    <div className="ie-tourn-title">{featuredTournament.name}</div>
-                    <div className="ie-tourn-desc">{featuredTournament.desc}</div>
-                    <div className="ie-tourn-meta">
-                      {[
-                        { icon: "🎮", label: featuredTournament.game },
-                        { icon: "🏆", label: featuredTournament.prizePool },
-                        { icon: "🎟️", label: featuredTournament.entry },
-                        { icon: "📅", label: featuredTournament.startDate?.includes("T") ? new Date(featuredTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredTournament.startDate },
-                      ].map(c => (
-                        <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="ie-tourn-right">
-                    <div className="ie-slots-num" style={{ color: "#A12B1F" }}>{slotsLeft}</div>
-                    <div className="ie-slots-label">slots remaining</div>
-                    <div className="ie-slots-bar">
-                      <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "#A12B1F" }} />
-                    </div>
-                    <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament.id}`); }} style={{ background: "linear-gradient(135deg, #A12B1F, #7A1F15)", borderColor: "rgba(161,43,31,0.5)", boxShadow: "0 4px 22px rgba(161,43,31,.4)" }}>
-                      View Tournament →
-                    </button>
-                  </div>
-                </div>
-                );
-              })()}
-
-              {/* Valorant Tournament */}
-              {featuredValTournament && (() => {
-                const valBadge = getRegBadge(featuredValTournament);
-                const valEnded = valBadge.ended;
-                return (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament.id}`)} style={{ cursor: "pointer", ...(valEnded ? { borderColor: "rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.04)" } : {}) }}>
-                  <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge val" style={valEnded ? { background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" } : {}}>
-                      {valBadge.isOpen && <span className="ie-pulse" style={{ background: "#3CCBFF" }} />}
-                      {valEnded && <span style={{ fontSize: "0.72rem" }}>👑</span>}
-                      {valBadge.label}
-                    </div>
-                    <div className="ie-tourn-title">{featuredValTournament.name}</div>
-                    {valEnded && featuredValTournament.championTeamName && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
-                        <span style={{ fontSize: "1.1rem" }}>👑</span>
-                        <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredValTournament.championTeamName}</span>
+              {(
+                [
+                  featuredTournament    && { type: "dota"     as const },
+                  featuredValTournament && { type: "valorant" as const },
+                  featuredCs2Tournament && { type: "cs2"      as const },
+                ]
+                  .filter(Boolean)
+                  .sort((a, b) => {
+                    const priority = (type: "dota" | "valorant" | "cs2") => {
+                      const badge = type === "dota" ? getRegBadge(featuredTournament!) : type === "valorant" ? getRegBadge(featuredValTournament!) : getRegBadge(featuredCs2Tournament!);
+                      if (badge.isOpen) return 0;
+                      if (!badge.ended) return 1;
+                      return 2;
+                    };
+                    return priority(a!.type) - priority(b!.type);
+                  }) as { type: "dota" | "valorant" | "cs2" }[]
+              ).map(({ type }) => {
+                if (type === "dota") {
+                  const dotaBadge = getRegBadge(featuredTournament!);
+                  return (
+                  <div key="dota" className="ie-tourn-wrap" onClick={() => router.push(`/tournament/${featuredTournament!.id}`)} style={{ cursor: "pointer" }}>
+                    <div className="ie-tourn-left">
+                      <div className="ie-tourn-badge" style={dotaBadge.isOpen ? {} : { background: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.3)", color: "#ef4444" }}>
+                        {dotaBadge.isOpen && <span className="ie-pulse" style={{ background: "#A12B1F" }} />}
+                        {dotaBadge.label}
                       </div>
-                    )}
-                    {!valEnded && <div className="ie-tourn-desc">{featuredValTournament.desc}</div>}
-                    {!valEnded && (
-                    <div className="ie-tourn-meta">
-                      {[
-                        { icon: "🎮", label: featuredValTournament.game || "Valorant" },
-                        { icon: "🏆", label: featuredValTournament.prizePool || "TBD" },
-                        { icon: "🎟️", label: featuredValTournament.entryFee && featuredValTournament.entryFee > 0 ? `₹${featuredValTournament.entryFee}` : featuredValTournament.entry || "Free" },
-                        { icon: "📅", label: featuredValTournament.startDate?.includes("T") ? new Date(featuredValTournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredValTournament.startDate },
-                      ].map(c => (
-                        <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
-                      ))}
+                      <div className="ie-tourn-title">{featuredTournament!.name}</div>
+                      <div className="ie-tourn-desc">{featuredTournament!.desc}</div>
+                      <div className="ie-tourn-meta">
+                        {[
+                          { icon: "🎮", label: featuredTournament!.game },
+                          { icon: "🏆", label: featuredTournament!.prizePool },
+                          { icon: "🎟️", label: featuredTournament!.entry },
+                          { icon: "📅", label: featuredTournament!.startDate?.includes("T") ? new Date(featuredTournament!.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredTournament!.startDate },
+                        ].map(c => (
+                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                        ))}
+                      </div>
                     </div>
-                    )}
+                    <div className="ie-tourn-right">
+                      {slotsLeft !== null && slotsLeft > 0 ? (
+                        <>
+                          <div className="ie-slots-num" style={{ color: "#A12B1F" }}>{slotsLeft}</div>
+                          <div className="ie-slots-label">slots remaining</div>
+                          <div className="ie-slots-bar">
+                            <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "#A12B1F" }} />
+                          </div>
+                          <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament!.id}`); }} style={{ background: "linear-gradient(135deg, #A12B1F, #7A1F15)", borderColor: "rgba(161,43,31,0.5)", boxShadow: "0 4px 22px rgba(161,43,31,.4)" }}>
+                            View Tournament →
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ef4444" }}>Tournament Ongoing</div>
+                          <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament!.id}`); }} style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
+                            View Tournament →
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="ie-tourn-right">
-                    {valEnded ? (
-                      <>
-                        <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Tournament Completed</div>
-                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3CCBFF, #30B5E6)", borderColor: "rgba(60,203,255,0.5)", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
-                          View Results →
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="ie-slots-num" style={{ color: "#3CCBFF" }}>{valSlotsLeft}</div>
-                        <div className="ie-slots-label">slots remaining</div>
-                        <div className="ie-slots-bar">
-                          <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#3CCBFF" }} />
+                  );
+                }
+                if (type === "valorant") {
+                  const valBadge = getRegBadge(featuredValTournament!);
+                  const valEnded = valBadge.ended;
+                  return (
+                  <div key="valorant" className="ie-tourn-wrap" onClick={() => router.push(`/valorant/tournament/${featuredValTournament!.id}`)} style={{ cursor: "pointer", ...(!valBadge.isOpen ? { borderColor: "rgba(239,68,68,0.25)", background: "rgba(239,68,68,0.03)" } : {}) }}>
+                    <div className="ie-tourn-left">
+                      <div className="ie-tourn-badge val" style={!valBadge.isOpen ? { background: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.3)", color: "#ef4444" } : {}}>
+                        {valBadge.isOpen && <span className="ie-pulse" style={{ background: "#3CCBFF" }} />}
+                        {valEnded && <span style={{ fontSize: "0.72rem" }}>👑</span>}
+                        {valBadge.label}
+                      </div>
+                      <div className="ie-tourn-title">{featuredValTournament!.name}</div>
+                      {valEnded && featuredValTournament!.championTeamName && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
+                          <span style={{ fontSize: "1.1rem" }}>👑</span>
+                          <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredValTournament!.championTeamName}</span>
                         </div>
-                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3CCBFF, #30B5E6)", borderColor: "rgba(60,203,255,0.5)", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
-                          View Tournament →
-                        </button>
-                      </>
-                    )}
+                      )}
+                      {!valEnded && <div className="ie-tourn-desc">{featuredValTournament!.desc}</div>}
+                      {!valEnded && (
+                      <div className="ie-tourn-meta">
+                        {[
+                          { icon: "🎮", label: featuredValTournament!.game || "Valorant" },
+                          { icon: "🏆", label: featuredValTournament!.prizePool || "TBD" },
+                          { icon: "🎟️", label: featuredValTournament!.entryFee && featuredValTournament!.entryFee > 0 ? `₹${featuredValTournament!.entryFee}` : featuredValTournament!.entry || "Free" },
+                          { icon: "📅", label: featuredValTournament!.startDate?.includes("T") ? new Date(featuredValTournament!.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredValTournament!.startDate },
+                        ].map(c => (
+                          <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
+                        ))}
+                      </div>
+                      )}
+                    </div>
+                    <div className="ie-tourn-right">
+                      {valEnded ? (
+                        <>
+                          <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ef4444" }}>Tournament Completed</div>
+                          <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament!.id}`); }} style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
+                            View Tournament →
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {valSlotsLeft !== null && valSlotsLeft > 0 ? (
+                            <>
+                              <div className="ie-slots-num" style={{ color: "#3CCBFF" }}>{valSlotsLeft}</div>
+                              <div className="ie-slots-label">slots remaining</div>
+                              <div className="ie-slots-bar">
+                                <div className="ie-slots-fill" style={{ width:`${valSlotPct}%`, background: valSlotPct > 80 ? "#ef4444" : valSlotPct > 50 ? "#f59e0b" : "#3CCBFF" }} />
+                              </div>
+                              <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament!.id}`); }} style={{ background: "linear-gradient(135deg, #3CCBFF, #30B5E6)", borderColor: "rgba(60,203,255,0.5)", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
+                                View Tournament →
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ef4444" }}>Tournament Ongoing</div>
+                              <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament!.id}`); }} style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
+                                View Tournament →
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-                );
-              })()}
-
-              {/* CS2 Tournament */}
-              {featuredCs2Tournament && (() => {
-                const cs2Badge = getRegBadge(featuredCs2Tournament);
+                  );
+                }
+                // CS2
+                const cs2Badge = getRegBadge(featuredCs2Tournament!);
                 const cs2Ended = cs2Badge.ended;
                 return (
-                <div className="ie-tourn-wrap" onClick={() => router.push(`/cs2/tournament/${featuredCs2Tournament.id}`)} style={{ cursor: "pointer", ...(cs2Ended ? { borderColor: "rgba(255,215,0,0.25)", background: "rgba(255,215,0,0.04)" } : {}) }}>
+                <div key="cs2" className="ie-tourn-wrap" onClick={() => router.push(`/cs2/tournament/${featuredCs2Tournament!.id}`)} style={{ cursor: "pointer", ...(!cs2Badge.isOpen ? { borderColor: "rgba(239,68,68,0.25)", background: "rgba(239,68,68,0.03)" } : {}) }}>
                   <div className="ie-tourn-left">
-                    <div className="ie-tourn-badge" style={cs2Ended ? { background: "rgba(255,215,0,0.12)", borderColor: "rgba(255,215,0,0.3)", color: "#ffd700" } : { background: "rgba(240,165,0,0.12)", borderColor: "rgba(240,165,0,0.3)", color: "#f0a500" }}>
+                    <div className="ie-tourn-badge" style={cs2Badge.isOpen ? { background: "rgba(240,165,0,0.12)", borderColor: "rgba(240,165,0,0.3)", color: "#f0a500" } : { background: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.3)", color: "#ef4444" }}>
                       {cs2Badge.isOpen && <span className="ie-pulse" style={{ background: "#f0a500" }} />}
                       {cs2Ended && <span style={{ fontSize: "0.72rem" }}>👑</span>}
                       {cs2Badge.label}
                     </div>
-                    <div className="ie-tourn-title">{featuredCs2Tournament.name}</div>
-                    {cs2Ended && featuredCs2Tournament.championTeamName && (
+                    <div className="ie-tourn-title">{featuredCs2Tournament!.name}</div>
+                    {cs2Ended && featuredCs2Tournament!.championTeamName && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 14px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 100, width: "fit-content" }}>
                         <span style={{ fontSize: "1.1rem" }}>👑</span>
-                        <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredCs2Tournament.championTeamName}</span>
+                        <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#ffd700" }}>{featuredCs2Tournament!.championTeamName}</span>
                       </div>
                     )}
-                    {!cs2Ended && <div className="ie-tourn-desc">{featuredCs2Tournament.desc}</div>}
+                    {!cs2Ended && <div className="ie-tourn-desc">{featuredCs2Tournament!.desc}</div>}
                     {!cs2Ended && (
                     <div className="ie-tourn-meta">
                       {[
-                        { icon: "🎮", label: featuredCs2Tournament.game || "CS2" },
-                        { icon: "🏆", label: featuredCs2Tournament.prizePool || "TBD" },
-                        { icon: "🎟️", label: featuredCs2Tournament.entryFee && featuredCs2Tournament.entryFee > 0 ? `₹${featuredCs2Tournament.entryFee}` : featuredCs2Tournament.entry || "Free" },
-                        { icon: "📅", label: featuredCs2Tournament.startDate?.includes("T") ? new Date(featuredCs2Tournament.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredCs2Tournament.startDate },
+                        { icon: "🎮", label: featuredCs2Tournament!.game || "CS2" },
+                        { icon: "🏆", label: featuredCs2Tournament!.prizePool || "TBD" },
+                        { icon: "🎟️", label: featuredCs2Tournament!.entryFee && featuredCs2Tournament!.entryFee > 0 ? `₹${featuredCs2Tournament!.entryFee}` : featuredCs2Tournament!.entry || "Free" },
+                        { icon: "📅", label: featuredCs2Tournament!.startDate?.includes("T") ? new Date(featuredCs2Tournament!.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : featuredCs2Tournament!.startDate },
                       ].map(c => (
                         <div className="ie-tourn-chip" key={c.label}><span>{c.icon}</span>{c.label}</div>
                       ))}
@@ -614,36 +642,47 @@ export default function Home() {
                   <div className="ie-tourn-right">
                     {cs2Ended ? (
                       <>
-                        <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Tournament Completed</div>
-                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament.id}`); }} style={{ background: "linear-gradient(135deg, #f0a500, #d99400)", borderColor: "rgba(240,165,0,0.5)", boxShadow: "0 4px 22px rgba(240,165,0,.4)" }}>
-                          View Results →
+                        <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ef4444" }}>Tournament Completed</div>
+                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament!.id}`); }} style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
+                          View Tournament →
                         </button>
                       </>
                     ) : (
                       <>
-                        <div className="ie-slots-num" style={{ color: "#f0a500" }}>{cs2SlotsLeft}</div>
-                        <div className="ie-slots-label">slots remaining</div>
-                        <div className="ie-slots-bar">
-                          <div className="ie-slots-fill" style={{ width:`${cs2SlotPct}%`, background: cs2SlotPct > 80 ? "#ef4444" : cs2SlotPct > 50 ? "#f59e0b" : "#f0a500" }} />
-                        </div>
-                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament.id}`); }} style={{ background: "linear-gradient(135deg, #f0a500, #d99400)", borderColor: "rgba(240,165,0,0.5)", boxShadow: "0 4px 22px rgba(240,165,0,.4)" }}>
-                          View Tournament →
-                        </button>
+                        {cs2SlotsLeft !== null && cs2SlotsLeft > 0 ? (
+                          <>
+                            <div className="ie-slots-num" style={{ color: "#f0a500" }}>{cs2SlotsLeft}</div>
+                            <div className="ie-slots-label">slots remaining</div>
+                            <div className="ie-slots-bar">
+                              <div className="ie-slots-fill" style={{ width:`${cs2SlotPct}%`, background: cs2SlotPct > 80 ? "#ef4444" : cs2SlotPct > 50 ? "#f59e0b" : "#f0a500" }} />
+                            </div>
+                            <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament!.id}`); }} style={{ background: "linear-gradient(135deg, #f0a500, #d99400)", borderColor: "rgba(240,165,0,0.5)", boxShadow: "0 4px 22px rgba(240,165,0,.4)" }}>
+                              View Tournament →
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ef4444" }}>Tournament Ongoing</div>
+                            <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament!.id}`); }} style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 4px 22px rgba(239,68,68,.4)" }}>
+                              View Tournament →
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
                 </div>
                 );
-              })()}
+              })}
             </div>
           )}
           <div style={{ textAlign: "center", marginTop: 36 }}>
             <button onClick={() => router.push("/valorant")} style={{
               display: "inline-flex", alignItems: "center", gap: 10,
-              background: "linear-gradient(135deg, #3B82F6, #2563EB)", color: "#fff",
+              background: "linear-gradient(135deg, #EF4444, #DC2626)", color: "#fff",
               border: "none", borderRadius: 100, padding: "16px 40px",
               fontSize: "1.05rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
-              boxShadow: "0 4px 24px rgba(59,130,246,0.35)", transition: "opacity 0.2s, transform 0.1s",
+              boxShadow: "0 4px 24px rgba(239,68,68,0.35)", transition: "opacity 0.2s, transform 0.1s",
             }}
               onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; }}
               onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
@@ -738,7 +777,7 @@ export default function Home() {
       <footer className="ie-footer">
         <div className="ie-container">
           <div className="ie-footer-brand">
-            <Image src="/ielogo.png" alt="Indian Esports" width={30} height={30} style={{ borderRadius: 6 }} />
+            <Image src="/logo6.png" alt="Indian Esports" width={30} height={30} style={{ objectFit: "contain" }} />
             <span className="ie-footer-name">Indian Esports</span>
           </div>
           <div className="ie-footer-links">
