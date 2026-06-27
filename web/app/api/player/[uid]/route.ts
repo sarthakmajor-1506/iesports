@@ -19,6 +19,71 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       .get();
     const rankHistory = rhSnap.docs.map(doc => doc.data());
 
+    // ── Global leaderboard stats (server-side; client SDK is blocked for
+    // unauthenticated visitors, which is why public profiles looked empty). ──
+    let globalStats: any = null;
+    if (d.riotPuuid) {
+      const glDoc = await adminDb.collection("globalLeaderboard").doc(d.riotPuuid).get();
+      if (glDoc.exists) globalStats = glDoc.data();
+    }
+
+    // ── Valorant match history (server-side). Ported from the page's old
+    // client-SDK loop so the public profile shows match history without auth. ──
+    const matchHistory: any[] = [];
+    const regVal: string[] = d.registeredValorantTournaments || [];
+    if (regVal.length > 0) {
+      const tournamentIds = regVal.slice(0, 10);
+      const results = await Promise.all(tournamentIds.map(async (tId) => {
+        try {
+          const [tDoc, matchesSnap] = await Promise.all([
+            adminDb.collection("valorantTournaments").doc(tId).get(),
+            adminDb.collection("valorantTournaments").doc(tId).collection("matches").orderBy("matchDay").get(),
+          ]);
+          return { tId, tName: tDoc.exists ? (tDoc.data() as any).name : tId, matches: matchesSnap.docs };
+        } catch { return null; }
+      }));
+      for (const result of results) {
+        if (!result) continue;
+        const { tId, tName, matches } = result;
+        for (const mDoc of matches) {
+          const m: any = mDoc.data();
+          if (m.status !== "completed" && m.status !== "live") continue;
+          const games: any[] = [];
+          let playerInMatch = false;
+          for (let gNum = 1; gNum <= 5; gNum++) {
+            const g = m[`game${gNum}`] || m.games?.[`game${gNum}`];
+            if (!g || !g.playerStats) continue;
+            const ps = g.playerStats.find((p: any) =>
+              (d.riotPuuid && p.puuid === d.riotPuuid) ||
+              (p.name?.toLowerCase() === d.riotGameName?.toLowerCase())
+            );
+            if (ps) {
+              playerInMatch = true;
+              const roundsInGame = g.roundsPlayed || (g.redRoundsWon + g.blueRoundsWon) || 1;
+              games.push({
+                gameNum: gNum, mapName: g.mapName || "Unknown", winner: g.winner || "",
+                team1Rounds: g.team1RoundsWon ?? 0, team2Rounds: g.team2RoundsWon ?? 0,
+                playerTeam: ps.tournamentTeam || ps.teamId || "",
+                kills: ps.kills || 0, deaths: ps.deaths || 0, assists: ps.assists || 0,
+                agent: ps.agent || "Unknown", score: ps.score || 0,
+                acs: roundsInGame > 0 ? Math.round(ps.score / roundsInGame) : 0,
+              });
+            }
+          }
+          if (playerInMatch) {
+            matchHistory.push({
+              tournamentId: tId, tournamentName: tName, matchDocId: mDoc.id,
+              matchDay: m.matchDay, matchIndex: m.matchIndex,
+              team1Name: m.team1Name, team2Name: m.team2Name,
+              team1Score: m.team1Score, team2Score: m.team2Score,
+              games, completedAt: m.completedAt,
+            });
+          }
+        }
+      }
+      matchHistory.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
+    }
+
     return NextResponse.json({
       uid,
       fullName: d.fullName || null,
@@ -28,10 +93,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       riotAvatar: d.riotAvatar || null,
       riotRank: d.riotRank || null,
       riotTier: d.riotTier || 0,
-      // TODO(security): stop exposing riotPuuid publicly (Riot policy = no PUUID
-      // de-anonymization). Blocked on moving the globalLeaderboard lookup in
-      // app/player/[uid]/page.tsx server-side so the PUUID never leaves the server.
-      riotPuuid: d.riotPuuid || null,
+      // riotPuuid intentionally NOT exposed (Riot policy forbids PUUID
+      // de-anonymization). The globalLeaderboard lookup + match attribution that
+      // needed it now run server-side in this route, so the client never sees it.
       riotVerified: d.riotVerified || null,
       riotPeakRank: d.riotPeakRank || null,
       riotPeakTier: d.riotPeakTier || 0,
@@ -59,6 +123,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ uid
       honorTournamentId: d.honorTournamentId || null,
       honorTournamentName: d.honorTournamentName || null,
       rankHistory,
+      globalStats,
+      matchHistory,
     });
   } catch (e) {
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });

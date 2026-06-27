@@ -6,7 +6,7 @@ import Navbar, { triggerPhoneModal } from "@/app/components/Navbar";
 import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import { useAuth } from "@/app/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import { triggerDiscordPrompt, hasDiscordAccount } from "@/app/components/DiscordAccountsPrompt";
@@ -195,71 +195,11 @@ export default function PlayerProfile() {
           }
         }
 
-        if (d.riotPuuid) {
-          const glDoc = await getDoc(doc(db, "globalLeaderboard", d.riotPuuid));
-          if (glDoc.exists()) setGlobalStats(glDoc.data() as GlobalStats);
-        }
-
-        if (d.registeredValorantTournaments?.length > 0) {
-          const history: MatchHistoryItem[] = [];
-          // Fetch all tournaments in parallel instead of sequential loop
-          const tournamentIds = d.registeredValorantTournaments.slice(0, 10);
-          const tournamentResults = await Promise.all(tournamentIds.map(async (tId: string) => {
-            try {
-              const [tDoc, matchesSnap] = await Promise.all([
-                getDoc(doc(db, "valorantTournaments", tId)),
-                getDocs(query(collection(db, "valorantTournaments", tId, "matches"), orderBy("matchDay"))),
-              ]);
-              return { tId, tName: tDoc.exists() ? tDoc.data().name : tId, matches: matchesSnap };
-            } catch { return null; }
-          }));
-          for (const result of tournamentResults) {
-            if (!result) continue;
-            const { tId, tName, matches: matchesSnap } = result;
-              for (const mDoc of matchesSnap.docs) {
-                const m = mDoc.data();
-                if (m.status !== "completed" && m.status !== "live") continue;
-                const games: MatchHistoryItem["games"] = [];
-                let playerInMatch = false;
-                for (let gNum = 1; gNum <= 5; gNum++) {
-                  const gKey = `game${gNum}`;
-                  const g = m[gKey] || m.games?.[gKey];
-                  if (!g || !g.playerStats) continue;
-                  const ps = g.playerStats.find((p: any) => {
-                    if (d.riotPuuid && p.puuid === d.riotPuuid) return true;
-                    if (p.name?.toLowerCase() === d.riotGameName?.toLowerCase()) return true;
-                    return false;
-                  });
-                  if (ps) {
-                    playerInMatch = true;
-                    const roundsInGame = g.roundsPlayed || (g.redRoundsWon + g.blueRoundsWon) || 1;
-                    games.push({
-                      gameNum: gNum,
-                      mapName: g.mapName || "Unknown",
-                      winner: g.winner || "",
-                      team1Rounds: g.team1RoundsWon ?? 0,
-                      team2Rounds: g.team2RoundsWon ?? 0,
-                      playerTeam: ps.tournamentTeam || ps.teamId || "",
-                      kills: ps.kills || 0, deaths: ps.deaths || 0, assists: ps.assists || 0,
-                      agent: ps.agent || "Unknown", score: ps.score || 0,
-                      acs: roundsInGame > 0 ? Math.round(ps.score / roundsInGame) : 0,
-                    });
-                  }
-                }
-                if (playerInMatch) {
-                  history.push({
-                    tournamentId: tId, tournamentName: tName, matchDocId: mDoc.id,
-                    matchDay: m.matchDay, matchIndex: m.matchIndex,
-                    team1Name: m.team1Name, team2Name: m.team2Name,
-                    team1Score: m.team1Score, team2Score: m.team2Score,
-                    games, completedAt: m.completedAt,
-                  });
-                }
-              }
-          }
-          history.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
-          setMatchHistory(history);
-        }
+        // Global leaderboard stats + Valorant match history now come from the
+        // API (Admin SDK), so public/unauthenticated visitors see them too —
+        // the old client-SDK reads were blocked by Firestore rules for guests.
+        if (d.globalStats) setGlobalStats(d.globalStats as GlobalStats);
+        if (Array.isArray(d.matchHistory)) setMatchHistory(d.matchHistory as MatchHistoryItem[]);
 
         // Rank history comes from API (admin SDK — bypasses security rules)
         if (d.rankHistory?.length > 0) {
@@ -339,23 +279,8 @@ export default function PlayerProfile() {
     <div className="pp-page"><Navbar /><div className="pp-content"><div className="pp-loading">Loading player profile...</div></div></div></>
   );
 
-  if (!user) return (
-    <><style>{baseStyles}</style>
-    <div style={{ minHeight: "100vh", background: "#0A0F2A", fontFamily: "var(--font-geist-sans),system-ui,sans-serif", display: "flex", flexDirection: "column" }}>
-      <Navbar />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", textAlign: "center" }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>👤</div>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#F0EEEA", marginBottom: 8 }}>Sign in to view player profile</h2>
-        <p style={{ fontSize: "0.88rem", color: "#8A8880", marginBottom: 28, maxWidth: 400, lineHeight: 1.6 }}>Create an account or sign in to see player stats, match history, and more.</p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <button onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(88,101,242,0.15)", color: "#818cf8", border: "1px solid rgba(88,101,242,0.35)", borderRadius: 100, padding: "12px 28px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            Sign in with Discord
-          </button>
-        </div>
-      </div>
-    </div></>
-  );
+  // Player profiles are PUBLIC — no sign-in gate. Owner-only edit controls remain
+  // gated on `isOwnProfile` (and private fields like phone/UPI are owner-only).
 
   if (!profile) return (
     <><style>{baseStyles}</style>
