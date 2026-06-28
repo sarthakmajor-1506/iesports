@@ -1281,13 +1281,15 @@ function ValorantTournamentDetailInner() {
                 <button className="vtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
                 </button>
-                <WallOfShame
-                  tournamentId={id}
-                  user={user}
-                  onRequireLogin={() => setShowLoginPrompt(true)}
-                  mode={(tournament as any)?.wallOfShameMode === "thanks" ? "thanks" : "shame"}
-                  thanksMessage={(tournament as any)?.wallOfShameThanksMessage || undefined}
-                />
+                {!(tournament as any)?.wallOfShameHidden && (
+                  <WallOfShame
+                    tournamentId={id}
+                    user={user}
+                    onRequireLogin={() => setShowLoginPrompt(true)}
+                    mode={(tournament as any)?.wallOfShameMode === "thanks" ? "thanks" : "shame"}
+                    thanksMessage={(tournament as any)?.wallOfShameThanksMessage || undefined}
+                  />
+                )}
                 {/* Reopen the tournament wrap — only once the Grand Final is done */}
                 {wrapAvailable && (
                   <button
