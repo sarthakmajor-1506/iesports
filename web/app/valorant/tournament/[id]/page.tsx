@@ -519,6 +519,9 @@ function ValorantTournamentDetailInner() {
   const [teams, setTeams] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
+  // Tournament wrap: open by default on every page open; reopenable via a button.
+  const [wrapOpen, setWrapOpen] = useState(true);
+  const [wrapAvailable, setWrapAvailable] = useState(false);
   const [rankReports, setRankReports] = useState<any[]>([]);
 
   const fetchRankReports = () => {
@@ -1122,9 +1125,10 @@ function ValorantTournamentDetailInner() {
       <div className="vtd-page">
         <Navbar />
 
-        {/* End-of-tournament celebration wrap — shows on every open once the
-            Grand Final is complete (self-gates internally); closeable top-left. */}
-        <TournamentWrap tournament={tournament} teams={teams} matches={matches} leaderboard={leaderboard} players={players} />
+        {/* End-of-tournament celebration wrap — open by default on every page
+            open once the Grand Final is complete (self-gates); reopen via the
+            button next to Wall of Shame; closeable top-left. */}
+        <TournamentWrap tournament={tournament} teams={teams} matches={matches} leaderboard={leaderboard} players={players} open={wrapOpen} onClose={() => setWrapOpen(false)} onAvailable={setWrapAvailable} />
 
         {/* Back button */}
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 30px 0" }}>
@@ -1284,6 +1288,16 @@ function ValorantTournamentDetailInner() {
                   mode={(tournament as any)?.wallOfShameMode === "thanks" ? "thanks" : "shame"}
                   thanksMessage={(tournament as any)?.wallOfShameThanksMessage || undefined}
                 />
+                {/* Reopen the tournament wrap — only once the Grand Final is done */}
+                {wrapAvailable && (
+                  <button
+                    onClick={() => setWrapOpen(true)}
+                    title="View tournament recap"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 100, border: "1px solid rgba(245,197,66,0.4)", background: "linear-gradient(135deg, rgba(245,197,66,0.18), rgba(230,71,122,0.12))", color: "#f5c542", fontSize: "0.82rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", transition: "all 0.2s" }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 18px rgba(245,197,66,0.35)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
+                  >🏆 Tournament Wrap</button>
+                )}
               </div>
             </div>
           </div>

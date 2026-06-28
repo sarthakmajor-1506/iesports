@@ -22,12 +22,15 @@ const TIER_COLOR: Record<string, string> = {
 const baseRank = (s: string) => { const b = String(s || "").split(" ")[0]; return RANK_ORDER.includes(b) ? b : "Unranked"; };
 const inr = (n: number) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
-export default function TournamentWrap({ tournament, teams, matches, leaderboard, players }: {
+export default function TournamentWrap({ tournament, teams, matches, leaderboard, players, open, onClose, onAvailable }: {
   tournament: AnyT; teams: AnyT[]; matches: AnyT[]; leaderboard: AnyT[]; players: AnyT[];
+  open: boolean; onClose: () => void; onAvailable?: (available: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
-
   const data = useMemo(() => buildWrap({ tournament, teams, matches, leaderboard, players }), [tournament, teams, matches, leaderboard, players]);
+
+  // Tell the parent whether the wrap can be shown (Grand Final complete), so it
+  // can render the "open recap" button only once the wrap is available.
+  useEffect(() => { onAvailable?.(!!data); }, [data, onAvailable]);
 
   // Lock background scroll while open
   useEffect(() => {
@@ -55,7 +58,7 @@ export default function TournamentWrap({ tournament, teams, matches, leaderboard
       </div>
 
       {/* close — top LEFT */}
-      <button className="tw-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+      <button className="tw-close" onClick={onClose} aria-label="Close">✕</button>
 
       <div className="tw-scroll">
         <div className="tw-inner">
