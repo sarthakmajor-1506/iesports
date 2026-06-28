@@ -15,6 +15,7 @@ import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import WallOfShame from "@/app/components/WallOfShame";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import { readCache, writeCache } from "@/lib/pageCache";
+import TournamentWrap from "@/app/components/TournamentWrap";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -1120,6 +1121,10 @@ function ValorantTournamentDetailInner() {
 
       <div className="vtd-page">
         <Navbar />
+
+        {/* End-of-tournament celebration wrap — shows on every open once the
+            Grand Final is complete (self-gates internally); closeable top-left. */}
+        <TournamentWrap tournament={tournament} teams={teams} matches={matches} leaderboard={leaderboard} players={players} />
 
         {/* Back button */}
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 30px 0" }}>
