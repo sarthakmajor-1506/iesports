@@ -488,6 +488,7 @@ function CS2TournamentDetailInner() {
     return false;
   });
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showSubstituteRegister, setShowSubstituteRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
@@ -572,11 +573,11 @@ function CS2TournamentDetailInner() {
     setWaitlistLoading(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/waitlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ tournamentId: id, game: "valorant" }) });
+      const res = await fetch("/api/waitlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ tournamentId: id, game: "cs2" }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setOnWaitlist(data.onWaitlist);
-    } catch (e: any) { alert(e.message || "Could not update waitlist"); } finally { setWaitlistLoading(false); }
+    } catch (e: any) { alert(e.message || "Could not update substitute list"); } finally { setWaitlistLoading(false); }
   };
   useEffect(() => { if (!tournament) return; const tick = () => setCountdown(getTimeUntilDeadline(tournament.registrationDeadline)); tick(); const i = setInterval(tick, 60000); return () => clearInterval(i); }, [tournament]);
 
@@ -1169,17 +1170,7 @@ function CS2TournamentDetailInner() {
                       setShowRegister(true);
                     }}>Register Now →</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                      <>
-                        <button className="csd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
-                        <button
-                          onClick={() => {
-                            if (!user) { setShowLoginPrompt(true); return; }
-                            toggleWaitlist();
-                          }}
-                          disabled={waitlistLoading}
-                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                        >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
-                      </>
+                      <button className="csd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
                     )}
                     {isRegistered && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1204,16 +1195,27 @@ function CS2TournamentDetailInner() {
                       </div>
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
-                      <button
-                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
-                        style={{
-                          padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
-                          border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
-                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
-                      >Leaderboard</button>
+                      <>
+                        <button
+                          onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                          style={{
+                            padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                            border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                            fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                        >View Matches</button>
+                        <button
+                          onClick={() => {
+                            if (!user) { setShowLoginPrompt(true); return; }
+                            if (onWaitlist) toggleWaitlist();
+                            else setShowSubstituteRegister(true);
+                          }}
+                          disabled={waitlistLoading}
+                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                        >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
+                      </>
                     )}
                   </>
                 )}
@@ -1897,6 +1899,7 @@ function CS2TournamentDetailInner() {
       </div>
 
       {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
+      {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ LOGIN PROMPT ═══ */}
       {showLoginPrompt && !user && (

@@ -22,13 +22,14 @@ type Props = {
   user: any;
   dotaProfile: any;
   game?: "dota2" | "valorant" | "cs2";
+  isSubstitute?: boolean; // post-close substitute-list join — same full-detail wizard, different endpoint
   onClose: () => void;
   onSuccess: () => void;
 };
 
 type Step = "choose" | "create" | "join" | "solo" | "success" | "connect";
 
-export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", onClose, onSuccess }: Props) {
+export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, onClose, onSuccess }: Props) {
   const { riotData, userProfile } = useAuth();
   const [step, setStep] = useState<Step>("connect"); // always start at connect check
   const [joinCode, setJoinCode] = useState("");
@@ -262,8 +263,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const allRequirementsMet = hasFullName && hasPhone && hasDiscord && gameAccountOk;
 
   // Auto-advance past connect step if ALL requirements are met
+  // Substitutes always go through the single solo-style confirm step —
+  // they're joining a list, not forming/picking a team.
   const actualStep = step === "connect" && allRequirementsMet
-    ? (isShuffle ? "solo" : "choose")
+    ? ((isShuffle || isSubstitute) ? "solo" : "choose")
     : step;
 
   // ── Requirement items for UI ───────────────────────────────────────────
@@ -375,6 +378,19 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const handleSolo = async () => {
     setLoading(true); setError(""); setWarning("");
     try {
+      if (isSubstitute) {
+        const waitlistGame = isCS2 ? "cs2" : isValorant ? "valorant" : "dota";
+        const token = await user.getIdToken();
+        const res = await fetch("/api/waitlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ tournamentId: tournament.id, game: waitlistGame }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        onSuccess(); setStep("success");
+        return;
+      }
       const endpoint = isCS2 ? "/api/cs2/solo" : isValorant ? "/api/valorant/solo" : "/api/teams/solo";
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }) });
       const data = await res.json();
@@ -699,14 +715,14 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               <div style={{ textAlign: "center" as const, animation: "reg-fade-in 0.3s ease" }}>
                 <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u2705"}</div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 14 }}>All set!</h3>
-                <button onClick={() => { if (isShuffle) handleSolo(); else setStep("choose"); }} disabled={loading} style={{
+                <button onClick={() => { if (isShuffle || isSubstitute) handleSolo(); else setStep("choose"); }} disabled={loading} style={{
                   width: "100%", padding: 14,
                   background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
                   border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15,
                   cursor: loading ? "default" : "pointer",
                   boxShadow: `0 4px 20px ${accentColor}33`,
                 }}>
-                  {loading ? "Registering..." : isShuffle ? "Register Now \u2192" : "Continue \u2192"}
+                  {loading ? "Registering..." : isSubstitute ? "Join Substitute List \u2192" : isShuffle ? "Register Now \u2192" : "Continue \u2192"}
                 </button>
               </div>
             )}
@@ -747,13 +763,24 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           </div>
         )}
 
-        {/* ═══════ SHUFFLE FORMAT: Direct solo registration ═══════ */}
-        {actualStep === "solo" && isShuffle && (
+        {/* ═══════ SHUFFLE FORMAT / SUBSTITUTE: Direct solo confirm ═══════ */}
+        {actualStep === "solo" && (isShuffle || isSubstitute) && (
           <div>
-            <p style={{ color: "#aaa", fontSize: 14, marginBottom: 8, lineHeight: 1.6 }}>
-              This is a <span style={{ color: accentColor, fontWeight: 700 }}>shuffle tournament</span> — all players register solo. Teams will be auto-generated with balanced skill levels after registration closes.
-            </p>
-            <p style={{ color: "#666", fontSize: 12, marginBottom: 20 }}>No premades, no comfort picks — just raw skill.</p>
+            {isSubstitute ? (
+              <>
+                <p style={{ color: "#aaa", fontSize: 14, marginBottom: 8, lineHeight: 1.6 }}>
+                  Registration for this tournament is <span style={{ color: accentColor, fontWeight: 700 }}>closed</span>. Joining the substitute list means we'll reach out to you first if a registered player drops out.
+                </p>
+                <p style={{ color: "#666", fontSize: 12, marginBottom: 20 }}>Your full details (Discord, {isValorant ? "Riot ID" : "Steam"}, phone) are saved so we can contact you quickly.</p>
+              </>
+            ) : (
+              <>
+                <p style={{ color: "#aaa", fontSize: 14, marginBottom: 8, lineHeight: 1.6 }}>
+                  This is a <span style={{ color: accentColor, fontWeight: 700 }}>shuffle tournament</span> — all players register solo. Teams will be auto-generated with balanced skill levels after registration closes.
+                </p>
+                <p style={{ color: "#666", fontSize: 12, marginBottom: 20 }}>No premades, no comfort picks — just raw skill.</p>
+              </>
+            )}
             {error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
             <button onClick={handleSolo} disabled={loading} style={{
               width: "100%", padding: 14,
@@ -761,7 +788,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               border: "none", borderRadius: 8, color: "#fff",
               fontWeight: 700, fontSize: 15, cursor: loading ? "default" : "pointer",
             }}>
-              {loading ? "Registering..." : "Register Solo →"}
+              {loading ? "Registering..." : isSubstitute ? "Join Substitute List →" : "Register Solo →"}
             </button>
           </div>
         )}
@@ -873,9 +900,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
         {actualStep === "success" && (
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 56 }}>{teamCode ? "🎉" : "🏆"}</p>
+            <p style={{ fontSize: 56 }}>{teamCode ? "🎉" : isSubstitute ? "📋" : "🏆"}</p>
             <h3 style={{ fontSize: 20, fontWeight: 800, marginTop: 12, color: "#fff" }}>
-              {teamCode ? "⚔️ Team Created!" : "✨ You're Registered!"}
+              {teamCode ? "⚔️ Team Created!" : isSubstitute ? "📋 Added to Substitute List!" : "✨ You're Registered!"}
             </h3>
 
             {teamCode ? (
@@ -896,6 +923,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   }}>Share on WhatsApp</button>
                 </div>
               </>
+            ) : isSubstitute ? (
+              <p style={{ color: "#555", fontSize: 13, marginTop: 8, lineHeight: 1.6 }}>
+                You're on the substitute list! We'll reach out via Discord or phone if a slot opens up.
+              </p>
             ) : isShuffle ? (
               <p style={{ color: "#555", fontSize: 13, marginTop: 8, lineHeight: 1.6 }}>
                 You're registered! Teams will be auto-generated with balanced skill levels after registration closes.

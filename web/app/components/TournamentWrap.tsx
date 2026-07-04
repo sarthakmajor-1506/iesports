@@ -22,6 +22,13 @@ const TIER_COLOR: Record<string, string> = {
 const baseRank = (s: string) => { const b = String(s || "").split(" ")[0]; return RANK_ORDER.includes(b) ? b : "Unranked"; };
 const inr = (n: number) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
+// One-off champion photo overrides, keyed by tournament id — not a schema field,
+// just a static asset swap for a specific tournament's wrap (matches existing
+// `bannerImage || "/staticFallback.jpg"` convention used elsewhere in the app).
+const CHAMPION_PHOTO_OVERRIDES: Record<string, string> = {
+  "league-of-rising-stars-ascension": "/ascension-champions.jpg",
+};
+
 export default function TournamentWrap({ tournament, teams, matches, leaderboard, players, open, onClose, onAvailable }: {
   tournament: AnyT; teams: AnyT[]; matches: AnyT[]; leaderboard: AnyT[]; players: AnyT[];
   open: boolean; onClose: () => void; onAvailable?: (available: boolean) => void;
@@ -42,6 +49,7 @@ export default function TournamentWrap({ tournament, teams, matches, leaderboard
 
   if (!data || !open) return null;
   const { champion, runnerUp, mvps, prizeWinner, prizeRunnerUp, tournamentName } = data;
+  const championPhoto = CHAMPION_PHOTO_OVERRIDES[tournament?.id];
 
   return (
     <div className="tw-root" role="dialog" aria-modal="true">
@@ -71,16 +79,24 @@ export default function TournamentWrap({ tournament, teams, matches, leaderboard
 
           {/* CHAMPION */}
           <section className="tw-champ-sec">
-            <div className="tw-trophy">🏆</div>
             <div className="tw-label tw-gold-text">CHAMPIONS</div>
-            <div className="tw-champ-logo-wrap">
-              <div className="tw-glow-ring" />
-              <TeamLogo team={champion.team} gold />
-            </div>
+            {championPhoto ? (
+              <div className="tw-champ-photo-wrap">
+                <img className="tw-champ-photo" src={championPhoto} alt={champion.team.teamName} />
+              </div>
+            ) : (
+              <>
+                <div className="tw-trophy">🏆</div>
+                <div className="tw-champ-logo-wrap">
+                  <div className="tw-glow-ring" />
+                  <TeamLogo team={champion.team} gold />
+                </div>
+              </>
+            )}
             <h2 className="tw-champ-name tw-gold-text">{champion.team.teamName}</h2>
             <CountUp className="tw-prize tw-gold-text" value={prizeWinner} prefix="₹" />
             <div className="tw-prize-label">PRIZE</div>
-            <Roster members={champion.team.members} accent="#f5c542" />
+            <Roster members={champion.team.members} accent="#f5c542" compact />
           </section>
 
           {/* RUNNER-UP */}
@@ -91,7 +107,7 @@ export default function TournamentWrap({ tournament, teams, matches, leaderboard
             <h3 className="tw-runner-name">{runnerUp.team.teamName}</h3>
             <CountUp className="tw-prize-sm tw-silver-text" value={prizeRunnerUp} prefix="₹" />
             <div className="tw-prize-label">PRIZE</div>
-            <Roster members={runnerUp.team.members} accent="#c9d1d3" />
+            <Roster members={runnerUp.team.members} accent="#c9d1d3" compact />
           </section>
 
           {/* MVPs per bracket (rank tier) */}
@@ -138,9 +154,9 @@ function TeamLogo({ team, gold }: { team: AnyT; gold?: boolean }) {
     : <div className="tw-team-logo tw-logo-fallback" style={{ width: size, height: size, fontSize: gold ? 40 : 26, background: gold ? "linear-gradient(135deg,#f5c542,#b8860b)" : "linear-gradient(135deg,#c9d1d3,#7c8487)" }}>{initials}</div>;
 }
 
-function Roster({ members, accent }: { members: AnyT[]; accent: string }) {
+function Roster({ members, accent, compact }: { members: AnyT[]; accent: string; compact?: boolean }) {
   return (
-    <div className="tw-roster">
+    <div className={`tw-roster${compact ? " tw-roster-compact" : ""}`}>
       {(members || []).map((p, i) => (
         <div key={p.uid || i} className="tw-player" style={{ animationDelay: `${0.08 * i}s`, borderColor: accent + "44" }}>
           {p.riotAvatar ? <img className="tw-player-av" src={p.riotAvatar} alt="" /> : <div className="tw-player-av tw-av-fallback">{(p.riotGameName || p.fullName || "?")[0]}</div>}
@@ -252,29 +268,37 @@ const styles = `
 .tw-sub{font-size:.92rem;color:#b6b1c8;}
 .tw-gold-text{background:linear-gradient(180deg,#fff4c2,#f5c542 45%,#c8941f);-webkit-background-clip:text;background-clip:text;color:transparent;}
 .tw-silver-text{background:linear-gradient(180deg,#fff,#c9d1d3 45%,#8d9598);-webkit-background-clip:text;background-clip:text;color:transparent;}
-.tw-champ-sec{margin-top:46px;animation:tw-up .7s ease .15s both;}
+.tw-champ-sec{margin-top:32px;animation:tw-up .7s ease .15s both;}
 .tw-trophy{font-size:3.4rem;animation:tw-float 3.2s ease-in-out infinite;filter:drop-shadow(0 6px 22px rgba(245,197,66,.5));}
 .tw-label{font-size:.78rem;font-weight:900;letter-spacing:.34em;margin-top:6px;}
 .tw-champ-logo-wrap{position:relative;width:160px;height:160px;margin:18px auto 4px;display:flex;align-items:center;justify-content:center;}
 .tw-glow-ring{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle, rgba(245,197,66,.5),transparent 65%);animation:tw-pulse 2.4s ease-in-out infinite;}
 .tw-team-logo{border-radius:50%;object-fit:cover;position:relative;z-index:1;animation:tw-pop .6s cubic-bezier(.2,1.3,.4,1) .25s both;}
 .tw-logo-fallback{display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1407;border-radius:50%;}
+.tw-champ-photo-wrap{margin:14px auto 8px;max-width:380px;width:100%;border-radius:18px;overflow:hidden;border:2px solid rgba(245,197,66,.5);box-shadow:0 8px 30px rgba(245,197,66,.25),0 0 0 6px rgba(245,197,66,.07);animation:tw-pop .6s cubic-bezier(.2,1.3,.4,1) .2s both;}
+.tw-champ-photo{width:100%;display:block;object-fit:cover;aspect-ratio:3/2;}
 .tw-champ-name{font-size:clamp(1.8rem,5.4vw,3rem);font-weight:900;margin:6px 0 2px;}
 .tw-prize{font-size:clamp(1.7rem,5vw,2.6rem);font-weight:900;margin-top:4px;}
 .tw-prize-sm{font-size:clamp(1.3rem,4vw,1.9rem);font-weight:900;margin-top:2px;}
 .tw-prize-label{font-size:.62rem;letter-spacing:.3em;color:#8e88a3;font-weight:800;margin-top:2px;}
-.tw-runner-sec{margin-top:52px;padding-top:34px;border-top:1px solid rgba(255,255,255,.08);animation:tw-up .7s ease .25s both;}
+.tw-runner-sec{margin-top:34px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);animation:tw-up .7s ease .25s both;}
 .tw-medal{font-size:2.4rem;animation:tw-float 3.6s ease-in-out infinite;}
 .tw-runner-logo-wrap{margin:14px auto 4px;}
 .tw-runner-name{font-size:clamp(1.4rem,4vw,2rem);font-weight:900;color:#e7e9ea;margin:4px 0 0;}
-.tw-roster{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:20px auto 0;max-width:760px;}
-.tw-player{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid;border-radius:100px;padding:7px 16px 7px 7px;animation:tw-up .5s ease both;}
+.tw-roster{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px auto 0;max-width:760px;}
+.tw-roster-compact{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tw-roster-compact::-webkit-scrollbar{display:none;}
+.tw-player{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid;border-radius:100px;padding:7px 16px 7px 7px;animation:tw-up .5s ease both;flex-shrink:0;}
+.tw-roster-compact .tw-player{padding:5px 12px 5px 5px;gap:6px;}
 .tw-player-av{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;}
+.tw-roster-compact .tw-player-av{width:26px;height:26px;}
 .tw-player-info{text-align:left;min-width:0;}
 .tw-player-name{font-size:.86rem;font-weight:800;white-space:nowrap;}
+.tw-roster-compact .tw-player-name{font-size:.7rem;}
 .tw-player-rank{font-size:.66rem;font-weight:700;}
+.tw-roster-compact .tw-player-rank{font-size:.56rem;}
 .tw-av-fallback{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#3a3358,#221d3c);font-weight:800;color:#cfc8ea;}
-.tw-mvp-sec{margin-top:54px;padding-top:34px;border-top:1px solid rgba(255,255,255,.08);animation:tw-up .7s ease .35s both;}
+.tw-mvp-sec{margin-top:40px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);animation:tw-up .7s ease .35s both;}
 .tw-mvp-head{font-size:clamp(1.3rem,4vw,1.8rem);font-weight:900;margin:4px 0 22px;}
 .tw-mvp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
 .tw-mvp-card{position:relative;overflow:hidden;background:rgba(20,18,34,.7);border:1px solid;border-radius:16px;padding:18px 12px 16px;animation:tw-pop .55s cubic-bezier(.2,1.2,.4,1) both;}
@@ -297,5 +321,16 @@ const styles = `
 @keyframes tw-spin{to{transform:rotate(360deg)}}
 @keyframes tw-grad{to{background-position:300% 0}}
 @keyframes tw-shine{0%{left:-60%}55%,100%{left:130%}}
-@media (max-width:520px){.tw-inner{padding-top:58px}.tw-champ-logo-wrap{width:130px;height:130px}}
+@media (max-width:520px){
+  .tw-inner{padding-top:58px}
+  .tw-champ-logo-wrap{width:130px;height:130px}
+  .tw-champ-photo-wrap{max-width:280px}
+  /* Force all 5 into one row with no scroll — equal-width mini columns instead of pills */
+  .tw-roster-compact{flex-wrap:nowrap;overflow-x:visible;justify-content:space-between;gap:4px;padding-bottom:0;}
+  .tw-roster-compact .tw-player{flex:1 1 0;min-width:0;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border-radius:10px;background:rgba(255,255,255,.04);}
+  .tw-roster-compact .tw-player-av{width:32px;height:32px;}
+  .tw-roster-compact .tw-player-info{text-align:center;width:100%;}
+  .tw-roster-compact .tw-player-name{font-size:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;}
+  .tw-roster-compact .tw-player-rank{display:none}
+}
 `;

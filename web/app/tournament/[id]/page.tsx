@@ -705,6 +705,7 @@ function DotaTournamentDetailInner() {
     return false;
   });
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showSubstituteRegister, setShowSubstituteRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
@@ -1444,21 +1445,7 @@ function DotaTournamentDetailInner() {
                   >Register Now →</button>
                 )}
                 {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                  <>
-                    <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>Slots Full</button>
-                    <button
-                      onClick={() => {
-                        if (!user) {
-                          try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search); } catch {}
-                          window.location.href = "/api/auth/discord-login";
-                          return;
-                        }
-                        toggleWaitlist();
-                      }}
-                      disabled={waitlistLoading}
-                      style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                    >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
-                  </>
+                  <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>No Slots Open</button>
                 )}
                 {isRegistered && (
                   <div className="dtd-registered-cluster" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1494,10 +1481,21 @@ function DotaTournamentDetailInner() {
                   </div>
                 )}
                 {regClosed && !isRegistered && isRegOpen && (
-                  <button
-                    onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
-                    style={{ padding: "10px 24px", background: "rgba(190,58,37,0.12)", color: "#BE3A25", border: "1px solid rgba(190,58,37,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
-                  >Leaderboard</button>
+                  <>
+                    <button
+                      onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                      style={{ padding: "10px 24px", background: "rgba(190,58,37,0.12)", color: "#BE3A25", border: "1px solid rgba(190,58,37,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
+                    >View Matches</button>
+                    <button
+                      onClick={() => {
+                        if (!user) { setShowLoginPrompt(true); return; }
+                        if (onWaitlist) toggleWaitlist();
+                        else setShowSubstituteRegister(true);
+                      }}
+                      disabled={waitlistLoading}
+                      style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                    >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
+                  </>
                 )}
                 <button className="dtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
@@ -2203,6 +2201,17 @@ function DotaTournamentDetailInner() {
           dotaProfile={dotaProfile}
           onClose={() => setShowRegister(false)}
           onSuccess={() => { setIsRegistered(true); refetchData(); }}
+        />
+      )}
+
+      {showSubstituteRegister && user && (
+        <RegisterModal
+          tournament={tournament}
+          user={user}
+          dotaProfile={dotaProfile}
+          isSubstitute
+          onClose={() => setShowSubstituteRegister(false)}
+          onSuccess={() => { setOnWaitlist(true); refetchData(); }}
         />
       )}
 

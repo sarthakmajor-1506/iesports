@@ -268,7 +268,7 @@ export default function CS2Tournaments() {
                             )}
                           </div>
                         ) : slotsLeft <= 0 ? (
-                          <button className="cs-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>Slots Full</button>
+                          <button className="cs-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>No Slots Open</button>
                         ) : (
                           <button className="cs-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${t.id}`); }}>Register →</button>
                         )}

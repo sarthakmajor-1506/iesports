@@ -36,6 +36,12 @@ const TABS: { key: Tab; label: string; Icon: React.FC<{ size?: number; strokeWid
   { key: "leaderboard", label: "Leaderboard",  Icon: BarChart3 },
 ];
 
+// One-off champion photo override, keyed by tournament id — matches the same
+// override used in TournamentWrap.tsx for this tournament's wrap.
+const CHAMPION_PHOTO_OVERRIDES: Record<string, string> = {
+  "league-of-rising-stars-ascension": "/ascension-champions.jpg",
+};
+
 function formatDate(iso: string) {
   try { return new Date(iso).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }); } catch { return iso; }
 }
@@ -495,6 +501,7 @@ function ValorantTournamentDetailInner() {
     return false;
   });
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showSubstituteRegister, setShowSubstituteRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
@@ -1222,24 +1229,7 @@ function ValorantTournamentDetailInner() {
                       setShowRegister(true);
                     }}>Register Now →</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>Slots Full</button>
-                          <button
-                            onClick={() => {
-                              if (!user) { setShowLoginPrompt(true); return; }
-                              toggleWaitlist();
-                            }}
-                            disabled={waitlistLoading}
-                            style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                          >{waitlistLoading ? "..." : onWaitlist ? "On Waitlist ✓" : "Join Waitlist"}</button>
-                        </div>
-                        {waitlistData.length > 0 && (
-                          <button onClick={() => setWaitlistOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fbbf24" }}>{waitlistData.length} on waitlist</span>
-                          </button>
-                        )}
-                      </div>
+                      <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
                     )}
                     {isRegistered && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1264,17 +1254,33 @@ function ValorantTournamentDetailInner() {
                       </div>
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
-                      <button
-                        className="vtd-hero-compact-btn"
-                        onClick={() => { setActiveTab("leaderboard"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
-                        style={{
-                          padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
-                          border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
-                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
-                      >Leaderboard</button>
+                      <>
+                        <button
+                          className="vtd-hero-compact-btn"
+                          onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                          style={{
+                            padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                            border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                            fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                        >View Matches</button>
+                        <button
+                          onClick={() => {
+                            if (!user) { setShowLoginPrompt(true); return; }
+                            if (onWaitlist) toggleWaitlist();
+                            else setShowSubstituteRegister(true);
+                          }}
+                          disabled={waitlistLoading}
+                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                        >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
+                        {waitlistData.length > 0 && (
+                          <button onClick={() => setWaitlistOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fbbf24" }}>{waitlistData.length} substitutes</span>
+                          </button>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -1321,6 +1327,11 @@ function ValorantTournamentDetailInner() {
             }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 0%, rgba(255,215,0,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
               <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#ffd700", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Tournament Champion</div>
+              {CHAMPION_PHOTO_OVERRIDES[id] && (
+                <div style={{ maxWidth: 360, width: "100%", margin: "0 auto 12px", borderRadius: 14, overflow: "hidden", border: "2px solid rgba(255,215,0,0.35)", boxShadow: "0 8px 28px rgba(255,215,0,0.2)" }}>
+                  <img src={CHAMPION_PHOTO_OVERRIDES[id]} alt={championTeamName} style={{ width: "100%", display: "block", objectFit: "cover", aspectRatio: "3 / 2" }} />
+                </div>
+              )}
               <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#E6E6E6", lineHeight: 1.2 }}>{championTeamName}</div>
               {championMembers.length > 0 && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
@@ -2177,6 +2188,7 @@ function ValorantTournamentDetailInner() {
       </div>
 
       {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
+      {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ WAITLIST POPUP ═══ */}
       {waitlistOpen && waitlistData.length > 0 && (

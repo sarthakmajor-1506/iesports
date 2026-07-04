@@ -430,7 +430,6 @@ export default function Home() {
               { name: "Dota 2",         tag: "Live Now",    src: "/dota2image33.jpeg",  soon: false, href: "/dota2" },
               { name: "Valorant",       tag: "Live Now",    src: "/valorantimage1.jpg", soon: false, href: "/valorant" },
               { name: "Counter Strike", tag: "Live Now",    src: "/csgoimage3.jpg",     soon: false, href: "/cs2" },
-              { name: "Call of Duty",   tag: "Coming Soon", src: "/codimage1.jpg",      soon: true,  href: "" },
             ].map(g => (
               <div className="ie-game-card" key={g.name} onClick={() => { if (g.href) router.push(g.href); }}>
                 <Image className="ie-game-card-img" src={g.src} alt={g.name} fill sizes="(max-width:480px) 100vw,(max-width:900px) 50vw,25vw" style={{ objectFit: "cover" }} loading="lazy" />
@@ -507,11 +506,17 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="ie-tourn-right">
-                    <div className="ie-slots-num" style={{ color: "#A12B1F" }}>{slotsLeft}</div>
-                    <div className="ie-slots-label">slots remaining</div>
-                    <div className="ie-slots-bar">
-                      <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "#A12B1F" }} />
-                    </div>
+                    {slotsLeft !== null && slotsLeft <= 0 ? (
+                      <div className="ie-slots-label" style={{ color: "#A12B1F", fontWeight: 800, fontSize: "1rem" }}>No Slots Open</div>
+                    ) : (
+                      <>
+                        <div className="ie-slots-num" style={{ color: "#A12B1F" }}>{slotsLeft}</div>
+                        <div className="ie-slots-label">slots remaining</div>
+                        <div className="ie-slots-bar">
+                          <div className="ie-slots-fill" style={{ width:`${slotPct}%`, background: slotPct > 80 ? "#ef4444" : slotPct > 50 ? "#f59e0b" : "#A12B1F" }} />
+                        </div>
+                      </>
+                    )}
                     <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/tournament/${featuredTournament.id}`); }} style={{ background: "linear-gradient(135deg, #A12B1F, #7A1F15)", borderColor: "rgba(161,43,31,0.5)", boxShadow: "0 4px 22px rgba(161,43,31,.4)" }}>
                       View Tournament →
                     </button>
@@ -559,6 +564,13 @@ export default function Home() {
                         <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Tournament Completed</div>
                         <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3CCBFF, #30B5E6)", borderColor: "rgba(60,203,255,0.5)", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
                           View Results →
+                        </button>
+                      </>
+                    ) : valSlotsLeft !== null && valSlotsLeft <= 0 ? (
+                      <>
+                        <div className="ie-slots-label" style={{ color: "#3CCBFF", fontWeight: 800, fontSize: "1rem" }}>No Slots Open</div>
+                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${featuredValTournament.id}`); }} style={{ background: "linear-gradient(135deg, #3CCBFF, #30B5E6)", borderColor: "rgba(60,203,255,0.5)", boxShadow: "0 4px 22px rgba(60,203,255,.4)" }}>
+                          View Tournament →
                         </button>
                       </>
                     ) : (
@@ -617,6 +629,13 @@ export default function Home() {
                         <div className="ie-slots-label" style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Tournament Completed</div>
                         <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament.id}`); }} style={{ background: "linear-gradient(135deg, #f0a500, #d99400)", borderColor: "rgba(240,165,0,0.5)", boxShadow: "0 4px 22px rgba(240,165,0,.4)" }}>
                           View Results →
+                        </button>
+                      </>
+                    ) : cs2SlotsLeft !== null && cs2SlotsLeft <= 0 ? (
+                      <>
+                        <div className="ie-slots-label" style={{ color: "#f0a500", fontWeight: 800, fontSize: "1rem" }}>No Slots Open</div>
+                        <button className="ie-btn-register" onClick={(e) => { e.stopPropagation(); router.push(`/cs2/tournament/${featuredCs2Tournament.id}`); }} style={{ background: "linear-gradient(135deg, #f0a500, #d99400)", borderColor: "rgba(240,165,0,0.5)", boxShadow: "0 4px 22px rgba(240,165,0,.4)" }}>
+                          View Tournament →
                         </button>
                       </>
                     ) : (

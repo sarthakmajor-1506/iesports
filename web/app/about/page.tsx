@@ -66,7 +66,6 @@ export default function AboutPage() {
           <li><strong>Valorant</strong> — live. S/A/B/C tier brackets based on verified Riot competitive rank, with shuffle, auction, and standard team formats.</li>
           <li><strong>Dota 2</strong> — live. 5v5 team tournaments and weekly solo scoring tournaments with rank verification via Steam and OpenDota.</li>
           <li><strong>CS2 (Counter-Strike 2)</strong> — live. Solo and team tournaments with Steam-verified rosters.</li>
-          <li><strong>Call of Duty</strong> — coming soon.</li>
         </ul>
 
         <h2 style={h2}>How rank verification works</h2>

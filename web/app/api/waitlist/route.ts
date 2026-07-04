@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
+// Post-registration-close substitute list. Requires the same full profile
+// details as normal registration (fullName, phone, discord, game account) —
+// the RegisterModal "isSubstitute" flow enforces this before ever calling here.
+const GAME_COLLECTIONS: Record<string, string> = {
+  valorant: "valorantTournaments",
+  cs2: "cs2Tournaments",
+  dota: "tournaments",
+  dota2: "tournaments",
+};
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -16,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing tournamentId or game" }, { status: 400 });
     }
 
-    const collectionName = game === "valorant" ? "valorantTournaments" : "tournaments";
+    const collectionName = GAME_COLLECTIONS[game] || "tournaments";
     const ref = adminDb.collection(collectionName).doc(tournamentId).collection("waitlist").doc(uid);
     const snap = await ref.get();
 
@@ -26,12 +36,25 @@ export async function POST(req: NextRequest) {
     } else {
       const userDoc = await adminDb.collection("users").doc(uid).get();
       const userData = userDoc.data() || {};
-      await ref.set({
+      const entry: Record<string, any> = {
         uid,
-        displayName: decoded.name || userData.steamName || userData.riotGameName || "",
+        fullName: userData.fullName || decoded.name || "",
         phone: userData.phone || "",
+        discordId: userData.discordId || "",
+        discordUsername: userData.discordUsername || "",
         addedAt: new Date().toISOString(),
-      });
+      };
+      if (game === "valorant") {
+        entry.riotGameName = userData.riotGameName || "";
+        entry.riotTagLine = userData.riotTagLine || "";
+        entry.riotAvatar = userData.riotAvatar || "";
+        entry.riotRank = userData.riotRank || "";
+      } else {
+        entry.steamId = userData.steamId || "";
+        entry.steamName = userData.steamName || "";
+        entry.steamAvatar = userData.steamAvatar || "";
+      }
+      await ref.set(entry);
       return NextResponse.json({ onWaitlist: true });
     }
   } catch (err: any) {
@@ -55,7 +78,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing tournamentId or game" }, { status: 400 });
     }
 
-    const collectionName = game === "valorant" ? "valorantTournaments" : "tournaments";
+    const collectionName = GAME_COLLECTIONS[game] || "tournaments";
     const snap = await adminDb.collection(collectionName).doc(tournamentId).collection("waitlist").doc(uid).get();
     return NextResponse.json({ onWaitlist: snap.exists });
   } catch (err: any) {

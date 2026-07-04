@@ -12,7 +12,7 @@ export async function GET() {
     ]);
     const dotaAll = dotaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const dotaFeatured = dotaAll
-      .filter((t: any) => t.status === "upcoming" || t.status === "active" || t.status === "ongoing")
+      .filter((t: any) => !t.isTestTournament && (t.status === "upcoming" || t.status === "active" || t.status === "ongoing"))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -22,14 +22,10 @@ export async function GET() {
       .filter((t: any) => !t.isTestTournament && !isBangalore(t) && !valIsEnded(t))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-    // If no active/upcoming Valorant tournament, show the most recent ended one
-    let valResult = valFeatured.length > 0 ? valFeatured[0] : null;
-    if (!valResult) {
-      const valEnded = valAll
-        .filter((t: any) => !t.isTestTournament && !isBangalore(t) && valIsEnded(t))
-        .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-      if (valEnded.length > 0) valResult = valEnded[0];
-    }
+    // Featured only shows upcoming/active tournaments — ended ones belong in
+    // "Recent Results" only, never both (previously fell back to the most
+    // recent ended tournament here, which duplicated it into Recent Results too).
+    const valResult = valFeatured.length > 0 ? valFeatured[0] : null;
 
     // ── CS2: featured ──
     const cs2All = cs2Snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -37,16 +33,10 @@ export async function GET() {
     const cs2Featured = cs2All
       .filter((t: any) => !t.isTestTournament && !cs2IsEnded(t))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-    let cs2Result = cs2Featured.length > 0 ? cs2Featured[0] : null;
-    if (!cs2Result) {
-      const cs2Ended = cs2All
-        .filter((t: any) => !t.isTestTournament && cs2IsEnded(t))
-        .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-      if (cs2Ended.length > 0) cs2Result = cs2Ended[0];
-    }
+    const cs2Result = cs2Featured.length > 0 ? cs2Featured[0] : null;
 
     // ── Completed tournaments for "Recent Results" section ──
-    const dotaIsEnded = (t: any) => t.status === "ended" || t.status === "completed" || (t.endDate && now > new Date(t.endDate));
+    const dotaIsEnded = (t: any) => !t.isTestTournament && (t.status === "ended" || t.status === "completed" || (t.endDate && now > new Date(t.endDate)));
     const dotaCompleted = dotaAll
       .filter((t: any) => dotaIsEnded(t))
       .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());

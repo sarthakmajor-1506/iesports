@@ -270,7 +270,7 @@ export default function ValorantTournaments() {
                             )}
                           </div>
                         ) : slotsLeft <= 0 ? (
-                          <button className="vt-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>Slots Full</button>
+                          <button className="vt-reg-btn" style={{ background: "#555", cursor: "default", opacity: 0.7 }} disabled onClick={(e) => e.stopPropagation()}>No Slots Open</button>
                         ) : (
                           <button className="vt-reg-btn" onClick={(e) => { e.stopPropagation(); router.push(`/valorant/tournament/${t.id}`); }}>Register →</button>
                         )}
