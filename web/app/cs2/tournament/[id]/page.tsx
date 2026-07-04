@@ -691,6 +691,8 @@ function CS2TournamentDetailInner() {
   })();
 
   const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
+  // Canonical "tournament is over" check — see same comment in the Valorant tournament page.
+  const isEnded = tournament.status === "ended" || tournament.status === "completed" || (tournament.endDate && new Date() > new Date(tournament.endDate));
   const userTeam = getUserTeam();
   const teamMembers: Record<string, any[]> = {};
   const teamLogoMap: Record<string, string> = {};
@@ -1102,7 +1104,7 @@ function CS2TournamentDetailInner() {
             <div className="csd-hero-inner">
               <div className="csd-hero-game-tag">
                 Valorant Tournament
-                {tournament.status === "ended" && (
+                {isEnded && (
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.12)", letterSpacing: "0.08em" }}>Completed</span>
                 )}
                 {tournament.status === "active" && (
@@ -1110,7 +1112,7 @@ function CS2TournamentDetailInner() {
                 )}
               </div>
               <div className="csd-hero-title">{tournament.name}</div>
-              {tournament.status === "ended" && championTeamName && (
+              {isEnded && championTeamName && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, animation: "csd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.06s both" }}>
                   <span style={{ fontSize: "1.3rem" }}>🏆</span>
                   <div>
@@ -1119,7 +1121,7 @@ function CS2TournamentDetailInner() {
                   </div>
                 </div>
               )}
-              {tournament.status === "ended" && !championTeamName && (
+              {isEnded && !championTeamName && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, animation: "csd-hero-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.06s both" }}>
                   <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>Tournament has ended</span>
                 </div>
@@ -1128,7 +1130,7 @@ function CS2TournamentDetailInner() {
                 <div className="csd-hero-desc">{tournament.description || tournament.desc}</div>
               )}
               <div className="csd-hero-actions">
-                {tournament.status === "ended" ? (
+                {isEnded ? (
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button
@@ -1283,7 +1285,7 @@ function CS2TournamentDetailInner() {
           {/* Slots info strip */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, padding: "10px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, fontSize: "0.82rem", color: "#8A8880", flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} players</span>
-            {tournament.status === "ended" ? (
+            {isEnded ? (
               <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={14} strokeWidth={2} /> {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}</span>
                 {tournament.prizePool && tournament.prizePool !== "0" && (
