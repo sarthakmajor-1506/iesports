@@ -39,4 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-web/app/api/payments/
+# Razorpay WIP — kept out of git deliberately (legal/compliance, see docs/SAFETY_RULES.md).
+# Fixed the path: this .gitignore lives in web/, so the pattern is relative to web/.
+/app/api/payments/

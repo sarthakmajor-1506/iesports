@@ -1,0 +1,24 @@
+import { config } from "dotenv"; config({ path: ".env.local" });
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getLiveLeagueMatch } from "../../lib/dotaLive";
+if(!getApps().length)initializeApp({credential:cert({projectId:process.env.FIREBASE_PROJECT_ID,clientEmail:process.env.FIREBASE_CLIENT_EMAIL,privateKey:process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g,"\n")})});
+const db=getFirestore();
+(async()=>{
+  const m:any=(await db.collection("tournaments").doc("domin8-ultimate-tilt-proof-tournament").collection("matches").doc("r3-match-5").get()).data();
+  const isT1Rad=m.vetoState?.radiantTeam!=="team2";
+  console.log(`SIDES: Radiant=${isT1Rad?m.team1Name:m.team2Name}  Dire=${isT1Rad?m.team2Name:m.team1Name}  (toss radiantTeam=${m.vetoState?.radiantTeam||"default team1"})`);
+  console.log(`BO${m.bestOf} | series ${m.team1Name} ${m.team1Score}-${m.team2Score} ${m.team2Name}\n`);
+  const r=await getLiveLeagueMatch("8841284748",process.env.STEAM_API_KEY||"");
+  console.log(`durationSec=${r.durationSec} spectators=${r.spectators} streamDelay=${r.streamDelaySec}s roshan=${r.roshanRespawnSec}`);
+  const d=r.draft!;
+  console.log("\n— DRAFT —");
+  console.log("RADIANT bans:",d.radiant.bans.map(h=>h.name).join(", ")||"-");
+  console.log("RADIANT picks:",d.radiant.picks.map(h=>h.name).join(", ")||"-");
+  console.log("DIRE bans:",d.dire.bans.map(h=>h.name).join(", ")||"-");
+  console.log("DIRE picks:",d.dire.picks.map(h=>h.name).join(", ")||"-");
+  console.log("\n— PLAYERS (in scoreboard) —");
+  const show=(s:any,lbl:string)=>(s?.players||[]).forEach((p:any)=>console.log(`  ${lbl} ${p.name.padEnd(16)} ${p.heroName.padEnd(16)} lvl${p.level} ${p.kills}/${p.deaths}/${p.assists} nw${p.netWorth} pos(${p.x},${p.y})`));
+  show(r.radiant,"R"); show(r.dire,"D");
+  process.exit(0);
+})();

@@ -1,0 +1,50 @@
+[
+  {
+    "matchIndex": 0,
+    "roundNumber": 1,
+    "team1Name": "Muth Rajya",
+    "team2Name": "Radiant Reapers",
+    "team1Score": 1,
+    "team2Score": 1,
+    "startTimestamp": 0,
+    "endTimestamp": 50,
+    "frameFile": "score_000001.png",
+    "notes": "Round already in progress at clip start. Buy phase 0-10s, gameplay 15-50s. Radiant Reapers wins this round."
+  },
+  {
+    "matchIndex": 0,
+    "roundNumber": 2,
+    "team1Name": "Muth Rajya",
+    "team2Name": "Radiant Reapers",
+    "team1Score": 1,
+    "team2Score": 2,
+    "startTimestamp": 55,
+    "endTimestamp": 170,
+    "frameFile": "score_000012.png",
+    "notes": "Buy phase 55-85s, gameplay 90-170s. Long round with spike planted. Score stays 1-2."
+  },
+  {
+    "matchIndex": 0,
+    "roundNumber": 3,
+    "team1Name": "Muth Rajya",
+    "team2Name": "Radiant Reapers",
+    "team1Score": 1,
+    "team2Score": 2,
+    "startTimestamp": 175,
+    "endTimestamp": 255,
+    "frameFile": "score_000036.png",
+    "notes": "Gameplay 175-250s. Round ends at ~255s. Muth Rajya wins this round."
+  },
+  {
+    "matchIndex": 0,
+    "roundNumber": 4,
+    "team1Name": "Muth Rajya",
+    "team2Name": "Radiant Reapers",
+    "team1Score": 2,
+    "team2Score": 2,
+    "startTimestamp": 270,
+    "endTimestamp": 295,
+    "frameFile": "score_000055.png",
+    "notes": "Post-round screen 255-275s, buy phase starts ~280s. Score now 2-2. Clip ends during buy phase."
+  }
+]

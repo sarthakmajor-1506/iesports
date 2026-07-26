@@ -1,0 +1,21 @@
+import { config } from "dotenv"; config({ path: ".env.local" });
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+if(!getApps().length)initializeApp({credential:cert({projectId:process.env.FIREBASE_PROJECT_ID,clientEmail:process.env.FIREBASE_CLIENT_EMAIL,privateKey:process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g,"\n")})});
+const db=getFirestore();
+const TID="league-of-rising-stars-ascension";
+(async()=>{
+  const st:any=(await db.collection("whatsappStatus").doc("state").get()).data();
+  console.log("WA bot: state="+st?.state+" lastSeen="+(st?.lastSeen||st?.updatedAt));
+  console.log("\n=== lb-r2-m2 + any recently completed ===");
+  const ms=await db.collection("valorantTournaments").doc(TID).collection("matches").get();
+  ms.docs.map(d=>({id:d.id,...(d.data() as any)})).filter((m:any)=>m.status==="completed"&&m.completedAt>"2026-06-07T08:00").forEach((m:any)=>console.log(`  ${m.id} status=${m.status} ${m.team1Name} ${m.team1Score}-${m.team2Score} ${m.team2Name} completedAt=${m.completedAt} announced=${m.resultAnnouncedAt||"NOT-ANNOUNCED"} waGroup(tourn?)`));
+  const m2:any=(await db.collection("valorantTournaments").doc(TID).collection("matches").doc("lb-r2-m2").get()).data();
+  console.log(`  lb-r2-m2 status=${m2.status} score=${m2.team1Score}-${m2.team2Score} completedAt=${m2.completedAt||"-"} announced=${m2.resultAnnouncedAt||"-"}`);
+  const t:any=(await db.collection("valorantTournaments").doc(TID).get()).data();
+  console.log("  tournament.whatsappGroupId="+t.whatsappGroupId);
+  console.log("\n=== ALL whatsappOutbox docs since 08:30 ===");
+  const q=await db.collection("whatsappOutbox").get();
+  q.docs.map(d=>({id:d.id,...(d.data() as any)})).filter((d:any)=>String(d.createdAt)>"2026-06-07T08:30").sort((a:any,b:any)=>String(a.createdAt).localeCompare(String(b.createdAt))).forEach((d:any)=>console.log(`  [${d.id}] ${d.createdAt} action=${d.action||"legacy"} source=${d.source||"-"} status=${d.status} target=${d.target?.id||"-"} ${d.error?"ERR:"+d.error:""}`));
+  process.exit(0);
+})();

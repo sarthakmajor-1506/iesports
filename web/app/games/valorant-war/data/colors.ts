@@ -1,0 +1,25 @@
+// v9 cyber-futuristic palette. Brighter neon accents + glow shadows.
+export const COLORS = {
+  bg:           '#0a131c',
+  bgRaised:     'rgba(255,255,255,0.04)',
+  bgHover:      'rgba(255,255,255,0.07)',
+  border:       'rgba(255,255,255,0.10)',
+  borderGlow:   'rgba(60,203,255,0.35)',
+  text:         '#F0EEEA',
+  textMuted:    'rgba(255,255,255,0.58)',
+  textDim:      'rgba(255,255,255,0.35)',
+  accent:       '#3CCBFF',
+  accentHover:  '#30B5E6',
+  accentGlow:   'rgba(60,203,255,0.8)',
+  warning:      '#fbbf24',
+  warningGlow:  'rgba(251,191,36,0.85)',
+  danger:       '#ff5252',
+  dangerGlow:   'rgba(255,82,82,0.8)',
+  success:      '#4ade80',
+  hpBar:        '#4ade80',
+  hpBarLow:     '#fbbf24',
+  hpBarCrit:    '#ff5252',
+  // Neon ult-color
+  ultPurple:    '#c084fc',
+  ultGlow:      'rgba(192,132,252,0.85)',
+} as const;

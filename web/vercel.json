@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "scratch": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/registration-close",

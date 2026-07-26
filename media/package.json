@@ -1,0 +1,23 @@
+{
+  "name": "iesports-media",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "download": "tsx src/01-download.ts",
+    "frames": "tsx src/02-extract-frames.ts",
+    "timeline": "tsx src/03-build-timeline.ts",
+    "speakers": "tsx src/04-detect-speakers.ts",
+    "transcribe": "tsx src/05-transcribe.ts",
+    "trim": "tsx src/06-trim-highlights.ts",
+    "reels": "tsx src/07-make-reels.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

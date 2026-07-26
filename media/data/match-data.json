@@ -1,0 +1,2525 @@
+{
+  "tournamentId": "league-of-rising-stars-prelims",
+  "matchDay": 4,
+  "matchIndex": 4,
+  "isBracket": true,
+  "bracketType": "grand_final",
+  "bracketRound": 1,
+  "bracketLabel": "Grand Final",
+  "team1": {
+    "teamId": "TBD",
+    "teamName": "TBD",
+    "seed": 0,
+    "members": []
+  },
+  "team2": {
+    "teamId": "TBD",
+    "teamName": "TBD",
+    "seed": 0,
+    "members": []
+  },
+  "winnerGoesTo": null,
+  "loserGoesTo": null,
+  "createdAt": "2026-04-05T08:56:45.384Z",
+  "scheduledTime": "2026-04-05T19:00:00+05:30",
+  "lobbyPassword": "EZC981",
+  "lobbyName": "Prelims Match 6",
+  "lobbySetAt": "2026-04-05T13:48:55.460Z",
+  "team2VcId": "1490348494995722401",
+  "startedAt": "2026-04-05T13:52:49.001Z",
+  "team1VcId": "1490348492420419626",
+  "waitingRoomVcId": null,
+  "team1Name": "Radiant Reapers",
+  "team1Id": "team-3",
+  "team2Id": "team-1",
+  "team2Name": "Muth Rajya 🏴‍☠️",
+  "game1": {
+    "valorantMatchId": "a9e41c36-c9bf-4c02-ab36-6c935213c124",
+    "mapName": "Fracture",
+    "roundsPlayed": 16,
+    "redRoundsWon": 3,
+    "blueRoundsWon": 13,
+    "winningTeam": "Blue",
+    "team1RoundsWon": 3,
+    "team2RoundsWon": 13,
+    "winner": "team2",
+    "team1ValorantSide": "Red",
+    "team2ValorantSide": "Blue",
+    "playerStats": [
+      {
+        "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+        "name": "AZRAEL x ICE ツ",
+        "tag": "MANAV",
+        "team": "Blue",
+        "agent": "Breach",
+        "kills": 14,
+        "deaths": 11,
+        "assists": 10,
+        "score": 3877,
+        "headshots": 10,
+        "bodyshots": 21,
+        "legshots": 3,
+        "damageDealt": 2627,
+        "damageReceived": 2031,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 1,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+        "name": "TyeDye",
+        "tag": "999",
+        "team": "Blue",
+        "agent": "Waylay",
+        "kills": 15,
+        "deaths": 13,
+        "assists": 7,
+        "score": 4917,
+        "headshots": 16,
+        "bodyshots": 28,
+        "legshots": 2,
+        "damageDealt": 3172,
+        "damageReceived": 2091,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 6,
+        "firstDeaths": 2,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+        "name": "MUTH SIPAHI",
+        "tag": "hello",
+        "team": "Blue",
+        "agent": "Chamber",
+        "kills": 7,
+        "deaths": 7,
+        "assists": 3,
+        "score": 1925,
+        "headshots": 6,
+        "bodyshots": 17,
+        "legshots": 0,
+        "damageDealt": 1620,
+        "damageReceived": 1360,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 2,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+        "name": "HornieHippo5705",
+        "tag": "ATK",
+        "team": "Red",
+        "agent": "Breach",
+        "kills": 9,
+        "deaths": 14,
+        "assists": 5,
+        "score": 2698,
+        "headshots": 5,
+        "bodyshots": 28,
+        "legshots": 3,
+        "damageDealt": 1589,
+        "damageReceived": 2715,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+        "name": "クロス",
+        "tag": "ARTA",
+        "team": "Red",
+        "agent": "Miks",
+        "kills": 10,
+        "deaths": 14,
+        "assists": 6,
+        "score": 3085,
+        "headshots": 8,
+        "bodyshots": 28,
+        "legshots": 1,
+        "damageDealt": 1848,
+        "damageReceived": 2834,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 3,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+        "name": "MuthMantri",
+        "tag": "siuuu",
+        "team": "Blue",
+        "agent": "Omen",
+        "kills": 22,
+        "deaths": 8,
+        "assists": 4,
+        "score": 5479,
+        "headshots": 16,
+        "bodyshots": 35,
+        "legshots": 2,
+        "damageDealt": 3499,
+        "damageReceived": 1523,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 1,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+        "name": "Sync",
+        "tag": "TBSM",
+        "team": "Blue",
+        "agent": "Killjoy",
+        "kills": 13,
+        "deaths": 7,
+        "assists": 2,
+        "score": 3401,
+        "headshots": 7,
+        "bodyshots": 48,
+        "legshots": 5,
+        "damageDealt": 2272,
+        "damageReceived": 1499,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+        "name": "orcus",
+        "tag": "bbg",
+        "team": "Red",
+        "agent": "Jett",
+        "kills": 14,
+        "deaths": 14,
+        "assists": 2,
+        "score": 3986,
+        "headshots": 12,
+        "bodyshots": 17,
+        "legshots": 1,
+        "damageDealt": 2650,
+        "damageReceived": 2802,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 3,
+        "firstDeaths": 5,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+        "name": "samuhikdushkrm69",
+        "tag": "2811",
+        "team": "Red",
+        "agent": "Gekko",
+        "kills": 6,
+        "deaths": 14,
+        "assists": 1,
+        "score": 1602,
+        "headshots": 4,
+        "bodyshots": 9,
+        "legshots": 1,
+        "damageDealt": 945,
+        "damageReceived": 2061,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 0,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+        "name": "Default11",
+        "tag": "2222",
+        "team": "Red",
+        "agent": "Cypher",
+        "kills": 7,
+        "deaths": 15,
+        "assists": 2,
+        "score": 2227,
+        "headshots": 7,
+        "bodyshots": 17,
+        "legshots": 1,
+        "damageDealt": 1480,
+        "damageReceived": 2786,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 2,
+        "firstDeaths": 2,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      }
+    ],
+    "roundResults": [
+      {
+        "round": 1,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 2,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 3,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 4,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 5,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 6,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 7,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 8,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 9,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 10,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 11,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 12,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 13,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 14,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 15,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 16,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      }
+    ],
+    "killMatrix": {
+      "14ec31b3-f55c-5f02-adb8-abc986699326": {
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2
+      },
+      "c875c9ee-670a-5280-8002-f4463ace156b": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 2
+      },
+      "222fd982-1fe9-5eef-a545-a30f48545337": {
+        "c875c9ee-670a-5280-8002-f4463ace156b": 5,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 1
+      },
+      "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1
+      },
+      "b78e5cce-4588-5735-b827-98864d4e679e": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 1,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+      },
+      "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 3,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 3,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 3
+      },
+      "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+      },
+      "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 7,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 6,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 3
+      },
+      "d7967492-5972-53e7-900d-dccd61f90fe2": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+      },
+      "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 1
+      }
+    },
+    "fetchedAt": "2026-04-05T14:27:32.177Z",
+    "apiVersion": "v4",
+    "status": "completed"
+  },
+  "game1MatchId": "a9e41c36-c9bf-4c02-ab36-6c935213c124",
+  "game1Winner": "team2",
+  "team2Score": 1,
+  "game2Winner": "team1",
+  "game2MatchId": "c9b19444-3011-40af-a5fb-522386163890",
+  "game2": {
+    "valorantMatchId": "c9b19444-3011-40af-a5fb-522386163890",
+    "mapName": "Lotus",
+    "roundsPlayed": 18,
+    "redRoundsWon": 13,
+    "blueRoundsWon": 5,
+    "winningTeam": "Red",
+    "team1RoundsWon": 13,
+    "team2RoundsWon": 5,
+    "winner": "team1",
+    "team1ValorantSide": "Red",
+    "team2ValorantSide": "Blue",
+    "playerStats": [
+      {
+        "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+        "name": "HornieHippo5705",
+        "tag": "ATK",
+        "team": "Red",
+        "agent": "Breach",
+        "kills": 13,
+        "deaths": 14,
+        "assists": 6,
+        "score": 3426,
+        "headshots": 5,
+        "bodyshots": 39,
+        "legshots": 12,
+        "damageDealt": 2293,
+        "damageReceived": 2808,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 1,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+        "name": "クロス",
+        "tag": "ARTA",
+        "team": "Red",
+        "agent": "Omen",
+        "kills": 19,
+        "deaths": 9,
+        "assists": 9,
+        "score": 4769,
+        "headshots": 18,
+        "bodyshots": 12,
+        "legshots": 2,
+        "damageDealt": 2713,
+        "damageReceived": 1905,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 1,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+        "name": "Default11",
+        "tag": "2222",
+        "team": "Red",
+        "agent": "Raze",
+        "kills": 16,
+        "deaths": 15,
+        "assists": 8,
+        "score": 5149,
+        "headshots": 12,
+        "bodyshots": 55,
+        "legshots": 2,
+        "damageDealt": 3544,
+        "damageReceived": 2739,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 3,
+        "firstDeaths": 2,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+        "name": "AZRAEL x ICE ツ",
+        "tag": "MANAV",
+        "team": "Blue",
+        "agent": "Miks",
+        "kills": 11,
+        "deaths": 15,
+        "assists": 19,
+        "score": 3863,
+        "headshots": 9,
+        "bodyshots": 36,
+        "legshots": 4,
+        "damageDealt": 2571,
+        "damageReceived": 2778,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 2,
+        "firstDeaths": 2,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+        "name": "TyeDye",
+        "tag": "999",
+        "team": "Blue",
+        "agent": "Waylay",
+        "kills": 16,
+        "deaths": 17,
+        "assists": 4,
+        "score": 4853,
+        "headshots": 14,
+        "bodyshots": 33,
+        "legshots": 4,
+        "damageDealt": 3238,
+        "damageReceived": 3151,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 5,
+        "firstDeaths": 5,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+        "name": "MuthMantri",
+        "tag": "siuuu",
+        "team": "Blue",
+        "agent": "Fade",
+        "kills": 11,
+        "deaths": 15,
+        "assists": 6,
+        "score": 2966,
+        "headshots": 10,
+        "bodyshots": 25,
+        "legshots": 1,
+        "damageDealt": 1939,
+        "damageReceived": 2362,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+        "name": "Sync",
+        "tag": "TBSM",
+        "team": "Blue",
+        "agent": "Vyse",
+        "kills": 15,
+        "deaths": 17,
+        "assists": 6,
+        "score": 4334,
+        "headshots": 9,
+        "bodyshots": 37,
+        "legshots": 1,
+        "damageDealt": 2596,
+        "damageReceived": 2912,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 2,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+        "name": "samuhikdushkrm69",
+        "tag": "2811",
+        "team": "Red",
+        "agent": "Cypher",
+        "kills": 15,
+        "deaths": 10,
+        "assists": 6,
+        "score": 4005,
+        "headshots": 10,
+        "bodyshots": 39,
+        "legshots": 1,
+        "damageDealt": 2578,
+        "damageReceived": 1946,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 2,
+        "firstDeaths": 3,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+        "name": "orcus",
+        "tag": "bbg",
+        "team": "Red",
+        "agent": "Jett",
+        "kills": 17,
+        "deaths": 12,
+        "assists": 2,
+        "score": 4285,
+        "headshots": 16,
+        "bodyshots": 18,
+        "legshots": 1,
+        "damageDealt": 2622,
+        "damageReceived": 2330,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 4,
+        "firstDeaths": 1,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+        "name": "MUTH SIPAHI",
+        "tag": "hello",
+        "team": "Blue",
+        "agent": "Breach",
+        "kills": 7,
+        "deaths": 16,
+        "assists": 3,
+        "score": 2010,
+        "headshots": 7,
+        "bodyshots": 13,
+        "legshots": 0,
+        "damageDealt": 1345,
+        "damageReceived": 2508,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 1,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      }
+    ],
+    "roundResults": [
+      {
+        "round": 1,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 2,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 3,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 4,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 5,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 6,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 7,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 8,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 9,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 10,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 11,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 12,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 13,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 14,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 15,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 16,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 17,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 18,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      }
+    ],
+    "killMatrix": {
+      "14ec31b3-f55c-5f02-adb8-abc986699326": {
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 4,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 2,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 3
+      },
+      "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 6,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 2,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2
+      },
+      "d7967492-5972-53e7-900d-dccd61f90fe2": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 7,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 1,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2
+      },
+      "222fd982-1fe9-5eef-a545-a30f48545337": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 6,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+      },
+      "c875c9ee-670a-5280-8002-f4463ace156b": {
+        "222fd982-1fe9-5eef-a545-a30f48545337": 6,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4
+      },
+      "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 2
+      },
+      "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 3,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 6,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 3
+      },
+      "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+        "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 2,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 2
+      },
+      "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 2
+      },
+      "b78e5cce-4588-5735-b827-98864d4e679e": {
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 1
+      }
+    },
+    "fetchedAt": "2026-04-05T15:08:21.920Z",
+    "apiVersion": "v4",
+    "status": "completed"
+  },
+  "game3Winner": "team1",
+  "team1Score": 2,
+  "completedAt": "2026-04-05T15:48:09.763Z",
+  "game3MatchId": "80df413c-a161-4afb-aa0d-3a38ff678bdb",
+  "seriesAutoComputed": true,
+  "game3": {
+    "valorantMatchId": "80df413c-a161-4afb-aa0d-3a38ff678bdb",
+    "mapName": "Pearl",
+    "roundsPlayed": 18,
+    "redRoundsWon": 13,
+    "blueRoundsWon": 5,
+    "winningTeam": "Red",
+    "team1RoundsWon": 13,
+    "team2RoundsWon": 5,
+    "winner": "team1",
+    "team1ValorantSide": "Red",
+    "team2ValorantSide": "Blue",
+    "playerStats": [
+      {
+        "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+        "name": "TyeDye",
+        "tag": "999",
+        "team": "Blue",
+        "agent": "Waylay",
+        "kills": 17,
+        "deaths": 17,
+        "assists": 2,
+        "score": 5095,
+        "headshots": 15,
+        "bodyshots": 18,
+        "legshots": 3,
+        "damageDealt": 3161,
+        "damageReceived": 2763,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 4,
+        "firstDeaths": 6,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+        "name": "Sync",
+        "tag": "TBSM",
+        "team": "Blue",
+        "agent": "Fade",
+        "kills": 5,
+        "deaths": 18,
+        "assists": 3,
+        "score": 1498,
+        "headshots": 4,
+        "bodyshots": 17,
+        "legshots": 1,
+        "damageDealt": 984,
+        "damageReceived": 2731,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 2,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+        "name": "samuhikdushkrm69",
+        "tag": "2811",
+        "team": "Red",
+        "agent": "Cypher",
+        "kills": 5,
+        "deaths": 9,
+        "assists": 1,
+        "score": 1142,
+        "headshots": 4,
+        "bodyshots": 9,
+        "legshots": 1,
+        "damageDealt": 721,
+        "damageReceived": 1619,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 1,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+        "name": "クロス",
+        "tag": "ARTA",
+        "team": "Red",
+        "agent": "Omen",
+        "kills": 17,
+        "deaths": 9,
+        "assists": 7,
+        "score": 4267,
+        "headshots": 12,
+        "bodyshots": 35,
+        "legshots": 0,
+        "damageDealt": 2740,
+        "damageReceived": 1933,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+        "name": "Default11",
+        "tag": "2222",
+        "team": "Red",
+        "agent": "Jett",
+        "kills": 12,
+        "deaths": 14,
+        "assists": 4,
+        "score": 3373,
+        "headshots": 8,
+        "bodyshots": 24,
+        "legshots": 2,
+        "damageDealt": 2416,
+        "damageReceived": 2433,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 2,
+        "firstDeaths": 3,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+        "name": "orcus",
+        "tag": "bbg",
+        "team": "Red",
+        "agent": "Phoenix",
+        "kills": 24,
+        "deaths": 10,
+        "assists": 3,
+        "score": 6624,
+        "headshots": 20,
+        "bodyshots": 30,
+        "legshots": 1,
+        "damageDealt": 3985,
+        "damageReceived": 2539,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 7,
+        "firstDeaths": 2,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      },
+      {
+        "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+        "name": "AZRAEL x ICE ツ",
+        "tag": "MANAV",
+        "team": "Blue",
+        "agent": "Chamber",
+        "kills": 9,
+        "deaths": 13,
+        "assists": 1,
+        "score": 2453,
+        "headshots": 6,
+        "bodyshots": 19,
+        "legshots": 2,
+        "damageDealt": 1788,
+        "damageReceived": 2166,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 3,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+        "name": "MuthMantri",
+        "tag": "siuuu",
+        "team": "Blue",
+        "agent": "Astra",
+        "kills": 13,
+        "deaths": 15,
+        "assists": 5,
+        "score": 4017,
+        "headshots": 12,
+        "bodyshots": 35,
+        "legshots": 3,
+        "damageDealt": 2865,
+        "damageReceived": 2917,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+        "name": "MUTH SIPAHI",
+        "tag": "hello",
+        "team": "Blue",
+        "agent": "Killjoy",
+        "kills": 5,
+        "deaths": 16,
+        "assists": 3,
+        "score": 1820,
+        "headshots": 5,
+        "bodyshots": 12,
+        "legshots": 1,
+        "damageDealt": 1278,
+        "damageReceived": 2604,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 0,
+        "firstDeaths": 1,
+        "teamId": "team-1",
+        "tournamentTeam": "team2"
+      },
+      {
+        "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+        "name": "HornieHippo5705",
+        "tag": "ATK",
+        "team": "Red",
+        "agent": "Fade",
+        "kills": 21,
+        "deaths": 7,
+        "assists": 2,
+        "score": 5476,
+        "headshots": 8,
+        "bodyshots": 62,
+        "legshots": 5,
+        "damageDealt": 3343,
+        "damageReceived": 1576,
+        "directFirstKills": null,
+        "directFirstDeaths": null,
+        "firstKills": 1,
+        "firstDeaths": 0,
+        "teamId": "team-3",
+        "tournamentTeam": "team1"
+      }
+    ],
+    "roundResults": [
+      {
+        "round": 1,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 2,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 3,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 4,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 5,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 6,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 7,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 8,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 9,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 10,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 11,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 12,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 13,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 14,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 15,
+        "winTeam": "Blue",
+        "endType": "",
+        "winner": "team2"
+      },
+      {
+        "round": 16,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 17,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      },
+      {
+        "round": 18,
+        "winTeam": "Red",
+        "endType": "",
+        "winner": "team1"
+      }
+    ],
+    "killMatrix": {
+      "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 3,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+      },
+      "d7967492-5972-53e7-900d-dccd61f90fe2": {
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 7,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 7,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 2,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1
+      },
+      "222fd982-1fe9-5eef-a545-a30f48545337": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 1
+      },
+      "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+        "222fd982-1fe9-5eef-a545-a30f48545337": 5,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 4,
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 6,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 5
+      },
+      "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 1,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 2,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 1
+      },
+      "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 2
+      },
+      "c875c9ee-670a-5280-8002-f4463ace156b": {
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+        "b78e5cce-4588-5735-b827-98864d4e679e": 6,
+        "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+        "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2
+      },
+      "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 3,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 1
+      },
+      "14ec31b3-f55c-5f02-adb8-abc986699326": {
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+        "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 5
+      },
+      "b78e5cce-4588-5735-b827-98864d4e679e": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": 1,
+        "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+      }
+    },
+    "fetchedAt": "2026-04-05T15:48:09.699Z",
+    "apiVersion": "v4",
+    "status": "completed"
+  },
+  "games": {
+    "game1": {
+      "valorantMatchId": "a9e41c36-c9bf-4c02-ab36-6c935213c124",
+      "mapName": "Fracture",
+      "roundsPlayed": 16,
+      "redRoundsWon": 3,
+      "blueRoundsWon": 13,
+      "winningTeam": "Blue",
+      "team1RoundsWon": 3,
+      "team2RoundsWon": 13,
+      "winner": "team2",
+      "team1ValorantSide": "Red",
+      "team2ValorantSide": "Blue",
+      "playerStats": [
+        {
+          "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+          "name": "AZRAEL x ICE ツ",
+          "tag": "MANAV",
+          "team": "Blue",
+          "agent": "Breach",
+          "kills": 14,
+          "deaths": 11,
+          "assists": 10,
+          "score": 3877,
+          "headshots": 10,
+          "bodyshots": 21,
+          "legshots": 3,
+          "damageDealt": 2627,
+          "damageReceived": 2031,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 1,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+          "name": "TyeDye",
+          "tag": "999",
+          "team": "Blue",
+          "agent": "Waylay",
+          "kills": 15,
+          "deaths": 13,
+          "assists": 7,
+          "score": 4917,
+          "headshots": 16,
+          "bodyshots": 28,
+          "legshots": 2,
+          "damageDealt": 3172,
+          "damageReceived": 2091,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 6,
+          "firstDeaths": 2,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+          "name": "MUTH SIPAHI",
+          "tag": "hello",
+          "team": "Blue",
+          "agent": "Chamber",
+          "kills": 7,
+          "deaths": 7,
+          "assists": 3,
+          "score": 1925,
+          "headshots": 6,
+          "bodyshots": 17,
+          "legshots": 0,
+          "damageDealt": 1620,
+          "damageReceived": 1360,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 2,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+          "name": "HornieHippo5705",
+          "tag": "ATK",
+          "team": "Red",
+          "agent": "Breach",
+          "kills": 9,
+          "deaths": 14,
+          "assists": 5,
+          "score": 2698,
+          "headshots": 5,
+          "bodyshots": 28,
+          "legshots": 3,
+          "damageDealt": 1589,
+          "damageReceived": 2715,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+          "name": "クロス",
+          "tag": "ARTA",
+          "team": "Red",
+          "agent": "Miks",
+          "kills": 10,
+          "deaths": 14,
+          "assists": 6,
+          "score": 3085,
+          "headshots": 8,
+          "bodyshots": 28,
+          "legshots": 1,
+          "damageDealt": 1848,
+          "damageReceived": 2834,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 3,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+          "name": "MuthMantri",
+          "tag": "siuuu",
+          "team": "Blue",
+          "agent": "Omen",
+          "kills": 22,
+          "deaths": 8,
+          "assists": 4,
+          "score": 5479,
+          "headshots": 16,
+          "bodyshots": 35,
+          "legshots": 2,
+          "damageDealt": 3499,
+          "damageReceived": 1523,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 1,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+          "name": "Sync",
+          "tag": "TBSM",
+          "team": "Blue",
+          "agent": "Killjoy",
+          "kills": 13,
+          "deaths": 7,
+          "assists": 2,
+          "score": 3401,
+          "headshots": 7,
+          "bodyshots": 48,
+          "legshots": 5,
+          "damageDealt": 2272,
+          "damageReceived": 1499,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+          "name": "orcus",
+          "tag": "bbg",
+          "team": "Red",
+          "agent": "Jett",
+          "kills": 14,
+          "deaths": 14,
+          "assists": 2,
+          "score": 3986,
+          "headshots": 12,
+          "bodyshots": 17,
+          "legshots": 1,
+          "damageDealt": 2650,
+          "damageReceived": 2802,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 3,
+          "firstDeaths": 5,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+          "name": "samuhikdushkrm69",
+          "tag": "2811",
+          "team": "Red",
+          "agent": "Gekko",
+          "kills": 6,
+          "deaths": 14,
+          "assists": 1,
+          "score": 1602,
+          "headshots": 4,
+          "bodyshots": 9,
+          "legshots": 1,
+          "damageDealt": 945,
+          "damageReceived": 2061,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 0,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+          "name": "Default11",
+          "tag": "2222",
+          "team": "Red",
+          "agent": "Cypher",
+          "kills": 7,
+          "deaths": 15,
+          "assists": 2,
+          "score": 2227,
+          "headshots": 7,
+          "bodyshots": 17,
+          "legshots": 1,
+          "damageDealt": 1480,
+          "damageReceived": 2786,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 2,
+          "firstDeaths": 2,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        }
+      ],
+      "roundResults": [
+        {
+          "round": 1,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 2,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 3,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 4,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 5,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 6,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 7,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 8,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 9,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 10,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 11,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 12,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 13,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 14,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 15,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 16,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        }
+      ],
+      "killMatrix": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": {
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2
+        },
+        "c875c9ee-670a-5280-8002-f4463ace156b": {
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 2
+        },
+        "222fd982-1fe9-5eef-a545-a30f48545337": {
+          "c875c9ee-670a-5280-8002-f4463ace156b": 5,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 1
+        },
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1
+        },
+        "b78e5cce-4588-5735-b827-98864d4e679e": {
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 1,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+        },
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 3,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 3,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 3
+        },
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+        },
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 7,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 6,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 3
+        },
+        "d7967492-5972-53e7-900d-dccd61f90fe2": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+        },
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 1
+        }
+      },
+      "fetchedAt": "2026-04-05T14:27:32.177Z",
+      "apiVersion": "v4",
+      "status": "completed"
+    },
+    "game2": {
+      "valorantMatchId": "c9b19444-3011-40af-a5fb-522386163890",
+      "mapName": "Lotus",
+      "roundsPlayed": 18,
+      "redRoundsWon": 13,
+      "blueRoundsWon": 5,
+      "winningTeam": "Red",
+      "team1RoundsWon": 13,
+      "team2RoundsWon": 5,
+      "winner": "team1",
+      "team1ValorantSide": "Red",
+      "team2ValorantSide": "Blue",
+      "playerStats": [
+        {
+          "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+          "name": "HornieHippo5705",
+          "tag": "ATK",
+          "team": "Red",
+          "agent": "Breach",
+          "kills": 13,
+          "deaths": 14,
+          "assists": 6,
+          "score": 3426,
+          "headshots": 5,
+          "bodyshots": 39,
+          "legshots": 12,
+          "damageDealt": 2293,
+          "damageReceived": 2808,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 1,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+          "name": "クロス",
+          "tag": "ARTA",
+          "team": "Red",
+          "agent": "Omen",
+          "kills": 19,
+          "deaths": 9,
+          "assists": 9,
+          "score": 4769,
+          "headshots": 18,
+          "bodyshots": 12,
+          "legshots": 2,
+          "damageDealt": 2713,
+          "damageReceived": 1905,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 1,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+          "name": "Default11",
+          "tag": "2222",
+          "team": "Red",
+          "agent": "Raze",
+          "kills": 16,
+          "deaths": 15,
+          "assists": 8,
+          "score": 5149,
+          "headshots": 12,
+          "bodyshots": 55,
+          "legshots": 2,
+          "damageDealt": 3544,
+          "damageReceived": 2739,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 3,
+          "firstDeaths": 2,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+          "name": "AZRAEL x ICE ツ",
+          "tag": "MANAV",
+          "team": "Blue",
+          "agent": "Miks",
+          "kills": 11,
+          "deaths": 15,
+          "assists": 19,
+          "score": 3863,
+          "headshots": 9,
+          "bodyshots": 36,
+          "legshots": 4,
+          "damageDealt": 2571,
+          "damageReceived": 2778,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 2,
+          "firstDeaths": 2,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+          "name": "TyeDye",
+          "tag": "999",
+          "team": "Blue",
+          "agent": "Waylay",
+          "kills": 16,
+          "deaths": 17,
+          "assists": 4,
+          "score": 4853,
+          "headshots": 14,
+          "bodyshots": 33,
+          "legshots": 4,
+          "damageDealt": 3238,
+          "damageReceived": 3151,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 5,
+          "firstDeaths": 5,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+          "name": "MuthMantri",
+          "tag": "siuuu",
+          "team": "Blue",
+          "agent": "Fade",
+          "kills": 11,
+          "deaths": 15,
+          "assists": 6,
+          "score": 2966,
+          "headshots": 10,
+          "bodyshots": 25,
+          "legshots": 1,
+          "damageDealt": 1939,
+          "damageReceived": 2362,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+          "name": "Sync",
+          "tag": "TBSM",
+          "team": "Blue",
+          "agent": "Vyse",
+          "kills": 15,
+          "deaths": 17,
+          "assists": 6,
+          "score": 4334,
+          "headshots": 9,
+          "bodyshots": 37,
+          "legshots": 1,
+          "damageDealt": 2596,
+          "damageReceived": 2912,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 2,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+          "name": "samuhikdushkrm69",
+          "tag": "2811",
+          "team": "Red",
+          "agent": "Cypher",
+          "kills": 15,
+          "deaths": 10,
+          "assists": 6,
+          "score": 4005,
+          "headshots": 10,
+          "bodyshots": 39,
+          "legshots": 1,
+          "damageDealt": 2578,
+          "damageReceived": 1946,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 2,
+          "firstDeaths": 3,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+          "name": "orcus",
+          "tag": "bbg",
+          "team": "Red",
+          "agent": "Jett",
+          "kills": 17,
+          "deaths": 12,
+          "assists": 2,
+          "score": 4285,
+          "headshots": 16,
+          "bodyshots": 18,
+          "legshots": 1,
+          "damageDealt": 2622,
+          "damageReceived": 2330,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 4,
+          "firstDeaths": 1,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+          "name": "MUTH SIPAHI",
+          "tag": "hello",
+          "team": "Blue",
+          "agent": "Breach",
+          "kills": 7,
+          "deaths": 16,
+          "assists": 3,
+          "score": 2010,
+          "headshots": 7,
+          "bodyshots": 13,
+          "legshots": 0,
+          "damageDealt": 1345,
+          "damageReceived": 2508,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 1,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        }
+      ],
+      "roundResults": [
+        {
+          "round": 1,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 2,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 3,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 4,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 5,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 6,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 7,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 8,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 9,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 10,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 11,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 12,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 13,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 14,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 15,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 16,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 17,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 18,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        }
+      ],
+      "killMatrix": {
+        "14ec31b3-f55c-5f02-adb8-abc986699326": {
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 4,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 2,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 3
+        },
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 6,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 2,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2
+        },
+        "d7967492-5972-53e7-900d-dccd61f90fe2": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 2,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 7,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 1,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2
+        },
+        "222fd982-1fe9-5eef-a545-a30f48545337": {
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 2,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 6,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 5,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+        },
+        "c875c9ee-670a-5280-8002-f4463ace156b": {
+          "222fd982-1fe9-5eef-a545-a30f48545337": 6,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 4,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4
+        },
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 2
+        },
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 3,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 6,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 3,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 3
+        },
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+          "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 2,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 2
+        },
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 2
+        },
+        "b78e5cce-4588-5735-b827-98864d4e679e": {
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 1,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 1,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 1
+        }
+      },
+      "fetchedAt": "2026-04-05T15:08:21.920Z",
+      "apiVersion": "v4",
+      "status": "completed"
+    },
+    "game3": {
+      "valorantMatchId": "80df413c-a161-4afb-aa0d-3a38ff678bdb",
+      "mapName": "Pearl",
+      "roundsPlayed": 18,
+      "redRoundsWon": 13,
+      "blueRoundsWon": 5,
+      "winningTeam": "Red",
+      "team1RoundsWon": 13,
+      "team2RoundsWon": 5,
+      "winner": "team1",
+      "team1ValorantSide": "Red",
+      "team2ValorantSide": "Blue",
+      "playerStats": [
+        {
+          "puuid": "14ec31b3-f55c-5f02-adb8-abc986699326",
+          "name": "TyeDye",
+          "tag": "999",
+          "team": "Blue",
+          "agent": "Waylay",
+          "kills": 17,
+          "deaths": 17,
+          "assists": 2,
+          "score": 5095,
+          "headshots": 15,
+          "bodyshots": 18,
+          "legshots": 3,
+          "damageDealt": 3161,
+          "damageReceived": 2763,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 4,
+          "firstDeaths": 6,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "222fd982-1fe9-5eef-a545-a30f48545337",
+          "name": "Sync",
+          "tag": "TBSM",
+          "team": "Blue",
+          "agent": "Fade",
+          "kills": 5,
+          "deaths": 18,
+          "assists": 3,
+          "score": 1498,
+          "headshots": 4,
+          "bodyshots": 17,
+          "legshots": 1,
+          "damageDealt": 984,
+          "damageReceived": 2731,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 2,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b",
+          "name": "samuhikdushkrm69",
+          "tag": "2811",
+          "team": "Red",
+          "agent": "Cypher",
+          "kills": 5,
+          "deaths": 9,
+          "assists": 1,
+          "score": 1142,
+          "headshots": 4,
+          "bodyshots": 9,
+          "legshots": 1,
+          "damageDealt": 721,
+          "damageReceived": 1619,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 1,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "c875c9ee-670a-5280-8002-f4463ace156b",
+          "name": "クロス",
+          "tag": "ARTA",
+          "team": "Red",
+          "agent": "Omen",
+          "kills": 17,
+          "deaths": 9,
+          "assists": 7,
+          "score": 4267,
+          "headshots": 12,
+          "bodyshots": 35,
+          "legshots": 0,
+          "damageDealt": 2740,
+          "damageReceived": 1933,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "870a70d3-47d6-54c1-aa45-768b0c76768d",
+          "name": "Default11",
+          "tag": "2222",
+          "team": "Red",
+          "agent": "Jett",
+          "kills": 12,
+          "deaths": 14,
+          "assists": 4,
+          "score": 3373,
+          "headshots": 8,
+          "bodyshots": 24,
+          "legshots": 2,
+          "damageDealt": 2416,
+          "damageReceived": 2433,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 2,
+          "firstDeaths": 3,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "d537468c-af85-533e-a3bf-04bcc6422c9a",
+          "name": "orcus",
+          "tag": "bbg",
+          "team": "Red",
+          "agent": "Phoenix",
+          "kills": 24,
+          "deaths": 10,
+          "assists": 3,
+          "score": 6624,
+          "headshots": 20,
+          "bodyshots": 30,
+          "legshots": 1,
+          "damageDealt": 3985,
+          "damageReceived": 2539,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 7,
+          "firstDeaths": 2,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        },
+        {
+          "puuid": "391fbd7f-53cd-5d2e-a740-73d0245c7765",
+          "name": "AZRAEL x ICE ツ",
+          "tag": "MANAV",
+          "team": "Blue",
+          "agent": "Chamber",
+          "kills": 9,
+          "deaths": 13,
+          "assists": 1,
+          "score": 2453,
+          "headshots": 6,
+          "bodyshots": 19,
+          "legshots": 2,
+          "damageDealt": 1788,
+          "damageReceived": 2166,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 3,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "5ac3df36-8c19-5d2c-b472-c22d8539ce26",
+          "name": "MuthMantri",
+          "tag": "siuuu",
+          "team": "Blue",
+          "agent": "Astra",
+          "kills": 13,
+          "deaths": 15,
+          "assists": 5,
+          "score": 4017,
+          "headshots": 12,
+          "bodyshots": 35,
+          "legshots": 3,
+          "damageDealt": 2865,
+          "damageReceived": 2917,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "b78e5cce-4588-5735-b827-98864d4e679e",
+          "name": "MUTH SIPAHI",
+          "tag": "hello",
+          "team": "Blue",
+          "agent": "Killjoy",
+          "kills": 5,
+          "deaths": 16,
+          "assists": 3,
+          "score": 1820,
+          "headshots": 5,
+          "bodyshots": 12,
+          "legshots": 1,
+          "damageDealt": 1278,
+          "damageReceived": 2604,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 0,
+          "firstDeaths": 1,
+          "teamId": "team-1",
+          "tournamentTeam": "team2"
+        },
+        {
+          "puuid": "d7967492-5972-53e7-900d-dccd61f90fe2",
+          "name": "HornieHippo5705",
+          "tag": "ATK",
+          "team": "Red",
+          "agent": "Fade",
+          "kills": 21,
+          "deaths": 7,
+          "assists": 2,
+          "score": 5476,
+          "headshots": 8,
+          "bodyshots": 62,
+          "legshots": 5,
+          "damageDealt": 3343,
+          "damageReceived": 1576,
+          "directFirstKills": null,
+          "directFirstDeaths": null,
+          "firstKills": 1,
+          "firstDeaths": 0,
+          "teamId": "team-3",
+          "tournamentTeam": "team1"
+        }
+      ],
+      "roundResults": [
+        {
+          "round": 1,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 2,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 3,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 4,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 5,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 6,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 7,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 8,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 9,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 10,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 11,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 12,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 13,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 14,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 15,
+          "winTeam": "Blue",
+          "endType": "",
+          "winner": "team2"
+        },
+        {
+          "round": 16,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 17,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        },
+        {
+          "round": 18,
+          "winTeam": "Red",
+          "endType": "",
+          "winner": "team1"
+        }
+      ],
+      "killMatrix": {
+        "870a70d3-47d6-54c1-aa45-768b0c76768d": {
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 3,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 3,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 1
+        },
+        "d7967492-5972-53e7-900d-dccd61f90fe2": {
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 7,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 7,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 2,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1
+        },
+        "222fd982-1fe9-5eef-a545-a30f48545337": {
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 3,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 1,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 1
+        },
+        "d537468c-af85-533e-a3bf-04bcc6422c9a": {
+          "222fd982-1fe9-5eef-a545-a30f48545337": 5,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 4,
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 6,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 5
+        },
+        "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 1,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 1,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 2,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 1
+        },
+        "391fbd7f-53cd-5d2e-a740-73d0245c7765": {
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 2
+        },
+        "c875c9ee-670a-5280-8002-f4463ace156b": {
+          "391fbd7f-53cd-5d2e-a740-73d0245c7765": 4,
+          "b78e5cce-4588-5735-b827-98864d4e679e": 6,
+          "14ec31b3-f55c-5f02-adb8-abc986699326": 4,
+          "222fd982-1fe9-5eef-a545-a30f48545337": 1,
+          "5ac3df36-8c19-5d2c-b472-c22d8539ce26": 2
+        },
+        "5ac3df36-8c19-5d2c-b472-c22d8539ce26": {
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 3,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 2,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 5,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 1
+        },
+        "14ec31b3-f55c-5f02-adb8-abc986699326": {
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 4,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 2,
+          "d537468c-af85-533e-a3bf-04bcc6422c9a": 4,
+          "d7967492-5972-53e7-900d-dccd61f90fe2": 2,
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 5
+        },
+        "b78e5cce-4588-5735-b827-98864d4e679e": {
+          "870a70d3-47d6-54c1-aa45-768b0c76768d": 1,
+          "c875c9ee-670a-5280-8002-f4463ace156b": 3,
+          "4fa2f597-1bc1-5ca5-a9db-6c06c84f9b6b": 1
+        }
+      },
+      "fetchedAt": "2026-04-05T15:48:09.699Z",
+      "apiVersion": "v4",
+      "status": "completed"
+    }
+  },
+  "status": "completed"
+}

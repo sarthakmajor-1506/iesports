@@ -1,0 +1,122 @@
+[
+  {
+    "name": "orcus",
+    "team": "Radiant Reapers",
+    "bestGame": 3,
+    "kills": 24,
+    "deaths": 10,
+    "assists": 3,
+    "acs": 368,
+    "kd": 2.4,
+    "reason": "Game 3: 24K/10D/3A, 368 ACS, 2.40 KD",
+    "clipFile": "orcus.mp4"
+  },
+  {
+    "name": "MuthMantri",
+    "team": "Muth Rajya",
+    "bestGame": 1,
+    "kills": 22,
+    "deaths": 8,
+    "assists": 4,
+    "acs": 342,
+    "kd": 2.75,
+    "reason": "Game 1: 22K/8D/4A, 342 ACS, 2.75 KD",
+    "clipFile": "MuthMantri.mp4"
+  },
+  {
+    "name": "TyeDye",
+    "team": "Muth Rajya",
+    "bestGame": 1,
+    "kills": 15,
+    "deaths": 13,
+    "assists": 7,
+    "acs": 307,
+    "kd": 1.15,
+    "reason": "Game 1: 15K/13D/7A, 307 ACS, 1.15 KD",
+    "clipFile": "TyeDye.mp4"
+  },
+  {
+    "name": "HornieHippo5705",
+    "team": "Radiant Reapers",
+    "bestGame": 3,
+    "kills": 21,
+    "deaths": 7,
+    "assists": 2,
+    "acs": 304,
+    "kd": 3,
+    "reason": "Game 3: 21K/7D/2A, 304 ACS, 3.00 KD",
+    "clipFile": "HornieHippo5705.mp4"
+  },
+  {
+    "name": "Default11",
+    "team": "Radiant Reapers",
+    "bestGame": 2,
+    "kills": 16,
+    "deaths": 15,
+    "assists": 8,
+    "acs": 286,
+    "kd": 1.07,
+    "reason": "Game 2: 16K/15D/8A, 286 ACS, 1.07 KD",
+    "clipFile": "Default11.mp4"
+  },
+  {
+    "name": "クロス",
+    "team": "Radiant Reapers",
+    "bestGame": 2,
+    "kills": 19,
+    "deaths": 9,
+    "assists": 9,
+    "acs": 265,
+    "kd": 2.11,
+    "reason": "Game 2: 19K/9D/9A, 265 ACS, 2.11 KD",
+    "clipFile": "___.mp4"
+  },
+  {
+    "name": "AZRAEL x ICE ツ",
+    "team": "Muth Rajya",
+    "bestGame": 1,
+    "kills": 14,
+    "deaths": 11,
+    "assists": 10,
+    "acs": 242,
+    "kd": 1.27,
+    "reason": "Game 1: 14K/11D/10A, 242 ACS, 1.27 KD",
+    "clipFile": "AZRAEL_x_ICE__.mp4"
+  },
+  {
+    "name": "samuhikdushkrm69",
+    "team": "Radiant Reapers",
+    "bestGame": 2,
+    "kills": 15,
+    "deaths": 10,
+    "assists": 6,
+    "acs": 223,
+    "kd": 1.5,
+    "reason": "Game 2: 15K/10D/6A, 223 ACS, 1.50 KD",
+    "clipFile": "samuhikdushkrm69.mp4"
+  },
+  {
+    "name": "Sync",
+    "team": "Muth Rajya",
+    "bestGame": 1,
+    "kills": 13,
+    "deaths": 7,
+    "assists": 2,
+    "acs": 213,
+    "kd": 1.86,
+    "reason": "Game 1: 13K/7D/2A, 213 ACS, 1.86 KD",
+    "clipFile": "Sync.mp4"
+  },
+  {
+    "name": "MUTH SIPAHI",
+    "team": "Muth Rajya",
+    "bestGame": 1,
+    "kills": 7,
+    "deaths": 7,
+    "assists": 3,
+    "acs": 120,
+    "kd": 1,
+    "reason": "Game 1: 7K/7D/3A, 120 ACS, 1.00 KD",
+    "clipFile": "MUTH_SIPAHI.mp4"
+  }
+]

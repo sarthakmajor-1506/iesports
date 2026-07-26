@@ -1,0 +1,16 @@
+node_modules/
+dist/
+input/
+output/
+# Heavy rendered-video working dirs — code/config in src/, scripts/, data/ is
+# kept; the multi-GB video + frame artifacts are regenerable (see CLAUDE.md).
+ascension-reels/
+ascension-match-recaps/
+ad/
+*.mp4
+*.mov
+*.wav
+*.png
+*.srt
+.env
+.DS_Store
