@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 
-// Post-registration-close substitute list. Requires the same full profile
-// details as normal registration (fullName, phone, discord, game account) —
-// the RegisterModal "isSubstitute" flow enforces this before ever calling here.
+// Substitute list, offered once there is no seat left to take: registration has
+// closed, or every slot is booked. While slots are open the tournament pages
+// show Register Now instead and never route here. Requires the same full
+// profile details as normal registration (fullName, phone, discord, game
+// account) — the RegisterModal "isSubstitute" flow enforces this before ever
+// calling here.
 const GAME_COLLECTIONS: Record<string, string> = {
   valorant: "valorantTournaments",
   cs2: "cs2Tournaments",

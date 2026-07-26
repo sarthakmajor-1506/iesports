@@ -691,6 +691,10 @@ function CS2TournamentDetailInner() {
   })();
 
   const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
+  // Substitute list is the fallback path, never an alternative to registering.
+  // It opens only once there is no seat left to take: registration has closed,
+  // or every slot is booked. While slots are open the only CTA is Register Now.
+  const canSubstitute = isRegOpen && !isRegistered && (regClosed || slotsLeft <= 0);
   // Canonical "tournament is over" check — see same comment in the Valorant tournament page.
   const isEnded = tournament.status === "ended" || tournament.status === "completed" || (tournament.endDate && new Date() > new Date(tournament.endDate));
   const userTeam = getUserTeam();
@@ -1172,7 +1176,9 @@ function CS2TournamentDetailInner() {
                       setShowRegister(true);
                     }}>Register Now →</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                      <button className="csd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
+                      <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
+                        Slots Full
+                      </div>
                     )}
                     {isRegistered && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1197,27 +1203,27 @@ function CS2TournamentDetailInner() {
                       </div>
                     )}
                     {regClosed && !isRegistered && isRegOpen && (
-                      <>
-                        <button
-                          onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
-                          style={{
-                            padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
-                            border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
-                            fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
-                        >View Matches</button>
-                        <button
-                          onClick={() => {
-                            if (!user) { setShowLoginPrompt(true); return; }
-                            if (onWaitlist) toggleWaitlist();
-                            else setShowSubstituteRegister(true);
-                          }}
-                          disabled={waitlistLoading}
-                          style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                        >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
-                      </>
+                      <button
+                        onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                        style={{
+                          padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA",
+                          border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem",
+                          fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,165,250,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(96,165,250,0.25)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(96,165,250,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                      >View Matches</button>
+                    )}
+                    {canSubstitute && (
+                      <button
+                        onClick={() => {
+                          if (!user) { setShowLoginPrompt(true); return; }
+                          if (onWaitlist) toggleWaitlist();
+                          else setShowSubstituteRegister(true);
+                        }}
+                        disabled={waitlistLoading}
+                        style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#6fcf8a" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                      >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
                     )}
                   </>
                 )}

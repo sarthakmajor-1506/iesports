@@ -14,6 +14,7 @@ Run any of these with `npx tsx scripts/dev-tools/<name>.ts` from the
 | `launchBotLobby.ts` | Fire a `launch` GC action via `botLobbyCommands` and report bot state after |
 | `listAllDotaTournaments.ts` | Tournament inventory with status, dates, `discordChannelId` |
 | `listCS2Tournaments.ts` | Same for CS2 tournaments |
+| `listArchivedRegistrants.ts` | Read-only dump of a tournament's `archivedRegistrants` (people signed up before a registry wipe) with phone/Discord, for re-invite outreach. `--pending`, `--csv` |
 | `pollOpenDota.ts` | Submit OpenDota parse jobs + poll for indexing (debugging match data availability) |
 | `recomputeDotaStandings.ts` | CLI backstop for full standings rebuild (auto-recompute is wired into `lib/recomputeDotaStandings.ts` for runtime) |
 | `resetAndRestartBot.ts` | Hard reset: destroy active lobby + close all stale queues + reinit bot state |

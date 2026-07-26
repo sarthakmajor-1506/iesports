@@ -29,6 +29,7 @@ in most cases.
 | `_inspectCS2Prelim.ts` | Inspect the CS2 Prelim tournament before shifting its dates |
 | `_inspectDomin8R1M4.ts` | Audit the Domin8 r1-match-4 doc after auto-resolve fired |
 | `_quickResetR1M1.ts` | Quick reset of Domin8 r1-match-1 mid-debugging |
+| `_relaunchSep2026Paid.ts` | Moved CS2 Prelims (26 Sep) and Valorant Horizon (27 Sep) to paid one-day events, 20 slots, 500 entry, 8,000 winner-takes-all. Archives the old free-entry registry to `archivedRegistrants` before wiping it. Dry-run by default, `--apply` to commit. |
 | `_reattachMatchId.ts` | Re-stamp `dotaMatchId` on test r1-match-1 after an over-aggressive cleanup wiped it |
 | `_resetAllTestMatches.ts` | Reset all 5 test matches at once |
 | `_resetR2M2.ts` | Reset Domin8 r2-match-2 after iesportsbot dropped its lobby |

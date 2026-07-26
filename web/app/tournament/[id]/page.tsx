@@ -874,6 +874,10 @@ function DotaTournamentDetailInner() {
   const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
   // Canonical "tournament is over" check — see same comment in the Valorant tournament page.
   const isEnded = tournament.status === "ended" || tournament.status === "completed" || (tournament.endDate && new Date() > new Date(tournament.endDate));
+  // Substitute list is the fallback path, never an alternative to registering.
+  // It opens only once there is no seat left to take: registration has closed,
+  // or every slot is booked. While slots are open the only CTA is Register Now.
+  const canSubstitute = isRegOpen && !isRegistered && !isEnded && (regClosed || slotsLeft <= 0);
 
   const handleUnregister = async () => {
     if (!user || !id) return;
@@ -1447,7 +1451,9 @@ function DotaTournamentDetailInner() {
                   >Register Now →</button>
                 )}
                 {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
-                  <button disabled style={{ padding: "12px 32px", background: "#555", color: "#aaa", border: "none", borderRadius: 100, fontSize: "0.92rem", fontWeight: 800, cursor: "default", fontFamily: "inherit", opacity: 0.7 }}>No Slots Open</button>
+                  <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
+                    Slots Full
+                  </div>
                 )}
                 {isRegistered && (
                   <div className="dtd-registered-cluster" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1483,23 +1489,21 @@ function DotaTournamentDetailInner() {
                   </div>
                 )}
                 {regClosed && !isRegistered && isRegOpen && (
-                  <>
-                    <button
-                      onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
-                      style={{ padding: "10px 24px", background: "rgba(190,58,37,0.12)", color: "#BE3A25", border: "1px solid rgba(190,58,37,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
-                    >View Matches</button>
-                    {!isEnded && (
-                      <button
-                        onClick={() => {
-                          if (!user) { setShowLoginPrompt(true); return; }
-                          if (onWaitlist) toggleWaitlist();
-                          else setShowSubstituteRegister(true);
-                        }}
-                        disabled={waitlistLoading}
-                        style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
-                      >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
-                    )}
-                  </>
+                  <button
+                    onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                    style={{ padding: "10px 24px", background: "rgba(190,58,37,0.12)", color: "#BE3A25", border: "1px solid rgba(190,58,37,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}
+                  >View Matches</button>
+                )}
+                {canSubstitute && (
+                  <button
+                    onClick={() => {
+                      if (!user) { setShowLoginPrompt(true); return; }
+                      if (onWaitlist) toggleWaitlist();
+                      else setShowSubstituteRegister(true);
+                    }}
+                    disabled={waitlistLoading}
+                    style={{ padding: "10px 22px", background: onWaitlist ? "rgba(34,197,94,0.12)" : "rgba(251,191,36,0.1)", color: onWaitlist ? "#4ade80" : "#fbbf24", border: `1px solid ${onWaitlist ? "rgba(34,197,94,0.3)" : "rgba(251,191,36,0.3)"}`, borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: waitlistLoading ? "default" : "pointer", fontFamily: "inherit", transition: "all 0.2s", opacity: waitlistLoading ? 0.6 : 1 }}
+                  >{waitlistLoading ? "..." : onWaitlist ? "On Substitute List ✓ (leave)" : "Join as Substitute"}</button>
                 )}
                 <button className="dtd-hero-share-btn" onClick={() => setShowShareCard(true)} title="Share tournament">
                   <Share2 size={18} />
