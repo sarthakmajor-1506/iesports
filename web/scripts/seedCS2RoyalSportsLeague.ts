@@ -47,7 +47,11 @@ async function seed() {
   await db.collection("cs2Tournaments").doc(TID).set({
     name: "Royal Sports League",
     game: "cs2",
-    format: "standard",
+    // "shuffle" is what routes RegisterModal.tsx straight to the solo
+    // registration flow (POST /api/cs2/solo). CS2 has no team create/join
+    // API route yet, so any other format value would send players into a
+    // "create/join team" step that 404s.
+    format: "shuffle",
     status: "upcoming",
     bracketsComputed: false,
     registrationDeadline: REGISTRATION_CLOSES,
