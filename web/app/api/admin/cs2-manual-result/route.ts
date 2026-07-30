@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyAdmin } from "@/lib/verifyAdmin";
 import { recomputeCS2Standings, sortCS2Standings } from "@/lib/recomputeCS2Standings";
+import { sendCS2MatchResult, sendCS2TournamentComplete } from "@/lib/discord";
 
 /**
  * Manual CS2 match result entry. CS2 has no live result webhook yet (the
@@ -14,12 +15,19 @@ import { recomputeCS2Standings, sortCS2Standings } from "@/lib/recomputeCS2Stand
  *        team1Rounds?, team2Rounds? }
  *
  * After writing the result:
+ *   - a Discord channel announcement is posted (fire-and-forget, never fails
+ *     the request) — CS2 has no bot result-announcer watching Firestore yet
+ *     (that's still TODO per docs/CS2_TOURNAMENT_CONTEXT.md phase 6), so this
+ *     route posts directly instead of relying on the bot
  *   - non-bracket (group) matches trigger a full grouped standings recompute
  *   - once every group match is complete, the two semifinal placeholder
  *     matches are auto-seeded from the group standings (crossover seeding:
  *     GroupA #1 vs GroupB #2, GroupB #1 vs GroupA #2)
  *   - once both semifinals are complete, the final placeholder match is
  *     auto-seeded from the semifinal winners
+ *   - if this IS the final match, the tournament is stamped
+ *     championTeamId/championTeamName/status:"ended" and a champion
+ *     announcement is posted
  *
  * This only fires for the fixed 2-group / 4-team playoff shape this route
  * was built for (semifinal match ids "cs2-sf1"/"cs2-sf2", final "cs2-final").
@@ -45,22 +53,26 @@ export async function POST(req: NextRequest) {
 
   const tref = adminDb.collection("cs2Tournaments").doc(tournamentId);
   const ref = tref.collection("matches").doc(matchId);
-  const snap = await ref.get();
+  const [snap, tSnap] = await Promise.all([ref.get(), tref.get()]);
   if (!snap.exists) return NextResponse.json({ error: "match not found" }, { status: 404 });
   const m: any = snap.data();
+  const tournament: any = tSnap.data() || {};
 
   const nowIso = new Date().toISOString();
   const winnerName = winner === "team1" ? m.team1Name : m.team2Name;
+  const team1RoundsWon = team1Rounds ?? (winner === "team1" ? 13 : 0);
+  const team2RoundsWon = team2Rounds ?? (winner === "team2" ? 13 : 0);
+  const team1SeriesScore = winner === "team1" ? 1 : 0;
+  const team2SeriesScore = winner === "team2" ? 1 : 0;
 
   await ref.set({
     status: "completed",
-    team1Score: winner === "team1" ? 1 : 0,
-    team2Score: winner === "team2" ? 1 : 0,
+    team1Score: team1SeriesScore,
+    team2Score: team2SeriesScore,
     winner,
     completedAt: nowIso,
     game1: {
-      team1RoundsWon: team1Rounds ?? (winner === "team1" ? 13 : 0),
-      team2RoundsWon: team2Rounds ?? (winner === "team2" ? 13 : 0),
+      team1RoundsWon, team2RoundsWon,
       completedAt: nowIso,
       status: "completed",
     },
@@ -72,8 +84,20 @@ export async function POST(req: NextRequest) {
     },
   }, { merge: true });
 
+  const bo = m.isBracket
+    ? (m.bracketType === "grand_final" ? (tournament.grandFinalBestOf || 3) : (tournament.bracketBestOf || 3))
+    : (tournament.matchesPerRound || 1);
+
+  const discordAnnounce = await sendCS2MatchResult({
+    team1Name: m.team1Name, team2Name: m.team2Name, winnerName,
+    team1RoundsWon, team2RoundsWon, team1SeriesScore, team2SeriesScore, bo,
+    isBracket: !!m.isBracket, bracketLabel: m.bracketLabel,
+    channelIdOverride: tournament.discordChannelId,
+  }).catch((e: any) => ({ ok: false, error: e?.message || String(e) }));
+
   let standingsRefresh: any = null;
   let bracketAdvance: any = null;
+  let championAnnounce: any = null;
 
   if (!m.isBracket) {
     try { standingsRefresh = await recomputeCS2Standings(adminDb, tournamentId); }
@@ -84,9 +108,27 @@ export async function POST(req: NextRequest) {
   } else {
     try { bracketAdvance = await maybeSeedCS2Final(tournamentId); }
     catch (e: any) { bracketAdvance = { error: e?.message || String(e) }; }
+
+    if (matchId === "cs2-final") {
+      await tref.set({
+        championTeamId: winner === "team1" ? m.team1Id : m.team2Id,
+        championTeamName: winnerName,
+        status: "ended",
+      }, { merge: true });
+
+      championAnnounce = await sendCS2TournamentComplete({
+        tournamentName: tournament.name || "CS2 Tournament",
+        tournamentId,
+        winnerName,
+        prizePool: tournament.prizePool || "TBD",
+        team1Name: m.team1Name, team2Name: m.team2Name,
+        team1SeriesScore, team2SeriesScore,
+        channelIdOverride: tournament.discordChannelId,
+      }).catch((e: any) => ({ ok: false, error: e?.message || String(e) }));
+    }
   }
 
-  return NextResponse.json({ ok: true, winner, winnerName, matchId, standingsRefresh, bracketAdvance });
+  return NextResponse.json({ ok: true, winner, winnerName, matchId, discordAnnounce, standingsRefresh, bracketAdvance, championAnnounce });
 }
 
 /**
