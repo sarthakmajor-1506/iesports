@@ -37,7 +37,7 @@ const TID = "cs2-royal-sports-league";
 
 // NOTE: start/end times are a placeholder single-day window — adjust before
 // running if you want a different start time for 31 July.
-const REGISTRATION_CLOSES = "2026-07-31T00:00:00+05:30";
+const REGISTRATION_CLOSES = "2026-07-31T23:59:00+05:30";
 const START_DATE = "2026-07-31T10:00:00+05:30";
 const END_DATE = "2026-07-31T22:00:00+05:30";
 
