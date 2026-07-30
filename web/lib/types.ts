@@ -680,3 +680,24 @@ export interface CS2Tournament {
     formatBg?: string;
   };
 }
+
+// ── CS2 team (Firestore: "cs2Tournaments/{id}/teams/{teamId}") ─────
+// Written by /api/cs2/shuffle-teams (lib/shuffleCS2Teams.ts) — no MMR/role
+// system like Dota's Team, since CS2 has no automated skill signal yet.
+export interface CS2Team {
+  id: string;
+  tournamentId: string;
+  teamIndex: number;
+  teamName: string;
+  groupId: string;
+  captainUid: string;
+  avgSkillLevel: number;
+  members: Array<{
+    uid: string;
+    steamName: string;
+    steamAvatar: string;
+    skillLevel: number;
+    cs2RankTier: number;
+  }>;
+  createdAt: string;
+}
