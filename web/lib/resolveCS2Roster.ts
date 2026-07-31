@@ -13,6 +13,27 @@ import type { Firestore } from "firebase-admin/firestore";
  * users/{uid}.steamId.
  */
 
+/**
+ * Steam names routinely contain decorative Unicode ("𝐊Λ𝐋ΛП𝐈𝐏ΣΣ𝐊 ツ нυитєя007™"),
+ * which lands in the MatchZy match config and from there in console commands
+ * and the server hostname. MatchZy reports a failed load only as
+ * "Match load failed!" with no reason, so anything in the payload that could
+ * plausibly be rejected is worth removing rather than debugging blind.
+ *
+ * Keeps printable ASCII, collapses whitespace, caps length, and falls back to
+ * a placeholder if nothing usable survives. The name is cosmetic — identity is
+ * the Steam64 key, which is untouched.
+ */
+export function safePlayerName(raw: string | undefined | null): string {
+  const cleaned = String(raw ?? "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/["\\;]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 28);
+  return cleaned || "player";
+}
+
 export interface CS2RosterResolution {
   ok: boolean;
   error?: string;
@@ -64,7 +85,7 @@ export async function resolveCS2Roster(
         missing.push({ uid: mem.uid, steamName: mem.steamName });
         return;
       }
-      players[String(steamId)] = mem.steamName || userSnap.data()?.steamName || "player";
+      players[String(steamId)] = safePlayerName(mem.steamName || userSnap.data()?.steamName);
     }));
     return players;
   };
