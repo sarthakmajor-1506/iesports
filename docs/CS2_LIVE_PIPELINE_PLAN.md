@@ -112,19 +112,30 @@ places and must be byte-identical in all three.
 CS2_RCON_HOST=62.72.41.184
 CS2_RCON_PORT=27042
 CS2_RCON_PASSWORD=<the rcon_password from the friend, verified working>
+CS2_RCON_HOST_2=62.72.41.184
+CS2_RCON_PORT_2=27021
+CS2_RCON_PASSWORD_2=<the second box's rcon_password>
 CS2_MATCH_CONFIG_TOKEN=<TOKEN>
 ```
 
 `CS2_RCON_PORT` is **not optional**. `rconTargetFromEnv()` in
 `bot/src/services/cs2-rcon.ts:65` defaults to 27015 and this server is on 27042.
 
-Redeploy the bot. Success looks like this line in the Railway logs:
+The `_2` set is the **second game server**, which exists so the fixture sheet's
+two concurrent areas can both run — one box holds one match. It is optional:
+without it the bot runs exactly as it did with one server, and any command
+aimed at server 2 comes back as an error rather than sitting pending forever.
+See "Two servers" in `docs/CS2_TOURNAMENT_CONTEXT.md`.
+
+Redeploy the bot. Success looks like these lines in the Railway logs:
 
 ```
-[CS2] RCON control running -> 62.72.41.184:27042
+[CS2] RCON control running -> server 1 62.72.41.184:27042
+[CS2] RCON control running -> server 2 62.72.41.184:27021
 ```
 
-If you instead see `[CS2] RCON not configured`, the env vars did not land.
+If you instead see `[CS2] RCON not configured`, the env vars did not land. If
+only server 1 appears, the `_2` variables did not land.
 
 ### 2c. Vercel environment variable
 
