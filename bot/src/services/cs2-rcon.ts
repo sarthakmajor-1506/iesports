@@ -57,10 +57,19 @@ export interface RconResult {
   error?: string;
 }
 
-/** null when RCON isn't configured — every caller treats that as "skip". */
+/**
+ * null when RCON isn't configured — every caller treats that as "skip".
+ *
+ * Values are trimmed because these are pasted into a hosting dashboard by
+ * hand, and a stray space is invisible there but fatal here: a padded host
+ * fails to connect, and a padded password fails auth with an error that
+ * looks identical to a genuinely wrong password. (The port survives untrimmed
+ * because Number() ignores surrounding whitespace, which is exactly why a
+ * padded port went unnoticed until it showed up in a startup log.)
+ */
 export function rconTargetFromEnv(): RconTarget | null {
-  const host = process.env.CS2_RCON_HOST;
-  const password = process.env.CS2_RCON_PASSWORD;
+  const host = process.env.CS2_RCON_HOST?.trim();
+  const password = process.env.CS2_RCON_PASSWORD?.trim();
   if (!host || !password) return null;
   return { host, port: Number(process.env.CS2_RCON_PORT || 27015), password };
 }

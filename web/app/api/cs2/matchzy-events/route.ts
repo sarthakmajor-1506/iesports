@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { safeTokenEqual } from "@/lib/cs2Auth";
+import { cs2TokenValid } from "@/lib/cs2Auth";
 import { settleCS2Match } from "@/lib/settleCS2Match";
 
 /**
@@ -39,9 +39,7 @@ function seenKeyFor(payload: any): string {
 }
 
 export async function POST(req: NextRequest) {
-  const configured = process.env.CS2_MATCH_CONFIG_TOKEN;
-  const provided = req.headers.get("x-iesports-token") || "";
-  if (!configured || !provided || !safeTokenEqual(provided, configured)) {
+  if (!cs2TokenValid(req.headers.get("x-iesports-token"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
