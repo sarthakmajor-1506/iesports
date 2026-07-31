@@ -158,7 +158,18 @@ export async function GET(
       matchzy_remote_log_url: `${CS2_PUBLIC_BASE_URL}/api/cs2/matchzy-events`,
       matchzy_remote_log_header_key: "X-IESports-Token",
       matchzy_remote_log_header_value: token,
-      matchzy_whitelist_enabled_default: "true",
+      // Whitelist OFF by default. It restricts connections to the Steam64s on
+      // this match's roster, which is only safe when those rosters are
+      // complete — and on the night they were not: loading a semifinal kicked
+      // everyone who had been added to a team by hand or had registered late,
+      // including players who were mid-game. A locked-out roster stops an
+      // event dead, while an open server just risks a stranger joining a
+      // password-protected match.
+      //
+      // Set `enforceWhitelist: true` on the tournament once its rosters are
+      // known-good to get the protection back. Note css_whitelist is a TOGGLE,
+      // not a setter, so this cvar is the only reliable way to set the state.
+      matchzy_whitelist_enabled_default: tournament.enforceWhitelist ? "true" : "false",
       // Round limit per the published fixture sheet: group games are MR16
       // (first to 9), play-offs MR24 (first to 13). CS2 defaults to 24, so
       // without this every group game would run to 13 and blow through its
