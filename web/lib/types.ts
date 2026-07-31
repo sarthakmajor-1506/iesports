@@ -701,3 +701,92 @@ export interface CS2Team {
   }>;
   createdAt: string;
 }
+
+// ── CS2 per-map result, keyed game1/game2/game3 on the match doc ───
+// NEVER an array — see docs/CS2_LIVE_PIPELINE_PLAN.md field-shape gotcha.
+export interface CS2GameResult {
+  team1RoundsWon: number;
+  team2RoundsWon: number;
+  status?: "live" | "completed";
+  map?: string;
+  demoUrl?: string;
+  completedAt?: string;
+}
+
+// ── CS2 match (Firestore: "cs2Tournaments/{id}/matches/{matchId}") ─
+// Written by lib/shuffleCS2Teams.ts (creation), lib/settleCS2Match.ts
+// (result — shared by the manual admin route and the MatchZy webhook),
+// and web/app/api/admin/cs2-server route (matchzyMatchId, plannedMaps).
+export interface CS2Match {
+  id: string;
+  tournamentId: string;
+  groupId?: string;
+  team1Id: string;
+  team1Name: string;
+  team2Id: string;
+  team2Name: string;
+  team1Score: number;
+  team2Score: number;
+  matchDay?: number;
+  matchIndex?: number;
+  isBracket: boolean;
+  bracketType?: "winners" | "grand_final"; // "winners" = semifinal (see lib/shuffleCS2Teams.ts)
+  bracketLabel?: string;
+  status: "pending" | "live" | "completed";
+  winner?: "team1" | "team2";
+  scheduledTime?: string;
+  completedAt?: string;
+  game1?: CS2GameResult;
+  game2?: CS2GameResult;
+  game3?: CS2GameResult;
+  // Server-control fields, added by the RCON pipeline (Phase 2+).
+  matchzyMatchId?: number;
+  plannedMaps?: string[];
+  liveStartedAt?: string;
+  liveUpdatedAt?: string;
+  vetoLog?: Array<{ event: string; map?: string; team?: string; side?: string; at: string }>;
+  result?: {
+    source: "manual-admin" | "matchzy";
+    winnerTeam: "team1" | "team2";
+    enteredBy?: string;
+    enteredAt: string;
+  };
+}
+
+// ── CS2 server control bus (Firestore, server-only via Admin SDK) ──
+// Bridge collections between web (admin panel) and the Railway bot's
+// RCON client. See bot/src/services/cs2-server.ts and
+// web/app/api/admin/cs2-server/route.ts.
+export type CS2ServerCommandAction =
+  | "load_match" | "start" | "force_start" | "end_match" | "force_end"
+  | "restart_match" | "pause" | "unpause" | "reload_admins"
+  | "change_map" | "set_password" | "status" | "exec";
+
+export interface CS2ServerCommand {
+  id: string;
+  action: CS2ServerCommandAction;
+  params: Record<string, any>;
+  status: "pending" | "processing" | "done" | "error";
+  result?: any;
+  error?: string | null;
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+}
+
+// Doc: cs2ServerControl/state — published by the bot, advisory only.
+// NEVER treat this as the source of truth for match state; the MatchZy
+// webhook into cs2Tournaments/{id}/matches/{id} is authoritative.
+export interface CS2ServerState {
+  status: "unknown" | "online" | "offline" | "error";
+  hostname: string | null;
+  map: string | null;
+  humans: number | null;
+  maxPlayers: number | null;
+  loadedMatchId: string | null;
+  lastCommand: string | null;
+  lastError: string | null;
+  host: string | null;
+  port: number;
+  updatedAt?: string;
+}
