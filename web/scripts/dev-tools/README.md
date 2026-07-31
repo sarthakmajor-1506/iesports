@@ -17,7 +17,7 @@ Run any of these with `npx tsx scripts/dev-tools/<name>.ts` from the
 | `pollOpenDota.ts` | Submit OpenDota parse jobs + poll for indexing (debugging match data availability) |
 | `recomputeDotaStandings.ts` | CLI backstop for full standings rebuild (auto-recompute is wired into `lib/recomputeDotaStandings.ts` for runtime) |
 | `resetAndRestartBot.ts` | Hard reset: destroy active lobby + close all stale queues + reinit bot state |
-| `seedCS2TestMatch.ts --p1=<uid> --p2=<uid> [--tid=]` | Creates a throwaway 1v1 CS2 tournament + 2 one-player teams + 1 pending match, for smoke-testing the RCON/MatchZy pipeline without touching real tournament data |
+| `seedCS2TestMatch.ts --p1=<uid\|name> --p2=<uid\|name> [--tid=] [--name=] [--apply]` | Creates a private 1v1 CS2 test tournament (`isTestTournament` + `visibleToUids`, so only those two players see it), registers both, and adds one pending match. For smoke-testing the RCON/MatchZy pipeline without touching real tournament data. Dry run unless `--apply` |
 | `softResetMatch.ts <tid> <mid>` | Soft reset one match's admin-side doc — bot lobby + VCs untouched |
 | `testCreateLobby.ts` | End-to-end smoke test: enqueue a `create` botLobbyCommand and poll for result |
 | `testGCFetch.ts` | Diagnose `requestMatchDetails` behavior — submits a known-good historical matchId to see if GC is responsive |
