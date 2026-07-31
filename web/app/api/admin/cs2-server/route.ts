@@ -201,6 +201,21 @@ export async function POST(req: NextRequest) {
     }
 
     const patch: any = { plannedMaps };
+
+    // Round limit for this match. Stored on the match doc because that is
+    // where match-config looks first (ahead of the tournament's
+    // groupMaxRounds / bracketMaxRounds), so a game shortened on the night to
+    // claw back time survives a reload without touching tournament config.
+    // Bounded rather than free-form: this ends up in a console command, and a
+    // typo'd 160 is a match nobody can finish.
+    if (body.params?.maxRounds !== undefined) {
+      const mr = Number(body.params.maxRounds);
+      if (!Number.isInteger(mr) || mr < 2 || mr > 60) {
+        return NextResponse.json({ error: "maxRounds must be a whole number between 2 and 60" }, { status: 400 });
+      }
+      patch.maxRounds = mr;
+    }
+
     if (body.params?.plannedMapSides !== undefined) {
       const sides = Array.isArray(body.params.plannedMapSides) ? body.params.plannedMapSides.map(String) : [];
       if (sides.length !== plannedMaps.length || !sides.every((s: string) => CS2_MAP_SIDES.includes(s))) {

@@ -66,6 +66,14 @@ function bestOfFor(m: MatchOpt | undefined, t: TournamentFormat | null): number 
   return Number(t?.matchesPerRound) || 1;
 }
 
+/** The round limits this tournament actually uses, plus a smoke-test length. */
+const MR_PRESETS = [
+  { value: 2, label: "MR2 — smoke test (first to 2)" },
+  { value: 6, label: "MR6 — short (first to 4)" },
+  { value: 16, label: "MR16 — league (first to 9)" },
+  { value: 24, label: "MR24 — play-off (first to 13)" },
+];
+
 /** mp_maxrounds the server will actually get — mirrors api/cs2/match-config. */
 function maxRoundsFor(m: MatchOpt | undefined, t: TournamentFormat | null): number {
   if (!m) return 24;
@@ -109,6 +117,7 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
   const [numMaps, setNumMaps] = useState(1);
   const [plannedMaps, setPlannedMaps] = useState<string[]>([CS2_ACTIVE_DUTY_MAPS[0]]);
   const [plannedMapSides, setPlannedMapSides] = useState<string[]>(["knife"]);
+  const [matchMaxRounds, setMatchMaxRounds] = useState("16");
   const [validation, setValidation] = useState<{ ok: boolean; detail: string } | null>(null);
 
   const [mapToChange, setMapToChange] = useState(CS2_ACTIVE_DUTY_MAPS[0]);
@@ -197,6 +206,9 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
       // be played, not as the normal path.
       return saved ?? Array.from({ length: n }, () => "knife");
     });
+    // Seeded from what this match would get anyway (its own maxRounds, else
+    // the tournament's stage default), so leaving it alone changes nothing.
+    setMatchMaxRounds(String(maxRoundsFor(selectedMatch, tFormat)));
     // The area on the fixture sheet IS the server the match belongs on.
     if (selectedMatch.area === 1 || selectedMatch.area === 2) setServerId(String(selectedMatch.area));
     setValidation(null);
@@ -346,8 +358,28 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
           <>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12, fontSize: "0.74rem", color: "#9ca3af" }}>
               <span>format <b style={{ color: "#e6e7ee" }}>BO{bestOf}</b></span>
-              <span>rounds <b style={{ color: "#e6e7ee" }}>MR{maxRoundsFor(selectedMatch, tFormat)}</b> (first to {Math.floor(maxRoundsFor(selectedMatch, tFormat) / 2) + 1})</span>
               <span>stage <b style={{ color: "#e6e7ee" }}>{selectedMatch.isBracket ? "play-off" : "league"}</b></span>
+            </div>
+
+            {/* Round limit, saved onto the match doc on Load Match. Match-config
+                prefers this over the tournament's group/bracket defaults, so a
+                game shortened on the night to claw back time survives a reload. */}
+            <span style={labelStyle}>Rounds (mp_maxrounds)</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+              <select style={{ ...selectStyle, width: "auto", minWidth: 210 }}
+                value={MR_PRESETS.some(p => String(p.value) === matchMaxRounds) ? matchMaxRounds : "custom"}
+                onChange={e => { if (e.target.value !== "custom") setMatchMaxRounds(e.target.value); }}>
+                {MR_PRESETS.map(p => <option key={p.value} value={String(p.value)}>{p.label}</option>)}
+                <option value="custom">custom…</option>
+              </select>
+              <input style={{ ...inputStyle, width: 90 }} value={matchMaxRounds} inputMode="numeric"
+                onChange={e => setMatchMaxRounds(e.target.value.replace(/\D/g, "").slice(0, 2))} />
+              <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
+                {Number(matchMaxRounds) >= 2
+                  ? `first to ${Math.floor(Number(matchMaxRounds) / 2) + 1}, halftime after ${Number(matchMaxRounds) / 2}`
+                  : "2–60"}
+                {Number(matchMaxRounds) % 2 === 1 && <b style={{ color: "#fcd34d" }}> · odd number splits the halves unevenly</b>}
+              </span>
             </div>
 
             {/* The fixture sheet's area is the server this match belongs on.
@@ -401,7 +433,13 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
                 onClick={async () => {
                   setBusy("load_match"); setMsg("⏳ saving planned maps…");
                   try {
-                    await api("save_planned_maps", { tournamentId, matchId, plannedMaps, plannedMapSides });
+                    await api("save_planned_maps", {
+                      tournamentId, matchId, plannedMaps, plannedMapSides,
+                      maxRounds: Number(matchMaxRounds) || undefined,
+                    });
+                    // Prefill the live push with what this match asked for —
+                    // on MatchZy 0.8.5 it will need pushing again once live.
+                    setLiveMaxRounds(String(Number(matchMaxRounds) || ""));
                     await cmd("load_match", { tournamentId, matchId });
                   } catch (e: any) { setMsg(`✗ load_match: ${e.message}`); }
                   finally { setBusy(null); }
@@ -497,9 +535,9 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
             }}>Apply to Server {serverId}</button>
           {selectedMatch && (
             <button style={btn("#374151")} onClick={() => {
-              setLiveMaxRounds(String(maxRoundsFor(selectedMatch, tFormat)));
+              setLiveMaxRounds(matchMaxRounds);
               setLiveFreezeTime("5");
-            }}>Use match values (MR{maxRoundsFor(selectedMatch, tFormat)})</button>
+            }}>Use match values (MR{matchMaxRounds || maxRoundsFor(selectedMatch, tFormat)})</button>
           )}
         </div>
       </div>
