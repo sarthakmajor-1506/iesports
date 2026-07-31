@@ -154,6 +154,11 @@ async function main() {
   batch.set(tref, {
     teamsGenerated: true, teamCount: 8, groupCount: 2,
     groupMaxRounds: 16, bracketMaxRounds: 24,
+    // BO1 everywhere, play-offs included. Restated here (the tournament
+    // seeder sets the same values) because this script is the one that runs
+    // on the night, and a stale BO3 on the tournament doc would put a
+    // three-map maplist in front of a play-off that has one 20-minute slot.
+    matchesPerRound: 1, bracketBestOf: 1, grandFinalBestOf: 1,
     status: "active", teamsGeneratedAt: nowIso,
   }, { merge: true });
   await batch.commit();

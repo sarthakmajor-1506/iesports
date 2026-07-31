@@ -2,9 +2,15 @@
  * Create the "Royal Sports League" CS2 tournament — opens solo registration.
  *
  * Format: 40 players (8 teams x 5), split into 2 groups of 4 once registration
- * closes. Group stage: round robin BO1 (3 matches per team). Top 2 per group
- * advance to a single-elimination play-off: 2 semifinals (BO3) -> final (BO3).
- * No 3rd place match. Free entry, prize pool TBD. One-day event on 31 July 2026.
+ * closes. Group stage: round robin BO1 at MR16 (3 matches per team). Top 2 per
+ * group advance to a single-elimination play-off: 2 semifinals -> final, also
+ * BO1 but at MR24. No 3rd place match. Free entry, prize pool TBD. One-day
+ * event on 31 July 2026.
+ *
+ * Everything is BO1: the published schedule runs matches back-to-back in
+ * 20-minute slots from 21:00, and a single BO3 play-off would eat three of
+ * those slots on its own. Play-offs get the longer MR24 instead, which is the
+ * time the format has to spend.
  *
  * This script only creates the tournament + opens registration. Team
  * formation, group assignment, and match generation happen AFTER
@@ -63,9 +69,9 @@ async function seed() {
     prizePool: "TBD",
     rules: [
       "40 players, 8 teams of 5 — teams and groups are assigned by admin after registration closes",
-      "Group stage: 2 groups of 4 teams, round robin, best of 1",
+      "Group stage: 2 groups of 4 teams, round robin, best of 1 — MR16 (first to 9)",
       "Top 2 teams from each group qualify for the play-offs",
-      "Play-offs: single elimination — 2 semifinals (best of 3) into 1 final (best of 3)",
+      "Play-offs: single elimination — 2 semifinals into 1 final, best of 1 — MR24 (first to 13)",
       "No 3rd place match",
       "Maps: standard CS2 active duty pool, team veto before each match",
       "All players must have a linked Steam account",
@@ -84,8 +90,15 @@ async function seed() {
     groupStageRounds: 3,
     matchesPerRound: 1,
     bracketFormat: "single_elimination",
-    bracketBestOf: 3,
-    grandFinalBestOf: 3,
+    // BO1 throughout — see the header. These drive both the config handed to
+    // MatchZy (num_maps in api/cs2/match-config) and the series score written
+    // on settle (lib/settleCS2Match.ts); they must never disagree.
+    bracketBestOf: 1,
+    grandFinalBestOf: 1,
+    // Round limits, read by api/cs2/match-config as the mp_maxrounds fallback
+    // when a match carries no maxRounds of its own.
+    groupMaxRounds: 16,
+    bracketMaxRounds: 24,
     bracketTeamCount: 4,
     createdAt: new Date().toISOString(),
   }, { merge: true });
