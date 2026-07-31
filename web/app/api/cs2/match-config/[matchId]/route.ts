@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { cs2TokenValid, cs2ConfigToken } from "@/lib/cs2Auth";
-import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
+import { resolveCS2Roster, safePlayerName } from "@/lib/resolveCS2Roster";
 import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
 
 /**
@@ -75,16 +75,30 @@ export async function GET(
 
   const mapSides = maplist.map(() => "knife");
 
+  // Diagnostic breadcrumb: proves whether MatchZy actually reached us. When a
+  // load fails, the server only ever says "Match load failed!" with no reason,
+  // so without this there is no way to tell a failed fetch from a rejected
+  // payload. Cheap (a handful of writes per event) and fire-and-forget.
+  adminDb.collection("cs2MatchConfigRequests").add({
+    at: new Date().toISOString(),
+    tournamentId, matchId,
+    matchzyMatchId: m.matchzyMatchId,
+    userAgent: req.headers.get("user-agent") || null,
+    ip: req.headers.get("x-forwarded-for") || null,
+  }).catch(() => {});
+
   return NextResponse.json({
-    matchid: m.matchzyMatchId,
+    // String, not number. MatchZy/Get5 configs use a string matchid, and a
+    // bare JSON number is a plausible cause of a silent parse rejection.
+    matchid: String(m.matchzyMatchId),
     num_maps: numMaps,
     maplist,
     skip_veto: true,
     map_sides: mapSides,
     players_per_team: tournament.playersPerTeam || 5,
     clinch_series: true,
-    team1: { name: team1.teamName || m.team1Name || "Team 1", players: team1Players },
-    team2: { name: team2.teamName || m.team2Name || "Team 2", players: team2Players },
+    team1: { name: safePlayerName(team1.teamName || m.team1Name) || "Team 1", players: team1Players },
+    team2: { name: safePlayerName(team2.teamName || m.team2Name) || "Team 2", players: team2Players },
     // Applied by MatchZy when it loads this config, and reverted on series
     // end (matchzy_reset_cvars_on_series_end defaults true). This is the
     // reliable way to point the server at our webhook: these are
