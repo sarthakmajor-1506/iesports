@@ -46,6 +46,50 @@ export interface CS2RosterResolution {
   match?: any;
 }
 
+/**
+ * Resolve a list of uids OR raw Steam64s into MatchZy's `{steam64: name}`
+ * shape. Used for spectators, where the input is whatever an admin had to
+ * hand: a site uid for a registered player, or a bare Steam64 pasted from a
+ * profile URL for a caster who never registered.
+ *
+ * Unresolvable entries are skipped rather than failing the call — a missing
+ * spectator must never block a match from loading. They are returned in
+ * `unresolved` so the panel can say who was dropped.
+ */
+export async function resolveCS2SteamIds(
+  db: Firestore,
+  tournamentId: string,
+  entries: string[],
+): Promise<{ players: Record<string, string>; unresolved: string[] }> {
+  const tRef = db.collection("cs2Tournaments").doc(tournamentId);
+  const players: Record<string, string> = {};
+  const unresolved: string[] = [];
+
+  await Promise.all(entries.map(async (raw) => {
+    const entry = String(raw || "").trim();
+    if (!entry) return;
+
+    // A 17-digit number is a Steam64 already — no lookup, and no requirement
+    // that the person has an account on the site at all.
+    if (/^\d{17}$/.test(entry)) {
+      players[entry] = players[entry] || "spectator";
+      return;
+    }
+
+    const [soloSnap, userSnap] = await Promise.all([
+      tRef.collection("soloPlayers").doc(entry).get(),
+      db.collection("users").doc(entry).get(),
+    ]);
+    const steamId = soloSnap.data()?.steamId || userSnap.data()?.steamId;
+    if (!steamId) { unresolved.push(entry); return; }
+    players[String(steamId)] = safePlayerName(
+      soloSnap.data()?.steamName || userSnap.data()?.steamName || userSnap.data()?.fullName
+    );
+  }));
+
+  return { players, unresolved };
+}
+
 export async function resolveCS2Roster(
   db: Firestore,
   tournamentId: string,

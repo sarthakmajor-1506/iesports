@@ -15,11 +15,23 @@
  * against steamName / discordUsername / fullName. A fragment that matches zero
  * or several users aborts with the candidates printed, rather than guessing.
  *
+ * TWO matches are created, `cs2-test-m1` (area 1) and `cs2-test-m2` (area 2),
+ * because the real event runs two game servers at once and the failure mode
+ * that matters — events from both boxes landing in the right match doc — is
+ * invisible with a single match. Load m1 on server 1 and m2 on server 2 and
+ * watch both settle.
+ *
+ * Rounds default to `--rounds=2` (mp_maxrounds 2, first to 2). A smoke test
+ * exists to prove the result pipeline, and MR16 means sitting through a real
+ * game to find out that it doesn't work.
+ *
  * Dry run by default (repo convention) — nothing is written until --apply:
  *   npx tsx scripts/dev-tools/seedCS2TestMatch.ts --p1=HunterxD --p2=Major
  *   npx tsx scripts/dev-tools/seedCS2TestMatch.ts --p1=HunterxD --p2=Major --apply
+ *   npx tsx scripts/dev-tools/seedCS2TestMatch.ts --p1=.. --p2=.. --rounds=6 --apply
  *
- * Re-running with --apply overwrites the same docs, so it is safe to redo.
+ * Re-running with --apply overwrites the same docs, so it is safe to redo. It
+ * resets both matches to pending — run it again to replay a test.
  */
 import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -57,6 +69,13 @@ const TNAME = arg("name") || "CS2 Test Tournament";
  */
 const T1NAME = arg("t1name");
 const T2NAME = arg("t2name");
+
+/**
+ * mp_maxrounds for the test matches. 2 (first to 2) keeps a full smoke test
+ * to a couple of minutes. Read by api/cs2/match-config off the match doc's
+ * `maxRounds`, the same field the real fixtures use for MR16/MR24.
+ */
+const ROUNDS = Math.max(2, Number(arg("rounds") || 2));
 
 interface Resolved { uid: string; steamId: string; steamName: string; steamAvatar: string; label: string }
 
@@ -115,7 +134,7 @@ async function main() {
   console.log(`\nTournament: cs2Tournaments/${TID}  "${TNAME}"`);
   console.log(`  isTestTournament: true  (hidden from the public CS2 list)`);
   console.log(`  visibleToUids: [${p1.uid}, ${p2.uid}]  (only these two see it)`);
-  console.log(`  match: cs2-test-m1  ${T1NAME || p1.steamName} vs ${T2NAME || p2.steamName}  BO1\n`);
+  console.log(`  matches: cs2-test-m1 (area 1) + cs2-test-m2 (area 2)  ${T1NAME || p1.steamName} vs ${T2NAME || p2.steamName}  BO1  MR${ROUNDS}\n`);
 
   if (!APPLY) {
     console.log("DRY RUN — nothing written. Re-run with --apply to create it.");
@@ -147,6 +166,10 @@ async function main() {
     matchesPerRound: 1,
     bracketBestOf: 1,
     grandFinalBestOf: 1,
+    // Fallback for both matches; each match doc also carries its own
+    // maxRounds, which wins.
+    groupMaxRounds: ROUNDS,
+    bracketMaxRounds: ROUNDS,
     rules: ["Private 1v1 test match for the RCON/MatchZy pipeline. Not a real tournament."],
     desc: "Private test tournament created by scripts/dev-tools/seedCS2TestMatch.ts",
     createdAt: nowIso,
@@ -183,20 +206,34 @@ async function main() {
   await tref.collection("teams").doc("team1").set(mkTeam("team1", 0, p1, t1), { merge: true });
   await tref.collection("teams").doc("team2").set(mkTeam("team2", 1, p2, t2), { merge: true });
 
-  await tref.collection("matches").doc("cs2-test-m1").set({
-    id: "cs2-test-m1", tournamentId: TID, groupId: "A",
-    team1Id: "team1", team1Name: t1,
-    team2Id: "team2", team2Name: t2,
-    team1Score: 0, team2Score: 0,
-    matchDay: 1, matchIndex: 1,
-    isBracket: false, status: "pending",
-    scheduledTime: nowIso,
-  }, { merge: true });
+  // One match per area, so both servers can be smoke-tested at once. Same two
+  // teams in both — the point is proving that each server's events land in
+  // its own match doc, not simulating a real bracket.
+  for (const [id, area, idx] of [["cs2-test-m1", 1, 1], ["cs2-test-m2", 2, 2]] as const) {
+    await tref.collection("matches").doc(id).set({
+      id, tournamentId: TID, groupId: "A",
+      team1Id: "team1", team1Name: t1,
+      team2Id: "team2", team2Name: t2,
+      team1Score: 0, team2Score: 0,
+      matchDay: 1, matchIndex: idx, area,
+      maxRounds: ROUNDS,
+      isBracket: false, status: "pending",
+      scheduledTime: nowIso,
+      // Cleared so a re-run is a genuine replay rather than a match that
+      // still carries the previous attempt's result.
+      winner: FieldValue.delete(), completedAt: FieldValue.delete(),
+      result: FieldValue.delete(), liveStartedAt: FieldValue.delete(),
+      liveUpdatedAt: FieldValue.delete(), matchzyMatchId: FieldValue.delete(),
+      game1: FieldValue.delete(), game2: FieldValue.delete(), game3: FieldValue.delete(),
+    }, { merge: true });
+  }
 
   console.log("Created.\n");
   console.log(`  Page:  https://www.iesports.in/cs2/tournament/${TID}`);
   console.log(`         (visible only to ${p1.steamName} and ${p2.steamName} while signed in)`);
-  console.log(`  Admin: /admin -> CS2 Server tab -> tournament "${TNAME}", match "cs2-test-m1"`);
+  console.log(`  Admin: /admin -> CS2 Server tab -> tournament "${TNAME}"`);
+  console.log(`         Server 1 -> match "cs2-test-m1"   Server 2 -> match "cs2-test-m2"`);
+  console.log(`         Both MR${ROUNDS} (first to ${Math.floor(ROUNDS / 2) + 1}), BO1.`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error("\n" + (e?.message || e)); process.exit(1); });

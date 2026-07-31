@@ -157,12 +157,64 @@ Bot polls `matchzy_stats_players` after series_end → `cs2Tournaments/{tid}/lea
 CS2_RCON_HOST=62.72.41.184
 CS2_RCON_PORT=27042
 CS2_RCON_PASSWORD=<from friend — the rcon_password, NOT lotgg5>
+CS2_RCON_HOST_2=62.72.41.184        # second server, area 2 (see below)
+CS2_RCON_PORT_2=27021
+CS2_RCON_PASSWORD_2=<the second box's rcon_password>
 CS2_MATCH_CONFIG_TOKEN=<random 32+ char, shared with matchzy_loadmatch_url header>
 CS2_STATUS_POLL_MS=20000            # optional
 MATCHZY_DATABASE_URL=<only if using the abandoned MAT path — not needed>
 ```
 Web (Vercel) needs `CS2_MATCH_CONFIG_TOKEN` too (to validate the webhook + config
-requests).
+requests). The web app never needs RCON credentials — it only writes command
+docs, and the bot is the only process that holds a socket to a game server.
+
+## Two servers (added 31 Jul 2026)
+
+The fixture sheet runs two matches per 20-minute slot, tagged **area 1** and
+**area 2**, and one game server holds exactly one match. Both areas therefore
+need their own box, and the second one is `62.72.41.184:27021` (MatchZy 0.8.68
+— note this is a *newer* build than server 1's 0.8.5, so verify a match config
+loads on it before relying on it).
+
+- Server ids are `"1"` and `"2"` and **equal the match's `area`**. Selecting a
+  match in the admin panel snaps the server picker to its area; loading it onto
+  the other box would kick whatever is live there, so the panel warns on a
+  mismatch rather than silently allowing it.
+- Every command doc carries `params.serverId`, defaulting to `"1"` — that is
+  both the original single-server behaviour and the right answer for any panel
+  build that predates the second box.
+- State is published per server: server 1 stays at `cs2ServerControl/state`
+  (renaming it would blank the status bar for anyone on a cached bundle),
+  server 2 at `cs2ServerControl/state2`.
+- Each server drains its own command queue, concurrently with the other but
+  serially within itself. A stuck RCON call on area 1 must not delay the area 2
+  match due to start the same minute.
+- Both servers post to the same `/api/cs2/matchzy-events` webhook. That is safe:
+  events resolve through `cs2MatchzyIndex/{matchzyMatchId}`, and match ids are
+  allocated uniquely per load.
+- Pre-flight both boxes with `npx tsx scripts/pingCS2Servers.ts` from `bot/`
+  (checks connect, auth, and that MatchZy is actually loaded — a server that
+  answers `status` without MatchZy accepts `matchzy_loadmatch_url` and does
+  nothing).
+
+## Knife rounds: `.stay` / `.switch` cannot be driven from the panel
+
+MatchZy's `css_stay` / `css_switch` handlers both open with
+`if (player == null || !isSideSelectionPhase) return;` (ConsoleCommands.cs), and
+an RCON command has no calling player. Issuing them over RCON is a **silent
+no-op** — no error, nothing in the log. Only the knife-winning team's players
+can end a knife round, by typing `.stay` / `.switch` in game.
+
+What the panel can do instead is decide sides *before* the match loads. The
+Load Match section has a side picker per map, saved to `plannedMapSides` on the
+match doc and passed through as MatchZy's `map_sides`:
+
+- `knife` — normal flow, knife round then the winner types `.stay`/`.switch`.
+- `team1_ct` / `team1_t` — sides assigned outright, **knife round skipped**.
+
+Use the override when a knife can't be played: a team a player short, or a slot
+running late. `map_sides` must have exactly one entry per map in `maplist` or
+MatchZy rejects the whole config with nothing but "Match load failed!".
 
 ## Immediate next step when resuming
 **RESOLVED 2026-07-31. Superseded by `docs/CS2_LIVE_PIPELINE_PLAN.md`.**
@@ -183,6 +235,32 @@ not mentioned anywhere else in this file:
 2. `cs2ServerControl` and `cs2ServerCommands` are default-denied by
    `firestore.rules`, so the admin panel cannot use the client-side `onSnapshot`
    pattern that `BotLobbyTab.tsx` uses.
+
+## Royal Sports League format (31 Jul 2026) — BO1 throughout
+
+`cs2-royal-sports-league` is **best-of-1 everywhere, play-offs included**. The
+schedule is back-to-back 20-minute slots from 21:00 to 00:40; a single BO3
+play-off would eat three of them. Length comes from the round limit instead:
+
+| Stage | Best of | `mp_maxrounds` | First to |
+|-------|---------|----------------|----------|
+| League (group) | 1 | 16 | 9 |
+| Play-offs (SF + final) | 1 | 24 | 13 |
+
+Three separate places must agree or the server and the scoreboard drift apart:
+
+- `cs2Tournaments/cs2-royal-sports-league` — `matchesPerRound`, `bracketBestOf`,
+  `grandFinalBestOf` all `1`; `groupMaxRounds` 16, `bracketMaxRounds` 24.
+- Each match doc — `maxRounds` (16 league / 24 play-off), which wins over the
+  tournament-level fallback.
+- `api/cs2/match-config` derives `num_maps` and `mp_maxrounds` from those, and
+  `lib/settleCS2Match.ts` derives the series score from the same fields. **Both
+  read the tournament doc — never hardcode a best-of in one and not the other.**
+
+Repair the live docs with `npx tsx scripts/setRoyalLeagueFormat.ts` (dry run by
+default, `--apply` to write). It exists because the tournament was originally
+seeded BO3 for play-offs, and re-running the seeder would have overwritten
+rosters and fixtures that had since been fixed by hand.
 
 ## Landmines
 - Never parse `status` for match state — webhook is truth.

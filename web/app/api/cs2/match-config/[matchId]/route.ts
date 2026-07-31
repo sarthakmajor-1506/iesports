@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { cs2TokenValid, cs2ConfigToken } from "@/lib/cs2Auth";
-import { resolveCS2Roster, safePlayerName } from "@/lib/resolveCS2Roster";
-import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
+import { resolveCS2Roster, resolveCS2SteamIds, safePlayerName } from "@/lib/resolveCS2Roster";
+import { CS2_ACTIVE_DUTY_MAPS, CS2_MAP_SIDES } from "@/lib/cs2Maps";
 
 /**
  * MatchZy match-config server. MatchZy GETs this when told to
@@ -73,7 +73,18 @@ export async function GET(
     maplist = numMaps === 1 ? DEFAULT_MAPS_BO1 : DEFAULT_MAPS_BO3;
   }
 
-  const mapSides = maplist.map(() => "knife");
+  // Sides per map. Default is a knife round, which is what players expect —
+  // but the knife decision itself can only be made in game (MatchZy's
+  // .stay/.switch handlers bail out when there is no calling player, so the
+  // admin panel cannot issue them over RCON). When an admin needs the
+  // decision settled up front — a team a player short, or a slot running
+  // late — they set `plannedMapSides` on the match and MatchZy skips the
+  // knife. Length must match the maplist or MatchZy rejects the whole config.
+  const mapSides = Array.isArray(m.plannedMapSides)
+    && m.plannedMapSides.length === maplist.length
+    && m.plannedMapSides.every((s: string) => CS2_MAP_SIDES.includes(s))
+      ? m.plannedMapSides
+      : maplist.map(() => "knife");
 
   // MR16 for the group stage, MR24 for bracket games, matching the published
   // fixture sheet. Per-match `maxRounds` wins if set, then the tournament's
@@ -81,6 +92,34 @@ export async function GET(
   const maxRounds = Number(m.maxRounds)
     || Number(m.isBracket ? tournament.bracketMaxRounds : tournament.groupMaxRounds)
     || (m.isBracket ? 24 : 16);
+
+  // Freeze time, same resolution order as maxRounds.
+  //
+  // WARNING: on MatchZy 0.8.5 (server 1) these cvars do NOT reliably survive
+  // going live — that build execs live.cfg after applying the match config's
+  // cvars, so live.cfg's mp_maxrounds/mp_freezetime win and a group game runs
+  // to 13 instead of 9. Newer builds (server 2 is on 0.8.68) apply the config
+  // cvars a second AFTER live.cfg and hold. Where the round limit matters,
+  // confirm it in game and push it again from the admin panel's live cvars
+  // control if the server ignored it.
+  const freezeTime = Number(m.freezeTime) || Number(tournament.freezeTime) || 5;
+
+  // Spectators. With matchzy_whitelist_enabled_default on, anyone not named in
+  // this config is refused at connect — including an admin, a caster, or a
+  // player watching the other group's game. This is the ONLY way for them to
+  // get in (short of GOTV, which is a delayed stream, not the server).
+  //
+  // Sources are merged so a tournament-wide list (admins, casters) doesn't
+  // have to be repeated on all 15 matches, while a single match can still add
+  // someone for one game. Entries are uids or bare Steam64s; unresolvable ones
+  // are dropped, never fatal — a missing spectator must not stop a match.
+  const spectatorEntries = [
+    ...(Array.isArray(tournament.spectatorUids) ? tournament.spectatorUids : []),
+    ...(Array.isArray(m.spectatorUids) ? m.spectatorUids : []),
+  ].map(String);
+  const spectators = spectatorEntries.length
+    ? (await resolveCS2SteamIds(adminDb, tournamentId, spectatorEntries)).players
+    : {};
 
   // Diagnostic breadcrumb: proves whether MatchZy actually reached us. When a
   // load fails, the server only ever says "Match load failed!" with no reason,
@@ -107,6 +146,10 @@ export async function GET(
     clinch_series: true,
     team1: { name: safePlayerName(team1.teamName || m.team1Name) || "Team 1", players: team1Players },
     team2: { name: safePlayerName(team2.teamName || m.team2Name) || "Team 2", players: team2Players },
+    // Omitted entirely when empty: MatchZy reads `spectators.players`, and an
+    // empty object is one more field on a payload whose only rejection
+    // message is "Match load failed!".
+    ...(Object.keys(spectators).length ? { spectators: { players: spectators } } : {}),
     // Applied by MatchZy when it loads this config, and reverted on series
     // end (matchzy_reset_cvars_on_series_end defaults true). Scoping them
     // per-match is correct on a shared box — the friend's own pugs never
@@ -122,6 +165,11 @@ export async function GET(
       // 20-minute slot. Overridable per match via `maxRounds` on the match
       // doc for a one-off (a re-run, or a shortened game to claw back time).
       mp_maxrounds: String(maxRounds),
+      // Buy time between rounds. CS2 defaults to 15s and MatchZy's live.cfg
+      // usually sets 15-20; at MR16 across a back-to-back schedule that is
+      // several minutes per match spent standing still. Overridable per
+      // tournament or per match.
+      mp_freezetime: String(freezeTime),
     },
   };
 
