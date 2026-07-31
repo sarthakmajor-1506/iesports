@@ -243,7 +243,13 @@ export function parseStatus(raw: string): CS2ServerStatus {
   const players = raw.match(/players\s*:\s*(\d+)\s+humans?,\s*(\d+)\s+bots?\s*\((\d+)\/?\d*\s*max\)/i);
   return {
     hostname: pick(/hostname\s*:\s*(.+)/i),
-    map: pick(/^\s*map\s*:\s*(\S+)/im),
+    // CS2's `status` has no `map :` line at all — that was the CS:GO format.
+    // The only place the map appears is the SourceTV block, as
+    // `Game Time  8:52:02, Mod "csgo", Map "de_dust2"`. Try the classic form
+    // first so this still works on anything that does emit it, then fall
+    // back to the CS2 form; without the fallback the admin panel shows a
+    // permanent "—" for the map.
+    map: pick(/^\s*map\s*:\s*(\S+)/im) ?? pick(/\bMap\s+"([^"]+)"/i),
     humans: players ? Number(players[1]) : null,
     bots: players ? Number(players[2]) : null,
     maxPlayers: players ? Number(players[3]) : null,

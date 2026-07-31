@@ -100,16 +100,23 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
     return () => { document.removeEventListener("visibilitychange", onVis); clearInterval(interval); };
   }, [adminKey, refresh]);
 
-  // Load CS2 tournaments once.
-  useEffect(() => {
+  // Not folded into the 5s state poll: list-tournaments scans whole
+  // collections, so it is refreshed on mount and on demand only. The manual
+  // button matters because a tournament seeded while this tab is open would
+  // otherwise never appear in the dropdown.
+  const loadTournaments = useCallback(async () => {
     if (!adminKey) return;
-    fetch("/api/admin/list-tournaments", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminKey, game: "cs2" }),
-    }).then(r => r.json()).then(j => {
+    try {
+      const res = await fetch("/api/admin/list-tournaments", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminKey, game: "cs2" }),
+      });
+      const j = await res.json();
       if (j.tournaments) setTournaments(j.tournaments);
-    }).catch(() => {});
+    } catch { /* dropdown just stays as-is */ }
   }, [adminKey]);
+
+  useEffect(() => { loadTournaments(); }, [loadTournaments]);
 
   // Load matches for the selected tournament (public detail endpoint).
   useEffect(() => {
@@ -169,7 +176,12 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
   const online = s.status === "online";
   const statusColor = online ? "#22c55e" : s.status === "error" ? "#ef4444" : s.status === "offline" ? "#ef4444" : "#eab308";
   const updatedAgeSec = s.updatedAt ? Math.round((Date.now() - new Date(s.updatedAt).getTime()) / 1000) : null;
-  const staleBot = updatedAgeSec !== null && updatedAgeSec > 120;
+  // The bot deliberately suppresses identical heartbeats and only forces a
+  // write every LIVENESS_FLOOR_MS (5 min, see bot/src/services/cs2-server.ts),
+  // so on an idle server `updatedAt` is routinely ~5 minutes old while the bot
+  // is perfectly healthy. Anything at or under that is normal; warn only well
+  // past it, otherwise this fires constantly and trains you to ignore it.
+  const staleBot = updatedAgeSec !== null && updatedAgeSec > 420;
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -200,7 +212,7 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
       {staleBot && (
         <div style={{ ...sectionStyle, borderColor: "#7c5e10", color: "#fcd34d" }}>
-          Bot hasn't reported in {updatedAgeSec}s — it may be down. Check the Railway logs before running commands.
+          Bot hasn&apos;t reported in {Math.round(updatedAgeSec! / 60)} min — it may be down. Check the Railway logs before running commands.
         </div>
       )}
       {s.lastError && <div style={{ ...sectionStyle, borderColor: "#7f1d1d", color: "#fca5a5" }}>Last error: {s.lastError}</div>}
@@ -208,11 +220,14 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
       {/* Prepare server */}
       <div style={sectionStyle}>
-        <div style={{ fontWeight: 800, marginBottom: 6, color: "#e6e7ee" }}>1. Prepare Server</div>
+        <div style={{ fontWeight: 800, marginBottom: 6, color: "#e6e7ee" }}>1. Prepare Server (optional)</div>
         <div style={{ color: "#888", fontSize: "0.78rem", marginBottom: 12 }}>
-          Points the server at our webhook and enables whitelist enforcement. Run once at
-          the start of the event. These are runtime cvars — they do NOT survive a server
-          restart, so run this again if the box reboots mid-event.
+          Best-effort attempt to set the webhook cvars globally. These are
+          CounterStrikeSharp plugin cvars, which do not reliably apply over RCON and
+          cannot be read back to confirm, so treat a green tick here as &quot;sent&quot;, not
+          &quot;applied&quot;. You do not need this: Load Match sends the same settings inside
+          the match config, which is the path that actually works and which reverts
+          automatically when the series ends.
         </div>
         <button style={btn("#7c3aed", busy === "prepare_server")} disabled={busy === "prepare_server"}
           onClick={() => cmd("prepare_server")}>Prepare Server</button>
@@ -223,7 +238,13 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
         <div style={{ fontWeight: 800, marginBottom: 14, color: "#e6e7ee" }}>2. Load a Match</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           <div>
-            <span style={labelStyle}>Tournament</span>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <span style={labelStyle}>Tournament</span>
+              <button
+                style={{ background: "none", border: 0, color: "#3CCBFF", cursor: "pointer", fontSize: "0.62rem", fontWeight: 800, padding: 0, fontFamily: "inherit" }}
+                onClick={loadTournaments}
+              >↻ reload list</button>
+            </div>
             <select style={selectStyle} value={tournamentId} onChange={e => { setTournamentId(e.target.value); setMatchId(""); }}>
               <option value="">— select —</option>
               {tournaments.map(t => <option key={t.id} value={t.id}>{t.name} ({t.status})</option>)}
