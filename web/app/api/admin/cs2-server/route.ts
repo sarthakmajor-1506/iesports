@@ -1,0 +1,223 @@
+import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyAdmin } from "@/lib/verifyAdmin";
+import { FieldValue } from "firebase-admin/firestore";
+import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
+import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
+
+/**
+ * CS2 game-server control — one route, action-dispatched. Same shape as
+ * admin/bot-lobby, for the same reason: web (Vercel) can't hold an RCON
+ * socket to a box in another datacenter, so this is a thin Firestore bridge:
+ *   - action:"state"  → read `cs2ServerControl/state` (bot publishes live here)
+ *   - any command     → enqueue `cs2ServerCommands/{id}` {status:"pending"}
+ *                        which the bot consumes via onSnapshot and runs over RCON.
+ *
+ * NOTE: `cs2ServerControl` / `cs2ServerCommands` are NOT in firestore.rules
+ * (default-deny), so the admin panel must poll this route's `state` action —
+ * it cannot use a client-side onSnapshot like BotLobbyTab does.
+ *
+ * Command actions: load_match | start | force_start | end_match | force_end |
+ *                   restart_match | pause | unpause | reload_admins |
+ *                   change_map | set_password | status | exec
+ * Plus `prepare_server` — a bundled one-shot setup action handled entirely
+ * server-side (see below) so CS2_MATCH_CONFIG_TOKEN never reaches the browser.
+ *
+ * RCON output is advisory. Match state (live scores, results) arrives via
+ * the MatchZy webhook (api/cs2/matchzy-events) into Firestore, never from
+ * parsing RCON `status`. See docs/CS2_LIVE_PIPELINE_PLAN.md.
+ */
+
+const COMMAND_ACTIONS = new Set([
+  "load_match", "start", "force_start", "end_match", "force_end",
+  "restart_match", "pause", "unpause", "reload_admins",
+  "change_map", "set_password", "status", "exec",
+]);
+
+// `iesports.in` 307-redirects to `www.iesports.in` — MatchZy's HTTP client is
+// not guaranteed to follow redirects, and a redirected POST is silent data
+// loss. Every URL handed to MatchZy must use this base, never
+// NEXT_PUBLIC_APP_URL (which is the non-www form used elsewhere in the repo).
+const CS2_PUBLIC_BASE_URL = process.env.CS2_PUBLIC_BASE_URL || "https://www.iesports.in";
+
+// Allowlist for the `exec` escape hatch. The bot's rconExec/exec action is
+// deliberately unrestricted (see bot/src/services/cs2-server.ts:165-166) —
+// this route is the only thing standing between an admin session and
+// arbitrary RCON commands, so only permit known-safe cvar reads/writes.
+const EXEC_PREFIXES = [
+  "matchzy_remote_log_url", "matchzy_remote_log_header_key", "matchzy_remote_log_header_value",
+  "matchzy_whitelist_enabled_default", "matchzy_kick_when_no_match_loaded",
+  "matchzy_autostart_mode", "matchzy_hostname_format", "sv_password", "tv_delay",
+  "css_plugins", "meta", "find", "status",
+];
+
+function execCommandAllowed(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  if (/[\r\n;"]/.test(trimmed)) return false; // no command chaining / smuggling
+  const head = trimmed.split(/\s+/)[0].toLowerCase();
+  return EXEC_PREFIXES.some((p) => head === p.toLowerCase());
+}
+
+export async function POST(req: NextRequest) {
+  let body: any;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
+  try { await verifyAdmin({ adminKey: body.adminKey, authToken: body.authToken }); }
+  catch (e: any) { return NextResponse.json({ error: e.message }, { status: 401 }); }
+
+  const action = String(body.action || "");
+
+  // ── Live state read (panel polls this — no onSnapshot, see header) ──────
+  if (action === "state") {
+    const s = await adminDb.collection("cs2ServerControl").doc("state").get();
+    const recent = await adminDb.collection("cs2ServerCommands")
+      .orderBy("createdAt", "desc").limit(8).get();
+    return NextResponse.json({
+      ok: true,
+      state: s.exists ? s.data() : {
+        status: "unknown", hostname: null, map: null, humans: null, maxPlayers: null,
+        loadedMatchId: null, lastCommand: null, lastError: null, host: null, port: 0,
+      },
+      recentCommands: recent.docs.map((d) => ({ id: d.id, ...d.data() })),
+    });
+  }
+
+  // ── One-shot event setup — never sent from the browser, so the shared
+  // token stays server-side. Enqueues the same cvars as EXEC_PREFIXES would
+  // allow individually; bundled here so the panel doesn't need the secret.
+  if (action === "prepare_server") {
+    const token = process.env.CS2_MATCH_CONFIG_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: "CS2_MATCH_CONFIG_TOKEN not configured on web" }, { status: 500 });
+    }
+    const webhookUrl = `${CS2_PUBLIC_BASE_URL}/api/cs2/matchzy-events`;
+    const commands = [
+      `matchzy_remote_log_url "${webhookUrl}"`,
+      `matchzy_remote_log_header_key "X-IESports-Token"`,
+      `matchzy_remote_log_header_value "${token}"`,
+      `matchzy_whitelist_enabled_default true`,
+      `matchzy_autostart_mode 1`,
+    ];
+    const commandIds: string[] = [];
+    for (const command of commands) {
+      const ref = await adminDb.collection("cs2ServerCommands").add({
+        action: "exec",
+        params: { command },
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        createdBy: body.by || "admin-panel",
+        serverCreatedAt: FieldValue.serverTimestamp(),
+      });
+      commandIds.push(ref.id);
+    }
+    return NextResponse.json({ ok: true, commandIds, action });
+  }
+
+  // ── Roster validation — same resolution the match-config endpoint uses,
+  // so a roster that validates clean here cannot fail differently when
+  // MatchZy actually loads the match. Pure read, nothing enqueued.
+  if (action === "validate_roster") {
+    const tournamentId = String(body.params?.tournamentId || "").trim();
+    const matchId = String(body.params?.matchId || "").trim();
+    if (!tournamentId || !matchId) {
+      return NextResponse.json({ error: "params.tournamentId and params.matchId required" }, { status: 400 });
+    }
+    const resolved = await resolveCS2Roster(adminDb, tournamentId, matchId);
+    if (!resolved.ok) return NextResponse.json({ ok: false, error: resolved.error, missing: resolved.missing });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Save the admin's map picks onto the match doc before load_match reads
+  // them. Separate from load_match itself so "validate" can run first
+  // without side effects.
+  if (action === "save_planned_maps") {
+    const tournamentId = String(body.params?.tournamentId || "").trim();
+    const matchId = String(body.params?.matchId || "").trim();
+    const plannedMaps = Array.isArray(body.params?.plannedMaps) ? body.params.plannedMaps.map(String) : [];
+    if (!tournamentId || !matchId || !plannedMaps.length) {
+      return NextResponse.json({ error: "params.tournamentId, params.matchId and a non-empty params.plannedMaps required" }, { status: 400 });
+    }
+    if (!plannedMaps.every((mp: string) => CS2_ACTIVE_DUTY_MAPS.includes(mp))) {
+      return NextResponse.json({ error: "plannedMaps must be from the Active Duty pool" }, { status: 400 });
+    }
+    await adminDb.collection("cs2Tournaments").doc(tournamentId)
+      .collection("matches").doc(matchId)
+      .set({ plannedMaps }, { merge: true });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Enqueue a command for the bot ───────────────────────────────────────
+  if (!COMMAND_ACTIONS.has(action)) {
+    return NextResponse.json({ error: `unknown action "${action}"` }, { status: 400 });
+  }
+
+  const params: any = { ...(body.params || {}) };
+
+  if (action === "change_map") {
+    const map = String(params.map || "");
+    if (!/^[a-z0-9_]+$/i.test(map)) {
+      return NextResponse.json({ error: "params.map must be a bare map name" }, { status: 400 });
+    }
+  }
+
+  if (action === "set_password") {
+    params.password = String(params.password ?? "").slice(0, 30);
+  }
+
+  if (action === "exec") {
+    const raw = String(params.command || "");
+    if (!execCommandAllowed(raw)) {
+      return NextResponse.json({ error: "command not allowlisted for exec" }, { status: 400 });
+    }
+  }
+
+  // load_match is not a passthrough: resolve the tournament/match, allocate
+  // a numeric MatchZy match id, and build the config URL for MatchZy to GET.
+  if (action === "load_match") {
+    const tournamentId = String(params.tournamentId || "").trim();
+    const matchId = String(params.matchId || "").trim();
+    if (!tournamentId || !matchId) {
+      return NextResponse.json({ error: "params.tournamentId and params.matchId required" }, { status: 400 });
+    }
+
+    const matchRef = adminDb.collection("cs2Tournaments").doc(tournamentId)
+      .collection("matches").doc(matchId);
+    const matchSnap = await matchRef.get();
+    if (!matchSnap.exists) {
+      return NextResponse.json({ error: "match not found" }, { status: 404 });
+    }
+
+    const token = process.env.CS2_MATCH_CONFIG_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: "CS2_MATCH_CONFIG_TOKEN not configured on web" }, { status: 500 });
+    }
+
+    // MatchZy 0.8.5 treats matchid as numeric in places — never reuse our
+    // string doc ids (e.g. "cs2-sf1") here.
+    const matchzyMatchId = Date.now();
+
+    await matchRef.set({ matchzyMatchId }, { merge: true });
+    await adminDb.collection("cs2MatchzyIndex").doc(String(matchzyMatchId)).set({
+      tournamentId, matchId, createdAt: new Date().toISOString(),
+    });
+
+    const configUrl = `${CS2_PUBLIC_BASE_URL}/api/cs2/match-config/${matchId}?t=${encodeURIComponent(tournamentId)}`;
+    params.url = configUrl;
+    params.headerKey = "X-IESports-Token";
+    params.headerValue = token; // bot also falls back to CS2_MATCH_CONFIG_TOKEN if omitted
+    params.matchId = matchId;
+  }
+
+  const ref = await adminDb.collection("cs2ServerCommands").add({
+    action,
+    params,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    createdBy: body.by || "admin-panel",
+    serverCreatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return NextResponse.json({ ok: true, commandId: ref.id, action });
+}

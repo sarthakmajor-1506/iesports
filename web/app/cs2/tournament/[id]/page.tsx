@@ -14,6 +14,7 @@ import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
+import { sortCS2Standings } from "@/lib/recomputeCS2Standings";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -528,8 +529,12 @@ function CS2TournamentDetailInner() {
         if (data.players) { setPlayers(data.players); if (user) setIsRegistered(data.players.some((p: any) => p.uid === user?.uid)); }
         if (data.teams) setTeams(data.teams);
         if (data.standings) {
-          const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
-          setStandings(sorted);
+          // Canonical CS2 tiebreaker chain (points -> roundDiff -> mapDiff ->
+          // wins), same as the semifinal auto-seed logic in
+          // lib/settleCS2Match.ts — was previously points -> buchholz ->
+          // mapDiff here, which could display a different order than the one
+          // the bracket was actually seeded from.
+          setStandings(sortCS2Standings(data.standings));
         }
         if (data.matches) {
           const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });

@@ -30,7 +30,8 @@ on them.
   (`MatchZy | {TEAM1} vs {TEAM2}` idle name), RCON TCP port open. MatchZy is very
   likely already installed — confirm with `meta list` / `css_plugins list`.
 - Join password shared by friend: `lotgg5` (this is `sv_password`, NOT the RCON
-  password — still need `rcon_password` from him).
+  password). The `rcon_password` was supplied on 2026-07-31 and is verified
+  working; it lives in the Railway env var only, never in this repo.
 - Single server = **serial matches**. One BO1 ≈ 45 min, so an 8-team round ≈ 3h.
   Schedule around this. User has accepted single-server for now.
 
@@ -164,9 +165,24 @@ Web (Vercel) needs `CS2_MATCH_CONFIG_TOKEN` too (to validate the webhook + confi
 requests).
 
 ## Immediate next step when resuming
-Get `rcon_password` from friend + confirm `meta list`/`css_plugins list`. Then set
-the CS2_RCON_* env on Railway, load a hand-written 2-player match JSON to prove the
-RCON→loadmatch→webhook loop end-to-end before building Phases 2-6.
+**RESOLVED 2026-07-31. Superseded by `docs/CS2_LIVE_PIPELINE_PLAN.md`.**
+
+The friend supplied the `rcon_password` and it is verified working against
+`62.72.41.184:27042`. `meta list` and `css_plugins list` both confirm the stack:
+CounterStrikeSharp v1.0.371 and **MatchZy 0.8.5, loaded**. GSLT is already set,
+GOTV is on 27043, and every cvar the pipeline needs (`matchzy_loadmatch_url`,
+`matchzy_remote_log_url` plus its header pair, `matchzy_demo_upload_url`,
+`matchzy_whitelist_enabled_default`) exists on this build and is currently unset.
+
+Read `docs/CS2_LIVE_PIPELINE_PLAN.md` for the verified server facts, the scoped
+build order, the test plan, and two landmines found during verification that are
+not mentioned anywhere else in this file:
+
+1. `iesports.in` 307-redirects to `www.iesports.in`, so every URL handed to
+   MatchZy must be the `www.` form.
+2. `cs2ServerControl` and `cs2ServerCommands` are default-denied by
+   `firestore.rules`, so the admin panel cannot use the client-side `onSnapshot`
+   pattern that `BotLobbyTab.tsx` uses.
 
 ## Landmines
 - Never parse `status` for match state — webhook is truth.
