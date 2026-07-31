@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { safeTokenEqual } from "@/lib/cs2Auth";
+import { cs2TokenValid } from "@/lib/cs2Auth";
 import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
 import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
 
@@ -31,9 +31,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ matchId: string }> }
 ) {
-  const configured = process.env.CS2_MATCH_CONFIG_TOKEN;
-  const provided = req.headers.get("x-iesports-token") || "";
-  if (!configured || !provided || !safeTokenEqual(provided, configured)) {
+  if (!cs2TokenValid(req.headers.get("x-iesports-token"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

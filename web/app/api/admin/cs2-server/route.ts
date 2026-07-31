@@ -4,6 +4,7 @@ import { verifyAdmin } from "@/lib/verifyAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
 import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
+import { cs2ConfigToken } from "@/lib/cs2Auth";
 
 /**
  * CS2 game-server control — one route, action-dispatched. Same shape as
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
   // token stays server-side. Enqueues the same cvars as EXEC_PREFIXES would
   // allow individually; bundled here so the panel doesn't need the secret.
   if (action === "prepare_server") {
-    const token = process.env.CS2_MATCH_CONFIG_TOKEN;
+    const token = cs2ConfigToken();
     if (!token) {
       return NextResponse.json({ error: "CS2_MATCH_CONFIG_TOKEN not configured on web" }, { status: 500 });
     }
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "match not found" }, { status: 404 });
     }
 
-    const token = process.env.CS2_MATCH_CONFIG_TOKEN;
+    const token = cs2ConfigToken();
     if (!token) {
       return NextResponse.json({ error: "CS2_MATCH_CONFIG_TOKEN not configured on web" }, { status: 500 });
     }
