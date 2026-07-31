@@ -191,9 +191,19 @@ export async function GET(req: NextRequest) {
       // Longer edge cache = far fewer function invocations (Vercel Fluid CPU) and
       // Firestore reads: the function only re-runs ~once per 90s per tournament,
       // and stale-while-revalidate serves the cached copy instantly for up to 10
-      // min. Tournament standings/results tolerate this staleness; the live match
-      // scoreboard is a separate, uncached endpoint.
-      res.headers.set("Cache-Control", "public, s-maxage=90, stale-while-revalidate=600");
+      // min. Tournament standings/results tolerate that staleness.
+      //
+      // A live match does not. This response carries the match documents the
+      // tournament page renders its live scoreboard from, so with the long
+      // window a round score could be up to ten minutes old — indistinguishable
+      // from the webhook being broken, which is exactly how it was read during
+      // the Royal Sports League event. While anything is live, cache for a few
+      // seconds only; the quiet case (every match pending or completed, i.e.
+      // almost all the time) keeps the long window.
+      const anyLive = matches.some((m: any) => m.status === "live");
+      res.headers.set("Cache-Control", anyLive
+        ? "public, s-maxage=5, stale-while-revalidate=10"
+        : "public, s-maxage=90, stale-while-revalidate=600");
     } else {
       res.headers.set("Cache-Control", "no-store");
     }

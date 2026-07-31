@@ -151,17 +151,28 @@ function MatchCard({ m, teamMembers, teamLogoMap, expandedMatch, setExpandedMatc
               </div>
               <span className="csd-mc-status-badge" style={{ background: "rgba(111,207,138,0.08)", color: "#6fcf8a" }}>FT</span>
             </>);
-          })() : isLive ? (
+          })() : isLive ? (() => {
+            // Same rule as the completed branch above: in a BO1 the meaningful
+            // score is rounds, not maps. team1Score/team2Score are the SERIES
+            // score, which stays 0-0 for a whole BO1 until it settles — so a
+            // live match showed 0-0 no matter how many rounds the webhook had
+            // recorded. Fall back to the series score only when there is no
+            // round data yet (between going_live and the first round_end).
+            const isBo1 = bestOf === 1;
+            const g1 = games[0];
+            const t1Display = isBo1 && g1 ? (g1.team1RoundsWon ?? m.team1Score ?? 0) : (m.team1Score || 0);
+            const t2Display = isBo1 && g1 ? (g1.team2RoundsWon ?? m.team2Score ?? 0) : (m.team2Score || 0);
+            return (
             <>
               <div className="csd-mc-score-box">
-                <span className="s">{m.team1Score || 0}</span><span className="dash">-</span><span className="s">{m.team2Score || 0}</span>
+                <span className="s">{t1Display}</span><span className="dash">-</span><span className="s">{t2Display}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
                 <div className="csd-mc-live-dot" />
                 <span className="csd-mc-status-badge" style={{ background: "rgba(34,197,94,0.15)", color: "#6fcf8a", padding: "1px 6px" }}>LIVE</span>
               </div>
-            </>
-          ) : (
+            </>);
+          })() : (
             <>
               {scheduledTime ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
