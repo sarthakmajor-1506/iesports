@@ -9,21 +9,48 @@ import { settleCS2Match } from "@/lib/settleCS2Match";
  * format). Token-auth, idempotent on (matchid, map_number, event,
  * round_number).
  *
- * IMPORTANT — read before trusting the field-name mapping below: the exact
- * MatchZy 0.8.5 payload shape was not confirmed against a live match at
- * write time. Every event is logged to `cs2MatchzyEvents` BEFORE any
- * parsing, unconditionally, specifically so Test 4 in
- * docs/CS2_LIVE_PIPELINE_PLAN.md can compare real payloads against the
- * field names guessed here (Get5's documented schema: `event`, `matchid`,
- * `map_number` 0-indexed, `team1_score`/`team2_score`,
- * `winner:{team:"team1"|"team2"}`, `team1_series_score`/
- * `team2_series_score`). If real payloads differ, fix the extraction below
- * — the raw log means no data is lost while that happens.
+ * Every event is logged to `cs2MatchzyEvents` BEFORE any parsing,
+ * unconditionally. Keep that: it is the only record if the extraction below
+ * is wrong, and it is how the real payload shape was established.
+ *
+ * A confirmed MatchZy 0.8.5 series_start looks like:
+ *   {"team1":{"id":"","name":"Hunter"},"team2":{"id":"","name":"Major"},
+ *    "num_maps":1,"matchid":900001,"event":"series_start"}
+ * Note `matchid` is a NUMBER and teams are OBJECTS, so scores live at
+ * `team1.score` rather than Get5's documented flat `team1_score`. The
+ * helpers below accept either, because reading only the flat form yields 0
+ * for every round — a pipeline that looks healthy while recording 0-0.
  *
  * Field-shape rule: games are written keyed `game1`/`game2`/`game3`
  * (map_number 0 → game1), never as an array. See
  * web/app/cs2/tournament/[id]/page.tsx:98.
  */
+
+/**
+ * Pull a team's score out of an event payload, tolerating both shapes.
+ *
+ * A real series_start from MatchZy 0.8.5 arrives as
+ * `{"team1":{"id":"","name":"Hunter"},...}` — team objects, not flat keys —
+ * so scores are expected at `team1.score`. Get5's documented schema uses flat
+ * `team1_score`. Reading only the flat form silently yields 0 for every round,
+ * which looks like a working pipeline recording a 0-0 game. Check both, and
+ * return null rather than 0 when genuinely absent so callers can tell
+ * "no score in this event" from "score is zero".
+ */
+function teamScore(payload: any, team: "team1" | "team2"): number | null {
+  const flat = payload?.[`${team}_score`];
+  const nested = payload?.[team]?.score;
+  const v = flat ?? nested;
+  return Number.isFinite(Number(v)) ? Number(v) : null;
+}
+
+/** Same tolerance for the series score reported on series_end. */
+function seriesScore(payload: any, team: "team1" | "team2"): number | undefined {
+  const flat = payload?.[`${team}_series_score`];
+  const nested = payload?.[team]?.series_score;
+  const v = flat ?? nested;
+  return Number.isFinite(Number(v)) ? Number(v) : undefined;
+}
 
 function gameKeyFor(mapNumber: any): string {
   const n = Number.isFinite(Number(mapNumber)) ? Number(mapNumber) : 0;
@@ -98,10 +125,13 @@ export async function POST(req: NextRequest) {
 
       case "round_end": {
         const gk = gameKeyFor(payload.map_number);
-        const t1 = Number(payload.team1_score ?? 0);
-        const t2 = Number(payload.team2_score ?? 0);
+        const t1 = teamScore(payload, "team1");
+        const t2 = teamScore(payload, "team2");
+        // Skip rather than write zeros: a round_end we can't read a score from
+        // would otherwise overwrite a correct running score with 0-0.
+        if (t1 === null && t2 === null) break;
         await matchRef.set({
-          [gk]: { team1RoundsWon: t1, team2RoundsWon: t2 },
+          [gk]: { team1RoundsWon: t1 ?? 0, team2RoundsWon: t2 ?? 0 },
           liveUpdatedAt: nowIso,
         }, { merge: true });
         break;
@@ -109,11 +139,15 @@ export async function POST(req: NextRequest) {
 
       case "map_result": {
         const gk = gameKeyFor(payload.map_number);
-        const t1 = Number(payload.team1_score ?? 0);
-        const t2 = Number(payload.team2_score ?? 0);
+        const t1 = teamScore(payload, "team1");
+        const t2 = teamScore(payload, "team2");
         await matchRef.set({
           [gk]: {
-            team1RoundsWon: t1, team2RoundsWon: t2,
+            // On a map_result with no readable score, leave whatever the
+            // round_end stream already recorded rather than zeroing it.
+            ...(t1 !== null || t2 !== null
+              ? { team1RoundsWon: t1 ?? 0, team2RoundsWon: t2 ?? 0 }
+              : {}),
             status: "completed", completedAt: nowIso,
             ...(payload.map_name ? { map: String(payload.map_name) } : {}),
           },
@@ -128,10 +162,8 @@ export async function POST(req: NextRequest) {
         const freshSnap = await matchRef.get();
         const fresh: any = freshSnap.data() || {};
         const winnerTeam = payload.winner?.team === "team2" ? "team2" : "team1";
-        const team1SeriesScore = Number.isFinite(Number(payload.team1_series_score))
-          ? Number(payload.team1_series_score) : undefined;
-        const team2SeriesScore = Number.isFinite(Number(payload.team2_series_score))
-          ? Number(payload.team2_series_score) : undefined;
+        const team1SeriesScore = seriesScore(payload, "team1");
+        const team2SeriesScore = seriesScore(payload, "team2");
 
         let highestGame = 1;
         for (let i = 1; i <= 5; i++) if (fresh[`game${i}`]) highestGame = i;
