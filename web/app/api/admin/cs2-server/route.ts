@@ -76,6 +76,7 @@ const EXEC_PREFIXES = [
   // the match is live is the only fix that doesn't need file access to the box.
   "mp_maxrounds", "mp_freezetime", "mp_overtime_enable", "mp_overtime_maxrounds",
   "mp_halftime_duration", "mp_round_restart_delay", "mp_warmuptime",
+  "mp_friendlyfire",
 ];
 
 function execCommandAllowed(raw: string): boolean {

@@ -540,6 +540,30 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
             }}>Use match values (MR{matchMaxRounds || maxRoundsFor(selectedMatch, tFormat)})</button>
           )}
         </div>
+
+        {/* Friendly fire is its own control rather than another text field: it
+            is a yes/no that gets flipped mid-event (usually off after someone
+            team-kills), and typing a cvar value under time pressure is how you
+            end up sending mp_friendlyfire 10. Sent immediately, like the rest
+            of this section — it does not wait for a match load. */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
+          <span style={{ ...labelStyle, marginBottom: 0 }}>Friendly fire</span>
+          {([["ON", "1", "#b91c1c"], ["OFF", "0", "#374151"]] as const).map(([label, value, colour]) => (
+            <button key={value} style={btn(colour, busy === `ff${value}`)} disabled={busy === `ff${value}`}
+              onClick={async () => {
+                setBusy(`ff${value}`); setMsg(`⏳ friendly fire ${label}…`);
+                try {
+                  await api("exec", { command: `mp_friendlyfire ${value}` });
+                  setMsg(`✓ friendly fire ${label} on Server ${serverId} — applies next round`);
+                  setTimeout(refresh, 1500);
+                } catch (e: any) { setMsg(`✗ friendly fire: ${e.message}`); }
+                finally { setBusy(null); }
+              }}>Friendly fire {label}</button>
+          ))}
+          <span style={{ fontSize: "0.72rem", color: "#666" }}>
+            Takes effect from the next round. MatchZy&apos;s live.cfg sets this at go-live, so re-apply after a match starts.
+          </span>
+        </div>
       </div>
 
       {/* Command log */}
