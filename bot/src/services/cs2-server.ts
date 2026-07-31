@@ -167,6 +167,22 @@ async function runCommand(
 
       const r = await rconExec([`matchzy_loadmatch_url ${rconArg(url)} ${rconArg(key)} ${rconArg(value)}`], s.def);
       if (!r.ok) return { ok: false, error: r.error };
+
+      // MatchZy refuses a load while it still holds a match and says so only
+      // in the RCON reply:
+      //   "[LoadMatchDataCommand] A match is already setup with id: -1,
+      //    cannot load a new match!"
+      // RCON succeeded, so without this the panel showed a green "done" while
+      // the server quietly ignored every load. It cost an evening: the config
+      // endpoint kept getting fetched (MatchZy downloads it before refusing),
+      // which looked exactly like a working pipeline that had stopped
+      // reporting. `End Match` clears the stuck state.
+      if (/cannot load a new match|already setup with id/i.test(r.output || "")) {
+        return {
+          ok: false,
+          error: `server still holds a match — run End Match first. MatchZy said: ${(r.output || "").trim().slice(0, 160)}`,
+        };
+      }
       // Recorded so the panel can show which match the server is holding.
       // Confirmation that it actually loaded comes from the series_start
       // webhook, not from this echo.
