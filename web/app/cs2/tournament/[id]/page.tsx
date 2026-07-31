@@ -1588,7 +1588,10 @@ function CS2TournamentDetailInner() {
 
                   if (groupIds.length > 1) {
                     return (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+                      // Stacked, not side by side: at 8 columns each, two
+                      // tables sharing a row squeeze both into horizontal
+                      // scroll on a phone, which is where these get read.
+                      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
                         {groupIds.map((gid: any) => {
                           // A team with no completed match has no standings row
                           // yet; show it on zeroes rather than omitting it, so
@@ -1610,7 +1613,7 @@ function CS2TournamentDetailInner() {
                               return (b.wins || 0) - (a.wins || 0);
                             });
                           return (
-                            <div key={gid} style={{ flex: "1 1 380px", minWidth: 320, overflowX: "auto" }}>
+                            <div key={gid} style={{ width: "100%", overflowX: "auto" }}>
                               <div style={{ fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.08em", color: "#8A8880", marginBottom: 8, textTransform: "uppercase" }}>Group {gid}</div>
                               <table className="csd-standings-table csd-freeze-team">
                                 {/* D column: the group stage is MR16 with no overtime, so a
