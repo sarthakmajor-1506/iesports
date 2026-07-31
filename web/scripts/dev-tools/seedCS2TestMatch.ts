@@ -49,6 +49,15 @@ const APPLY = process.argv.includes("--apply");
 const TID = arg("tid") || "cs2-test-tournament";
 const TNAME = arg("name") || "CS2 Test Tournament";
 
+/**
+ * Team names default to the player's Steam name, but Steam names are often
+ * decorative Unicode ("𝐊Λ𝐋ΛП𝐈𝐏ΣΣ𝐊 ツ нυитєя007™"), and the team name ends up
+ * in MatchZy's server hostname via matchzy_hostname_format. Override with
+ * --t1name / --t2name to keep the hostname legible.
+ */
+const T1NAME = arg("t1name");
+const T2NAME = arg("t2name");
+
 interface Resolved { uid: string; steamId: string; steamName: string; steamAvatar: string; label: string }
 
 function resolvePlayer(needle: string, allUsers: any[]): Resolved {
@@ -106,7 +115,7 @@ async function main() {
   console.log(`\nTournament: cs2Tournaments/${TID}  "${TNAME}"`);
   console.log(`  isTestTournament: true  (hidden from the public CS2 list)`);
   console.log(`  visibleToUids: [${p1.uid}, ${p2.uid}]  (only these two see it)`);
-  console.log(`  match: cs2-test-m1  ${p1.steamName} vs ${p2.steamName}  BO1\n`);
+  console.log(`  match: cs2-test-m1  ${T1NAME || p1.steamName} vs ${T2NAME || p2.steamName}  BO1\n`);
 
   if (!APPLY) {
     console.log("DRY RUN — nothing written. Re-run with --apply to create it.");
@@ -161,20 +170,23 @@ async function main() {
     }, { merge: true });
   }
 
-  const mkTeam = (id: string, idx: number, p: Resolved) => ({
+  const t1 = T1NAME || p1.steamName;
+  const t2 = T2NAME || p2.steamName;
+
+  const mkTeam = (id: string, idx: number, p: Resolved, teamName: string) => ({
     id, tournamentId: TID, teamIndex: idx,
-    teamName: p.steamName, groupId: "A",
+    teamName, groupId: "A",
     captainUid: p.uid, avgSkillLevel: 1,
     members: [{ uid: p.uid, steamName: p.steamName, steamAvatar: p.steamAvatar, skillLevel: 1, cs2RankTier: 0 }],
     createdAt: nowIso,
   });
-  await tref.collection("teams").doc("team1").set(mkTeam("team1", 0, p1), { merge: true });
-  await tref.collection("teams").doc("team2").set(mkTeam("team2", 1, p2), { merge: true });
+  await tref.collection("teams").doc("team1").set(mkTeam("team1", 0, p1, t1), { merge: true });
+  await tref.collection("teams").doc("team2").set(mkTeam("team2", 1, p2, t2), { merge: true });
 
   await tref.collection("matches").doc("cs2-test-m1").set({
     id: "cs2-test-m1", tournamentId: TID, groupId: "A",
-    team1Id: "team1", team1Name: p1.steamName,
-    team2Id: "team2", team2Name: p2.steamName,
+    team1Id: "team1", team1Name: t1,
+    team2Id: "team2", team2Name: t2,
     team1Score: 0, team2Score: 0,
     matchDay: 1, matchIndex: 1,
     isBracket: false, status: "pending",
