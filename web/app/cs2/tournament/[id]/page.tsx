@@ -1594,7 +1594,11 @@ function CS2TournamentDetailInner() {
                             <div key={gid} style={{ flex: "1 1 380px", minWidth: 320, overflowX: "auto" }}>
                               <div style={{ fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.08em", color: "#8A8880", marginBottom: 8, textTransform: "uppercase" }}>Group {gid}</div>
                               <table className="csd-standings-table csd-freeze-team">
-                                <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th style={{ color: "#f0a500" }}>Pts</th><th>RD</th></tr></thead>
+                                {/* D column: the group stage is MR16 with no overtime, so a
+                                    drawn game is a normal outcome worth a point each. Without
+                                    it a drawn team reads as having played a game that shows
+                                    in neither W nor L. */}
+                                <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#f0a500" }}>Pts</th><th>RD</th></tr></thead>
                                 <tbody>
                                   {rows.map((s: any, i: number) => (
                                     <tr key={s.id} style={i < 2 ? { background: "rgba(74,222,128,0.05)" } : {}}>
@@ -1602,6 +1606,7 @@ function CS2TournamentDetailInner() {
                                       <td style={{ fontWeight: 700 }}>{s.teamName}</td>
                                       <td>{s.played || 0}</td>
                                       <td>{s.wins || 0}</td>
+                                      <td>{s.draws || 0}</td>
                                       <td>{s.losses || 0}</td>
                                       <td style={{ fontWeight: 800, color: "#f0a500" }}>{s.points || 0}</td>
                                       <td style={{ color: (s.roundDiff || 0) > 0 ? "#6fcf8a" : (s.roundDiff || 0) < 0 ? "#d07070" : "#8A8880" }}>{(s.roundDiff || 0) > 0 ? "+" : ""}{s.roundDiff || 0}</td>

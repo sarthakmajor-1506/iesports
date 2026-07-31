@@ -223,6 +223,7 @@ export async function sendCS2MatchResult(opts: {
   bo: number;
   isBracket?: boolean;
   bracketLabel?: string;
+  isDraw?: boolean;
   channelIdOverride?: string;
 }) {
   const channelId = getCS2ResultsChannelId(opts.channelIdOverride);
@@ -231,10 +232,19 @@ export async function sendCS2MatchResult(opts: {
   const matchLabel = opts.bracketLabel || `${opts.team1Name} vs ${opts.team2Name}`;
   const roundScore = `${Math.max(opts.team1RoundsWon, opts.team2RoundsWon)}-${Math.min(opts.team1RoundsWon, opts.team2RoundsWon)}`;
 
-  const lines = [
-    `🔫 **${matchLabel}** [${opts.team1SeriesScore}-${opts.team2SeriesScore} in BO${opts.bo}]`,
-    `**${opts.winnerName}** wins **${roundScore}**`,
-  ];
+  // A draw has no winner to name, and the high-low round score would read as
+  // one — "8-8" is fine either way, but "Draw wins 8-8" is not.
+  const isDraw = opts.isDraw || opts.winnerName === "Draw";
+
+  const lines = isDraw
+    ? [
+        `🔫 **${matchLabel}** [BO${opts.bo}]`,
+        `**Draw ${opts.team1RoundsWon}-${opts.team2RoundsWon}** — 1 point each`,
+      ]
+    : [
+        `🔫 **${matchLabel}** [${opts.team1SeriesScore}-${opts.team2SeriesScore} in BO${opts.bo}]`,
+        `**${opts.winnerName}** wins **${roundScore}**`,
+      ];
 
   return sendChannelMessage(channelId, lines.join("\n"));
 }

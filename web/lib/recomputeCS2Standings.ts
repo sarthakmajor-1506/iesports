@@ -11,8 +11,13 @@ import type { Firestore } from "firebase-admin/firestore";
  *   - uses the canonical CS2 tiebreaker chain from
  *     docs/CS2_TOURNAMENT_CONTEXT.md: points → roundDiff → mapDiff → wins
  *
+ * Points: 3 for a win, 1 each for a draw, 0 for a loss. A drawn match is a
+ * real outcome in this format — the group stage is MR16, so 8-8 is reachable
+ * and there is no overtime — and a draw that silently vanished from the table
+ * would leave two teams showing fewer games played than they had played.
+ *
  * Standings shape:
- *   { teamId, teamName, groupId, played, wins, losses, points,
+ *   { teamId, teamName, groupId, played, wins, draws, losses, points,
  *     roundsWon, roundsLost, roundDiff, mapsWon, mapsLost, mapDiff }
  */
 export async function recomputeCS2Standings(
@@ -29,7 +34,7 @@ export async function recomputeCS2Standings(
 
   type S = {
     teamId: string; teamName: string; groupId: string;
-    played: number; wins: number; losses: number; points: number;
+    played: number; wins: number; draws: number; losses: number; points: number;
     roundsWon: number; roundsLost: number;
     mapsWon: number; mapsLost: number;
   };
@@ -37,7 +42,7 @@ export async function recomputeCS2Standings(
   const init = (tid: string, name: string, groupId: string) => {
     if (!std[tid]) std[tid] = {
       teamId: tid, teamName: name || tid, groupId,
-      played: 0, wins: 0, losses: 0, points: 0,
+      played: 0, wins: 0, draws: 0, losses: 0, points: 0,
       roundsWon: 0, roundsLost: 0, mapsWon: 0, mapsLost: 0,
     };
   };
@@ -47,7 +52,11 @@ export async function recomputeCS2Standings(
     const m: any = doc.data();
     if (!m.team1Id || !m.team2Id) continue;
 
-    let winner: "team1" | "team2" | null = m.winner ?? null;
+    // "draw" is an explicit outcome written by settleCS2Match, not the absence
+    // of a winner. A completed match with neither — a result that was never
+    // entered properly — is still skipped, because counting it would award
+    // points nobody earned.
+    let winner: "team1" | "team2" | "draw" | null = m.winner ?? null;
     if (!winner) {
       const t1 = m.team1Score ?? 0;
       const t2 = m.team2Score ?? 0;
@@ -80,7 +89,8 @@ export async function recomputeCS2Standings(
     a.roundsWon += t1Rounds; a.roundsLost += t2Rounds;
     b.roundsWon += t2Rounds; b.roundsLost += t1Rounds;
 
-    if (winner === "team1") { a.wins++; b.losses++; a.points += 3; }
+    if (winner === "draw") { a.draws++; b.draws++; a.points += 1; b.points += 1; }
+    else if (winner === "team1") { a.wins++; b.losses++; a.points += 3; }
     else { b.wins++; a.losses++; b.points += 3; }
   }
 

@@ -29,7 +29,10 @@ export type CS2GamesPatch = Record<string, {
 export interface SettleCS2MatchInput {
   tournamentId: string;
   matchId: string;
-  winner: "team1" | "team2";
+  /** "draw" is valid for group games only — the group stage is MR16 with no
+   *  overtime, so 8-8 happens. A bracket match must produce a winner or the
+   *  play-off cannot advance, and is rejected. */
+  winner: "team1" | "team2" | "draw";
   /** Round score of the deciding map — used for the Discord message and, when
    *  `games` is omitted, to synthesize a single `game1` (the manual-admin
    *  shape). Ignored for scoring when `games` is provided. */
@@ -47,7 +50,7 @@ export interface SettleCS2MatchInput {
 export interface SettleCS2MatchResult {
   ok: boolean;
   error?: string;
-  winner?: "team1" | "team2";
+  winner?: "team1" | "team2" | "draw";
   winnerName?: string;
   matchId?: string;
   discordAnnounce?: any;
@@ -65,11 +68,23 @@ export async function settleCS2Match(db: Firestore, input: SettleCS2MatchInput):
   const m: any = snap.data();
   const tournament: any = tSnap.data() || {};
 
+  const isDraw = winner === "draw";
+
+  // A drawn bracket match would leave the play-off with no team to advance,
+  // and maybeSeedCS2Final would read `winner` as neither side. Refuse it here
+  // rather than writing a result the bracket cannot act on.
+  if (isDraw && m.isBracket) {
+    return { ok: false, error: "a bracket match cannot be drawn — it must produce a winner to advance" };
+  }
+
   const nowIso = new Date().toISOString();
-  const winnerName = winner === "team1" ? m.team1Name : m.team2Name;
+  const winnerName = isDraw ? "Draw" : winner === "team1" ? m.team1Name : m.team2Name;
 
   const team1RoundsWon = input.team1Rounds ?? (winner === "team1" ? 13 : 0);
   const team2RoundsWon = input.team2Rounds ?? (winner === "team2" ? 13 : 0);
+  // Series score is maps won. Nobody wins the map in a drawn BO1, so a draw is
+  // 0-0 — which also keeps recomputeCS2Standings' mapDiff honest, and makes
+  // the match card's existing `team1Score === team2Score` draw styling fire.
   const team1SeriesScore = input.team1SeriesScore ?? (winner === "team1" ? 1 : 0);
   const team2SeriesScore = input.team2SeriesScore ?? (winner === "team2" ? 1 : 0);
 
@@ -99,7 +114,7 @@ export async function settleCS2Match(db: Firestore, input: SettleCS2MatchInput):
   const discordAnnounce = await sendCS2MatchResult({
     team1Name: m.team1Name, team2Name: m.team2Name, winnerName,
     team1RoundsWon, team2RoundsWon, team1SeriesScore, team2SeriesScore, bo,
-    isBracket: !!m.isBracket, bracketLabel: m.bracketLabel,
+    isBracket: !!m.isBracket, bracketLabel: m.bracketLabel, isDraw,
     channelIdOverride: tournament.discordChannelId,
   }).catch((e: any) => ({ ok: false, error: e?.message || String(e) }));
 
@@ -113,7 +128,7 @@ export async function settleCS2Match(db: Firestore, input: SettleCS2MatchInput):
 
     try { bracketAdvance = await maybeSeedCS2Semifinals(db, tournamentId); }
     catch (e: any) { bracketAdvance = { error: e?.message || String(e) }; }
-  } else {
+  } else if (winner !== "draw") {
     try { bracketAdvance = await maybeSeedCS2Final(db, tournamentId); }
     catch (e: any) { bracketAdvance = { error: e?.message || String(e) }; }
 

@@ -733,7 +733,9 @@ export interface CS2Match {
   bracketType?: "winners" | "grand_final"; // "winners" = semifinal (see lib/shuffleCS2Teams.ts)
   bracketLabel?: string;
   status: "pending" | "live" | "completed";
-  winner?: "team1" | "team2";
+  /** "draw" is group-stage only — MR16 with no overtime makes 8-8 reachable.
+   *  A bracket match must produce a winner; settleCS2Match rejects a draw. */
+  winner?: "team1" | "team2" | "draw";
   scheduledTime?: string;
   completedAt?: string;
   game1?: CS2GameResult;

@@ -2771,6 +2771,27 @@ export default function AdminPanel() {
                                   🏆 {m.team2Name} wins
                                 </button>
                               </div>
+                              {/* Draws are real in this format: the group stage is MR16 with
+                                  no overtime, so 8-8 happens and both teams take a point.
+                                  Not offered on bracket matches — a play-off has to produce
+                                  someone to advance, and the API rejects it. */}
+                              {!m.isBracket && (
+                                <button disabled={loading} style={{ ...btnStyle, width: "100%", marginTop: 6, fontSize: "0.72rem", background: "#78716c44", border: "1px solid #a8a29e88" }}
+                                  onClick={async () => {
+                                    const rounds = cs2Team1Rounds.trim() && cs2Team2Rounds.trim()
+                                      ? ` at ${cs2Team1Rounds}-${cs2Team2Rounds}` : "";
+                                    if (!confirm(`Record this match as a DRAW${rounds}? Both teams get 1 point.`)) return;
+                                    try {
+                                      await apiCall("/api/admin/cs2-manual-result", {
+                                        tournamentId, matchId: opsMatchId, winner: "draw",
+                                        team1Rounds: cs2Team1Rounds.trim() ? Number(cs2Team1Rounds) : undefined,
+                                        team2Rounds: cs2Team2Rounds.trim() ? Number(cs2Team2Rounds) : undefined,
+                                      });
+                                    } catch {/* apiCall already logged */}
+                                  }}>
+                                  🤝 Draw — 1 point each
+                                </button>
+                              )}
                             </div>
                           </div>
                         ) : (

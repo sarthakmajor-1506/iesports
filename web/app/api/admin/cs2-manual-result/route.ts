@@ -11,8 +11,8 @@ import { settleCS2Match } from "@/lib/settleCS2Match";
  * auto-seed (crossover from group standings, then semifinal winners into the
  * final) and champion stamping all live in one place.
  *
- * POST { adminKey|authToken, tournamentId, matchId, winner: "team1"|"team2",
- *        team1Rounds?, team2Rounds? }
+ * POST { adminKey|authToken, tournamentId, matchId,
+ *        winner: "team1"|"team2"|"draw", team1Rounds?, team2Rounds? }
  *
  * This only fires for the fixed 2-group / 4-team playoff shape (semifinal
  * match ids "cs2-sf1"/"cs2-sf2", final "cs2-final"). Tournaments that don't
@@ -34,7 +34,12 @@ export async function POST(req: NextRequest) {
   const team2Rounds = Number.isFinite(body.team2Rounds) ? Number(body.team2Rounds) : null;
 
   if (!tournamentId || !matchId) return NextResponse.json({ error: "tournamentId and matchId required" }, { status: 400 });
-  if (winner !== "team1" && winner !== "team2") return NextResponse.json({ error: "winner must be 'team1' or 'team2'" }, { status: 400 });
+  // "draw" is a group-stage outcome: MR16 with no overtime makes 8-8 a real
+  // result. settleCS2Match rejects it for bracket matches, which must produce
+  // someone to advance.
+  if (winner !== "team1" && winner !== "team2" && winner !== "draw") {
+    return NextResponse.json({ error: "winner must be 'team1', 'team2' or 'draw'" }, { status: 400 });
+  }
 
   const result = await settleCS2Match(adminDb, {
     tournamentId, matchId, winner, team1Rounds, team2Rounds,
