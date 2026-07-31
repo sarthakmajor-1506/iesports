@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { cs2TokenValid } from "@/lib/cs2Auth";
+import { cs2TokenValid, cs2ConfigToken } from "@/lib/cs2Auth";
 import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
 import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
 
@@ -27,11 +27,16 @@ export const dynamic = "force-dynamic";
 const DEFAULT_MAPS_BO1 = ["de_mirage"];
 const DEFAULT_MAPS_BO3 = ["de_mirage", "de_inferno", "de_nuke"];
 
+// Must be the www. form — iesports.in 307-redirects, and MatchZy is not
+// guaranteed to follow redirects on the webhook POST.
+const CS2_PUBLIC_BASE_URL = process.env.CS2_PUBLIC_BASE_URL || "https://www.iesports.in";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ matchId: string }> }
 ) {
-  if (!cs2TokenValid(req.headers.get("x-iesports-token"))) {
+  const token = cs2ConfigToken();
+  if (!token || !cs2TokenValid(req.headers.get("x-iesports-token"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -80,7 +85,17 @@ export async function GET(
     clinch_series: true,
     team1: { name: team1.teamName || m.team1Name || "Team 1", players: team1Players },
     team2: { name: team2.teamName || m.team2Name || "Team 2", players: team2Players },
+    // Applied by MatchZy when it loads this config, and reverted on series
+    // end (matchzy_reset_cvars_on_series_end defaults true). This is the
+    // reliable way to point the server at our webhook: these are
+    // CounterStrikeSharp FakeConVars, and setting them ad-hoc over RCON
+    // neither takes effect reliably nor reads back, so RCON cannot confirm
+    // it worked. Scoping them per-match is also correct on a shared box —
+    // the friend's own pugs never POST into our webhook.
     cvars: {
+      matchzy_remote_log_url: `${CS2_PUBLIC_BASE_URL}/api/cs2/matchzy-events`,
+      matchzy_remote_log_header_key: "X-IESports-Token",
+      matchzy_remote_log_header_value: token,
       matchzy_whitelist_enabled_default: "true",
     },
   });
