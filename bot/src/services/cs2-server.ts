@@ -184,7 +184,15 @@ async function runCommand(
 
 export function startCS2ServerControl(db: Firestore): void {
   if (!rconTargetFromEnv()) {
-    console.log("[CS2] RCON not configured — server control disabled");
+    // Name the specific missing variable. "not configured" alone can't
+    // distinguish a missing host from a missing password, and these are set
+    // on the Railway bot service separately from Vercel's env, so a
+    // half-configured deploy is the common failure.
+    const missing = [
+      !process.env.CS2_RCON_HOST && "CS2_RCON_HOST",
+      !process.env.CS2_RCON_PASSWORD && "CS2_RCON_PASSWORD",
+    ].filter(Boolean).join(", ");
+    console.log(`[CS2] RCON not configured — server control disabled (missing: ${missing})`);
     return;
   }
 
@@ -224,5 +232,8 @@ export function startCS2ServerControl(db: Firestore): void {
       }
     }, (err) => console.error("[CS2] snapshot error:", err?.message || err));
 
+  if (!process.env.CS2_RCON_PORT) {
+    console.warn("[CS2] CS2_RCON_PORT unset — defaulting to 27015. Set it explicitly if the server uses another port.");
+  }
   console.log(`[CS2] RCON control running → ${process.env.CS2_RCON_HOST}:${process.env.CS2_RCON_PORT || 27015}`);
 }
