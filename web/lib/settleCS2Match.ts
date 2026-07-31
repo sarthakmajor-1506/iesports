@@ -155,47 +155,87 @@ export async function settleCS2Match(db: Firestore, input: SettleCS2MatchInput):
 }
 
 /**
- * Once both groups have finished their 6 round-robin matches, seed the two
- * semifinal placeholder matches (ids "cs2-sf1" / "cs2-sf2") from the group
- * standings. Crossover seeding (GroupA #1 vs GroupB #2, GroupB #1 vs GroupA
- * #2) avoids an all-one-group final when possible. No-op if the group stage
- * isn't done yet, or if the semifinal docs don't exist / are already seeded.
+ * Seed the semifinal placeholders ("cs2-sf1" / "cs2-sf2") from group
+ * standings, one group at a time.
+ *
+ * Crossover seeding — SF1 = Group A #1 vs Group B #2, SF2 = Group B #1 vs
+ * Group A #2 — matching the published fixture sheet and avoiding an
+ * all-one-group final where possible.
+ *
+ * Per group, not all-or-nothing: the two groups play back to back, so Group A
+ * is settled a full hour before Group B finishes, and an admin naturally wants
+ * the A side of the bracket visible as soon as it is known. Each group's slots
+ * fill the moment that group's six matches are complete.
+ *
+ * Every write is guarded on the slot still reading "TBD", so this is safe to
+ * call after every result and cannot overwrite a bracket that has since been
+ * corrected by hand. That guard used to live on SF1's team1 alone and stood in
+ * for the whole bracket: seeding one group first would have permanently
+ * skipped the other, leaving those slots on TBD with no way back short of
+ * editing Firestore.
  */
-async function maybeSeedCS2Semifinals(db: Firestore, tournamentId: string): Promise<{ seeded: boolean; reason?: string }> {
+export async function maybeSeedCS2Semifinals(
+  db: Firestore,
+  tournamentId: string,
+): Promise<{ seeded: boolean; slots?: string[]; reason?: string }> {
   const tref = db.collection("cs2Tournaments").doc(tournamentId);
 
   const groupMatchesSnap = await tref.collection("matches").where("isBracket", "==", false).get();
-  const groupMatches = groupMatchesSnap.docs.map(d => d.data());
+  const groupMatches = groupMatchesSnap.docs.map(d => d.data() as any);
   if (groupMatches.length === 0) return { seeded: false, reason: "no group matches" };
-  if (groupMatches.some((m: any) => m.status !== "completed")) return { seeded: false, reason: "group stage not finished" };
 
   const sf1Ref = tref.collection("matches").doc("cs2-sf1");
   const sf2Ref = tref.collection("matches").doc("cs2-sf2");
   const [sf1Snap, sf2Snap] = await Promise.all([sf1Ref.get(), sf2Ref.get()]);
   if (!sf1Snap.exists || !sf2Snap.exists) return { seeded: false, reason: "semifinal placeholders not found" };
-  if (sf1Snap.data()?.team1Id !== "TBD") return { seeded: false, reason: "already seeded" };
+  const sf1: any = sf1Snap.data();
+  const sf2: any = sf2Snap.data();
 
   const standingsSnap = await tref.collection("standings").get();
   const standings = standingsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-  const groupA = sortCS2Standings(standings.filter(s => s.groupId === "A"));
-  const groupB = sortCS2Standings(standings.filter(s => s.groupId === "B"));
-  if (groupA.length < 2 || groupB.length < 2) return { seeded: false, reason: "not enough standings rows per group" };
+
+  const groupDone = (gid: string) => {
+    const inGroup = groupMatches.filter(m => (m.groupId || "A") === gid);
+    return inGroup.length > 0 && inGroup.every(m => m.status === "completed");
+  };
 
   const nowIso = new Date().toISOString();
   const batch = db.batch();
-  batch.set(sf1Ref, {
-    team1Id: groupA[0].teamId, team1Name: groupA[0].teamName,
-    team2Id: groupB[1].teamId, team2Name: groupB[1].teamName,
-    seededAt: nowIso,
-  }, { merge: true });
-  batch.set(sf2Ref, {
-    team1Id: groupB[0].teamId, team1Name: groupB[0].teamName,
-    team2Id: groupA[1].teamId, team2Name: groupA[1].teamName,
-    seededAt: nowIso,
-  }, { merge: true });
-  await batch.commit();
+  const slots: string[] = [];
 
-  return { seeded: true };
+  // Group A → SF1 team1 (the #1 seed) and SF2 team2 (the #2 seed).
+  if (groupDone("A")) {
+    const a = sortCS2Standings(standings.filter(s => s.groupId === "A"));
+    if (a.length >= 2) {
+      if (sf1.team1Id === "TBD") {
+        batch.set(sf1Ref, { team1Id: a[0].teamId, team1Name: a[0].teamName, seededAt: nowIso }, { merge: true });
+        slots.push(`sf1.team1=${a[0].teamName}`);
+      }
+      if (sf2.team2Id === "TBD") {
+        batch.set(sf2Ref, { team2Id: a[1].teamId, team2Name: a[1].teamName, seededAt: nowIso }, { merge: true });
+        slots.push(`sf2.team2=${a[1].teamName}`);
+      }
+    }
+  }
+
+  // Group B → SF2 team1 (the #1 seed) and SF1 team2 (the #2 seed).
+  if (groupDone("B")) {
+    const b = sortCS2Standings(standings.filter(s => s.groupId === "B"));
+    if (b.length >= 2) {
+      if (sf2.team1Id === "TBD") {
+        batch.set(sf2Ref, { team1Id: b[0].teamId, team1Name: b[0].teamName, seededAt: nowIso }, { merge: true });
+        slots.push(`sf2.team1=${b[0].teamName}`);
+      }
+      if (sf1.team2Id === "TBD") {
+        batch.set(sf1Ref, { team2Id: b[1].teamId, team2Name: b[1].teamName, seededAt: nowIso }, { merge: true });
+        slots.push(`sf1.team2=${b[1].teamName}`);
+      }
+    }
+  }
+
+  if (!slots.length) return { seeded: false, reason: "nothing to seed (group unfinished or slots already filled)" };
+  await batch.commit();
+  return { seeded: true, slots };
 }
 
 /** Once both semifinals are complete, seed the final (id "cs2-final") from their winners. */
