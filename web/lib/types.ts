@@ -742,6 +742,14 @@ export interface CS2Match {
   // Server-control fields, added by the RCON pipeline (Phase 2+).
   matchzyMatchId?: number;
   plannedMaps?: string[];
+  /** Per-map starting sides: "knife" | "team1_ct" | "team1_t" (lib/cs2Maps).
+   *  Anything but "knife" skips the knife round — the only way to settle
+   *  sides from the panel, since .stay/.switch cannot be issued over RCON. */
+  plannedMapSides?: string[];
+  /** Fixture-sheet area, 1 or 2 — also the id of the server it runs on. */
+  area?: number;
+  /** mp_maxrounds override for this match: MR16 league, MR24 play-offs. */
+  maxRounds?: number;
   liveStartedAt?: string;
   liveUpdatedAt?: string;
   vetoLog?: Array<{ event: string; map?: string; team?: string; side?: string; at: string }>;
@@ -765,7 +773,10 @@ export type CS2ServerCommandAction =
 export interface CS2ServerCommand {
   id: string;
   action: CS2ServerCommandAction;
+  /** Always carries `serverId` ("1" | "2") — the bot routes on it. */
   params: Record<string, any>;
+  /** Mirror of params.serverId, for reading the command log at a glance. */
+  serverId?: string;
   status: "pending" | "processing" | "done" | "error";
   result?: any;
   error?: string | null;
@@ -774,10 +785,15 @@ export interface CS2ServerCommand {
   updatedAt?: string;
 }
 
-// Doc: cs2ServerControl/state — published by the bot, advisory only.
-// NEVER treat this as the source of truth for match state; the MatchZy
-// webhook into cs2Tournaments/{id}/matches/{id} is authoritative.
+// Doc: cs2ServerControl/state (server 1) and /state2 (server 2) — published
+// by the bot, advisory only. NEVER treat this as the source of truth for
+// match state; the MatchZy webhook into cs2Tournaments/{id}/matches/{id} is
+// authoritative.
 export interface CS2ServerState {
+  /** "1" | "2" — matches the `area` on the match doc. Absent on docs written
+   *  before the second server existed, where it is server 1 by definition. */
+  serverId?: string;
+  label?: string;
   status: "unknown" | "online" | "offline" | "error";
   hostname: string | null;
   map: string | null;

@@ -50,6 +50,20 @@ export interface RconTarget {
   password: string;
 }
 
+/** An RCON target plus the identity the rest of the pipeline routes on. */
+export interface CS2ServerDef extends RconTarget {
+  /** "1" | "2" — matches the `area` recorded on each match doc. */
+  id: string;
+  label: string;
+}
+
+/**
+ * Server ids are the fixture sheet's areas, not arbitrary labels: each
+ * 20-minute slot runs two matches at once, tagged area 1 / area 2, and the
+ * admin panel routes a match to the server whose id equals its area.
+ */
+export const CS2_SERVER_IDS = ["1", "2"] as const;
+
 export interface RconResult {
   ok: boolean;
   /** Concatenated server output across every command in the batch. */
@@ -72,6 +86,29 @@ export function rconTargetFromEnv(): RconTarget | null {
   const password = process.env.CS2_RCON_PASSWORD?.trim();
   if (!host || !password) return null;
   return { host, port: Number(process.env.CS2_RCON_PORT || 27015), password };
+}
+
+/**
+ * Every configured game server, in id order.
+ *
+ * Server "1" keeps the original unsuffixed variables so an existing deploy
+ * needs no edit; server "2" is the `_2` suffixed set. A second server is
+ * optional — with only the first configured this returns a single entry and
+ * everything behaves exactly as it did when one server was the only option.
+ *
+ * The two servers are separate CS2 instances that each need their own MatchZy
+ * install; they are NOT two ports into one game. Running the fixture sheet's
+ * two concurrent areas needs both, because one server can hold one match.
+ */
+export function cs2ServersFromEnv(): CS2ServerDef[] {
+  const read = (suffix: string, id: string): CS2ServerDef | null => {
+    const host = process.env[`CS2_RCON_HOST${suffix}`]?.trim();
+    const password = process.env[`CS2_RCON_PASSWORD${suffix}`]?.trim();
+    if (!host || !password) return null;
+    const port = Number(process.env[`CS2_RCON_PORT${suffix}`] || 27015);
+    return { id, label: `Server ${id}`, host, port, password };
+  };
+  return [read("", "1"), read("_2", "2")].filter(Boolean) as CS2ServerDef[];
 }
 
 /**

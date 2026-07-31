@@ -3,20 +3,27 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyAdmin } from "@/lib/verifyAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { resolveCS2Roster } from "@/lib/resolveCS2Roster";
-import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
+import { CS2_ACTIVE_DUTY_MAPS, CS2_MAP_SIDES } from "@/lib/cs2Maps";
 import { cs2ConfigToken } from "@/lib/cs2Auth";
 
 /**
  * CS2 game-server control — one route, action-dispatched. Same shape as
  * admin/bot-lobby, for the same reason: web (Vercel) can't hold an RCON
  * socket to a box in another datacenter, so this is a thin Firestore bridge:
- *   - action:"state"  → read `cs2ServerControl/state` (bot publishes live here)
+ *   - action:"state"  → read `cs2ServerControl/state{N}` (bot publishes live here)
  *   - any command     → enqueue `cs2ServerCommands/{id}` {status:"pending"}
  *                        which the bot consumes via onSnapshot and runs over RCON.
  *
  * NOTE: `cs2ServerControl` / `cs2ServerCommands` are NOT in firestore.rules
  * (default-deny), so the admin panel must poll this route's `state` action —
  * it cannot use a client-side onSnapshot like BotLobbyTab does.
+ *
+ * TWO SERVERS: the fixture sheet runs two matches per 20-minute slot (area 1
+ * and area 2) and one game server holds one match, so every command carries
+ * `params.serverId` ("1" | "2"). It defaults to "1", which is both the
+ * original single-server behaviour and the right answer for any panel build
+ * that predates the second box. Server 1's state stays at
+ * `cs2ServerControl/state`; server 2 is at `state2`.
  *
  * Command actions: load_match | start | force_start | end_match | force_end |
  *                   restart_match | pause | unpause | reload_admins |
@@ -34,6 +41,18 @@ const COMMAND_ACTIONS = new Set([
   "restart_match", "pause", "unpause", "reload_admins",
   "change_map", "set_password", "status", "exec",
 ]);
+
+// Server ids are the fixture sheet's areas — a match tagged area 2 belongs on
+// server 2. Ids, not hostnames: the credentials live only on the bot (Railway
+// env), so web never needs to know where a server actually is.
+const SERVER_IDS = ["1", "2"] as const;
+const STATE_DOC_IDS: Record<string, string> = { "1": "state", "2": "state2" };
+
+/** Unknown/missing ids fall back to "1", the pre-second-server behaviour. */
+function normalizeServerId(raw: unknown): string {
+  const id = String(raw ?? "1").trim();
+  return (SERVER_IDS as readonly string[]).includes(id) ? id : "1";
+}
 
 // `iesports.in` 307-redirects to `www.iesports.in` — MatchZy's HTTP client is
 // not guaranteed to follow redirects, and a redirected POST is silent data
@@ -72,15 +91,34 @@ export async function POST(req: NextRequest) {
 
   // ── Live state read (panel polls this — no onSnapshot, see header) ──────
   if (action === "state") {
-    const s = await adminDb.collection("cs2ServerControl").doc("state").get();
-    const recent = await adminDb.collection("cs2ServerCommands")
-      .orderBy("createdAt", "desc").limit(8).get();
+    const [snaps, recent] = await Promise.all([
+      Promise.all(SERVER_IDS.map((id) => adminDb.collection("cs2ServerControl").doc(STATE_DOC_IDS[id]).get())),
+      // Two servers means two streams of commands into one log, so the window
+      // is wider than the old 8 — with both areas loading at the same minute,
+      // 8 entries could hide everything server 2 did.
+      adminDb.collection("cs2ServerCommands").orderBy("createdAt", "desc").limit(20).get(),
+    ]);
+
+    const blank = {
+      status: "unknown", hostname: null, map: null, humans: null, maxPlayers: null,
+      loadedMatchId: null, lastCommand: null, lastError: null, host: null, port: 0,
+    };
+    const servers = SERVER_IDS.map((id, i) => ({
+      serverId: id,
+      label: `Server ${id}`,
+      // A server that has never been configured on the bot has no state doc at
+      // all. Reported as "unknown" rather than omitted, so the panel can show
+      // the slot and say it isn't wired up yet.
+      configured: snaps[i].exists,
+      ...blank,
+      ...(snaps[i].exists ? snaps[i].data() : {}),
+    }));
+
     return NextResponse.json({
       ok: true,
-      state: s.exists ? s.data() : {
-        status: "unknown", hostname: null, map: null, humans: null, maxPlayers: null,
-        loadedMatchId: null, lastCommand: null, lastError: null, host: null, port: 0,
-      },
+      servers,
+      // Kept for older panel bundles that read `state` directly.
+      state: servers[0],
       recentCommands: recent.docs.map((d) => ({ id: d.id, ...d.data() })),
     });
   }
@@ -93,6 +131,9 @@ export async function POST(req: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: "CS2_MATCH_CONFIG_TOKEN not configured on web" }, { status: 500 });
     }
+    // Each server needs its own copy of these cvars — they are per-box plugin
+    // settings, not anything Firestore holds.
+    const serverId = normalizeServerId(body.serverId ?? body.params?.serverId);
     const webhookUrl = `${CS2_PUBLIC_BASE_URL}/api/cs2/matchzy-events`;
     const commands = [
       `matchzy_remote_log_url "${webhookUrl}"`,
@@ -105,7 +146,8 @@ export async function POST(req: NextRequest) {
     for (const command of commands) {
       const ref = await adminDb.collection("cs2ServerCommands").add({
         action: "exec",
-        params: { command },
+        params: { command, serverId },
+        serverId,
         status: "pending",
         createdAt: new Date().toISOString(),
         createdBy: body.by || "admin-panel",
@@ -113,7 +155,7 @@ export async function POST(req: NextRequest) {
       });
       commandIds.push(ref.id);
     }
-    return NextResponse.json({ ok: true, commandIds, action });
+    return NextResponse.json({ ok: true, commandIds, action, serverId });
   }
 
   // ── Roster validation — same resolution the match-config endpoint uses,
@@ -133,6 +175,13 @@ export async function POST(req: NextRequest) {
   // ── Save the admin's map picks onto the match doc before load_match reads
   // them. Separate from load_match itself so "validate" can run first
   // without side effects.
+  //
+  // `plannedMapSides` rides along here because sides are decided at the same
+  // moment as maps and by the same person. It is the only way an admin can
+  // settle sides at all: MatchZy's .stay/.switch handlers open with
+  // `if (player == null || !isSideSelectionPhase) return;`, so an RCON-issued
+  // css_stay is a silent no-op — the knife winner must type it in game. Set a
+  // side here and MatchZy skips the knife round entirely.
   if (action === "save_planned_maps") {
     const tournamentId = String(body.params?.tournamentId || "").trim();
     const matchId = String(body.params?.matchId || "").trim();
@@ -143,9 +192,19 @@ export async function POST(req: NextRequest) {
     if (!plannedMaps.every((mp: string) => CS2_ACTIVE_DUTY_MAPS.includes(mp))) {
       return NextResponse.json({ error: "plannedMaps must be from the Active Duty pool" }, { status: 400 });
     }
+
+    const patch: any = { plannedMaps };
+    if (body.params?.plannedMapSides !== undefined) {
+      const sides = Array.isArray(body.params.plannedMapSides) ? body.params.plannedMapSides.map(String) : [];
+      if (sides.length !== plannedMaps.length || !sides.every((s: string) => CS2_MAP_SIDES.includes(s))) {
+        return NextResponse.json({ error: `plannedMapSides must be one of ${CS2_MAP_SIDES.join(" | ")} per planned map` }, { status: 400 });
+      }
+      patch.plannedMapSides = sides;
+    }
+
     await adminDb.collection("cs2Tournaments").doc(tournamentId)
       .collection("matches").doc(matchId)
-      .set({ plannedMaps }, { merge: true });
+      .set(patch, { merge: true });
     return NextResponse.json({ ok: true });
   }
 
@@ -155,6 +214,10 @@ export async function POST(req: NextRequest) {
   }
 
   const params: any = { ...(body.params || {}) };
+  // Which box this command lands on. Written into params (where the bot reads
+  // it) and onto the command doc itself (so the panel's log can show it).
+  const serverId = normalizeServerId(body.serverId ?? params.serverId);
+  params.serverId = serverId;
 
   if (action === "change_map") {
     const map = String(params.map || "");
@@ -228,11 +291,12 @@ export async function POST(req: NextRequest) {
   const ref = await adminDb.collection("cs2ServerCommands").add({
     action,
     params,
+    serverId,
     status: "pending",
     createdAt: new Date().toISOString(),
     createdBy: body.by || "admin-panel",
     serverCreatedAt: FieldValue.serverTimestamp(),
   });
 
-  return NextResponse.json({ ok: true, commandId: ref.id, action });
+  return NextResponse.json({ ok: true, commandId: ref.id, action, serverId });
 }

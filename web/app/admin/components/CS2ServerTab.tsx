@@ -3,7 +3,7 @@
 /**
  * CS2 game-server control tab — full control surface for the RCON/MatchZy
  * pipeline. Everything goes through `/api/admin/cs2-server`:
- *   - polls action:"state" → reads `cs2ServerControl/state` (bot publishes live)
+ *   - polls action:"state" → reads `cs2ServerControl/state{N}` (bot publishes live)
  *   - command actions      → enqueues `cs2ServerCommands` (bot runs over RCON)
  *
  * Unlike BotLobbyTab, this does NOT use a client-side onSnapshot — neither
@@ -11,12 +11,21 @@
  * (default-deny), so the browser has no read access to them directly. State
  * is polled through this route's Admin-SDK-backed `state` action instead.
  * See docs/CS2_LIVE_PIPELINE_PLAN.md.
+ *
+ * TWO SERVERS: the fixture sheet runs two matches per 20-minute slot, area 1
+ * and area 2, and one game server holds one match. Every command carries the
+ * selected `serverId`, and selecting a match snaps the server picker to that
+ * match's `area` — the single likeliest mistake on the night is loading the
+ * area 2 match onto the box already running area 1, which kicks the live game.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CS2_ACTIVE_DUTY_MAPS } from "@/lib/cs2Maps";
+import { CS2_ACTIVE_DUTY_MAPS, CS2_MAP_SIDES, cs2MapSideLabel } from "@/lib/cs2Maps";
 
 interface ServerState {
+  serverId?: string;
+  label?: string;
+  configured?: boolean;
   status?: "unknown" | "online" | "offline" | "error";
   hostname?: string | null;
   map?: string | null;
@@ -29,9 +38,41 @@ interface ServerState {
   port?: number;
   updatedAt?: string;
 }
-interface CmdLog { id: string; action?: string; status?: string; error?: string | null; createdAt?: string }
+interface CmdLog { id: string; action?: string; status?: string; error?: string | null; createdAt?: string; serverId?: string }
 interface TournamentOpt { id: string; name: string; status: string }
-interface MatchOpt { id: string; team1Name: string; team2Name: string; team1Id: string; team2Id: string; isBracket: boolean; status: string; matchzyMatchId?: number }
+interface MatchOpt {
+  id: string; team1Name: string; team2Name: string; team1Id: string; team2Id: string;
+  isBracket: boolean; status: string; matchzyMatchId?: number;
+  bracketType?: string; area?: number; maxRounds?: number;
+  plannedMaps?: string[]; plannedMapSides?: string[];
+}
+interface TournamentFormat {
+  matchesPerRound?: number; bracketBestOf?: number; grandFinalBestOf?: number;
+  groupMaxRounds?: number; bracketMaxRounds?: number;
+}
+
+/**
+ * Maps handed to MatchZy must number exactly the best-of, or match-config
+ * discards the list and falls back to the default map. Derived from the
+ * tournament doc rather than assumed: Royal Sports League is BO1 throughout
+ * (play-offs included), and a hardcoded BO3 here would put a three-map list
+ * in front of a play-off that has one 20-minute slot.
+ */
+function bestOfFor(m: MatchOpt | undefined, t: TournamentFormat | null): number {
+  if (!m) return 1;
+  if (m.isBracket) {
+    return Number(m.bracketType === "grand_final" ? t?.grandFinalBestOf : t?.bracketBestOf) || 1;
+  }
+  return Number(t?.matchesPerRound) || 1;
+}
+
+/** mp_maxrounds the server will actually get — mirrors api/cs2/match-config. */
+function maxRoundsFor(m: MatchOpt | undefined, t: TournamentFormat | null): number {
+  if (!m) return 24;
+  return Number(m.maxRounds)
+    || Number(m.isBracket ? t?.bracketMaxRounds : t?.groupMaxRounds)
+    || (m.isBracket ? 24 : 16);
+}
 
 const POLL_MS = 5000;
 
@@ -53,7 +94,8 @@ function randomPassword(): string {
 }
 
 export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
-  const [state, setState] = useState<ServerState | null>(null);
+  const [servers, setServers] = useState<ServerState[]>([]);
+  const [serverId, setServerId] = useState("1");
   const [cmds, setCmds] = useState<CmdLog[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -61,29 +103,34 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
   const [tournaments, setTournaments] = useState<TournamentOpt[]>([]);
   const [tournamentId, setTournamentId] = useState("");
+  const [tFormat, setTFormat] = useState<TournamentFormat | null>(null);
   const [matches, setMatches] = useState<MatchOpt[]>([]);
   const [matchId, setMatchId] = useState("");
   const [numMaps, setNumMaps] = useState(1);
   const [plannedMaps, setPlannedMaps] = useState<string[]>([CS2_ACTIVE_DUTY_MAPS[0]]);
+  const [plannedMapSides, setPlannedMapSides] = useState<string[]>(["knife"]);
   const [validation, setValidation] = useState<{ ok: boolean; detail: string } | null>(null);
 
   const [mapToChange, setMapToChange] = useState(CS2_ACTIVE_DUTY_MAPS[0]);
   const [password, setPassword] = useState("");
 
-  const api = useCallback(async (action: string, params?: any) => {
+  // Every command names its server. `serverId` sits outside `params` so that
+  // the route decides routing once, in one place, for both the passthrough
+  // commands and the ones it rewrites (load_match, prepare_server).
+  const api = useCallback(async (action: string, params?: any, targetServerId?: string) => {
     const res = await fetch("/api/admin/cs2-server", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminKey, action, params }),
+      body: JSON.stringify({ adminKey, action, params, serverId: targetServerId ?? serverId }),
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || "request failed");
     return j;
-  }, [adminKey]);
+  }, [adminKey, serverId]);
 
   const refresh = useCallback(async () => {
     try {
       const j = await api("state");
-      setState(j.state || null);
+      setServers(j.servers || (j.state ? [j.state] : []));
       setCmds(j.recentCommands || []);
     } catch (e: any) { setMsg(`state: ${e.message}`); }
     finally { setLoaded(true); }
@@ -118,28 +165,40 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
   useEffect(() => { loadTournaments(); }, [loadTournaments]);
 
-  // Load matches for the selected tournament (public detail endpoint).
+  // Load matches for the selected tournament (public detail endpoint). The
+  // tournament doc comes back with them and carries the format — best-of and
+  // round limits are read from it, never assumed here.
   useEffect(() => {
-    if (!tournamentId) { setMatches([]); return; }
+    if (!tournamentId) { setMatches([]); setTFormat(null); return; }
     fetch(`/api/tournaments/detail?id=${encodeURIComponent(tournamentId)}&game=cs2`)
       .then(r => r.json())
-      .then(j => setMatches(j.matches || []))
-      .catch(() => setMatches([]));
+      .then(j => { setMatches(j.matches || []); setTFormat(j.tournament || null); })
+      .catch(() => { setMatches([]); setTFormat(null); });
   }, [tournamentId]);
 
   const selectedMatch = matches.find(m => m.id === matchId);
+  const bestOf = bestOfFor(selectedMatch, tFormat);
 
   useEffect(() => {
     if (!selectedMatch) return;
-    const n = selectedMatch.isBracket ? 3 : 1; // group=BO1, bracket=BO3 default; admin can override map count implicitly via list length below
+    const n = bestOfFor(selectedMatch, tFormat);
     setNumMaps(n);
     setPlannedMaps((prev) => {
-      const next = [...prev];
+      const saved = selectedMatch.plannedMaps?.length === n ? selectedMatch.plannedMaps : prev;
+      const next = [...saved];
       while (next.length < n) next.push(CS2_ACTIVE_DUTY_MAPS[next.length % CS2_ACTIVE_DUTY_MAPS.length]);
       return next.slice(0, n);
     });
+    setPlannedMapSides(() => {
+      const saved = selectedMatch.plannedMapSides?.length === n ? selectedMatch.plannedMapSides : null;
+      // Knife by default — the sides override exists for when a knife can't
+      // be played, not as the normal path.
+      return saved ?? Array.from({ length: n }, () => "knife");
+    });
+    // The area on the fixture sheet IS the server the match belongs on.
+    if (selectedMatch.area === 1 || selectedMatch.area === 2) setServerId(String(selectedMatch.area));
     setValidation(null);
-  }, [selectedMatch?.id]);
+  }, [selectedMatch?.id, tFormat]);
 
   const cmd = async (action: string, params?: any, confirmMsg?: string) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -172,47 +231,65 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
   if (!adminKey) return <div style={{ color: "#888", padding: 20 }}>Enter admin key to use the CS2 Server panel.</div>;
   if (!loaded) return <div style={{ color: "#888", padding: 20 }}>Loading CS2 server state…</div>;
 
-  const s = state || {};
-  const online = s.status === "online";
-  const statusColor = online ? "#22c55e" : s.status === "error" ? "#ef4444" : s.status === "offline" ? "#ef4444" : "#eab308";
-  const updatedAgeSec = s.updatedAt ? Math.round((Date.now() - new Date(s.updatedAt).getTime()) / 1000) : null;
+  const s = servers.find(sv => String(sv.serverId || "1") === serverId) || {};
+  const ageSec = (sv: ServerState) => sv.updatedAt ? Math.round((Date.now() - new Date(sv.updatedAt).getTime()) / 1000) : null;
+  const updatedAgeSec = ageSec(s);
   // The bot deliberately suppresses identical heartbeats and only forces a
   // write every LIVENESS_FLOOR_MS (5 min, see bot/src/services/cs2-server.ts),
   // so on an idle server `updatedAt` is routinely ~5 minutes old while the bot
   // is perfectly healthy. Anything at or under that is normal; warn only well
   // past it, otherwise this fires constantly and trains you to ignore it.
   const staleBot = updatedAgeSec !== null && updatedAgeSec > 420;
+  const statusColorOf = (sv: ServerState) =>
+    sv.status === "online" ? "#22c55e" : sv.status === "error" || sv.status === "offline" ? "#ef4444" : "#eab308";
 
   return (
     <div style={{ maxWidth: 900 }}>
-      {/* Status bar */}
-      <div style={{ ...sectionStyle, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <div>
-          <span style={labelStyle}>Server</span>
-          <span style={{ fontWeight: 800, color: statusColor, textTransform: "uppercase" }}>{s.status || "unknown"}</span>
-        </div>
-        <div>
-          <span style={labelStyle}>Hostname</span>
-          <span style={{ color: "#e6e7ee" }}>{s.hostname || "—"}</span>
-        </div>
-        <div>
-          <span style={labelStyle}>Map</span>
-          <span style={{ color: "#e6e7ee" }}>{s.map || "—"}</span>
-        </div>
-        <div>
-          <span style={labelStyle}>Players</span>
-          <span style={{ color: "#e6e7ee", fontWeight: 800 }}>{s.humans ?? "—"}{s.maxPlayers ? ` / ${s.maxPlayers}` : ""}</span>
-        </div>
-        <div>
-          <span style={labelStyle}>Loaded match</span>
-          <span style={{ color: "#e6e7ee" }}>{s.loadedMatchId || "none"}</span>
-        </div>
-        <button style={{ ...btn("#374151"), marginLeft: "auto" }} onClick={refresh}>↻ Refresh</button>
+      {/* Server picker + status. Both servers are always shown: on a two-area
+          night the question is never "how is the server", it's "which of the
+          two is free". */}
+      <div style={{ ...sectionStyle, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {["1", "2"].map((id) => {
+          const sv = servers.find(x => String(x.serverId || "1") === id) || {};
+          const active = id === serverId;
+          const unconfigured = sv.configured === false;
+          return (
+            <button key={id} onClick={() => setServerId(id)} style={{
+              flex: "1 1 300px", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+              background: active ? "#15171d" : "#0a0b0e",
+              border: `1px solid ${active ? "#3CCBFF" : "#1e1e22"}`,
+              borderRadius: 10, padding: 14,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ fontWeight: 800, color: active ? "#3CCBFF" : "#e6e7ee" }}>Server {id}</span>
+                <span style={{ fontWeight: 800, fontSize: "0.72rem", color: statusColorOf(sv), textTransform: "uppercase" }}>
+                  {unconfigured ? "not configured" : (sv.status || "unknown")}
+                </span>
+                {sv.host && <span style={{ fontSize: "0.68rem", color: "#666" }}>{sv.host}:{sv.port}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.72rem", color: "#9ca3af" }}>
+                <span>map <b style={{ color: "#e6e7ee" }}>{sv.map || "—"}</b></span>
+                <span>players <b style={{ color: "#e6e7ee" }}>{sv.humans ?? "—"}{sv.maxPlayers ? `/${sv.maxPlayers}` : ""}</b></span>
+                <span>match <b style={{ color: "#e6e7ee" }}>{sv.loadedMatchId || "none"}</b></span>
+              </div>
+              {unconfigured && (
+                <div style={{ fontSize: "0.68rem", color: "#fcd34d", marginTop: 8 }}>
+                  Set CS2_RCON_HOST_{id} / CS2_RCON_PORT_{id} / CS2_RCON_PASSWORD_{id} on the Railway bot service.
+                </div>
+              )}
+            </button>
+          );
+        })}
+        <button style={{ ...btn("#374151"), alignSelf: "center" }} onClick={refresh}>↻ Refresh</button>
+      </div>
+
+      <div style={{ marginBottom: 12, fontSize: "0.75rem", color: "#9ca3af" }}>
+        Commands below go to <b style={{ color: "#3CCBFF" }}>Server {serverId}</b>{s.hostname ? ` (${s.hostname})` : ""}.
       </div>
 
       {staleBot && (
         <div style={{ ...sectionStyle, borderColor: "#7c5e10", color: "#fcd34d" }}>
-          Bot hasn&apos;t reported in {Math.round(updatedAgeSec! / 60)} min — it may be down. Check the Railway logs before running commands.
+          Bot hasn&apos;t reported for server {serverId} in {Math.round(updatedAgeSec! / 60)} min — it may be down. Check the Railway logs before running commands.
         </div>
       )}
       {s.lastError && <div style={{ ...sectionStyle, borderColor: "#7f1d1d", color: "#fca5a5" }}>Last error: {s.lastError}</div>}
@@ -256,7 +333,7 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
               <option value="">— select —</option>
               {matches.map(m => (
                 <option key={m.id} value={m.id}>
-                  {m.id} — {m.team1Name} vs {m.team2Name} ({m.status})
+                  {m.id}{m.area ? ` [area ${m.area}]` : ""} — {m.team1Name} vs {m.team2Name} ({m.status})
                 </option>
               ))}
             </select>
@@ -265,14 +342,51 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
         {selectedMatch && (
           <>
-            <span style={labelStyle}>Maps ({numMaps === 1 ? "BO1" : "BO3"})</span>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12, fontSize: "0.74rem", color: "#9ca3af" }}>
+              <span>format <b style={{ color: "#e6e7ee" }}>BO{bestOf}</b></span>
+              <span>rounds <b style={{ color: "#e6e7ee" }}>MR{maxRoundsFor(selectedMatch, tFormat)}</b> (first to {Math.floor(maxRoundsFor(selectedMatch, tFormat) / 2) + 1})</span>
+              <span>stage <b style={{ color: "#e6e7ee" }}>{selectedMatch.isBracket ? "play-off" : "league"}</b></span>
+            </div>
+
+            {/* The fixture sheet's area is the server this match belongs on.
+                Loading it onto the other box would kick whatever is live
+                there, so the mismatch is called out rather than silently
+                allowed — overriding is still possible, deliberately. */}
+            {selectedMatch.area && String(selectedMatch.area) !== serverId && (
+              <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, border: "1px solid #7c5e10", color: "#fcd34d", fontSize: "0.74rem" }}>
+                This match is area {selectedMatch.area} but Server {serverId} is selected — loading it here will interrupt whatever Server {serverId} is running.
+              </div>
+            )}
+
+            <span style={labelStyle}>Maps &amp; sides (BO{numMaps})</span>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               {plannedMaps.map((mp, i) => (
-                <select key={i} style={{ ...selectStyle, width: "auto", minWidth: 140 }} value={mp}
-                  onChange={e => setPlannedMaps(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}>
-                  {CS2_ACTIVE_DUTY_MAPS.map(am => <option key={am} value={am}>{am}</option>)}
-                </select>
+                <div key={i} style={{ display: "flex", gap: 6 }}>
+                  <select style={{ ...selectStyle, width: "auto", minWidth: 140 }} value={mp}
+                    onChange={e => setPlannedMaps(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}>
+                    {CS2_ACTIVE_DUTY_MAPS.map(am => <option key={am} value={am}>{am}</option>)}
+                  </select>
+                  <select style={{ ...selectStyle, width: "auto", minWidth: 190 }} value={plannedMapSides[i] || "knife"}
+                    onChange={e => setPlannedMapSides(prev => {
+                      const next = [...prev];
+                      while (next.length < plannedMaps.length) next.push("knife");
+                      next[i] = e.target.value;
+                      return next.slice(0, plannedMaps.length);
+                    })}>
+                    {CS2_MAP_SIDES.map(sd => (
+                      <option key={sd} value={sd}>
+                        {cs2MapSideLabel(sd, selectedMatch.team1Name, selectedMatch.team2Name)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ))}
+            </div>
+            <div style={{ color: "#666", fontSize: "0.72rem", marginBottom: 12 }}>
+              Leave on <b>Knife round</b> for the normal flow — the knife winner types <b>.stay</b> or <b>.switch</b> in
+              game. Those two are chat commands only: MatchZy ignores them unless a player sends them, so the panel
+              cannot press them for you. Picking a side here instead skips the knife entirely, which is the way to
+              settle sides from admin when a team is short or the slot is running late. Applies on Load Match.
             </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -285,7 +399,7 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
                 onClick={async () => {
                   setBusy("load_match"); setMsg("⏳ saving planned maps…");
                   try {
-                    await api("save_planned_maps", { tournamentId, matchId, plannedMaps });
+                    await api("save_planned_maps", { tournamentId, matchId, plannedMaps, plannedMapSides });
                     await cmd("load_match", { tournamentId, matchId });
                   } catch (e: any) { setMsg(`✗ load_match: ${e.message}`); }
                   finally { setBusy(null); }
@@ -349,6 +463,9 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
         {cmds.length === 0 && <div style={{ color: "#888", fontSize: "0.8rem" }}>none</div>}
         {cmds.map(c => (
           <div key={c.id} style={{ display: "flex", gap: 10, fontSize: "0.76rem", padding: "4px 0", borderBottom: "1px solid #18181c" }}>
+            {/* Two servers share this log — without the id you cannot tell
+                which box an error came from. */}
+            <span style={{ color: "#6b7280", minWidth: 22 }}>S{c.serverId || "1"}</span>
             <span style={{ color: "#9ca3af", minWidth: 90 }}>{c.action}</span>
             <span style={{ color: c.status === "done" ? "#86efac" : c.status === "error" ? "#fca5a5" : "#fcd34d", minWidth: 70 }}>{c.status}</span>
             <span style={{ color: "#666", flex: 1 }}>{c.error || c.createdAt || ""}</span>
