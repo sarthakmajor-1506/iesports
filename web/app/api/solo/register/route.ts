@@ -28,7 +28,12 @@ export async function POST(req: NextRequest) {
     // NOTE: No "hasn't started yet" check — users CAN register for upcoming/next week tournaments
     // as long as the registration deadline hasn't passed
 
-    if (tData.entryFee > 0) return NextResponse.json({ error: "Payment integration coming soon" }, { status: 400 });
+    if (tData.entryFee > 0) {
+      return NextResponse.json(
+        { error: "This tournament requires payment", requiresPayment: true, entryFee: tData.entryFee },
+        { status: 400 }
+      );
+    }
 
     if ((tData.slotsBooked || 0) >= tData.totalSlots) return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
 

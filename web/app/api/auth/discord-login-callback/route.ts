@@ -93,6 +93,9 @@ export async function GET(req: NextRequest) {
       await adminDb.collection("users").doc(firebaseUid).update({
         discordUsername: discordUser.username,
         discordAvatar,
+        // email scope was added after some users already linked — only ever
+        // written when Discord actually returns one, never overwritten with null
+        ...(discordUser.email ? { email: discordUser.email } : {}),
         ...(discordConnections.length > 0 ? { discordConnections } : {}),
       });
     } else {
@@ -117,6 +120,7 @@ export async function GET(req: NextRequest) {
         discordAvatar,
         discordConnectedAt: new Date(),
         createdAt: new Date(),
+        ...(discordUser.email ? { email: discordUser.email } : {}),
         // No Steam data — user signed in via Discord only
         steamId: null,
         steamName: null,

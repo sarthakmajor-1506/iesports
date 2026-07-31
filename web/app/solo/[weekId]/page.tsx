@@ -520,6 +520,43 @@ useEffect(() => {
     finally { setRegistering(false); }
   };
 
+  // Paid tournaments redirect to PayU's hosted checkout instead of writing
+  // the registration directly — the webhook confirms payment and books the
+  // slot server-side (see app/api/payu/webhook/route.ts).
+  const handlePaidRegister = async () => {
+    if (!user) return;
+    setRegistering(true); setError("");
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/payu/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tournamentId: id, game: "dota2" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = data.payuUrl;
+      Object.entries(data.fields).forEach(([k, v]) => {
+        const input = document.createElement("input");
+        input.type = "hidden"; input.name = k; input.value = String(v);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+    } catch (e: any) {
+      setError(e.message || "Failed to start payment");
+      setRegistering(false);
+    }
+  };
+
+  const handleRegisterClick = () => {
+    if ((tournament as any)?.entryFee > 0) handlePaidRegister();
+    else handleRegister();
+  };
+
   const handleRefresh = async () => {
     if (!user || refreshing) return;
     setRefreshing(true);
@@ -632,8 +669,10 @@ useEffect(() => {
                   </div>
                 )}
                 {canRegister && (
-                  <button onClick={handleRegister} disabled={registering} style={{ width:"100%", padding:"11px 0", background:"#F05A28", border:"none", borderRadius:100, color:"#fff", fontWeight:700, fontSize:".88rem", cursor:"pointer", fontFamily:"inherit", opacity:registering?.6:1, boxShadow:"0 3px 14px rgba(240,90,40,.3)" }}>
-                    {registering?"Registering…":"Register Free →"}
+                  <button onClick={handleRegisterClick} disabled={registering} style={{ width:"100%", padding:"11px 0", background:"#F05A28", border:"none", borderRadius:100, color:"#fff", fontWeight:700, fontSize:".88rem", cursor:"pointer", fontFamily:"inherit", opacity:registering?.6:1, boxShadow:"0 3px 14px rgba(240,90,40,.3)" }}>
+                    {registering
+                      ? ((tournament as any)?.entryFee > 0 ? "Redirecting to payment…" : "Registering…")
+                      : ((tournament as any)?.entryFee > 0 ? `Pay ₹${(tournament as any).entryFee} & Register →` : "Register Free →")}
                   </button>
                 )}
                 {isRegistered&&<div style={{width:"100%",padding:"11px 0",textAlign:"center",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:100,color:"#16a34a",fontWeight:700,fontSize:".86rem"}}>✓ Registered</div>}

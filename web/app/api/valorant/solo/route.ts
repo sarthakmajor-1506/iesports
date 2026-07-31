@@ -64,6 +64,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
+    if (tData.entryFee > 0) {
+      return NextResponse.json(
+        { error: "This tournament requires payment", requiresPayment: true, entryFee: tData.entryFee },
+        { status: 400 }
+      );
+    }
+
     // Check slots
     if (tData.slotsBooked >= tData.totalSlots) {
       return NextResponse.json({ error: "Tournament is full" }, { status: 400 });

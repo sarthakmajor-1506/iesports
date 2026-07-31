@@ -27,7 +27,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-type Step = "choose" | "create" | "join" | "solo" | "success" | "connect";
+type Step = "choose" | "create" | "join" | "solo" | "success" | "connect" | "payment";
 
 export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, onClose, onSuccess }: Props) {
   const { riotData, userProfile } = useAuth();
@@ -375,6 +375,33 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     } catch (e: any) { setError(e.message || "Failed to join team"); } finally { setLoading(false); }
   };
 
+  // Paid CS2/Valorant solo tournaments redirect to PayU's hosted checkout
+  // instead of registering directly — the webhook confirms payment and
+  // books the slot server-side (see app/api/payu/webhook/route.ts). Throws
+  // on failure so it composes with handleSolo's existing try/catch/finally.
+  const handlePaidSolo = async () => {
+    const token = await user.getIdToken();
+    const res = await fetch("/api/payu/initiate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tournamentId: tournament.id, game }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setStep("payment");
+    try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = data.payuUrl;
+    Object.entries(data.fields).forEach(([k, v]) => {
+      const input = document.createElement("input");
+      input.type = "hidden"; input.name = k; input.value = String(v);
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  };
+
   const handleSolo = async () => {
     setLoading(true); setError(""); setWarning("");
     try {
@@ -389,6 +416,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         onSuccess(); setStep("success");
+        return;
+      }
+      if ((isCS2 || isValorant) && tournament?.entryFee > 0) {
+        await handlePaidSolo();
         return;
       }
       const endpoint = isCS2 ? "/api/cs2/solo" : isValorant ? "/api/valorant/solo" : "/api/teams/solo";
@@ -790,6 +821,20 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             }}>
               {loading ? "Registering..." : isSubstitute ? "Join Substitute List →" : "Register Solo →"}
             </button>
+          </div>
+        )}
+
+        {/* ═══════ PAYMENT: brief redirect state before PayU form submits ═══════ */}
+        {actualStep === "payment" && (
+          <div style={{ textAlign: "center" as const, padding: "20px 0" }}>
+            <div style={{
+              width: 36, height: 36, margin: "0 auto 16px",
+              border: "3px solid #1a1a1a", borderTopColor: accentColor, borderRadius: "50%",
+              animation: "reg-spin 0.8s linear infinite",
+            }} />
+            <style>{`@keyframes reg-spin { to { transform: rotate(360deg); } }`}</style>
+            <p style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>Redirecting to PayU…</p>
+            <p style={{ color: "#666", fontSize: 12, marginTop: 6 }}>Don&apos;t close this tab.</p>
           </div>
         )}
 

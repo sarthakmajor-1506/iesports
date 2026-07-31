@@ -86,6 +86,9 @@ export async function GET(req: NextRequest) {
         ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
         : null,
       discordConnectedAt: new Date(),
+      // email scope was added after some users already linked — only ever
+      // written when Discord actually returns one, never overwritten with null
+      ...(discordUser.email ? { email: discordUser.email } : {}),
       ...(discordConnections.length > 0 ? { discordConnections } : {}),
     }, { merge: true });
 

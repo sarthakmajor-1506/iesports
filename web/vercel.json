@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/registration-close",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/payu-reconcile",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

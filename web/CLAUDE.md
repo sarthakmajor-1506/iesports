@@ -278,6 +278,7 @@ registeredCS2Tournaments: string[]             ← CS2
 - `comments/{id}` — tournament/match comment threads
 - `rankReports/{id}` — player-vs-player rank dispute submissions
 - `waitlist/{id}` — pre-launch / event waitlist signups
+- `payuOrders/{txnid}` — PayU payment orders for paid solo registration. `txnid` doc ID is the idempotency key; `registrationCompleted` gates the booking transaction. See "PayU Payment Gateway" section below.
 
 ---
 
@@ -387,6 +388,11 @@ HENRIK_API_KEY=HDEV-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # Admin routes
 ADMIN_SECRET=
 
+# PayU (test/sandbox first — see "PayU Payment Gateway" section below)
+PAYU_MERCHANT_KEY=
+PAYU_MERCHANT_SALT=
+PAYU_MODE=test
+
 # App
 NEXT_PUBLIC_APP_URL=https://iesports.in
 ```
@@ -420,6 +426,42 @@ vercel --prod
 ```
 
 ---
+
+## PayU Payment Gateway
+
+Paid solo registration (CS2, Valorant, Dota solo) goes through PayU's Hosted Checkout Pro — a full-page redirect to PayU's own payment page, so card data never touches our server (SAQ-A PCI DSS scope). Team create/join flows are **not** wired to payment yet — they stay free/unblocked.
+
+### Hard rule
+`web/app/api/payments/` remains reserved/gitignored per `docs/SAFETY_RULES.md` (separate, unfinished Razorpay work — "Sarthak handles this"). All PayU code lives under `app/api/payu/*` instead. Never merge these two paths.
+
+### Flow
+1. `RegisterModal.tsx` (`handlePaidSolo`, CS2/Valorant) or `app/solo/[weekId]/page.tsx` (`handlePaidRegister`, Dota solo) call `POST /api/payu/initiate` with a Firebase ID token.
+2. `initiate` re-validates everything the free registration routes validate, computes `amount` server-side from Firestore `entryFee`, creates a `payuOrders/{txnid}` doc (`status: "initiated"`), and returns a PayU form-field set. **No slot is booked yet.**
+3. The client builds a hidden form from those fields and submits it — a full-page navigation to PayU.
+4. PayU calls back two ways: a server-to-server `POST /api/payu/webhook` (authoritative) and a browser POST-redirect to `POST /api/payu/return` (cosmetic — redirects to `app/payu/return/page.tsx`, which polls `GET /api/payu/order-status`).
+5. The webhook verifies PayU's response hash, then calls `lib/payuBooking.ts`'s `finalizeSuccessfulPayment()` — an idempotent, transactional booking (keyed on `payuOrders/{txnid}.registrationCompleted`) that performs the same Firestore writes the equivalent free-registration route does.
+6. `app/api/cron/payu-reconcile/route.ts` (every 10 min, or daily on Vercel Hobby — see its file comment) sweeps orders stuck in `initiated`/`pending` and resolves them via PayU's Verify Payment API, calling the same `finalizeSuccessfulPayment()` helper so the fallback path can never drift from the webhook path.
+
+### Env vars
+`PAYU_MERCHANT_KEY`, `PAYU_MERCHANT_SALT`, `PAYU_MODE` (`test`|`live`) — test credentials live in `.env.local` locally; production credentials belong only in Vercel's Production environment variables, never committed.
+
+### Security notes (see also `docs/SAFETY_RULES.md`)
+- `initiate`/`order-status` require a verified Firebase ID token — `uid` is never trusted from client input (stricter than the legacy `/api/{game}/solo` routes).
+- Every inbound PayU response is hash-verified (`crypto.timingSafeEqual`, constant-time) before being trusted.
+- `PAYU_MERCHANT_SALT` and full webhook payloads (contain email/phone/name) are never logged.
+- No refund automation exists — unregistering from a paid tournament frees the slot but does not trigger a PayU refund.
+
+### Payment receipt: Discord DM, not email
+No email was collected anywhere in this app before this integration. Discord OAuth now requests the `email` scope (`app/api/auth/discord/route.ts`, `discord-login/route.ts`), and both callbacks write `users/{uid}.email` when Discord returns one — but **existing already-linked users won't have it until they re-link/re-login** (Discord doesn't retroactively grant new scopes to old tokens). `initiate` uses `userData.email` if present, else a synthetic `{uid}@users.iesports.in` placeholder that satisfies PayU's required field but receives nothing.
+
+The actual receipt is a Discord DM sent from `lib/payuBooking.ts` on successful booking (`sendDM`, fire-and-forget, non-blocking) — reliable because Discord is already mandatory for every registered user, unlike email.
+
+### Local testing
+`scripts/setupPayuTestTournament.ts` seeds a hidden ₹10-entry CS2 solo test tournament (`test-payu-cs2-solo`, `isTestTournament: true`). CS2 was picked because it has no deadline gate (Dota solo) or rank-refresh side effects (Valorant). The webhook needs a public HTTPS URL to receive PayU's server-to-server callback — use a tunnel (cloudflared/ngrok) pointed at `localhost:3000` and register `<tunnel-url>/api/payu/webhook` once in the PayU test dashboard's Webhooks tab. `surl`/`furl` (browser redirects) work fine against plain `localhost` since that's the tester's own browser.
+
+### If a future session extends this
+- Keep `lib/payuBooking.ts` as the single source of truth for "how a successful payment gets booked" — both the webhook and the reconciliation cron must keep calling it, never duplicate its logic.
+- Team create/join payment support (Dota 5v5, Valorant teams) would follow the same pattern but needs its own scoping decision — it was explicitly out of scope when this was built.
 
 ## Riot API Production Application (in progress)
 
@@ -491,7 +533,7 @@ iesports is applying for a Riot Games Production API key to replace the interim 
 - Mobile Navbar: add Riot section in drawer
 
 ### P4 — Future
-- Razorpay payment gateway (paid tournaments, Q3 2026)
+- PayU payment gateway (paid tournaments, entry fees) — solo registration only for now (CS2, Valorant, Dota solo). Team create/join flows are not yet wired to payment. Replaces the previously-planned Razorpay integration; the `razorpay` npm dependency stays installed but unused. See "PayU Payment Gateway" section below.
 - Call of Duty integration
 - Riot LoL / TFT / 2XKO support (after Valorant production app is approved — same product, additional game applications)
 

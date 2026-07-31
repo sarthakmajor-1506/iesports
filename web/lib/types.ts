@@ -119,6 +119,22 @@ export type SoloTournament = {
   endTime?: number;
 };
 
+export type PayuOrder = {
+  txnid: string;
+  uid: string;
+  tournamentId: string;
+  game: "dota2" | "valorant" | "cs2";
+  amount: number;
+  currency: "INR";
+  status: "initiated" | "pending" | "success" | "failure";
+  mihpayid: string | null;
+  payuStatus: string | null;
+  registrationCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  mode: "test" | "live";
+};
+
 export type SoloPlayer = {
   uid: string;
   steamId: string;
