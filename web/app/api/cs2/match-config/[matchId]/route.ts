@@ -75,6 +75,13 @@ export async function GET(
 
   const mapSides = maplist.map(() => "knife");
 
+  // MR16 for the group stage, MR24 for bracket games, matching the published
+  // fixture sheet. Per-match `maxRounds` wins if set, then the tournament's
+  // own overrides, then these defaults.
+  const maxRounds = Number(m.maxRounds)
+    || Number(m.isBracket ? tournament.bracketMaxRounds : tournament.groupMaxRounds)
+    || (m.isBracket ? 24 : 16);
+
   // Diagnostic breadcrumb: proves whether MatchZy actually reached us. When a
   // load fails, the server only ever says "Match load failed!" with no reason,
   // so without this there is no way to tell a failed fetch from a rejected
@@ -109,6 +116,12 @@ export async function GET(
       matchzy_remote_log_header_key: "X-IESports-Token",
       matchzy_remote_log_header_value: token,
       matchzy_whitelist_enabled_default: "true",
+      // Round limit per the published fixture sheet: group games are MR16
+      // (first to 9), play-offs MR24 (first to 13). CS2 defaults to 24, so
+      // without this every group game would run to 13 and blow through its
+      // 20-minute slot. Overridable per match via `maxRounds` on the match
+      // doc for a one-off (a re-run, or a shortened game to claw back time).
+      mp_maxrounds: String(maxRounds),
     },
   };
 
