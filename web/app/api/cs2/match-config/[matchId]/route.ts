@@ -88,9 +88,10 @@ export async function GET(
   }).catch(() => {});
 
   const config: Record<string, unknown> = {
-    // String, not number. MatchZy/Get5 configs use a string matchid, and a
-    // bare JSON number is a plausible cause of a silent parse rejection.
-    matchid: String(m.matchzyMatchId),
+    // Number, per MatchZy's documented schema (`"matchid": 27`). It was
+    // briefly sent as a string while chasing a load failure, which was wrong
+    // and is what kept the payload rejected after the player-name fix.
+    matchid: Number(m.matchzyMatchId),
     num_maps: numMaps,
     maplist,
     skip_veto: true,
