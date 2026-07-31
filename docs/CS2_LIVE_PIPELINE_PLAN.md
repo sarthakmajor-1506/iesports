@@ -622,10 +622,34 @@ create a scratch CS2 tournament with two dummy teams, as SAFETY_RULES suggests.
 
 Carried forward from `CS2_TOURNAMENT_CONTEXT.md` plus what this review found.
 
+- **`matchid` must be a JSON number that fits in a signed 32-bit int.**
+  This cost hours on the first live run. `Date.now()` gives a 13-digit
+  millisecond timestamp (~1.79e12) which overflows MatchZy's int parse, and
+  MatchZy then rejects the whole config with nothing but
+  `[MatchZy] Match load failed!` — no field named, no parse error, and the
+  HTTP fetch still returns 200, so every field looks equally suspect. Use
+  seconds (`Math.floor(Date.now()/1000)`), which fits until 2038. It must
+  also be a number, not a string: the documented schema is `"matchid": 27`.
+  When a config is rejected, the fastest way to find the offending key is
+  `?omit=` on the match-config endpoint.
+- **When testing a load over RCON, wait ~12s before judging the result.**
+  MatchZy fetches the config asynchronously, so the failure message arrives
+  long after the command returns. Judging on a short quiet window produces
+  false "it worked" readings — this happened during the first bisect and
+  sent the investigation down the wrong path.
+- **`cs2MatchConfigRequests` tells you whether MatchZy actually reached
+  you.** An entry from the server's IP proves the fetch succeeded and the
+  payload was rejected; no entry means it never arrived. Without that split
+  there is no way to tell a network problem from a schema problem.
 - **The webhook is the source of truth for match state. Never parse RCON
   `status` for scores or winners.** `status` output is advisory, and the RCON
   client resolves multi-packet responses on a silence window, so it can be
   truncated under load.
+- **Whitelist on with no match loaded kicks everyone.** Players connect
+  fully, then get `NETWORK_DISCONNECT_KICKED`. If people need to get on the
+  box between matches, set `matchzy_whitelist_enabled_default false` first.
+- **`sv_password` is set (`lotgg5`).** Players must use
+  `password lotgg5; connect 62.72.41.184:27042`, not a bare `connect`.
 - **Use `www.iesports.in` everywhere.** New this session.
 - **Do not use `onSnapshot` in the admin tab** for `cs2ServerControl`. New this
   session.
