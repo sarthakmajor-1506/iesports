@@ -1568,22 +1568,41 @@ function CS2TournamentDetailInner() {
                   <span className="csd-card-label" style={{ marginBottom: 0 }}>Group Stage Standings</span>
                   <TabSharePopover tabKey="standings" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
                 </div>
-                {standings.length === 0 ? (
-                  <div className="csd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="csd-empty-title">No standings yet</span><span className="csd-empty-sub">Standings will appear once matches are played.</span></div>
-                ) : (() => {
-                  // Grouped standings (e.g. CS2 Royal Sports League's 2 groups of 4):
-                  // each row carries a `groupId`. Render one table per group,
-                  // each independently sorted, top 2 highlighted as qualifying
-                  // for the single-elimination play-offs. Ungrouped tournaments
-                  // (existing CS2 Prelims/Horizon shape) fall through to the
-                  // single-table render below, unchanged.
-                  const groupIds = Array.from(new Set(standings.map((s: any) => s.groupId).filter(Boolean))).sort();
+                {(() => {
+                  // Groups come from the TEAMS, not from the standings rows.
+                  // recomputeCS2Standings only writes a row for a team that has
+                  // finished a match, so deriving groups from standings meant
+                  // Group B had no table at all until its first result — and,
+                  // worse, while only one group had played the page saw a
+                  // single group and fell through to the ungrouped table below.
+                  // Every team in the format is known up front; show it from
+                  // the start, on zeroes.
+                  const teamGroupIds = Array.from(new Set(teams.map((t: any) => t.groupId).filter(Boolean))).sort();
+                  const groupIds = teamGroupIds.length > 1
+                    ? teamGroupIds
+                    : Array.from(new Set(standings.map((s: any) => s.groupId).filter(Boolean))).sort();
+
+                  if (standings.length === 0 && groupIds.length < 2) {
+                    return <div className="csd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="csd-empty-title">No standings yet</span><span className="csd-empty-sub">Standings will appear once matches are played.</span></div>;
+                  }
+
                   if (groupIds.length > 1) {
                     return (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
                         {groupIds.map((gid: any) => {
-                          const rows = [...standings]
-                            .filter((s: any) => s.groupId === gid)
+                          // A team with no completed match has no standings row
+                          // yet; show it on zeroes rather than omitting it, so
+                          // the table is the group, not just the part of it
+                          // that has played.
+                          const byTeamId = new Map(standings.map((s: any) => [s.teamId || s.id, s]));
+                          const groupTeams = teams.filter((t: any) => t.groupId === gid);
+                          const rows = (groupTeams.length
+                            ? groupTeams.map((t: any) => byTeamId.get(t.id) || {
+                                id: t.id, teamId: t.id, teamName: t.teamName, groupId: gid,
+                                played: 0, wins: 0, draws: 0, losses: 0, points: 0,
+                                roundsWon: 0, roundsLost: 0, roundDiff: 0, mapsWon: 0, mapsLost: 0, mapDiff: 0,
+                              })
+                            : [...standings].filter((s: any) => s.groupId === gid))
                             .sort((a: any, b: any) => {
                               if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
                               if ((b.roundDiff || 0) !== (a.roundDiff || 0)) return (b.roundDiff || 0) - (a.roundDiff || 0);
@@ -1598,7 +1617,10 @@ function CS2TournamentDetailInner() {
                                     drawn game is a normal outcome worth a point each. Without
                                     it a drawn team reads as having played a game that shows
                                     in neither W nor L. */}
-                                <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#f0a500" }}>Pts</th><th>RD</th></tr></thead>
+                                {/* RW/RL, not MW/ML: every game here is a BO1, so maps won is
+                                    just the win count repeated, while rounds won and lost are
+                                    the real measure of the game and what RD is computed from. */}
+                                <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#f0a500" }}>Pts</th><th>RD</th></tr></thead>
                                 <tbody>
                                   {rows.map((s: any, i: number) => (
                                     <tr key={s.id} style={i < 2 ? { background: "rgba(74,222,128,0.05)" } : {}}>
@@ -1608,6 +1630,8 @@ function CS2TournamentDetailInner() {
                                       <td>{s.wins || 0}</td>
                                       <td>{s.draws || 0}</td>
                                       <td>{s.losses || 0}</td>
+                                      <td style={{ color: "#6fcf8a" }}>{s.roundsWon || 0}</td>
+                                      <td style={{ color: "#d07070" }}>{s.roundsLost || 0}</td>
                                       <td style={{ fontWeight: 800, color: "#f0a500" }}>{s.points || 0}</td>
                                       <td style={{ color: (s.roundDiff || 0) > 0 ? "#6fcf8a" : (s.roundDiff || 0) < 0 ? "#d07070" : "#8A8880" }}>{(s.roundDiff || 0) > 0 ? "+" : ""}{s.roundDiff || 0}</td>
                                     </tr>
