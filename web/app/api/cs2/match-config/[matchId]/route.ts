@@ -87,7 +87,7 @@ export async function GET(
     ip: req.headers.get("x-forwarded-for") || null,
   }).catch(() => {});
 
-  return NextResponse.json({
+  const config: Record<string, unknown> = {
     // String, not number. MatchZy/Get5 configs use a string matchid, and a
     // bare JSON number is a plausible cause of a silent parse rejection.
     matchid: String(m.matchzyMatchId),
@@ -100,17 +100,31 @@ export async function GET(
     team1: { name: safePlayerName(team1.teamName || m.team1Name) || "Team 1", players: team1Players },
     team2: { name: safePlayerName(team2.teamName || m.team2Name) || "Team 2", players: team2Players },
     // Applied by MatchZy when it loads this config, and reverted on series
-    // end (matchzy_reset_cvars_on_series_end defaults true). This is the
-    // reliable way to point the server at our webhook: these are
-    // CounterStrikeSharp FakeConVars, and setting them ad-hoc over RCON
-    // neither takes effect reliably nor reads back, so RCON cannot confirm
-    // it worked. Scoping them per-match is also correct on a shared box —
-    // the friend's own pugs never POST into our webhook.
+    // end (matchzy_reset_cvars_on_series_end defaults true). Scoping them
+    // per-match is correct on a shared box — the friend's own pugs never
+    // POST into our webhook.
     cvars: {
       matchzy_remote_log_url: `${CS2_PUBLIC_BASE_URL}/api/cs2/matchzy-events`,
       matchzy_remote_log_header_key: "X-IESports-Token",
       matchzy_remote_log_header_value: token,
       matchzy_whitelist_enabled_default: "true",
     },
-  });
+  };
+
+  /**
+   * Bisection aid. MatchZy reports a rejected config as nothing but
+   * "Match load failed!", with no field named and no parse error, so the only
+   * way to find an incompatible key is to remove keys until it loads.
+   * `?omit=cvars,map_sides` drops those top-level keys from the response.
+   *
+   * Token-gated like the rest of the route, and inert unless the parameter is
+   * passed, so it costs nothing in normal operation. Worth keeping: the next
+   * MatchZy upgrade can change the accepted schema and this is the only
+   * practical way to re-find the offending key.
+   */
+  const omit = (req.nextUrl.searchParams.get("omit") || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  for (const key of omit) delete config[key];
+
+  return NextResponse.json(config);
 }
