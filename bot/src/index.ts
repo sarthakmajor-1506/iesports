@@ -17,6 +17,7 @@ import { getDotaBot } from "./services/dota-gc";
 import { resolveDotaResults } from "./services/dota-results";
 import { announceResults } from "./services/result-announcer";
 import { startBotLobbyControl } from "./services/bot-lobby";
+import { startCS2ServerControl } from "./services/cs2-server";
 import { sendPreMatchWarning, startMatchLobby } from "./services/match-orchestrator";
 import { handleButton } from "./events/button-handler";
 import { handleModal } from "./events/modal-handler";
@@ -131,6 +132,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   // Web-driven bot lobby control (command channel + live state).
   try { startBotLobbyControl(getDb()); } catch (e: any) { console.error("[BotLobby] init failed:", e?.message || e); }
+  // CS2 match-server control over RCON. No-ops unless CS2_RCON_HOST +
+  // CS2_RCON_PASSWORD are set. Isolated from the Dota GC path: it only reads
+  // cs2ServerCommands and writes cs2ServerControl.
+  try { startCS2ServerControl(getDb()); } catch (e: any) { console.error("[CS2] init failed:", e?.message || e); }
 
   // Post Create Queue panel to #create-queue
   const createQueueChId = process.env.CREATE_QUEUE_CHANNEL_ID;

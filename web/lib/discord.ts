@@ -200,6 +200,71 @@ export async function sendRegistrationDM(opts: {
   }
 }
 
+function getCS2ResultsChannelId(channelIdOverride?: string): string {
+  return channelIdOverride || process.env.RESULTS_CHANNEL_ID || "";
+}
+
+/** Announce a completed CS2 match to a Discord channel. Called directly from
+ *  the web app (api/admin/cs2-manual-result), not the bot — CS2 has no
+ *  MatchZy/RCON result feed yet for the bot's result-announcer to watch (see
+ *  docs/CS2_TOURNAMENT_CONTEXT.md), so results are admin-entered and
+ *  announced from here instead. `channelIdOverride` should be the
+ *  tournament's `discordChannelId` when set (per-tournament routing, see
+ *  docs/CLAUDE_CONTEXT.md "Test tournament visibility model"), falling back
+ *  to the shared RESULTS_CHANNEL_ID. */
+export async function sendCS2MatchResult(opts: {
+  team1Name: string;
+  team2Name: string;
+  winnerName: string;
+  team1RoundsWon: number;
+  team2RoundsWon: number;
+  team1SeriesScore: number;
+  team2SeriesScore: number;
+  bo: number;
+  isBracket?: boolean;
+  bracketLabel?: string;
+  channelIdOverride?: string;
+}) {
+  const channelId = getCS2ResultsChannelId(opts.channelIdOverride);
+  if (!channelId) return { ok: false, error: "No Discord channel configured" };
+
+  const matchLabel = opts.bracketLabel || `${opts.team1Name} vs ${opts.team2Name}`;
+  const roundScore = `${Math.max(opts.team1RoundsWon, opts.team2RoundsWon)}-${Math.min(opts.team1RoundsWon, opts.team2RoundsWon)}`;
+
+  const lines = [
+    `🔫 **${matchLabel}** [${opts.team1SeriesScore}-${opts.team2SeriesScore} in BO${opts.bo}]`,
+    `**${opts.winnerName}** wins **${roundScore}**`,
+  ];
+
+  return sendChannelMessage(channelId, lines.join("\n"));
+}
+
+/** Announce the CS2 tournament champion. Same web-side-only rationale as
+ *  sendCS2MatchResult above. */
+export async function sendCS2TournamentComplete(opts: {
+  tournamentName: string;
+  tournamentId: string;
+  winnerName: string;
+  prizePool: string;
+  team1Name: string;
+  team2Name: string;
+  team1SeriesScore: number;
+  team2SeriesScore: number;
+  channelIdOverride?: string;
+}) {
+  const channelId = getCS2ResultsChannelId(opts.channelIdOverride);
+  if (!channelId) return { ok: false, error: "No Discord channel configured" };
+
+  const message = [
+    `🏆 **CS2 CHAMPIONS — ${opts.winnerName}** 🏆`,
+    `💰 **Prize: ₹${opts.prizePool}**\n`,
+    `⚔️ **GRAND FINAL** — ${opts.team1Name} vs ${opts.team2Name} (${opts.team1SeriesScore}-${opts.team2SeriesScore})`,
+    `\n📎 https://iesports.in/cs2/tournament/${opts.tournamentId}`,
+  ].join("\n");
+
+  return sendChannelMessage(channelId, message);
+}
+
 // ─── Voice channel + permission overwrite helpers ────────────────────────────
 // Used by the Voice Panel admin tab to manage a private "test" voice channel
 // where owners always have access and other users are toggled on/off.

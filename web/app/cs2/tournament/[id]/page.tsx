@@ -8,11 +8,13 @@ import Navbar from "@/app/components/Navbar";
 import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import RegisterModal from "@/app/components/RegisterModal";
 import DoubleBracket from "@/app/components/DoubleBracket";
+import SingleEliminationBracket from "@/app/components/SingleEliminationBracket";
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
+import { sortCS2Standings } from "@/lib/recomputeCS2Standings";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -527,8 +529,12 @@ function CS2TournamentDetailInner() {
         if (data.players) { setPlayers(data.players); if (user) setIsRegistered(data.players.some((p: any) => p.uid === user?.uid)); }
         if (data.teams) setTeams(data.teams);
         if (data.standings) {
-          const sorted = [...data.standings].sort((a: any, b: any) => { if (b.points !== a.points) return b.points - a.points; if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz; return (b.mapsWon - b.mapsLost) - (a.mapsWon - a.mapsLost); });
-          setStandings(sorted);
+          // Canonical CS2 tiebreaker chain (points -> roundDiff -> mapDiff ->
+          // wins), same as the semifinal auto-seed logic in
+          // lib/settleCS2Match.ts — was previously points -> buchholz ->
+          // mapDiff here, which could display a different order than the one
+          // the bracket was actually seeded from.
+          setStandings(sortCS2Standings(data.standings));
         }
         if (data.matches) {
           const sorted = [...data.matches].sort((a: any, b: any) => { if (!!a.isBracket !== !!b.isBracket) return a.isBracket ? 1 : -1; const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0; const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0; if (tA !== tB) return tA - tB; if (a.matchDay !== b.matchDay) return a.matchDay - b.matchDay; return (a.matchIndex || 0) - (b.matchIndex || 0); });
@@ -1554,6 +1560,53 @@ function CS2TournamentDetailInner() {
                 {standings.length === 0 ? (
                   <div className="csd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="csd-empty-title">No standings yet</span><span className="csd-empty-sub">Standings will appear once matches are played.</span></div>
                 ) : (() => {
+                  // Grouped standings (e.g. CS2 Royal Sports League's 2 groups of 4):
+                  // each row carries a `groupId`. Render one table per group,
+                  // each independently sorted, top 2 highlighted as qualifying
+                  // for the single-elimination play-offs. Ungrouped tournaments
+                  // (existing CS2 Prelims/Horizon shape) fall through to the
+                  // single-table render below, unchanged.
+                  const groupIds = Array.from(new Set(standings.map((s: any) => s.groupId).filter(Boolean))).sort();
+                  if (groupIds.length > 1) {
+                    return (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+                        {groupIds.map((gid: any) => {
+                          const rows = [...standings]
+                            .filter((s: any) => s.groupId === gid)
+                            .sort((a: any, b: any) => {
+                              if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
+                              if ((b.roundDiff || 0) !== (a.roundDiff || 0)) return (b.roundDiff || 0) - (a.roundDiff || 0);
+                              if ((b.mapDiff || 0) !== (a.mapDiff || 0)) return (b.mapDiff || 0) - (a.mapDiff || 0);
+                              return (b.wins || 0) - (a.wins || 0);
+                            });
+                          return (
+                            <div key={gid} style={{ flex: "1 1 380px", minWidth: 320, overflowX: "auto" }}>
+                              <div style={{ fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.08em", color: "#8A8880", marginBottom: 8, textTransform: "uppercase" }}>Group {gid}</div>
+                              <table className="csd-standings-table csd-freeze-team">
+                                <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th style={{ color: "#f0a500" }}>Pts</th><th>RD</th></tr></thead>
+                                <tbody>
+                                  {rows.map((s: any, i: number) => (
+                                    <tr key={s.id} style={i < 2 ? { background: "rgba(74,222,128,0.05)" } : {}}>
+                                      <td style={{ fontWeight: 800, color: i < 2 ? "#4ade80" : "#555550" }}>{i + 1}</td>
+                                      <td style={{ fontWeight: 700 }}>{s.teamName}</td>
+                                      <td>{s.played || 0}</td>
+                                      <td>{s.wins || 0}</td>
+                                      <td>{s.losses || 0}</td>
+                                      <td style={{ fontWeight: 800, color: "#f0a500" }}>{s.points || 0}</td>
+                                      <td style={{ color: (s.roundDiff || 0) > 0 ? "#6fcf8a" : (s.roundDiff || 0) < 0 ? "#d07070" : "#8A8880" }}>{(s.roundDiff || 0) > 0 ? "+" : ""}{s.roundDiff || 0}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })}
+                        <div style={{ flexBasis: "100%", fontSize: "0.65rem", color: "#6b7280" }}>
+                          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(74,222,128,0.4)", marginRight: 4, verticalAlign: "middle" }} />Top 2 per group qualify for the play-offs
+                        </div>
+                      </div>
+                    );
+                  }
                   const bracketCount = tournament.bracketTeamCount || tournament.bracketSize || standings.length;
                   const ubCount = Math.ceil(bracketCount / 2);
                   const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
@@ -1654,7 +1707,18 @@ function CS2TournamentDetailInner() {
                 </div>
                 <TabSharePopover tabKey="brackets" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
               </div>
-              {tournament.bracketFormat === "single_elimination" ? (
+              {tournament.bracketFormat === "single_elimination" && (tournament.bracketTeamCount || tournament.bracketSize || 4) <= 4 ? (
+                // DoubleBracket's Bracket3/Bracket4 layouts always draw a Lower
+                // Bracket section (correct for double elim, wrong for a true
+                // single-elim playoff) — use the dedicated component instead.
+                <SingleEliminationBracket
+                  matches={bracketMatches}
+                  bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}
+                  bracketBestOf={tournament.bracketBestOf || 3}
+                  grandFinalBestOf={tournament.grandFinalBestOf || 3}
+                  tournamentId={id}
+                />
+              ) : tournament.bracketFormat === "single_elimination" ? (
                 <DoubleBracket
                   matches={bracketMatches.filter((m: any) => m.bracketType !== "lower")}
                   bracketSize={tournament.bracketTeamCount || tournament.bracketSize || 4}

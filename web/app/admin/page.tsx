@@ -14,6 +14,7 @@ import type { ShuffleTeam } from "@/app/components/remotion/ShuffleReveal";
 const ShuffleVideoPlayer = dynamic(() => import("@/app/components/ShuffleVideoPlayer"), { ssr: false });
 const VoicePanelTab = dynamic(() => import("@/app/admin/components/VoicePanelTab"), { ssr: false });
 const BotLobbyTab = dynamic(() => import("@/app/admin/components/BotLobbyTab"), { ssr: false });
+const CS2ServerTab = dynamic(() => import("@/app/admin/components/CS2ServerTab"), { ssr: false });
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ interface DiscordConnection { type: string; name: string; id: string; verified: 
 interface PlayerData { uid: string; fullName?: string; phone?: string; riotGameName?: string; riotTagLine?: string; riotRank?: string; riotTier?: string; riotPuuid?: string; riotRegion?: string; riotAccountLevel?: number; riotVerified?: string; riotVerificationNote?: string; riotAvatar?: string; riotScreenshotUrl?: string; riotLinkedAt?: string; steamId?: string; steamName?: string; steamAvatar?: string; steamLinkedAt?: string; dotaRankTier?: number; dotaBracket?: string; dotaMMR?: number; discordId?: string; discordUsername?: string; discordAvatar?: string; discordConnectedAt?: string; discordConnections?: DiscordConnection[]; registeredValorantTournaments?: string[]; registeredTournaments?: string[]; registeredSoloTournaments?: string[]; createdAt?: string; upiId?: string; personalPhoto?: string; }
 interface AllTournamentItem { id: string; game: string; collection: string; name: string; format: string; status: string; totalSlots: number; slotsBooked: number; entryFee: number; prizePool: string; startDate: string; isTestTournament: boolean; createdAt: string; ownerId?: string; }
 
-type AdminTab = "tournament" | "players" | "create" | "voicePanel" | "botLobby";
+type AdminTab = "tournament" | "players" | "create" | "voicePanel" | "botLobby" | "cs2Server";
 
 // ─── Game config ──────────────────────────────────────────────────────────────
 const GAME_OPTIONS = [
@@ -441,6 +442,9 @@ export default function AdminPanel() {
   const [dotaJobLogs, setDotaJobLogs] = useState<string[]>([]);
   const [dotaJobError, setDotaJobError] = useState<string | null>(null);
   const [dotaForcedMatchId, setDotaForcedMatchId] = useState("");
+  const [cs2Team1Rounds, setCs2Team1Rounds] = useState("");
+  const [cs2Team2Rounds, setCs2Team2Rounds] = useState("");
+  const [testDmSendingUid, setTestDmSendingUid] = useState<string | null>(null);
 
   // Real-time listener on the dotaResultJobs doc — bot writes status updates
   // through it as it processes. Updates push within ~500ms of the bot writing.
@@ -1442,6 +1446,7 @@ export default function AdminPanel() {
             <button className={`adm-tab ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>Create Tournament</button>
             <button className={`adm-tab ${activeTab === "voicePanel" ? "active" : ""}`} onClick={() => setActiveTab("voicePanel")}>Voice Panel</button>
             <button className={`adm-tab ${activeTab === "botLobby" ? "active" : ""}`} onClick={() => setActiveTab("botLobby")}>Bot Lobby</button>
+            <button className={`adm-tab ${activeTab === "cs2Server" ? "active" : ""}`} onClick={() => setActiveTab("cs2Server")}>CS2 Server</button>
             {loading && <span style={{ marginLeft: 12, fontSize: "0.7rem", color: "#f59e0b", fontWeight: 700, animation: "pulse 1s infinite" }}>LOADING...</span>}
           </div>
 
@@ -2719,8 +2724,57 @@ export default function AdminPanel() {
                               </div>
                             </div>
                           </div>
+                        ) : selectedTournament?.game === "cs2" ? (
+                          /* CS2 — manual result entry. No MatchZy/RCON result feed yet
+                             (see docs/CS2_TOURNAMENT_CONTEXT.md) so this is admin-entered,
+                             same as Dota's fallback. Discord announcement + standings
+                             recompute + play-off auto-seed all happen server-side in
+                             /api/admin/cs2-manual-result. */
+                          <div style={{ marginTop: 10 }}>
+                            {isCompleted && <div style={stepHint("#4ade80")}>Match resolved — Discord announcement posted automatically.</div>}
+                            <div style={{ marginTop: 14, padding: 12, background: "#0d0d0f", borderRadius: 8, border: "1px solid #2a2a2e" }}>
+                              <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#fbbf24", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                MANUAL RESULT
+                              </div>
+                              <div style={{ fontSize: "0.58rem", color: "#888", marginBottom: 10 }}>
+                                Round score is optional — used for the group-stage tiebreaker (roundDiff). Leave blank to just record the winner.
+                              </div>
+                              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                <input value={cs2Team1Rounds} onChange={e => setCs2Team1Rounds(e.target.value)} placeholder={`${m.team1Name} rounds`} style={{ ...inputStyle, marginBottom: 0 }} />
+                                <input value={cs2Team2Rounds} onChange={e => setCs2Team2Rounds(e.target.value)} placeholder={`${m.team2Name} rounds`} style={{ ...inputStyle, marginBottom: 0 }} />
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#16a34a44", border: "1px solid #16a34a88" }}
+                                  onClick={async () => {
+                                    if (!confirm(`Mark ${m.team1Name} as winner of this match?`)) return;
+                                    try {
+                                      await apiCall("/api/admin/cs2-manual-result", {
+                                        tournamentId, matchId: opsMatchId, winner: "team1",
+                                        team1Rounds: cs2Team1Rounds.trim() ? Number(cs2Team1Rounds) : undefined,
+                                        team2Rounds: cs2Team2Rounds.trim() ? Number(cs2Team2Rounds) : undefined,
+                                      });
+                                    } catch {/* apiCall already logged */}
+                                  }}>
+                                  🏆 {m.team1Name} wins
+                                </button>
+                                <button disabled={loading} style={{ ...btnStyle, flex: 1, fontSize: "0.72rem", background: "#16a34a44", border: "1px solid #16a34a88" }}
+                                  onClick={async () => {
+                                    if (!confirm(`Mark ${m.team2Name} as winner of this match?`)) return;
+                                    try {
+                                      await apiCall("/api/admin/cs2-manual-result", {
+                                        tournamentId, matchId: opsMatchId, winner: "team2",
+                                        team1Rounds: cs2Team1Rounds.trim() ? Number(cs2Team1Rounds) : undefined,
+                                        team2Rounds: cs2Team2Rounds.trim() ? Number(cs2Team2Rounds) : undefined,
+                                      });
+                                    } catch {/* apiCall already logged */}
+                                  }}>
+                                  🏆 {m.team2Name} wins
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         ) : (
-                          /* Valorant / CS2 — existing fetch flow */
+                          /* Valorant — existing fetch flow */
                           <>
                             {!isLive && !isCompleted && <div style={stepHint("#f59e0b")}>Start match first to fetch results</div>}
                             {(isLive || isCompleted) && (
@@ -3356,6 +3410,30 @@ export default function AdminPanel() {
                             {(!p.discordConnections || p.discordConnections.length === 0) && p.discordId && (
                               <div style={{ marginTop: 10, fontSize: "0.62rem", color: "#555", fontStyle: "italic" }}>No linked accounts found on Discord</div>
                             )}
+                            {p.discordId && (
+                              <button
+                                disabled={testDmSendingUid === p.uid}
+                                onClick={async () => {
+                                  setTestDmSendingUid(p.uid);
+                                  try {
+                                    const res = await fetch("/api/admin/test-discord-dm", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json", "x-admin-secret": adminKey },
+                                      body: JSON.stringify({
+                                        discordId: p.discordId,
+                                        message: "👋 Test DM from iesports admin — if you can read this, your Discord DMs are working for tournament notifications.",
+                                      }),
+                                    });
+                                    const d = await res.json();
+                                    addLog(d.ok ? `✅ Test DM sent to ${p.discordUsername || p.discordId}` : `❌ Test DM failed: ${d.error}`);
+                                  } catch (e: any) { addLog(`❌ Test DM failed: ${e.message}`); }
+                                  finally { setTestDmSendingUid(null); }
+                                }}
+                                style={{ marginTop: 10, width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid #818cf844", background: "#818cf822", color: "#a5b4fc", fontSize: "0.68rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                              >
+                                {testDmSendingUid === p.uid ? "Sending…" : "📨 Send Test DM"}
+                              </button>
+                            )}
                           </div>
 
                           {/* Tournaments */}
@@ -3898,6 +3976,13 @@ export default function AdminPanel() {
           {/* ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === "botLobby" && (
             <BotLobbyTab adminKey={adminKey} />
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {/* TAB 6: CS2 SERVER                                                   */}
+          {/* ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === "cs2Server" && (
+            <CS2ServerTab adminKey={adminKey} />
           )}
 
           {/* ═══ ACTIVITY LOG ═══ */}
