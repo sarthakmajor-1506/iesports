@@ -93,6 +93,17 @@ export async function GET(
     || Number(m.isBracket ? tournament.bracketMaxRounds : tournament.groupMaxRounds)
     || (m.isBracket ? 24 : 16);
 
+  // Freeze time, same resolution order as maxRounds.
+  //
+  // WARNING: on MatchZy 0.8.5 (server 1) these cvars do NOT reliably survive
+  // going live — that build execs live.cfg after applying the match config's
+  // cvars, so live.cfg's mp_maxrounds/mp_freezetime win and a group game runs
+  // to 13 instead of 9. Newer builds (server 2 is on 0.8.68) apply the config
+  // cvars a second AFTER live.cfg and hold. Where the round limit matters,
+  // confirm it in game and push it again from the admin panel's live cvars
+  // control if the server ignored it.
+  const freezeTime = Number(m.freezeTime) || Number(tournament.freezeTime) || 5;
+
   // Spectators. With matchzy_whitelist_enabled_default on, anyone not named in
   // this config is refused at connect — including an admin, a caster, or a
   // player watching the other group's game. This is the ONLY way for them to
@@ -154,6 +165,11 @@ export async function GET(
       // 20-minute slot. Overridable per match via `maxRounds` on the match
       // doc for a one-off (a re-run, or a shortened game to claw back time).
       mp_maxrounds: String(maxRounds),
+      // Buy time between rounds. CS2 defaults to 15s and MatchZy's live.cfg
+      // usually sets 15-20; at MR16 across a back-to-back schedule that is
+      // several minutes per match spent standing still. Overridable per
+      // tournament or per match.
+      mp_freezetime: String(freezeTime),
     },
   };
 

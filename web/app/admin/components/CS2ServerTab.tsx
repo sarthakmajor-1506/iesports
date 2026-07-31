@@ -113,6 +113,8 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
 
   const [mapToChange, setMapToChange] = useState(CS2_ACTIVE_DUTY_MAPS[0]);
   const [password, setPassword] = useState("");
+  const [liveMaxRounds, setLiveMaxRounds] = useState("");
+  const [liveFreezeTime, setLiveFreezeTime] = useState("5");
 
   // Every command names its server. `serverId` sits outside `params` so that
   // the route decides routing once, in one place, for both the passthrough
@@ -454,6 +456,51 @@ export default function CS2ServerTab({ adminKey }: { adminKey: string }) {
         </div>
         <div style={{ marginTop: 12 }}>
           <button style={btn("#374151", busy === "reload_admins")} disabled={busy === "reload_admins"} onClick={() => cmd("reload_admins")}>Reload Admins</button>
+        </div>
+      </div>
+
+      {/* Live match rules. Separate from the match config on purpose: MatchZy
+          0.8.5 execs live.cfg AFTER applying the config's cvars, so on that
+          build the round limit we send is overwritten the moment the match
+          goes live and a group game runs to 13 instead of 9. Pushing them here
+          once the match is live is the only fix that doesn't need file access
+          to the box. Newer builds hold the config value and this is a no-op. */}
+      <div style={sectionStyle}>
+        <div style={{ fontWeight: 800, marginBottom: 6, color: "#e6e7ee" }}>5. Live Match Rules</div>
+        <div style={{ color: "#888", fontSize: "0.78rem", marginBottom: 12 }}>
+          Push straight onto Server {serverId} right now. Use this if the scoreboard shows the wrong
+          round limit after going live — older MatchZy builds let their own live.cfg overwrite what we
+          sent with the match. Takes effect from the next round.
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div>
+            <span style={labelStyle}>Max rounds</span>
+            <input style={{ ...inputStyle, width: 110 }} value={liveMaxRounds} inputMode="numeric"
+              onChange={e => setLiveMaxRounds(e.target.value.replace(/\D/g, ""))} placeholder="16" />
+          </div>
+          <div>
+            <span style={labelStyle}>Freeze time (s)</span>
+            <input style={{ ...inputStyle, width: 110 }} value={liveFreezeTime} inputMode="numeric"
+              onChange={e => setLiveFreezeTime(e.target.value.replace(/\D/g, ""))} placeholder="5" />
+          </div>
+          <button style={btn("#7c3aed", busy === "live_rules")}
+            disabled={busy === "live_rules" || (!liveMaxRounds && !liveFreezeTime)}
+            onClick={async () => {
+              setBusy("live_rules"); setMsg("⏳ pushing match rules…");
+              try {
+                if (liveMaxRounds) await api("exec", { command: `mp_maxrounds ${Number(liveMaxRounds)}` });
+                if (liveFreezeTime) await api("exec", { command: `mp_freezetime ${Number(liveFreezeTime)}` });
+                setMsg(`✓ sent to Server ${serverId} — check the scoreboard next round`);
+                setTimeout(refresh, 1500);
+              } catch (e: any) { setMsg(`✗ live rules: ${e.message}`); }
+              finally { setBusy(null); }
+            }}>Apply to Server {serverId}</button>
+          {selectedMatch && (
+            <button style={btn("#374151")} onClick={() => {
+              setLiveMaxRounds(String(maxRoundsFor(selectedMatch, tFormat)));
+              setLiveFreezeTime("5");
+            }}>Use match values (MR{maxRoundsFor(selectedMatch, tFormat)})</button>
+          )}
         </div>
       </div>
 

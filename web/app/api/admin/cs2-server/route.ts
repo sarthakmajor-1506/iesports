@@ -69,6 +69,13 @@ const EXEC_PREFIXES = [
   "matchzy_whitelist_enabled_default", "matchzy_kick_when_no_match_loaded",
   "matchzy_autostart_mode", "matchzy_hostname_format", "sv_password", "tv_delay",
   "css_plugins", "meta", "find", "status",
+  // Match-rule cvars, needed live rather than only in the match config:
+  // MatchZy 0.8.5 execs live.cfg AFTER applying the config's cvars, so on that
+  // build our mp_maxrounds is overwritten at the moment the match goes live
+  // and a group game silently runs to 13 instead of 9. Pushing them again once
+  // the match is live is the only fix that doesn't need file access to the box.
+  "mp_maxrounds", "mp_freezetime", "mp_overtime_enable", "mp_overtime_maxrounds",
+  "mp_halftime_duration", "mp_round_restart_delay", "mp_warmuptime",
 ];
 
 function execCommandAllowed(raw: string): boolean {
