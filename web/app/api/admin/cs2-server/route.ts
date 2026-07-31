@@ -197,7 +197,21 @@ export async function POST(req: NextRequest) {
 
     // MatchZy 0.8.5 treats matchid as numeric in places — never reuse our
     // string doc ids (e.g. "cs2-sf1") here.
-    const matchzyMatchId = Date.now();
+    // MatchZy parses matchid as a 32-bit int. A Date.now() millisecond
+    // timestamp is 13 digits (~1.79e12), which overflows it, and MatchZy then
+    // rejects the ENTIRE match config with nothing but "Match load failed!" —
+    // no field named, no parse error, and the HTTP fetch still succeeds, so
+    // the failure looks like it could be anything. Seconds fit comfortably
+    // (~1.79e9 < 2^31-1) until 2038.
+    // Still never reuse our string doc ids (e.g. "cs2-sf1") here.
+    let matchzyMatchId = Math.floor(Date.now() / 1000);
+    // Two loads within the same second would collide on the reverse index and
+    // silently route one match's webhook events into the other's document.
+    for (let i = 0; i < 10; i++) {
+      const clash = await adminDb.collection("cs2MatchzyIndex").doc(String(matchzyMatchId)).get();
+      if (!clash.exists) break;
+      matchzyMatchId += 1;
+    }
 
     await matchRef.set({ matchzyMatchId }, { merge: true });
     await adminDb.collection("cs2MatchzyIndex").doc(String(matchzyMatchId)).set({
