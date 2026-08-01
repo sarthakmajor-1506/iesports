@@ -12,6 +12,7 @@ import SingleEliminationBracket from "@/app/components/SingleEliminationBracket"
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
+import CS2TournamentWrap from "@/app/components/CS2TournamentWrap";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import { sortCS2Standings } from "@/lib/recomputeCS2Standings";
@@ -519,6 +520,10 @@ function CS2TournamentDetailInner() {
   const tabsWrapRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  // Celebration overlay. Open by default: the wrap only exists once the final
+  // is complete, and at that point it is the thing a visitor came to see.
+  const [wrapOpen, setWrapOpen] = useState(true);
+  const [wrapAvailable, setWrapAvailable] = useState(false);
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [rankReports, setRankReports] = useState<any[]>([]);
@@ -1097,6 +1102,15 @@ function CS2TournamentDetailInner() {
       <div className="csd-page">
         <Navbar />
 
+        {/* End-of-tournament celebration. Self-gating: renders nothing until
+            the final is complete, so it is inert for every tournament still
+            being played. Opens by default on each page open, closeable, and
+            re-openable from the button next to the hero. */}
+        <CS2TournamentWrap
+          tournament={tournament} teams={teams} matches={matches}
+          open={wrapOpen} onClose={() => setWrapOpen(false)} onAvailable={setWrapAvailable}
+        />
+
         {/* Back button */}
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 30px 0" }}>
           <button onClick={() => router.back()} style={{
@@ -1147,6 +1161,20 @@ function CS2TournamentDetailInner() {
                 <div className="csd-hero-desc">{tournament.description || tournament.desc}</div>
               )}
               <div className="csd-hero-actions">
+                {/* Closing the celebration shouldn't lose it — the photos are
+                    the point of the page once the event is over. */}
+                {wrapAvailable && !wrapOpen && (
+                  <button
+                    onClick={() => setWrapOpen(true)}
+                    style={{
+                      padding: "10px 22px", background: "rgba(245,197,66,0.14)", color: "#f5c542",
+                      border: "1px solid rgba(245,197,66,0.35)", borderRadius: 100, fontSize: "0.86rem",
+                      fontWeight: 800, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,197,66,0.22)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(245,197,66,0.25)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(245,197,66,0.14)"; e.currentTarget.style.boxShadow = "none"; }}
+                  >🏆 View champions</button>
+                )}
                 {isEnded ? (
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
