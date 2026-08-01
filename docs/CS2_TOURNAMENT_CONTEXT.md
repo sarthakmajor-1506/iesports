@@ -263,6 +263,14 @@ seeded BO3 for play-offs, and re-running the seeder would have overwritten
 rosters and fixtures that had since been fixed by hand.
 
 ## Landmines
+
+**Before running another event, read `docs/CS2_EVENT_RUNBOOK.md`.** It is the
+post-mortem of the Royal Sports League night: the pre-flight checklist, a
+failure catalogue with exact symptoms (a refused load that looks like a working
+one, live.cfg overwriting our cvars, the whitelist kicking everyone,
+.stay/.switch being impossible over RCON), and every script built to handle
+them.
+
 - Never parse `status` for match state — webhook is truth.
 - Rotate `sv_password` per match (set_password action) so stale passwords don't
   let people walk into a live game.
