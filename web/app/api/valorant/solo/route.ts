@@ -5,6 +5,7 @@ import { recalcTiers } from "@/lib/recalcTiers";
 import { syncPlayerSnapshot } from "@/lib/valorantPlayerSnapshot";
 import { seedRating, floorCheck, ratingToRank, ratingToTier } from "@/lib/elo";
 import { sendRegistrationDM } from "@/lib/discord";
+import { requirePaidEntry } from "@/lib/paidEntry";
 
 const HENRIK_BASE = "https://api.henrikdev.xyz/valorant";
 
@@ -67,6 +68,16 @@ export async function POST(req: NextRequest) {
     // Check slots
     if (tData.slotsBooked >= tData.totalSlots) {
       return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+    }
+
+    // Paid entry — checked before the rank refresh below, so an unpaid attempt
+    // costs nothing and writes nothing.
+    const gate = await requirePaidEntry({ game: "valorant", tournamentId, uid, tournament: tData });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, requiresPayment: gate.requiresPayment, entryFee: gate.entryFee },
+        { status: gate.status }
+      );
     }
 
     // ── Check not already registered ───────────────────────────────────────

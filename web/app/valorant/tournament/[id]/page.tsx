@@ -574,9 +574,15 @@ function ValorantTournamentDetailInner() {
     setTLoading(false);
   };
 
-  const refetchData = () => {
+  // `fresh` is for refetches that follow a write — registering, unregistering,
+  // or landing back here from a completed payment. Those must bypass the CDN,
+  // which otherwise serves a snapshot taken before the write and shows the
+  // player as not registered for something they just paid for. Routine polling
+  // stays cached so the edge cache keeps doing its job.
+  const refetchData = (fresh = false) => {
     if (!id) return;
-    fetch(`/api/tournaments/detail?id=${id}&game=valorant`)
+    const qs = fresh ? `&fresh=${Date.now()}` : "";
+    fetch(`/api/tournaments/detail?id=${id}&game=valorant${qs}`, fresh ? { cache: "no-store" } : undefined)
       .then(r => r.json())
       .then(data => { writeCache(`tdetail:${id}:valorant`, data); applyData(data); })
       .catch(() => setTLoading(false));
@@ -588,9 +594,12 @@ function ValorantTournamentDetailInner() {
   useEffect(() => {
     // Instant render from cache (stale-while-revalidate) so back-button /
     // re-navigation paints immediately, then refresh in the background.
-    const cached = readCache(`tdetail:${id}:valorant`);
+    // Returning from PayU (?paid=<txnid>) must not paint the pre-payment cache
+    // — the player would see themselves unregistered for what they just bought.
+    const justPaid = !!searchParams.get("paid");
+    const cached = justPaid ? null : readCache(`tdetail:${id}:valorant`);
     if (cached) applyData(cached);
-    refetchData(); fetchRankReports(); fetchWaitlist();
+    refetchData(justPaid); fetchRankReports(); fetchWaitlist();
     const tick = () => { if (!document.hidden) refetchData(); };
     const interval = setInterval(tick, 180_000); // 3 min: edge cache serves most polls; cuts Vercel invocations + Firestore reads
     const onVis = () => { if (!document.hidden) refetchData(); };
@@ -633,7 +642,7 @@ function ValorantTournamentDetailInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
-      refetchData();
+      refetchData(true);
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -2192,7 +2201,7 @@ function ValorantTournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(true); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ WAITLIST POPUP ═══ */}

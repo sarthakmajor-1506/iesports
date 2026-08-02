@@ -536,9 +536,15 @@ function CS2TournamentDetailInner() {
       .catch(() => {});
   };
 
-  const refetchData = () => {
+  // `fresh` is for refetches that follow a write — registering, unregistering,
+  // or landing back here from a completed payment. Those must bypass the CDN,
+  // which otherwise serves a snapshot taken before the write and shows the
+  // player as not registered for something they just paid for. Routine polling
+  // stays cached so the edge cache keeps doing its job.
+  const refetchData = (fresh = false) => {
     if (!id) return;
-    fetch(`/api/tournaments/detail?id=${id}&game=cs2`)
+    const qs = fresh ? `&fresh=${Date.now()}` : "";
+    fetch(`/api/tournaments/detail?id=${id}&game=cs2${qs}`, fresh ? { cache: "no-store" } : undefined)
       .then(r => r.json())
       .then(data => {
         if (data.tournament) setTournament(data.tournament);
@@ -569,7 +575,9 @@ function CS2TournamentDetailInner() {
   // immediately on visibility change so the view is current when the user
   // returns. Replaces the old 30s always-on polling.
   useEffect(() => {
-    refetchData(); fetchRankReports();
+    // Arriving with ?paid=<txnid> means we have just come back from PayU, so
+    // the very first load has to skip the edge cache.
+    refetchData(!!searchParams.get("paid")); fetchRankReports();
     const tick = () => { if (!document.hidden) refetchData(); };
     const interval = setInterval(tick, 60_000);
     const onVis = () => { if (!document.hidden) refetchData(); };
@@ -618,7 +626,7 @@ function CS2TournamentDetailInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
-      refetchData();
+      refetchData(true);
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -2035,7 +2043,7 @@ function CS2TournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(); }} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(true); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ LOGIN PROMPT ═══ */}

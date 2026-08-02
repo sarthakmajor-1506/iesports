@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAndStoreRank } from "@/lib/opendota";
 import { FieldValue } from "firebase-admin/firestore";
+import { requirePaidEntry } from "@/lib/paidEntry";
 
 
 function generateCode() {
@@ -31,6 +32,15 @@ export async function POST(req: NextRequest) {
     if (!userData?.phone && !userData?.phoneNumber) return NextResponse.json({ error: "Phone number is required. Please log in with your phone number." }, { status: 400 });
     if (!userData?.discordId) return NextResponse.json({ error: "Discord account is required. Please connect Discord first." }, { status: 400 });
     if (!userData?.steamId) return NextResponse.json({ error: "Steam account not linked" }, { status: 400 });
+
+    // Paid entry — the captain pays for their own slot like any other player.
+    const gate = await requirePaidEntry({ game: "dota2", tournamentId, uid });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, requiresPayment: gate.requiresPayment, entryFee: gate.entryFee },
+        { status: gate.status }
+      );
+    }
 
     // Fetch rank from OpenDota
     const { bracket } = await fetchAndStoreRank(uid, userData.steamId, adminDb);

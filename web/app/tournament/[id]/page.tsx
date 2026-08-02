@@ -748,10 +748,15 @@ function DotaTournamentDetailInner() {
     setTLoading(false);
   };
 
-  const refetchData = (refreshRank = false) => {
+  // `fresh` is for refetches that follow a write — registering, unregistering,
+  // or landing back here from a completed payment. Those must bypass the CDN,
+  // which otherwise serves a snapshot taken before the write and shows the
+  // player as not registered for something they just paid for. Routine polling
+  // stays cached so the edge cache keeps doing its job.
+  const refetchData = (refreshRank = false, fresh = false) => {
     if (!id) return;
-    const qs = refreshRank ? `&refreshRank=1` : "";
-    fetch(`/api/tournaments/detail?id=${id}&game=dota2${qs}`)
+    const qs = `${refreshRank ? "&refreshRank=1" : ""}${fresh ? `&fresh=${Date.now()}` : ""}`;
+    fetch(`/api/tournaments/detail?id=${id}&game=dota2${qs}`, fresh ? { cache: "no-store" } : undefined)
       .then(r => r.json())
       .then(data => { writeCache(`tdetail:${id}:dota2`, data); applyData(data); })
       .catch(() => setTLoading(false));
@@ -772,9 +777,12 @@ function DotaTournamentDetailInner() {
     // tournament cached from a previous visit, paint it immediately so the
     // back-button / re-navigation shows content with no loading screen, then
     // refresh in the background below.
-    const cached = readCache(`tdetail:${id}:dota2`);
+    // Returning from PayU (?paid=<txnid>) must not paint the pre-payment cache
+    // — the player would see themselves unregistered for what they just bought.
+    const justPaid = !!searchParams.get("paid");
+    const cached = justPaid ? null : readCache(`tdetail:${id}:dota2`);
     if (cached) applyData(cached);
-    refetchData(false); fetchRankReports();
+    refetchData(false, justPaid); fetchRankReports();
     const tick = () => { if (!document.hidden) refetchData(false); };
     const interval = setInterval(tick, 180_000); // 3 min: edge cache serves most polls; cuts Vercel invocations + Firestore reads
     const onVis = () => { if (!document.hidden) refetchData(false); };
@@ -888,7 +896,7 @@ function DotaTournamentDetailInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
-      refetchData();
+      refetchData(false, true);
     } catch (e: any) {
       alert(e.message || "Failed to unregister");
     } finally {
@@ -2204,7 +2212,7 @@ function DotaTournamentDetailInner() {
           user={user}
           dotaProfile={dotaProfile}
           onClose={() => setShowRegister(false)}
-          onSuccess={() => { setIsRegistered(true); refetchData(); }}
+          onSuccess={() => { setIsRegistered(true); refetchData(false, true); }}
         />
       )}
 

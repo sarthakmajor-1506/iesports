@@ -279,6 +279,15 @@ registeredCS2Tournaments: string[]             ← CS2
 - `rankReports/{id}` — player-vs-player rank dispute submissions
 - `waitlist/{id}` — pre-launch / event waitlist signups
 
+### Payments (PayU — see `docs/PAYMENTS_PAYU.md`)
+- `payments/{txnid}` — one doc per attempt, with the raw callback + PayU's verify response
+- `paidEntries/{game__tournamentId__uid}` — the entitlement; derived id, so granting twice is a no-op
+- `payuWebhookEvents/{id}` — every webhook delivery, stored before it is interpreted
+
+Registration routes call `requirePaidEntry()` from `lib/paidEntry.ts` before
+writing anything. It returns immediately for free tournaments, so the gate is
+inert until a tournament has an `entryFee`.
+
 ---
 
 ## Auth Flows
@@ -317,6 +326,7 @@ STEAM_EXEMPT_PATHS  // auth required but Steam not required (/connect-steam, /co
 - **DoubleBracket.tsx:** SVG visualization. Reads from flat `team1Name`/`team2Name` fields — NOT nested objects. 50/50 split: top seeds → Upper Bracket, bottom → Lower Bracket.
 - **Interim Valorant rank API:** see `HENRIK_API_KEY` env var and `app/api/riot/lookup/route.ts` for endpoint and auth details. Rate-limited; will be replaced with official Riot endpoints after Production approval.
 - **Elo (`lib/elo.ts`):** Internal tournament seeding only. Never expose as a "true rank" or parallel MMR.
+- **Wall of Shame:** the hero button renders only when the tournament has at least one entry — an empty wall advertises a feature and shows nothing. The `/wall-of-shame` permalink still renders (it has its own empty state). `wallOfShameHidden` on the tournament doc suppresses it regardless.
 
 ### Dota 2
 - **Solo scoring (`lib/soloScoring.ts`):**
@@ -387,7 +397,13 @@ HENRIK_API_KEY=HDEV-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # Admin routes
 ADMIN_SECRET=
 
-# App
+# PayU (paid tournament entry — see docs/PAYMENTS_PAYU.md)
+PAYU_MODE=test                  # test | live — selects credentials AND endpoint
+PAYU_MERCHANT_KEY=              # fallback pair when no mode-specific one is set
+PAYU_MERCHANT_SALT=
+# PAYU_TEST_KEY= PAYU_TEST_SALT= PAYU_LIVE_KEY= PAYU_LIVE_SALT=
+
+# App — also becomes PayU's surl/furl, so it must be correct in production
 NEXT_PUBLIC_APP_URL=https://iesports.in
 ```
 
@@ -491,7 +507,11 @@ iesports is applying for a Riot Games Production API key to replace the interim 
 - Mobile Navbar: add Riot section in drawer
 
 ### P4 — Future
-- Razorpay payment gateway (paid tournaments, Q3 2026)
+- ~~Razorpay payment gateway~~ → **PayU is LIVE** (`docs/PAYMENTS_PAYU.md`).
+  Proven with real money; Valorant Horizon is charging ₹500. Remaining: ask PayU
+  to enable cards (only Net Banking + UPI are active) and UPI collect, settle the
+  two grandfathered Horizon registrations, and build an admin payments view for
+  reconciliation (ops currently runs `scripts/dev-tools/payuTools.ts reconcile`).
 - Call of Duty integration
 - Riot LoL / TFT / 2XKO support (after Valorant production app is approved — same product, additional game applications)
 

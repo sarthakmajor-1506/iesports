@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendRegistrationDM } from "@/lib/discord";
+import { requirePaidEntry } from "@/lib/paidEntry";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,15 @@ export async function POST(req: NextRequest) {
 
     if (tData.slotsBooked >= tData.totalSlots) {
       return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+    }
+
+    // Paid entry — no-op for free tournaments, 402 until the fee is settled.
+    const gate = await requirePaidEntry({ game: "cs2", tournamentId, uid, tournament: tData });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, requiresPayment: gate.requiresPayment, entryFee: gate.entryFee },
+        { status: gate.status }
+      );
     }
 
     const existingDoc = await adminDb.collection("cs2Tournaments").doc(tournamentId).collection("soloPlayers").doc(uid).get();

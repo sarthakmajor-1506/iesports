@@ -187,7 +187,17 @@ export async function GET(req: NextRequest) {
     // while-revalidate serves the cached copy instantly while a fresh one is
     // fetched in the background. The on-demand ?refreshRank=1 variant is never
     // cached so an explicit rank re-sync always runs live.
-    if (!refreshRank) {
+    // A caller that just changed this tournament — the player who has this
+    // second finished paying and registering — cannot be served a cached copy.
+    // The CDN would happily hand back a snapshot taken before the write and the
+    // player would be told they are not registered for something they just paid
+    // for. ?fresh=<token> both misses the edge cache (distinct cache key) and
+    // refuses to populate it.
+    const fresh = req.nextUrl.searchParams.get("fresh");
+
+    if (fresh) {
+      res.headers.set("Cache-Control", "no-store");
+    } else if (!refreshRank) {
       // Longer edge cache = far fewer function invocations (Vercel Fluid CPU) and
       // Firestore reads: the function only re-runs ~once per 90s per tournament,
       // and stale-while-revalidate serves the cached copy instantly for up to 10

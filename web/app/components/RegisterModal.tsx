@@ -7,6 +7,7 @@ import { doc, updateDoc, getDoc, getDocFromServer, setDoc } from "firebase/fires
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import type { ConfirmationResult } from "firebase/auth";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { startPayuCheckout, type CheckoutMode } from "@/app/lib/payuCheckout";
 
 const COUNTRIES = [
   { flag: "\u{1F1EE}\u{1F1F3}", code: "+91" },
@@ -27,7 +28,14 @@ type Props = {
   onSuccess: () => void;
 };
 
-type Step = "choose" | "create" | "join" | "solo" | "success" | "connect";
+type Step = "choose" | "create" | "join" | "solo" | "success" | "connect" | "pay";
+
+/**
+ * What the player is about to be charged for. Held while we show the
+ * confirmation step, so nobody is thrown at a payment gateway by a click that
+ * said "Register".
+ */
+type PendingPayment = { mode: CheckoutMode; tournamentId: string; entryFee: number };
 
 export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, onClose, onSuccess }: Props) {
   const { riotData, userProfile } = useAuth();
@@ -36,6 +44,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [teamCode, setTeamCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  // Transaction being paid for in the other tab, while this one waits.
+  const [watchTxnid, setWatchTxnid] = useState<string | null>(null);
   const [warning, setWarning] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
   const [fullName, setFullName] = useState(userProfile?.fullName || "");
@@ -145,6 +156,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const accentColor = isCS2 ? "#f0a500" : isValorant ? "#3CCBFF" : "#A12B1F";
 
   const isDota = game === "dota2" || (!isValorant && !isCS2);
+
+  // Substitutes join a waitlist rather than the tournament, so they are never
+  // charged — showing them a fee would be a lie.
+  const entryFee = Number(tournament?.entryFee) || 0;
+  const isPaidEntry = entryFee > 0 && !isSubstitute;
   const isProfilePrivate = isDota && (!dotaProfile?.dotaRankTier || dotaProfile?.dotaRankTier === 0);
 
   // ── Re-check linked accounts when user returns from another tab ────────
@@ -201,6 +217,39 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
   // Fetch on mount (user may already have Discord connected)
   useEffect(() => { refreshUserState(); }, [user]);
+
+  // ── Watch a payment happening in the other tab ─────────────────────────
+  // The status endpoint re-verifies against PayU on read, so this both reports
+  // the outcome and pushes a stuck payment to settle. Polling rather than
+  // postMessage because the PayU tab navigates away to a third-party origin and
+  // comes back — there is no channel that survives that reliably.
+  useEffect(() => {
+    if (!watchTxnid) return;
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/payments/status?txnid=${encodeURIComponent(watchTxnid)}`, { cache: "no-store" });
+        const d = await res.json();
+        if (cancelled || !res.ok) return;
+
+        if (d.status === "paid") {
+          setWatchTxnid(null); setLoading(false); setPendingPayment(null);
+          onSuccess(); setStep("success");
+        } else if (d.status === "failed") {
+          setWatchTxnid(null); setLoading(false);
+          setError("That payment didn't go through. Nothing was charged — you can try again.");
+        } else if (d.status === "review") {
+          setWatchTxnid(null); setLoading(false);
+          setError("Your payment needs a manual check. We'll sort it out — no need to pay again.");
+        }
+      } catch { /* transient — the next tick retries */ }
+    };
+
+    const interval = setInterval(check, 3000);
+    check();
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [watchTxnid]);
 
   // Re-fetch when user returns from another tab
   useEffect(() => {
@@ -265,9 +314,21 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   // Auto-advance past connect step if ALL requirements are met
   // Substitutes always go through the single solo-style confirm step —
   // they're joining a list, not forming/picking a team.
+  // On a paid shuffle tournament the "register solo" explainer sat between the
+  // player and the payment screen, asking for money twice — once as a fee card
+  // and again on the confirm step. Land straight on the confirm screen; the
+  // fee, the tournament and the method are all stated there.
+  const autoPay = allRequirementsMet && isShuffle && !isSubstitute && isPaidEntry;
+
   const actualStep = step === "connect" && allRequirementsMet
-    ? ((isShuffle || isSubstitute) ? "solo" : "choose")
+    ? (autoPay ? "pay" : (isShuffle || isSubstitute) ? "solo" : "choose")
     : step;
+
+  // The confirm screen is reachable two ways: after a 402 (pendingPayment is
+  // set with the server's authoritative fee) or directly via autoPay (fee from
+  // the tournament doc). Either way it needs something to render.
+  const payInfo: PendingPayment | null = pendingPayment
+    ?? (actualStep === "pay" ? { mode: "solo" as CheckoutMode, tournamentId: tournament.id, entryFee } : null);
 
   // ── Requirement items for UI ───────────────────────────────────────────
   type ReqItem = { id: string; label: string; desc: string; emoji: string; met: boolean; pending?: boolean; actionLabel?: string; action?: () => void };
@@ -352,12 +413,72 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
       ? discordRiot
       : null;
 
+  // ── Paid tournaments ────────────────────────────────────────────────────
+  // The client never decides what costs money. Registration is attempted as
+  // normal and the server answers 402 when a fee is outstanding, which is the
+  // signal to hand off to PayU.
+  const payuGame = isCS2 ? "cs2" : isValorant ? "valorant" : "dota2";
+
+  const needsPayment = (res: Response, data: any) => res.status === 402 && data?.requiresPayment;
+
+  /**
+   * Stop and ask. A 402 means money is about to change hands, and being
+   * bounced straight to a payment gateway from a button labelled "Register" is
+   * alarming — the player should see the amount and choose to go.
+   */
+  const askToPay = (mode: CheckoutMode, tournamentId: string, data: any) => {
+    setPendingPayment({
+      mode,
+      tournamentId,
+      entryFee: Number(data?.entryFee) || Number(tournament?.entryFee) || 0,
+    });
+    setError("");
+    setStep("pay");
+  };
+
+  const confirmAndPay = async () => {
+    if (!payInfo) return;
+    setLoading(true); setError("");
+    const outcome = await startPayuCheckout({
+      uid: user.uid, game: payuGame,
+      tournamentId: payInfo.tournamentId, mode: payInfo.mode,
+      newTab: true,
+    });
+
+    if (outcome.kind === "redirecting") return; // this tab is on its way to PayU
+
+    // Paying in the other tab. This one stays put and watches for the verdict,
+    // so the player comes back to a page that has already updated itself.
+    if (outcome.kind === "popup") { setWatchTxnid(outcome.txnid); return; }
+
+    if (outcome.kind === "error") { setError(outcome.error); setLoading(false); return; }
+
+    // Fee removed, or already settled between the two calls — no charge needed,
+    // so resume the registration the player originally asked for.
+    const { mode } = payInfo;
+    setPendingPayment(null);
+    setLoading(false);
+    if (mode === "team_create") await handleCreateTeam();
+    else if (mode === "team_join") await handleJoinTeam();
+    else await handleSolo();
+  };
+
+  const postJson = async (endpoint: string, body: any) => {
+    const res = await fetch(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    return { res, data: await res.json() };
+  };
+
   const handleCreateTeam = async () => {
     setLoading(true); setError("");
     try {
       const endpoint = isCS2 ? "/api/cs2/teams/create" : isValorant ? "/api/valorant/teams/create" : "/api/teams/create";
-      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }) });
-      const data = await res.json();
+      const body = { tournamentId: tournament.id, uid: user.uid };
+      const { res, data } = await postJson(endpoint, body);
+
+      if (needsPayment(res, data)) { askToPay("team_create", tournament.id, data); return; }
+
       if (!res.ok) throw new Error(data.error);
       setTeamCode(data.teamCode); onSuccess(); setStep("success");
     } catch (e: any) { setError(e.message || "Failed to create team"); } finally { setLoading(false); }
@@ -368,8 +489,12 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     setLoading(true); setError("");
     try {
       const endpoint = isCS2 ? "/api/cs2/teams/join" : isValorant ? "/api/valorant/teams/join" : "/api/teams/join";
-      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: joinCode.toUpperCase(), uid: user.uid }) });
-      const data = await res.json();
+      const body = { code: joinCode.toUpperCase(), uid: user.uid };
+      const { res, data } = await postJson(endpoint, body);
+
+      // The tournament is whichever one the captain's team belongs to.
+      if (needsPayment(res, data)) { askToPay("team_join", data.tournamentId || tournament.id, data); return; }
+
       if (!res.ok) throw new Error(data.error);
       onSuccess(); setStep("success");
     } catch (e: any) { setError(e.message || "Failed to join team"); } finally { setLoading(false); }
@@ -392,8 +517,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         return;
       }
       const endpoint = isCS2 ? "/api/cs2/solo" : isValorant ? "/api/valorant/solo" : "/api/teams/solo";
-      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }) });
-      const data = await res.json();
+      const body = { tournamentId: tournament.id, uid: user.uid };
+      const { res, data } = await postJson(endpoint, body);
+
+      if (needsPayment(res, data)) { askToPay("solo", tournament.id, data); return; }
+
       if (!res.ok) throw new Error(data.error);
       if (data.warning) setWarning(data.warning);
       onSuccess(); setStep("success");
@@ -722,7 +850,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                   cursor: loading ? "default" : "pointer",
                   boxShadow: `0 4px 20px ${accentColor}33`,
                 }}>
-                  {loading ? "Registering..." : isSubstitute ? "Join Substitute List \u2192" : isShuffle ? "Register Now \u2192" : "Continue \u2192"}
+                  {loading ? "Registering..."
+                    : isSubstitute ? "Join Substitute List \u2192"
+                    : isPaidEntry ? `Continue \u2014 \u20b9${entryFee} \u2192`
+                    : isShuffle ? "Register Now \u2192" : "Continue \u2192"}
                 </button>
               </div>
             )}
@@ -749,8 +880,12 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           </div>
         )}
 
-        {/* Riot pending note for Valorant — subtle, not alarming */}
-        {isValorant && riotPending && actualStep !== "connect" && actualStep !== "success" && (
+        {/* Riot pending note for Valorant — subtle, not alarming.
+            Never on the payment step: "verifying your Riot ID" next to a
+            request for ₹500 reads as "we might reject you after you pay", and
+            it costs conversions. Verification is already known to be fine by
+            this point — the server would not have asked for money otherwise. */}
+        {isValorant && riotPending && actualStep !== "connect" && actualStep !== "success" && actualStep !== "pay" && (
           <div style={{
             background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 10, padding: "10px 14px", marginBottom: 16,
@@ -760,6 +895,82 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             <p style={{ color: "#888", fontSize: 12, lineHeight: 1.5 }}>
               Nothing needed from you — our system is verifying your Riot ID. You can register normally.
             </p>
+          </div>
+        )}
+
+        {/* ═══════ PAID ENTRY: confirm before leaving for PayU ═══════ */}
+        {actualStep === "pay" && payInfo && (
+          <div style={{ animation: "reg-fade-in 0.3s ease" }}>
+            <div style={{ textAlign: "center" as const, marginBottom: 18 }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🎟️</div>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Confirm your entry</h3>
+              <p style={{ fontSize: 12, color: "#666", marginTop: 6, lineHeight: 1.5 }}>
+                This tournament has an entry fee. Your slot is confirmed the moment payment succeeds.
+              </p>
+            </div>
+
+            <div style={{
+              background: "#111", border: `1px solid ${accentColor}30`, borderRadius: 10,
+              padding: "16px 18px", marginBottom: 14,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 12, color: "#888" }}>Entry fee</span>
+                <span style={{ fontSize: 26, fontWeight: 800, color: accentColor }}>₹{payInfo.entryFee}</span>
+              </div>
+              <div style={{ height: 1, background: "#1c1c1c", margin: "12px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ fontSize: 11, color: "#555" }}>Tournament</span>
+                <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600, textAlign: "right" as const }}>{tournament.name}</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: watchTxnid ? `${accentColor}0d` : "rgba(255,255,255,0.03)",
+              border: `1px solid ${watchTxnid ? `${accentColor}33` : "rgba(255,255,255,0.08)"}`,
+              borderRadius: 10, padding: "11px 14px", marginBottom: 16,
+            }}>
+              <p style={{ fontSize: 11, color: watchTxnid ? "#ccc" : "#888", lineHeight: 1.6 }}>
+                {watchTxnid ? (
+                  <>
+                    <span style={{ fontWeight: 700 }}>Waiting for your payment…</span> Finish it in the PayU tab.
+                    This page updates by itself the moment it goes through — keep it open.
+                  </>
+                ) : (
+                  <>
+                    PayU opens in a <span style={{ color: "#ccc", fontWeight: 600 }}>new tab</span> for
+                    {" "}<span style={{ color: "#ccc", fontWeight: 600 }}>UPI or Net Banking</span>. This page
+                    stays open and updates as soon as payment clears.
+                  </>
+                )}
+              </p>
+            </div>
+
+            {error && <p style={{ color: "#ef4444", fontSize: 12, marginBottom: 12, textAlign: "center" as const }}>{error}</p>}
+
+            <button onClick={confirmAndPay} disabled={loading} style={{
+              width: "100%", padding: 14,
+              background: loading ? "#222" : `linear-gradient(135deg, ${accentColor}, ${isCS2 ? "#c78500" : isValorant ? "#2A9FCC" : "#7A1F15"})`,
+              border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15,
+              cursor: loading ? "default" : "pointer", fontFamily: "inherit",
+              boxShadow: loading ? "none" : `0 4px 20px ${accentColor}33`,
+            }}>
+              {watchTxnid ? "Waiting for payment…" : loading ? "Opening PayU…" : `Pay ₹${payInfo.entryFee} →`}
+            </button>
+
+            {/* When the confirm screen IS the first screen there is nothing
+                behind it, so backing out closes. Reached from a 402 there is a
+                real previous choice to return to. */}
+            <button onClick={() => {
+              setError("");
+              if (pendingPayment) { setPendingPayment(null); setStep(isShuffle ? "solo" : "choose"); }
+              else onClose();
+            }} disabled={loading} style={{
+              marginTop: 10, width: "100%", padding: 11, background: "transparent",
+              border: "1px solid #1a1a1a", borderRadius: 8, color: "#555", fontSize: 12,
+              cursor: loading ? "default" : "pointer", fontFamily: "inherit",
+            }}>
+              Not now
+            </button>
           </div>
         )}
 
@@ -781,6 +992,20 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 <p style={{ color: "#666", fontSize: 12, marginBottom: 20 }}>No premades, no comfort picks — just raw skill.</p>
               </>
             )}
+            {/* Say the price before the click, not after it. */}
+            {isPaidEntry && (
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "#111", border: `1px solid ${accentColor}30`, borderRadius: 10,
+                padding: "12px 16px", marginBottom: 14,
+              }}>
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Entry fee</p>
+                  <p style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Payable next step, via UPI or Net Banking</p>
+                </div>
+                <span style={{ fontSize: 22, fontWeight: 800, color: accentColor }}>₹{entryFee}</span>
+              </div>
+            )}
             {error && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>}
             <button onClick={handleSolo} disabled={loading} style={{
               width: "100%", padding: 14,
@@ -788,7 +1013,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
               border: "none", borderRadius: 8, color: "#fff",
               fontWeight: 700, fontSize: 15, cursor: loading ? "default" : "pointer",
             }}>
-              {loading ? "Registering..." : isSubstitute ? "Join Substitute List →" : "Register Solo →"}
+              {loading ? "Registering..."
+                : isSubstitute ? "Join Substitute List →"
+                : isPaidEntry ? `Continue — ₹${entryFee} →`
+                : "Register Solo →"}
             </button>
           </div>
         )}
@@ -796,6 +1024,20 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         {/* ═══════ STANDARD/AUCTION: 3-choice menu ═══════ */}
         {actualStep === "choose" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Captains routinely assume they are buying five slots. Say otherwise. */}
+            {isPaidEntry && (
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "#111", border: `1px solid ${accentColor}30`, borderRadius: 10,
+                padding: "12px 16px",
+              }}>
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Entry fee</p>
+                  <p style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Per player — each teammate pays their own</p>
+                </div>
+                <span style={{ fontSize: 22, fontWeight: 800, color: accentColor }}>₹{entryFee}</span>
+              </div>
+            )}
             <button onClick={() => setStep("create")} style={{
               padding: "18px 20px", background: "#111", border: "1px solid #222",
               borderRadius: 12, color: "#fff", cursor: "pointer", textAlign: "left" as const,

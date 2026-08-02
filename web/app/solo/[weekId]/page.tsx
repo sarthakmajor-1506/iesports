@@ -9,6 +9,7 @@ import Navbar from "../../components/Navbar";
 import { SoloTournament, SoloPlayer } from "@/lib/types";
 import { getTimeUntilDeadline } from "@/lib/soloTournaments";
 import { PRIZE_DISTRIBUTION, getPrizeForRank } from "@/lib/soloScoring";
+import { startPayuCheckout } from "@/app/lib/payuCheckout";
 
 // ── Hero map ─────────────────────────────────────────────────────────────────
 const HEROES: Record<number, string> = {
@@ -442,6 +443,10 @@ function SoloPageInner() {
   const [players,      setPlayers]      = useState<SoloPlayer[]>([]);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registering,  setRegistering]  = useState(false);
+  // Set once the server says this week costs money; drives the confirm step.
+  const [pendingFee,   setPendingFee]   = useState<number | null>(null);
+  // Transaction being paid for in the other tab, while this one waits.
+  const [watchTxnid,   setWatchTxnid]   = useState<string | null>(null);
   const [refreshing,   setRefreshing]   = useState(false);
   const [error,        setError]        = useState("");
   const [tLoading,     setTLoading]     = useState(true);
@@ -508,12 +513,59 @@ useEffect(() => {
 }, [user?.uid, id, isRegistered]);
 
 
+  const entryFeeAmount = Number((tournament as any)?.entryFee) || 0;
+
+  const payNow = async () => {
+    if (!user || !id) return;
+    setRegistering(true); setError("");
+    try {
+      const outcome = await startPayuCheckout({ uid: user.uid, game: "dota_solo", tournamentId: id, mode: "solo", newTab: true });
+      if (outcome.kind === "redirecting") return;          // this tab is leaving for PayU
+      if (outcome.kind === "popup") { setWatchTxnid(outcome.txnid); return; } // stay and watch
+      if (outcome.kind === "error") throw new Error(outcome.error);
+      // No charge needed after all — finish the registration normally.
+      setPendingFee(null);
+      await handleRegister();
+    } catch (e: any) { setError(e.message || "Could not start payment"); setRegistering(false); }
+  };
+
+  // Watch a payment being completed in the other tab; the status endpoint
+  // re-verifies against PayU on read, so this also nudges it to settle.
+  useEffect(() => {
+    if (!watchTxnid) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/payments/status?txnid=${encodeURIComponent(watchTxnid)}`, { cache: "no-store" });
+        const d = await res.json();
+        if (cancelled || !res.ok) return;
+        if (d.status === "paid") { setWatchTxnid(null); setRegistering(false); setPendingFee(null); setIsRegistered(true); }
+        else if (d.status === "failed") { setWatchTxnid(null); setRegistering(false); setError("That payment didn't go through. Nothing was charged — you can try again."); }
+        else if (d.status === "review") { setWatchTxnid(null); setRegistering(false); setError("Your payment needs a manual check. We'll sort it out — no need to pay again."); }
+      } catch { /* transient — next tick retries */ }
+    };
+    const interval = setInterval(check, 3000);
+    check();
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [watchTxnid]);
+
   const handleRegister = async () => {
     if (!user) return;
     setRegistering(true); setError("");
     try {
-      const res  = await fetch("/api/solo/register", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ tournamentId:id, uid:user.uid }) });
-      const data = await res.json();
+      const post = async () => {
+        const r = await fetch("/api/solo/register", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ tournamentId:id, uid:user.uid }) });
+        return { r, d: await r.json() };
+      };
+      let { r: res, d: data } = await post();
+
+      // 402 means this week has an entry fee. Show the amount and let the
+      // player choose to pay rather than dropping them on a payment gateway.
+      if (res.status === 402 && data?.requiresPayment) {
+        setPendingFee(Number(data.entryFee) || Number((tournament as any)?.entryFee) || 0);
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(true);
     } catch (e: any) { setError(e.message||"Registration failed"); }
@@ -631,10 +683,33 @@ useEffect(() => {
                     </div>
                   </div>
                 )}
-                {canRegister && (
+                {canRegister && pendingFee === null && (
                   <button onClick={handleRegister} disabled={registering} style={{ width:"100%", padding:"11px 0", background:"#F05A28", border:"none", borderRadius:100, color:"#fff", fontWeight:700, fontSize:".88rem", cursor:"pointer", fontFamily:"inherit", opacity:registering?.6:1, boxShadow:"0 3px 14px rgba(240,90,40,.3)" }}>
-                    {registering?"Registering…":"Register Free →"}
+                    {registering ? "Registering…"
+                      : entryFeeAmount > 0 ? `Register — ₹${entryFeeAmount} →`
+                      : "Register Free →"}
                   </button>
+                )}
+
+                {/* Confirm before handing the player to PayU. */}
+                {canRegister && pendingFee !== null && (
+                  <div style={{ width:"100%", display:"flex", flexDirection:"column", gap:8 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:12, padding:"10px 14px" }}>
+                      <div>
+                        <div style={{ fontSize:".78rem", fontWeight:800, color:"#9a3412" }}>Entry fee</div>
+                        <div style={{ fontSize:".68rem", color:"#c2410c", marginTop:2 }}>
+                          {watchTxnid ? "Finish in the PayU tab — this page updates itself" : "Opens PayU in a new tab · UPI or Net Banking"}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:"1.3rem", fontWeight:900, color:"#F05A28" }}>₹{pendingFee}</div>
+                    </div>
+                    <button onClick={payNow} disabled={registering} style={{ width:"100%", padding:"11px 0", background:"#F05A28", border:"none", borderRadius:100, color:"#fff", fontWeight:700, fontSize:".88rem", cursor:"pointer", fontFamily:"inherit", opacity:registering?.6:1, boxShadow:"0 3px 14px rgba(240,90,40,.3)" }}>
+                      {watchTxnid ? "Waiting for payment…" : registering ? "Opening PayU…" : `Pay ₹${pendingFee} →`}
+                    </button>
+                    <button onClick={() => { setPendingFee(null); setError(""); }} disabled={registering} style={{ width:"100%", padding:"9px 0", background:"transparent", border:"1px solid #e5e7eb", borderRadius:100, color:"#6b7280", fontWeight:600, fontSize:".78rem", cursor:"pointer", fontFamily:"inherit" }}>
+                      Not now
+                    </button>
+                  </div>
                 )}
                 {isRegistered&&<div style={{width:"100%",padding:"11px 0",textAlign:"center",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:100,color:"#16a34a",fontWeight:700,fontSize:".86rem"}}>✓ Registered</div>}
                 {error&&<p style={{fontSize:".78rem",color:"#dc2626"}}>{error}</p>}

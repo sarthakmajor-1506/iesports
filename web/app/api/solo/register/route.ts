@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { fetchAndSyncPlayer } from "@/lib/fetchAndSyncPlayer";
+import { requirePaidEntry } from "@/lib/paidEntry";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +29,13 @@ export async function POST(req: NextRequest) {
     // NOTE: No "hasn't started yet" check — users CAN register for upcoming/next week tournaments
     // as long as the registration deadline hasn't passed
 
-    if (tData.entryFee > 0) return NextResponse.json({ error: "Payment integration coming soon" }, { status: 400 });
+    const gate = await requirePaidEntry({ game: "dota_solo", tournamentId, uid, tournament: tData });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, requiresPayment: gate.requiresPayment, entryFee: gate.entryFee },
+        { status: gate.status }
+      );
+    }
 
     if ((tData.slotsBooked || 0) >= tData.totalSlots) return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
 

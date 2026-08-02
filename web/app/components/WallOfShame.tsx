@@ -273,6 +273,15 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
     }
   };
 
+  // An empty wall is worse than no wall: it advertises a feature, costs a click
+  // and shows nothing. The trigger only appears once there is something to see.
+  // Keyed on entries rather than a loaded flag so it stays hidden through the
+  // initial fetch instead of flashing in and out.
+  //
+  // The permalink page passes forceOpen and must still render — it has its own
+  // empty state, and someone following a direct link expects a page.
+  if (!forceOpen && entries.length === 0) return null;
+
   return (
     <>
       <style>{INLINE_STYLES}</style>
