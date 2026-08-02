@@ -54,7 +54,7 @@ type Props = {
 };
 
 /** "auto" lets the flow pick the right screen from what is already done. */
-type Stage = "auto" | "gate" | "fee" | "waiting" | "hub" | "name" | "phone" | "done";
+type Stage = "auto" | "checking" | "gate" | "fee" | "waiting" | "hub" | "name" | "phone" | "done";
 
 export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, onClose, onSuccess }: Props) {
   const { riotData, userProfile } = useAuth();
@@ -79,6 +79,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [localRiot, setLocalRiot] = useState(false);
   const [localPhone, setLocalPhone] = useState(false);
   const [localName, setLocalName] = useState(!!userProfile?.fullName);
+  // Has the user document been read at least once? Until it has, every
+  // "is X connected" answer is a guess that defaults to no.
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   type DiscordConn = { type: string; name: string; id: string; verified: boolean };
   const [discordConns, setDiscordConns] = useState<DiscordConn[]>([]);
@@ -134,19 +137,25 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const setupComplete = hasName && hasPhone && hasAccount;
 
   const refreshUserState = async () => {
-    if (!user) return;
+    if (!user) { setProfileLoaded(true); return; }
     try {
       let snap;
       try { snap = await getDocFromServer(doc(db, "users", user.uid)); } catch { snap = await getDoc(doc(db, "users", user.uid)); }
       const d = snap.data();
-      if (!d) return;
-      if (d.discordId) setLocalDiscord(true);
-      if (d.steamId) setLocalSteam(true);
-      if (d.riotGameName) setLocalRiot(true);
-      if (d.phone && d.phone.length > 3) setLocalPhone(true);
-      if (d.fullName) { setFullName(d.fullName); setLocalName(true); }
-      if (d.discordConnections?.length > 0) setDiscordConns(d.discordConnections);
-    } catch {}
+      if (d) {
+        if (d.discordId) setLocalDiscord(true);
+        if (d.steamId) setLocalSteam(true);
+        if (d.riotGameName) setLocalRiot(true);
+        if (d.phone && d.phone.length > 3) setLocalPhone(true);
+        if (d.fullName) { setFullName(d.fullName); setLocalName(true); }
+        if (d.discordConnections?.length > 0) setDiscordConns(d.discordConnections);
+      }
+    } catch {
+      // A failed read must not strand the modal on a spinner — fall through to
+      // whatever AuthContext already knows.
+    } finally {
+      setProfileLoaded(true);
+    }
   };
 
   useEffect(() => { refreshUserState(); }, [user]);
@@ -187,10 +196,18 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   }, [watchTxnid]);
 
   // ── Which screen ───────────────────────────────────────────────────────
+  // Nothing is decided until we know two things: what the player's profile
+  // actually contains, and whether they have already paid. Rendering before
+  // then guesses — and the guess is always "not connected", which flashed
+  // "Connect Discord" at players who connected it weeks ago. A brief spinner is
+  // honest; a wrong screen is not.
+  const ready = profileLoaded && (entryFee <= 0 || isSubstitute || entitlementLoaded);
+
   const resolved: Stage =
     stage !== "auto" ? stage
+    : !ready ? "checking"
     : !hasDiscord ? "gate"
-    : (entryFee > 0 && !hasPaid) ? (entitlementLoaded ? "fee" : "gate")
+    : (entryFee > 0 && !hasPaid) ? "fee"
     : "hub";
 
   // ── Actions ────────────────────────────────────────────────────────────
@@ -392,6 +409,14 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
           </div>
 
           <div style={{ padding: "18px 22px 24px" }}>
+
+            {/* ═══ CHECKING — brief, and never a wrong screen ═══ */}
+            {resolved === "checking" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 13, padding: "44px 10px" }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${UI.border}`, borderTopColor: T.acc, animation: "reg-spin .8s linear infinite" }} />
+                <div style={{ fontSize: 13, color: UI.faint }}>Checking your account…</div>
+              </div>
+            )}
 
             {/* ═══ DISCORD GATE ═══ */}
             {resolved === "gate" && (

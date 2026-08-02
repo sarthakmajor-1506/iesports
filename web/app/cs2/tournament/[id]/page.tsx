@@ -496,6 +496,9 @@ function CS2TournamentDetailInner() {
   // Paid, but name/phone/Steam still outstanding — they hold a slot without
   // being in the players list yet, so the CTA must not say "Register" again.
   const [setupPending, setSetupPending] = useState(false);
+  // Setup gaps known BEFORE the player clicks Register, so the button can say
+  // what the next step actually is instead of promising registration.
+  const [needsDiscord, setNeedsDiscord] = useState(false);
   const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
@@ -531,12 +534,16 @@ function CS2TournamentDetailInner() {
   const [matches, setMatches] = useState<any[]>([]);
   const [rankReports, setRankReports] = useState<any[]>([]);
 
+  // Auth resolves after mount, so this has to re-run when the user appears —
+  // otherwise the first call no-ops and the button never learns what is missing.
+  useEffect(() => { fetchEntitlement(); }, [user, id]);
+
   /** Paid-but-incomplete is invisible in the players list, so ask directly. */
   const fetchEntitlement = () => {
     if (!id || !user) return;
     fetch(`/api/payments/entitlement?game=cs2&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(d => setSetupPending(!!d.setupPending))
+      .then(d => { setSetupPending(!!d.setupPending); setNeedsDiscord(Array.isArray(d.missing) && d.missing.includes("discord")); })
       .catch(() => {});
   };
 
@@ -1236,7 +1243,7 @@ function CS2TournamentDetailInner() {
                     {canRegister && <button className="csd-reg-btn" onClick={() => {
                       if (!user) { setShowLoginPrompt(true); return; }
                       setShowRegister(true);
-                    }}>{setupPending ? "Details pending →" : "Register Now →"}</button>}
+                    }}>{setupPending ? "Details pending →" : needsDiscord ? "Connect Discord →" : "Register Now →"}</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                       <button className="csd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
                     )}
