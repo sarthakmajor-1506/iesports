@@ -12,6 +12,7 @@ import SingleEliminationBracket from "@/app/components/SingleEliminationBracket"
 import CommentSection from "@/app/components/CommentSection";
 import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
+import TournamentIntroVideo from "@/app/components/TournamentIntroVideo";
 import CS2TournamentWrap from "@/app/components/CS2TournamentWrap";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
@@ -1377,7 +1378,7 @@ function CS2TournamentDetailInner() {
                     only place that said so. */}
                 {isRegOpen && !regClosed && slotsLeft > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#8A8880" }}>
-                    or when the last {slotsLeft} {slotsLeft === 1 ? "slot fills" : "slots fill"}
+                    or when all {tournament.totalSlots} slots fill
                   </span>
                 )}
               </>
@@ -1387,6 +1388,12 @@ function CS2TournamentDetailInner() {
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === "overview" && (
             <div className="csd-tab-pane" ref={tabContentRef}>
+              {/* Explains the whole day in 30s — starts when scrolled into view.
+                  Only for tournaments that have not started; afterwards the page
+                  is about results, not how to enter. */}
+              {(tournament.status === "upcoming" || tournament.status === "active") && (
+                <TournamentIntroVideo game="cs2" tournament={tournament} />
+              )}
               {/* Stat tiles */}
               <div className="csd-stat-tiles">
                 <div className="csd-stat-tile red" style={{ animationDelay: "0s" }}>
@@ -1423,12 +1430,16 @@ function CS2TournamentDetailInner() {
                 </div>
                 <div className="csd-stat-tile" style={{ animationDelay: "0.3s" }}>
                   <div className="csd-stat-tile-icon"><Shield size={24} color="#8A8880" /></div>
-                  <div className="csd-stat-tile-val">Swiss</div>
+                  {/* Read from the tournament rather than hardcoded: these tiles
+                      said Swiss / Double Elim on a round-robin tournament, which
+                      contradicted both the rules below them and the explainer
+                      above them. */}
+                  <div className="csd-stat-tile-val">{tournament.groupStageFormat || "Swiss"}</div>
                   <div className="csd-stat-tile-lbl">Group Stage Format</div>
                 </div>
                 <div className="csd-stat-tile" style={{ animationDelay: "0.35s" }}>
                   <div className="csd-stat-tile-icon"><GitBranch size={24} color="#8A8880" /></div>
-                  <div className="csd-stat-tile-val">{tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</div>
+                  <div className="csd-stat-tile-val">{tournament.playoffFormat || (tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim")}</div>
                   <div className="csd-stat-tile-lbl">Play-Off Format</div>
                 </div>
               </div>
