@@ -948,10 +948,11 @@ export default function PlayerProfile() {
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {profile.riotVerified === "verified" ? (
-                        <span className="pp-acc-badge pp-acc-linked">✓ Verified</span>
-                      ) : profile.riotVerified === "pending" ? (
-                        <span className="pp-acc-badge pp-acc-pending">⏳ Pending</span>
+                      {/* Linked is linked. Rank-review state is internal and is
+                          shown only in the admin panel — a "pending" badge on a
+                          public profile reads as "this player isn't really in". */}
+                      {profile.riotGameName ? (
+                        <span className="pp-acc-badge pp-acc-linked">✓ Linked</span>
                       ) : (
                         <button className="pp-acc-link-btn" onClick={() => {
                           try { localStorage.removeItem("pendingRegistration"); sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {}

@@ -492,6 +492,9 @@ function ValorantTournamentDetailInner() {
   const [toastMsg, setToastMsg] = useState("Link copied!");
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  // Paid, but name/phone/Riot ID still outstanding — they hold a slot without
+  // being in the players list yet, so the CTA must not say "Register" again.
+  const [setupPending, setSetupPending] = useState(false);
   const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
@@ -530,6 +533,15 @@ function ValorantTournamentDetailInner() {
   const [wrapOpen, setWrapOpen] = useState(true);
   const [wrapAvailable, setWrapAvailable] = useState(false);
   const [rankReports, setRankReports] = useState<any[]>([]);
+
+  /** Paid-but-incomplete is invisible in the players list, so ask directly. */
+  const fetchEntitlement = () => {
+    if (!id || !user) return;
+    fetch(`/api/payments/entitlement?game=valorant&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => setSetupPending(!!d.setupPending))
+      .catch(() => {});
+  };
 
   const fetchRankReports = () => {
     if (!id) return;
@@ -599,7 +611,7 @@ function ValorantTournamentDetailInner() {
     const justPaid = !!searchParams.get("paid");
     const cached = justPaid ? null : readCache(`tdetail:${id}:valorant`);
     if (cached) applyData(cached);
-    refetchData(justPaid); fetchRankReports(); fetchWaitlist();
+    refetchData(justPaid); fetchRankReports(); fetchWaitlist(); fetchEntitlement();
     const tick = () => { if (!document.hidden) refetchData(); };
     const interval = setInterval(tick, 180_000); // 3 min: edge cache serves most polls; cuts Vercel invocations + Firestore reads
     const onVis = () => { if (!document.hidden) refetchData(); };
@@ -1241,7 +1253,7 @@ function ValorantTournamentDetailInner() {
                     {canRegister && <button className="vtd-reg-btn" onClick={() => {
                       if (!user) { setShowLoginPrompt(true); return; }
                       setShowRegister(true);
-                    }}>Register Now →</button>}
+                    }}>{setupPending ? "Details pending →" : "Register Now →"}</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                       <button className="vtd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
                     )}
@@ -2201,7 +2213,7 @@ function ValorantTournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(true); }} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); setSetupPending(false); refetchData(true); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ WAITLIST POPUP ═══ */}

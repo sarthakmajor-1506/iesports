@@ -493,6 +493,9 @@ function CS2TournamentDetailInner() {
   const [toastMsg, setToastMsg] = useState("Link copied!");
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  // Paid, but name/phone/Steam still outstanding — they hold a slot without
+  // being in the players list yet, so the CTA must not say "Register" again.
+  const [setupPending, setSetupPending] = useState(false);
   const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
@@ -527,6 +530,15 @@ function CS2TournamentDetailInner() {
   const [standings, setStandings] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [rankReports, setRankReports] = useState<any[]>([]);
+
+  /** Paid-but-incomplete is invisible in the players list, so ask directly. */
+  const fetchEntitlement = () => {
+    if (!id || !user) return;
+    fetch(`/api/payments/entitlement?game=cs2&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => setSetupPending(!!d.setupPending))
+      .catch(() => {});
+  };
 
   const fetchRankReports = () => {
     if (!id) return;
@@ -578,6 +590,7 @@ function CS2TournamentDetailInner() {
     // Arriving with ?paid=<txnid> means we have just come back from PayU, so
     // the very first load has to skip the edge cache.
     refetchData(!!searchParams.get("paid")); fetchRankReports();
+    fetchEntitlement();
     const tick = () => { if (!document.hidden) refetchData(); };
     const interval = setInterval(tick, 60_000);
     const onVis = () => { if (!document.hidden) refetchData(); };
@@ -1223,7 +1236,7 @@ function CS2TournamentDetailInner() {
                     {canRegister && <button className="csd-reg-btn" onClick={() => {
                       if (!user) { setShowLoginPrompt(true); return; }
                       setShowRegister(true);
-                    }}>Register Now →</button>}
+                    }}>{setupPending ? "Details pending →" : "Register Now →"}</button>}
                     {!regClosed && !isRegistered && slotsLeft <= 0 && isRegOpen && (
                       <button className="csd-reg-btn" disabled style={{ background: "#555", cursor: "default", opacity: 0.7 }}>No Slots Open</button>
                     )}
@@ -2043,7 +2056,7 @@ function CS2TournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); refetchData(true); }} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); setSetupPending(false); refetchData(true); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
 
       {/* ═══ LOGIN PROMPT ═══ */}

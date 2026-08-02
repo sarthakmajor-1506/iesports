@@ -284,12 +284,13 @@ export default function ConnectRiot() {
             <div className="cr-card">
               <div className="cr-accent" />
               <div className="cr-success">
-                <div className="cr-success-icon">
-                  {riotData?.riotVerified === "verified" ? "✅" : "⏳"}
-                </div>
-                <div className="cr-success-title">
-                  {riotData?.riotVerified === "verified" ? "Riot ID Verified" : "Verification Pending"}
-                </div>
+                {/* A linked Riot ID is done, full stop. Whether we have reviewed
+                    the rank is our problem, not the player's — showing "pending
+                    review" made people think their entry was provisional and
+                    cost registrations. Review state now lives in the admin panel
+                    only. */}
+                <div className="cr-success-icon">✅</div>
+                <div className="cr-success-title">Riot ID linked</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "center", margin: "16px 0" }}>
                   {riotData?.riotAvatar && (
                     <img src={riotData.riotAvatar} alt="" style={{ width: 40, height: 40, borderRadius: 8, border: "2px solid #ff4655" }} />
@@ -304,14 +305,9 @@ export default function ConnectRiot() {
                   </span>
                 )}
                 <div className="cr-success-text">
-                  {riotData?.riotVerified === "verified"
-                    ? "Your Riot ID has been verified. You're all set to join Valorant tournaments."
-                    : "Your Riot ID has been submitted for verification. This usually takes under 24 hours. You can still browse tournaments while you wait."
-                  }
+                  You&apos;re all set to join Valorant tournaments.
                 </div>
-                <span className={`cr-status-badge ${riotData?.riotVerified}`}>
-                  {riotData?.riotVerified === "verified" ? "✓ Verified" : "⏳ Pending Review"}
-                </span>
+                <span className="cr-status-badge verified">✓ Linked</span>
                 {refreshMsg && <p style={{ fontSize: 13, color: "#4ade80", marginTop: 12 }}>{refreshMsg}</p>}
                 {error && <p className="cr-error">{error}</p>}
 
@@ -470,13 +466,11 @@ export default function ConnectRiot() {
               <div className="cr-accent" />
               <div className="cr-success">
                 <div className="cr-success-icon">🎉</div>
-                <div className="cr-success-title">Riot ID Submitted!</div>
+                <div className="cr-success-title">Riot ID linked</div>
                 <div className="cr-success-text">
-                  Your Riot ID has been submitted for verification. We&apos;ll review it within 24 hours.
-                  You can browse Valorant tournaments while you wait. Riot Sign-On will replace this
-                  manual review step once Riot approves our production application.
+                  You&apos;re set — head back and finish signing up for your tournament.
                 </div>
-                <span className="cr-status-badge pending">⏳ Pending Review</span>
+                <span className="cr-status-badge verified">✓ Linked</span>
                 <button className="cr-btn" onClick={() => {
                   try {
                     const pending = localStorage.getItem("pendingRegistration");

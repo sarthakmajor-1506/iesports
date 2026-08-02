@@ -67,8 +67,16 @@ export async function POST(req: NextRequest) {
     if (tournament.registrationDeadline && new Date() > new Date(tournament.registrationDeadline)) {
       return NextResponse.json({ error: "Registration has closed for this tournament" }, { status: 400 });
     }
-    if (tournament.totalSlots && (tournament.slotsBooked || 0) >= tournament.totalSlots) {
-      return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+    // Capacity has to count players who have paid but not yet finished setup.
+    // `slotsBooked` only moves when a registration completes, so on its own it
+    // would let the tournament oversell to everyone still in the setup step —
+    // and the ones who lose that race would already have paid.
+    if (tournament.totalSlots) {
+      const paidHolders = await adminDb.collection("paidEntries").where("tournamentId", "==", tournamentId).get();
+      const held = Math.max(Number(tournament.slotsBooked) || 0, paidHolders.size);
+      if (held >= Number(tournament.totalSlots)) {
+        return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+      }
     }
 
     const userSnap = await adminDb.collection("users").doc(uid).get();
@@ -78,21 +86,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
-    // Everything the matching registration route demands, re-checked here.
-    // Taking money for a registration that is going to be rejected two seconds
-    // later is the worst failure this system can have — the player is out of
-    // pocket with nothing to show, and the refund is manual. The UI reaches
-    // payment only after these same checks pass, but this endpoint is reachable
-    // directly, so it cannot rely on that.
-    const missing =
-      !user.fullName ? "Full name is required. Please update your profile."
-      : !(user.phone || user.phoneNumber) ? "Phone number is required. Please verify your phone."
-      : !user.discordId ? "Discord account is required. Please connect Discord first."
-      : game === "valorant"
-        ? (!user.riotGameName || (user.riotVerified || "unlinked") === "unlinked" ? "Connect your Riot ID first" : null)
-        : (!user.steamId ? "Connect your Steam account first" : null);
-
-    if (missing) return NextResponse.json({ error: missing }, { status: 400 });
+    // Payment comes BEFORE profile setup: the player pays to hold a slot, then
+    // supplies name, phone and their game account. So the only prerequisite is
+    // Discord — that is how we reach someone whose payment succeeded but whose
+    // setup never finished, which is the one failure mode this ordering creates.
+    //
+    // The rest is still demanded before the registration itself completes; it
+    // has just moved after the money instead of in front of it.
+    if (!user.discordId) {
+      return NextResponse.json(
+        { error: "Connect Discord first — it's how we reach you about your match.", needsDiscord: true },
+        { status: 400 }
+      );
+    }
 
     // ── Build the checkout ───────────────────────────────────────────────
     const { key, salt, paymentUrl, mode: payuMode } = payuConfig();

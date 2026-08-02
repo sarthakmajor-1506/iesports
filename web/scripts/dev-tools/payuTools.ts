@@ -237,13 +237,29 @@ async function reconcile() {
     const user = await db.collection("users").doc(p.uid).get();
     const registered = ((user.data() as any)?.[cfg.registeredField] || []).includes(p.tournamentId);
 
+    // Since payment moved ahead of profile setup, "paid but not registered" is
+    // an expected transient state, not a fault: the player is mid-setup. It is
+    // only broken if their profile is COMPLETE and they still are not in.
+    // Treating the two the same would make this report cry wolf on every player
+    // who is simply still filling in their details.
+    const u: any = user.data() || {};
+    const profileIncomplete =
+      !u.fullName || !(u.phone || u.phoneNumber) || !u.discordId ||
+      (p.game === "valorant" ? !u.riotGameName : !u.steamId);
+
     const missingEntitlement = !ent.exists;
-    const missingRegistration = !registered;
+    const missingRegistration = !registered && !profileIncomplete;
+    const awaitingSetup = !registered && profileIncomplete;
     const ok = !missingEntitlement && !missingRegistration;
 
-    console.log(`  ${ok ? "OK  " : "FIX "} [${env.padEnd(4)}] ₹${String(p.amount).padEnd(5)} ${d.id}  ${p.game}/${p.tournamentId}  ${p.uid}`);
+    const tag = missingEntitlement || missingRegistration ? "FIX " : awaitingSetup ? "WAIT" : "OK  ";
+    console.log(`  ${tag} [${env.padEnd(4)}] ₹${String(p.amount).padEnd(5)} ${d.id}  ${p.game}/${p.tournamentId}  ${p.uid}`);
     if (missingEntitlement) console.log(`        no entitlement — paid but holds no claim to a slot`);
-    if (missingRegistration) console.log(`        PAID BUT NOT REGISTERED${p.registration?.error ? ` — ${p.registration.error}` : ""}`);
+    if (missingRegistration) console.log(`        PAID, PROFILE COMPLETE, STILL NOT REGISTERED${p.registration?.error ? ` — ${p.registration.error}` : ""}`);
+    if (awaitingSetup) console.log(`        paid, mid-setup — still needs: ${[
+      !u.fullName && "name", !(u.phone || u.phoneNumber) && "phone", !u.discordId && "discord",
+      (p.game === "valorant" ? !u.riotGameName && "riot" : !u.steamId && "steam"),
+    ].filter(Boolean).join(", ")}`);
 
     if (!ok) broken.push({ p, txnid: d.id, missingEntitlement, missingRegistration });
   }
