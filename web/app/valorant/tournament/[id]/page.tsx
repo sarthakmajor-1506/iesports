@@ -13,6 +13,7 @@ import { PlayerAvatarBadge } from "@/app/components/PlayerAvatarBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import WallOfShame from "@/app/components/WallOfShame";
+import TournamentIntroVideo from "@/app/components/TournamentIntroVideo";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import { readCache, writeCache } from "@/lib/pageCache";
 import TournamentWrap from "@/app/components/TournamentWrap";
@@ -1420,6 +1421,11 @@ function ValorantTournamentDetailInner() {
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === "overview" && (
             <div className="vtd-tab-pane" ref={tabContentRef}>
+              {/* 30s explainer — upcoming tournaments only. Once play starts the
+                  page is about results, not how to enter. */}
+              {(tournament.status === "upcoming" || tournament.status === "active") && (
+                <TournamentIntroVideo game="valorant" tournament={tournament} finalTime="22:30" />
+              )}
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>

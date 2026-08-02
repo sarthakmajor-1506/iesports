@@ -17,14 +17,14 @@ export const RemotionRoot: React.FC = () => (
     width={720}
     height={900}             // 4:5 — rendered at scale for delivery
     defaultProps={{
-      game: "cs2" as const,
-      tournamentName: "CS2 Prelims",
-      dateLabel: "Sunday 13 September",
+      game: "valorant" as const,
+      tournamentName: "LEAGUE OF RISING STARS - HORIZON",
+      dateLabel: "Sunday 27 September",
       prizePool: "8,000",
       entryFee: 500,
       totalSlots: 20,
-      deadlineLabel: "11 Sept",
-      finalTime: "17:00",
+      deadlineLabel: "24 Sept",
+      finalTime: "22:30",
     }}
   />
 );
