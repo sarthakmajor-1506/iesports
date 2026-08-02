@@ -43,3 +43,6 @@ web/app/api/payments/
 
 # Local PayU test checkout forms (scripts/dev-tools/payuTools.ts build)
 public/_payu/
+
+# Rendered explainer videos (scripts/renderExplainer.ts)
+public/videos/

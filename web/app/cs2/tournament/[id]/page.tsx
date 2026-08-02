@@ -402,7 +402,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(240,165,0,0.15)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`);
+              navigator.clipboard.writeText(`${window.location.origin}/cs2/tournament/${id}?tab=${tabKey}`);
               setToastMsg?.("Link copied!"); setShowToast(true); setTimeout(() => setShowToast(false), 2000); setOpen(false);
             }}>
             <Link2 size={14} /> Copy Link
@@ -434,7 +434,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
                 const canvas = await captureTabImage(tabContentRef.current);
                 const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), "image/png"));
                 const file = new File([blob], `${tournamentName.replace(/\s+/g, "_")}_${tabKey}.png`, { type: "image/png" });
-                const url = `${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`;
+                const url = `${window.location.origin}/cs2/tournament/${id}?tab=${tabKey}`;
                 const text = `Check out ${tournamentName} — ${tabKey} on iEsports!\n${url}`;
                 if (navigator.canShare?.({ files: [file] })) {
                   await navigator.share({ files: [file], text });
@@ -443,7 +443,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
                   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                 }
               } catch {
-                const url = `${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`;
+                const url = `${window.location.origin}/cs2/tournament/${id}?tab=${tabKey}`;
                 window.open(`https://wa.me/?text=${encodeURIComponent(`Check out ${tournamentName} — ${tabKey} on iEsports!\n${url}`)}`, "_blank");
               }
             }}>
@@ -462,7 +462,7 @@ function TabSharePopover({ tabKey, id, tournamentName, tabContentRef, setShowToa
                 await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
                 setToastMsg?.("Image copied — paste in Instagram Story!"); setShowToast(true); setTimeout(() => setShowToast(false), 2500);
               } catch {
-                navigator.clipboard.writeText(`${window.location.origin}/valorant/tournament/${id}?tab=${tabKey}`);
+                navigator.clipboard.writeText(`${window.location.origin}/cs2/tournament/${id}?tab=${tabKey}`);
                 setToastMsg?.("Link copied!"); setShowToast(true); setTimeout(() => setShowToast(false), 2000);
               }
             }}>
@@ -1163,7 +1163,10 @@ function CS2TournamentDetailInner() {
           <div className="csd-hero-content">
             <div className="csd-hero-inner">
               <div className="csd-hero-game-tag">
-                Valorant Tournament
+                {/* Left over from cloning this page off the Valorant one — it
+                    announced "VALORANT TOURNAMENT" at the top of every CS2
+                    tournament. */}
+                CS2 Tournament
                 {isEnded && (
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.12)", letterSpacing: "0.08em" }}>Completed</span>
                 )}
@@ -2135,7 +2138,7 @@ function CS2TournamentDetailInner() {
 
             {/* Social links + bottom */}
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — Valorant Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+" Entry"}\n\nRegister: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`🎮 ${tournament.name} — CS2 Tournament\n📅 ${formatDate(tournament.startDate)} · ${tournament.entryFee === 0 ? "Free Entry" : "₹"+tournament.entryFee+" Entry"}\n\nRegister: ${window.location.href}`)}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.3)", color: "#25d366", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <MessageCircle size={15} /> WhatsApp
               </a>
               <a href="https://www.instagram.com/iesports.in/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: "10px", borderRadius: 100, background: "rgba(225,48,108,0.1)", border: "1px solid rgba(225,48,108,0.3)", color: "#E1306C", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>

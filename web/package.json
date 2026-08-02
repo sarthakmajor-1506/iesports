@@ -34,6 +34,8 @@
     "last 2 Edge versions"
   ],
   "devDependencies": {
+    "@remotion/bundler": "^4.0.443",
+    "@remotion/renderer": "^4.0.443",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/openid": "^2.0.5",

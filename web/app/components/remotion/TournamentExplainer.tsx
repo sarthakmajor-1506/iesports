@@ -76,6 +76,25 @@ function useRise(delay = 0, distance = 18) {
   return { opacity: s, transform: `translateY(${(1 - s) * distance}px)` };
 }
 
+/** Wordmark, tournament name and a progress line — on screen for all 30s. */
+const Chrome: React.FC<{ T: any; name: string }> = ({ T, name }) => {
+  const frame = useCurrentFrame();
+  const pct = Math.min(1, frame / 900);
+  return (
+    <>
+      <div style={{ position: "absolute", top: 40, left: 56, right: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: ".18em", color: "#5c5c5c" }}>IESPORTS</span>
+        <span style={{ fontSize: 18, color: "#4a4a4a", letterSpacing: ".04em" }}>{name}</span>
+      </div>
+      <div style={{ position: "absolute", bottom: 46, left: 56, right: 56 }}>
+        <div style={{ height: 4, background: "#171717", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${pct * 100}%`, background: T.acc, borderRadius: 3, boxShadow: `0 0 12px ${T.glow}` }} />
+        </div>
+      </div>
+    </>
+  );
+};
+
 const Rise: React.FC<{ delay?: number; distance?: number; style?: React.CSSProperties; children: React.ReactNode }> =
   ({ delay = 0, distance, style, children }) => {
     const r = useRise(delay, distance);
@@ -96,8 +115,8 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
   const teamsOf = totalSlots / 5;
 
   const label: React.CSSProperties = { fontSize: 20, letterSpacing: ".18em", color: "#6a6a6a", fontWeight: 700 };
-  const head: React.CSSProperties = { fontSize: 54, fontWeight: 800, letterSpacing: "-.02em", lineHeight: 1.05, color: "#fff" };
-  const sub: React.CSSProperties = { fontSize: 26, color: "#9a9a9a", lineHeight: 1.5 };
+  const head: React.CSSProperties = { fontSize: 60, fontWeight: 800, letterSpacing: "-.02em", lineHeight: 1.05, color: "#fff" };
+  const sub: React.CSSProperties = { fontSize: 28, color: "#9a9a9a", lineHeight: 1.5 };
   const card: React.CSSProperties = { background: "#0e0e0e", border: "1px solid #1c1c1c", borderRadius: 18 };
 
   return (
@@ -105,9 +124,14 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
       {/* a slow accent wash so the frame is never flat black */}
       <AbsoluteFill style={{ background: `radial-gradient(120% 60% at 50% -10%, ${T.soft}, transparent 70%)` }} />
 
+      {/* Persistent chrome. Beats vary a lot in how much they contain, and
+          without this the short ones left the top and bottom thirds empty. It
+          also gives the viewer a sense of how much film is left. */}
+      <Chrome T={T} name={tournamentName} />
+
       {/* ═══ 1 · WHAT IT IS ═══ */}
       <Sequence from={0} durationInFrames={92}>
-        <AbsoluteFill style={{ padding: 56, justifyContent: "center", gap: 22 }}>
+        <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", gap: 22 }}>
           <Rise delay={0}><div style={{ ...label, color: T.acc }}>{T.label}</div></Rise>
           <Rise delay={5}><div style={head}>{tournamentName}</div></Rise>
           <Rise delay={11}><div style={{ ...sub, fontSize: 30 }}>{dateLabel}</div></Rise>
@@ -138,7 +162,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
 
       {/* ═══ 4 · SUBSTITUTES ═══ */}
       <Sequence from={242} durationInFrames={58}>
-        <AbsoluteFill style={{ padding: 56, justifyContent: "center", gap: 20 }}>
+        <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", gap: 20 }}>
           <Rise><div style={{ ...label, color: T.acc }}>LOBBY FULL?</div></Rise>
           <Rise delay={6}><div style={head}>Join as a<br />substitute — free.</div></Rise>
           <Rise delay={14}><div style={sub}>Someone drops out, you take their place. Their entry fee is already paid.</div></Rise>
@@ -162,7 +186,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
 
       {/* ═══ 8 · CTA ═══ */}
       <Sequence from={842} durationInFrames={58}>
-        <AbsoluteFill style={{ padding: 56, justifyContent: "center", alignItems: "center", gap: 20, textAlign: "center" }}>
+        <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", alignItems: "center", gap: 20, textAlign: "center" }}>
           <Rise><div style={{ ...head, fontSize: 60 }}>{totalSlots} slots.<br />₹{entryFee}.</div></Rise>
           <Rise delay={8}><div style={{ ...sub, fontSize: 28 }}>{dateLabel}</div></Rise>
           <Rise delay={14}>
@@ -189,7 +213,7 @@ const RegisterBeat: React.FC<any> = ({ T, entryFee, card, label, head, sub }) =>
   const done = frame >= 70;
 
   return (
-    <AbsoluteFill style={{ padding: 56, justifyContent: "center", gap: 20 }}>
+    <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", gap: 20 }}>
       <Rise><div style={{ ...label, color: T.acc }}>GETTING IN</div></Rise>
       <Rise delay={4}><div style={{ ...head, fontSize: 46 }}>Takes a minute</div></Rise>
 
@@ -234,7 +258,7 @@ const ClosesBeat: React.FC<any> = ({ T, totalSlots, deadlineLabel, label, head, 
   const full = filled >= totalSlots;
 
   return (
-    <AbsoluteFill style={{ padding: 56, justifyContent: "center", gap: 22 }}>
+    <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", gap: 22 }}>
       <Rise><div style={{ ...label, color: T.acc }}>REGISTRATION CLOSES</div></Rise>
       <Rise delay={4}><div style={{ ...head, fontSize: 46 }}>{deadlineLabel} — or when<br />it fills.</div></Rise>
 
@@ -264,7 +288,7 @@ const DrawBeat: React.FC<any> = ({ T, totalSlots, teamsOf, label, head, sub }) =
   const youIndex = 6; // lands in team B
 
   return (
-    <AbsoluteFill style={{ padding: 56, justifyContent: "center", gap: 22 }}>
+    <AbsoluteFill style={{ padding: "108px 56px 96px", justifyContent: "center", gap: 22 }}>
       <Rise><div style={{ ...label, color: T.acc }}>TOURNAMENT DAY</div></Rise>
       <Rise delay={4}><div style={{ ...head, fontSize: 46 }}>Teams are drawn<br />at random</div></Rise>
 
@@ -315,10 +339,10 @@ const DrawBeat: React.FC<any> = ({ T, totalSlots, teamsOf, label, head, sub }) =
 // ── Beat 6 · the round robin. Eleven seconds, and the reason this exists ───
 const RoundRobinBeat: React.FC<any> = ({ T, card, label }) => {
   const frame = useCurrentFrame();
-  const ROUND_AT = [40, 130, 220]; // when each 2-hour slot appears
+  const ROUND_AT = [8, 52, 96]; // all three slots up by ~3.5s; the rest of the beat is for reading
 
   return (
-    <AbsoluteFill style={{ padding: 48, justifyContent: "center", gap: 16 }}>
+    <AbsoluteFill style={{ padding: "104px 48px 92px", justifyContent: "center", gap: 16 }}>
       <Rise><div style={{ ...label, color: T.acc }}>ROUND ROBIN · BEST OF 2</div></Rise>
       <Rise delay={5}>
         <div style={{ fontSize: 40, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>
@@ -387,7 +411,7 @@ const StandingsBeat: React.FC<any> = ({ T, card, label, head, finalTime, prizePo
   const showFinal = frame > 76;
 
   return (
-    <AbsoluteFill style={{ padding: 52, justifyContent: "center", gap: 18 }}>
+    <AbsoluteFill style={{ padding: "104px 52px 92px", justifyContent: "center", gap: 18 }}>
       <Rise><div style={{ ...label, color: T.acc }}>FINAL STANDINGS</div></Rise>
 
       <div style={{ ...card, padding: 18, opacity: showFinal ? 0.25 : 1 }}>
@@ -426,7 +450,7 @@ const StandingsBeat: React.FC<any> = ({ T, card, label, head, finalTime, prizePo
       </Rise>
 
       {showFinal && (
-        <AbsoluteFill style={{ padding: 52, justifyContent: "center", alignItems: "center", gap: 16, textAlign: "center" }}>
+        <AbsoluteFill style={{ padding: "104px 52px 92px", justifyContent: "center", alignItems: "center", gap: 16, textAlign: "center" }}>
           <Rise delay={78}><div style={{ ...label, color: T.acc }}>{finalTime} · GRAND FINAL</div></Rise>
           <Rise delay={83}><div style={{ ...head, fontSize: 54 }}>Top two.<br />Best of 3.</div></Rise>
           <Rise delay={90}>
