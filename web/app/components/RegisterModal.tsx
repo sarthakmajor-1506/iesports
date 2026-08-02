@@ -207,7 +207,11 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     stage !== "auto" ? stage
     : !ready ? "checking"
     : !hasDiscord ? "gate"
-    : (entryFee > 0 && !hasPaid) ? "fee"
+    // Substitutes never pay. They take the slot of someone who already paid and
+    // didn't show, so charging them would collect the entry fee twice for one
+    // seat. They still complete every detail up front, so they can be dropped
+    // into a team on the day without chasing anyone.
+    : (entryFee > 0 && !hasPaid && !isSubstitute) ? "fee"
     : "hub";
 
   // ── Actions ────────────────────────────────────────────────────────────
@@ -479,16 +483,27 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
             {/* ═══ SETUP HUB ═══ */}
             {resolved === "hub" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {entryFee > 0 && hasPaid && (
+                {entryFee > 0 && hasPaid && !isSubstitute && (
                   <div style={{ display: "flex", alignItems: "center", gap: 7, color: UI.ok, fontSize: 11.5, letterSpacing: ".1em", fontWeight: 700 }}>
                     ✓ SLOT PAID · ₹{entryFee}
                   </div>
                 )}
-                <div style={h1}>{setupComplete ? "You're all set" : "Finish your setup"}</div>
+                {isSubstitute && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, color: T.acc, fontSize: 11.5, letterSpacing: ".1em", fontWeight: 700 }}>
+                    SUBSTITUTE LIST · NO ENTRY FEE
+                  </div>
+                )}
+                <div style={h1}>
+                  {isSubstitute ? (setupComplete ? "Ready to step in" : "Set up to sub in") : setupComplete ? "You're all set" : "Finish your setup"}
+                </div>
                 <div style={body}>
-                  {setupComplete
-                    ? "Everything's linked. Lock in your place below."
-                    : `${tasksDone} of 3 done — we need these to run your matches and pay out.`}
+                  {isSubstitute
+                    ? (setupComplete
+                        ? "You're set. Join the list and we'll call you the moment a slot frees up."
+                        : `${tasksDone} of 3 done. We take these now so you can be dropped straight into a team if someone drops out — no fee, their slot is already paid for.`)
+                    : setupComplete
+                      ? "Everything's linked. Lock in your place below."
+                      : `${tasksDone} of 3 done — we need these to run your matches and pay out.`}
                 </div>
 
                 <div style={{ height: 5, borderRadius: 3, background: "#161616", overflow: "hidden" }}>
@@ -514,7 +529,9 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
 
                 <button onClick={finish} disabled={!setupComplete || loading} style={setupComplete && !loading ? cta : ctaMuted}>
-                  {loading ? "Finishing…" : setupComplete ? "Complete registration" : `${3 - tasksDone} left`}
+                  {loading ? "Finishing…"
+                    : setupComplete ? (isSubstitute ? "Join the substitute list" : "Complete registration")
+                    : `${3 - tasksDone} left`}
                 </button>
               </div>
             )}

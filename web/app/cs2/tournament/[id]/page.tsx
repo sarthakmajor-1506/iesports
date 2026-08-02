@@ -1269,7 +1269,11 @@ function CS2TournamentDetailInner() {
                         Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
                       </div>
                     )}
-                    {regClosed && !isRegistered && isRegOpen && (
+                    {/* Substitutes open the moment registration is shut — by the
+                        deadline OR by a full lobby, whichever lands first. It
+                        used to wait for the date only, so a tournament that
+                        filled early offered nothing to the next player. */}
+                    {(regClosed || slotsLeft <= 0) && !isRegistered && isRegOpen && (
                       <>
                         <button
                           onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
@@ -1366,7 +1370,17 @@ function CS2TournamentDetailInner() {
                 )}
               </span>
             ) : (
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
+              <>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} strokeWidth={2} /> {isRegOpen ? countdown : `Opens ${formatDate(schedule.registrationOpens)}`}</span>
+                {/* Registration ends on whichever comes first — the deadline or
+                    a full lobby. The server already enforces both; this is the
+                    only place that said so. */}
+                {isRegOpen && !regClosed && slotsLeft > 0 && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#8A8880" }}>
+                    or when the last {slotsLeft} {slotsLeft === 1 ? "slot fills" : "slots fill"}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
