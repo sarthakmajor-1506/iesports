@@ -30,3 +30,8 @@ yarn-debug.log*
 \#*\#
 _backups/
 .env*
+
+# Belt and braces: no env file, anywhere in the tree, ever — except examples.
+**/.env
+**/.env.*
+!**/.env.example
