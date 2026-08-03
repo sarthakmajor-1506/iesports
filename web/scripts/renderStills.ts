@@ -15,7 +15,7 @@ const OUTDIR = path.resolve(ROOT, "public/videos/stills");
     entryPoint: path.join(ROOT, "remotion/index.ts"),
     webpackOverride: (cfg) => ({ ...cfg, resolve: { ...cfg.resolve, alias: { ...(cfg.resolve?.alias || {}), "@": ROOT } } }),
   });
-  const composition = await selectComposition({ serveUrl, id: "TournamentExplainer" });
+  const composition = await selectComposition({ serveUrl, id: process.argv.find(a=>a.startsWith("--id="))?.split("=")[1] || "TournamentExplainer" });
   for (const frame of FRAMES) {
     const out = path.join(OUTDIR, `f${String(frame).padStart(3, "0")}.png`);
     await renderStill({ composition, serveUrl, output: out, frame, overwrite: true });

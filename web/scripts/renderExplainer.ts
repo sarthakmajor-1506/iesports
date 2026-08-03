@@ -39,7 +39,8 @@ const OUT = path.resolve(ROOT, arg("out") || "public/videos/cs2-prelims-explaine
   });
   console.log("\nbundled.");
 
-  const composition = await selectComposition({ serveUrl, id: "TournamentExplainer" });
+  const ID = arg("id") || "TournamentExplainer";
+  const composition = await selectComposition({ serveUrl, id: ID });
   console.log(`rendering ${composition.durationInFrames} frames at ${Math.round(composition.width * SCALE)}x${Math.round(composition.height * SCALE)}…`);
 
   await renderMedia({
