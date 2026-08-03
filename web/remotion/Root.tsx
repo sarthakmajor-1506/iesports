@@ -26,13 +26,13 @@ export const RemotionRoot: React.FC = () => (
         entryFee: 500,
         totalSlots: 20,
         deadlineLabel: "24 Sept",
-        finalTime: "22:30",
+        finalTime: "17:00",
       }}
     />
     <Composition
       id="PerksExplainer"
       component={PerksExplainer as any}
-      durationInFrames={450}   // 15s
+      durationInFrames={600}   // 20s
       fps={30}
       width={720}
       height={900}

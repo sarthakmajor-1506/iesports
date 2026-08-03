@@ -46,9 +46,9 @@ const TEAM_NAMES = ["A", "B", "C", "D"] as const;
 
 /** The viewer's three fixtures, in the order they play them. */
 const MY_MATCHES = [
-  { time: "18:00", vs: "A" },
-  { time: "19:30", vs: "D" },
-  { time: "21:00", vs: "C" },
+  { time: "11:00", vs: "A" },
+  { time: "13:00", vs: "D" },
+  { time: "15:00", vs: "C" },
 ];
 
 /** Six matches × 2 points = 12, and these sum to 12. A and D tie on 3 so the
@@ -90,9 +90,9 @@ const beat = (frame: number, a: number, b: number, r = 12) => {
 
 // ── beat boundaries ────────────────────────────────────────────────────────
 const B = {
-  hero: [-10, 90], discord: [82, 168], pay: [160, 252], payu: [244, 306],
-  setup: [298, 378], done: [370, 438], reg: [430, 500],
-  draw: [494, 606], mine: [598, 744], stand: [736, 838], cta: [830, 910],
+  hero: [-10, 76], discord: [70, 132], pay: [126, 198], payu: [192, 238],
+  setup: [232, 292], done: [286, 332], reg: [326, 388],
+  draw: [382, 492], day: [486, 624], mine: [618, 730], stand: [724, 826], cta: [820, 910],
 } as const;
 
 export const TournamentExplainer: React.FC<ExplainerProps> = ({
@@ -103,7 +103,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
   entryFee = 500,
   totalSlots = 20,
   deadlineLabel = "24 Sept",
-  finalTime = "22:30",
+  finalTime = "17:00",
 }) => {
   const frame = useCurrentFrame();
   const T = GAME_THEME[game];
@@ -115,9 +115,9 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
 
   // Cursor lives INSIDE the camera, so it scales with the UI it operates —
   // rendered outside, it slid off every button as the camera pushed in.
-  const CLICKS = [64, 128, 224];
-  const cx = track(frame, [[0, 880], [30, 470], [56, 360], [64, 360], [78, 430], [118, 360], [128, 360], [142, 440], [206, 360], [224, 360], [244, 480], [292, 880]], EASE_IO);
-  const cy = track(frame, [[0, 1050], [30, 660], [56, 550], [64, 550], [78, 600], [118, 477], [128, 477], [142, 520], [206, 549], [224, 549], [244, 640], [292, 1050]], EASE_IO);
+  const CLICKS = [52, 106, 178];
+  const cx = track(frame, [[0, 880], [22, 470], [44, 360], [52, 360], [64, 430], [96, 360], [106, 360], [118, 440], [162, 360], [178, 360], [196, 480], [236, 880]], EASE_IO);
+  const cy = track(frame, [[0, 1050], [22, 660], [44, 550], [52, 550], [64, 600], [96, 477], [106, 477], [118, 520], [162, 549], [178, 549], [196, 640], [236, 1050]], EASE_IO);
   const pressed = CLICKS.some(c => frame >= c && frame < c + 7);
 
   const productPhase = frame < B.reg[1] + 6;
@@ -156,7 +156,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
                 <div style={{ display: "flex", gap: 12, marginTop: 26 }}>
                   {[["PRIZE", `₹${prizePool}`], ["SLOTS", String(totalSlots)], ["ENTRY", `₹${entryFee}`]].map(([k, v]) => <Stat key={k} k={k} v={v} />)}
                 </div>
-                <Button T={T} frame={frame} hoverAt={48} clickAt={64} label="Register →" />
+                <Button T={T} frame={frame} hoverAt={36} clickAt={52} label="Register →" />
               </div>
             </Screen>
 
@@ -165,7 +165,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
                 <Eyebrow>STEP 1 OF 3</Eyebrow>
                 <H>Connect Discord</H>
                 <P>Brackets, match calls and your team all live there.</P>
-                <Button T={T} frame={frame} hoverAt={112} clickAt={128} label="Continue with Discord" brand="#5865F2" fg="#fff" />
+                <Button T={T} frame={frame} hoverAt={90} clickAt={106} label="Continue with Discord" brand="#5865F2" fg="#fff" />
               </div>
             </Screen>
 
@@ -173,23 +173,23 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
               <div style={{ padding: "0 32px" }}>
                 <Eyebrow>STEP 2 OF 3 · SLOT HELD</Eyebrow>
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", marginTop: 10 }}>Claim your slot</div>
-                <Counter frame={frame} from={182} to={206} value={entryFee} />
+                <Counter frame={frame} from={148} to={172} value={entryFee} />
                 <P>UPI or Net Banking through PayU.</P>
                 <div style={{ fontSize: 15, color: "#4ade80", marginTop: 4 }}>Withdraw before registration closes — 100% refund.</div>
-                <Button T={T} frame={frame} hoverAt={206} clickAt={224} label={`Pay ₹${entryFee}`} />
+                <Button T={T} frame={frame} hoverAt={162} clickAt={178} label={`Pay ₹${entryFee}`} />
               </div>
             </Screen>
 
             <Screen o={win(frame, B.payu[0], B.payu[1], 10)}>
               <div style={{
                 position: "absolute", inset: 0, background: "#0a0b0d",
-                transform: `translateX(${interpolate(frame, [244, 260], [420, 0], { ...clamp, easing: EASE })}px)`,
+                transform: `translateX(${interpolate(frame, [192, 208], [420, 0], { ...clamp, easing: EASE })}px)`,
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18,
               }}>
                 <div style={{ fontSize: 15, letterSpacing: ".18em", color: "#5a5a5a", fontWeight: 800 }}>PAYU · SECURE</div>
-                <Spinner frame={frame} start={262} until={286} T={T} />
-                <div style={{ fontSize: 30, fontWeight: 800, color: frame > 286 ? "#4ade80" : "#fff" }}>
-                  {frame > 286 ? "✓ Paid" : `₹${entryFee}`}
+                <Spinner frame={frame} start={206} until={224} T={T} />
+                <div style={{ fontSize: 30, fontWeight: 800, color: frame > 224 ? "#4ade80" : "#fff" }}>
+                  {frame > 224 ? "✓ Paid" : `₹${entryFee}`}
                 </div>
               </div>
             </Screen>
@@ -198,18 +198,18 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
               <div style={{ padding: "0 32px" }}>
                 <div style={{ fontSize: 14, letterSpacing: ".14em", color: "#4ade80", fontWeight: 800 }}>✓ SLOT PAID · ₹{entryFee}</div>
                 <H>Finish setup</H>
-                <Progress frame={frame} from={314} to={364} T={T} />
+                <Progress frame={frame} from={240} to={286} T={T} />
                 <div style={{ marginTop: 4 }}>
-                  <Row done={frame > 322} label="Your name" value="saved" T={T} delay={322} frame={frame} />
-                  <Row done={frame > 340} label="Phone" value="verified" T={T} delay={340} frame={frame} />
-                  <Row done={frame > 358} label="Riot ID" value="linked" T={T} delay={358} frame={frame} />
+                  <Row done={frame > 248} label="Your name" value="saved" T={T} delay={248} frame={frame} />
+                  <Row done={frame > 262} label="Phone" value="verified" T={T} delay={262} frame={frame} />
+                  <Row done={frame > 276} label="Riot ID" value="linked" T={T} delay={276} frame={frame} />
                 </div>
               </div>
             </Screen>
 
             <Screen o={win(frame, B.done[0], B.done[1], 12)}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-                <Pop frame={frame} at={384}><div style={{ fontSize: 54 }}>🏆</div></Pop>
+                <Pop frame={frame} at={296}><div style={{ fontSize: 54 }}>🏆</div></Pop>
                 <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>You&apos;re in</div>
                 <div style={{ fontSize: 17, color: "#8d8d8d" }}>Everything from here happens on Discord.</div>
               </div>
@@ -223,7 +223,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
                 <Eyebrow>YOUR SLOT</Eyebrow>
                 <div style={{
                   marginTop: 16, padding: 18, borderRadius: 16, background: "#0f1113", border: "1px solid #1c1e21",
-                  transform: `translateY(${interpolate(frame, [436, 452], [14, 0], { ...clamp, easing: EASE })}px)`,
+                  transform: `translateY(${interpolate(frame, [332, 346], [14, 0], { ...clamp, easing: EASE })}px)`,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Chip bg="rgba(74,222,128,.12)" bd="rgba(74,222,128,.4)" fg="#6fcf8a">✓ Registered</Chip>
@@ -239,7 +239,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
                 </div>
                 <div style={{
                   fontSize: 16, color: "#4ade80", marginTop: 16, lineHeight: 1.5,
-                  opacity: interpolate(frame, [462, 476], [0, 1], clamp),
+                  opacity: interpolate(frame, [356, 370], [0, 1], clamp),
                 }}>
                   Changed your mind? Withdraw before registration closes — full ₹{entryFee} back.
                 </div>
@@ -253,12 +253,12 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
             finalTime={finalTime} prizePool={prizePool} entryFee={entryFee} dateLabel={dateLabel} />
         )}
 
-        {frame <= 300 && (
+        {frame <= 240 && (
           <div style={{
             position: "absolute", left: 0, top: 0, zIndex: 20,
             transform: `translate(${cx}px, ${cy}px) scale(${pressed ? 0.84 : 1})`,
             filter: "drop-shadow(0 4px 10px rgba(0,0,0,.7))",
-            opacity: interpolate(frame, [0, 14, 282, 296], [0, 1, 1, 0], clamp),
+            opacity: interpolate(frame, [0, 14, 222, 236], [0, 1, 1, 0], clamp),
           }}>
             {CLICKS.map(c => {
               const t = frame - c;
@@ -383,6 +383,7 @@ const POOL_Y = (k: number) => 392 + Math.floor(k / 5) * 62;
 
 const MatchDay: React.FC<any> = ({ frame, T, teamCount, totalSlots, finalTime, prizePool, entryFee, dateLabel }) => {
   const bDraw = beat(frame, B.draw[0], B.draw[1], 13);
+  const bDay = beat(frame, B.day[0], B.day[1], 13);
   const bMine = beat(frame, B.mine[0], B.mine[1], 13);
   const bStand = beat(frame, B.stand[0], B.stand[1], 12);
   const bCta = beat(frame, B.cta[0], B.cta[1], 11);
@@ -400,7 +401,7 @@ const MatchDay: React.FC<any> = ({ frame, T, teamCount, totalSlots, finalTime, p
       {/* ── the draw ── */}
       <AbsoluteFill style={bDraw}>
         <div style={{ position: "absolute", left: 58, right: 58, top: 176 }}>
-          <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>TOURNAMENT DAY · 17:30</div>
+          <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>TOURNAMENT DAY · 10:45</div>
           <div style={{ fontSize: 42, fontWeight: 800, color: "#fff", letterSpacing: "-.02em", lineHeight: 1.1, marginTop: 10 }}>
             Teams are drawn<br />at random
           </div>
@@ -443,6 +444,56 @@ const MatchDay: React.FC<any> = ({ frame, T, teamCount, totalSlots, finalTime, p
 
         <div style={{ position: "absolute", left: 58, right: 58, top: 628, fontSize: 20, color: "#8d8d8d", opacity: seated }}>
           {teamCount} teams of 5 — <span style={{ color: T.acc, fontWeight: 700 }}>you&apos;re in Team {YOU}</span>.
+        </div>
+      </AbsoluteFill>
+
+      {/* ── the day, hour by hour ── */}
+      <AbsoluteFill style={{ padding: "146px 54px 182px", justifyContent: "center", gap: 12, ...bDay }}>
+        <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>SUNDAY · THE WHOLE DAY</div>
+        <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", letterSpacing: "-.02em", lineHeight: 1.1 }}>
+          One day, start<br />to finish
+        </div>
+
+        <div style={{ position: "relative", marginTop: 8 }}>
+          {/* the spine the day runs down */}
+          <div style={{
+            position: "absolute", left: 7, top: 8, bottom: 8, width: 2, background: "#1e2126",
+          }} />
+          <div style={{
+            position: "absolute", left: 7, top: 8, width: 2, background: T.acc,
+            height: `${interpolate(frame, [B.day[0] + 20, B.day[0] + 108], [0, 100], clamp)}%`,
+            boxShadow: `0 0 10px ${T.glow}`,
+          }} />
+
+          {[
+            { t: "10:30", l: "Check in on Discord", s: "Lobby codes go out there" },
+            { t: "10:45", l: "Teams drawn at random", s: "4 teams of 5" },
+            { t: "11:00", l: "Match 1", s: "best of 2", hi: true },
+            { t: "13:00", l: "Match 2", s: "best of 2", hi: true },
+            { t: "15:00", l: "Match 3", s: "best of 2", hi: true },
+            { t: finalTime, l: "Grand Final", s: "best of 3 · top 2 only", gold: true },
+          ].map((r, i) => {
+            const at = B.day[0] + 24 + i * 15;
+            const a = interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: EASE });
+            return (
+              <div key={r.t} style={{
+                position: "relative", display: "flex", alignItems: "center", gap: 15, padding: "9px 0 9px 26px",
+                opacity: a, transform: `translateX(${(1 - a) * -12}px)`,
+              }}>
+                {/* node on the spine — positioned against its own row, or all
+                    six would collapse onto the wrapper's origin */}
+                <div style={{
+                  position: "absolute", left: 0, top: "50%", marginTop: -8, width: 16, height: 16, borderRadius: "50%",
+                  background: r.gold ? "#fbbf24" : r.hi ? T.acc : "#2a2e34",
+                  border: `2px solid ${r.gold ? "#fbbf24" : r.hi ? T.acc : "#33383f"}`,
+                  boxShadow: r.gold ? "0 0 12px rgba(251,191,36,.5)" : r.hi ? `0 0 12px ${T.glow}` : "none",
+                }} />
+                <span style={{ fontSize: 19, fontWeight: 800, width: 78, color: r.gold ? "#fbbf24" : r.hi ? T.acc : "#7a7a7a" }}>{r.t}</span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "#fff", flex: 1 }}>{r.l}</span>
+                <span style={{ fontSize: 14, color: r.gold ? "#fbbf24" : "#7d7d7d" }}>{r.s}</span>
+              </div>
+            );
+          })}
         </div>
       </AbsoluteFill>
 
@@ -518,6 +569,25 @@ const MatchDay: React.FC<any> = ({ frame, T, teamCount, totalSlots, finalTime, p
         </div>
         <div style={{ fontSize: 16, color: "#8d8d8d" }}>
           Each map won is a point. Level? <b style={{ color: "#fff" }}>RW−RL</b>, then <b style={{ color: "#fff" }}>K−D</b>.
+        </div>
+
+        {/* No bracket, no semis — the top two go straight to one final. Saying
+            so explicitly stops people assuming a longer play-off run. */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 4,
+          padding: "16px 18px", borderRadius: 15,
+          background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.35)",
+          opacity: interpolate(frame, [B.stand[0] + 56, B.stand[0] + 70], [0, 1], { ...clamp, easing: EASE }),
+          transform: `scale(${interpolate(frame, [B.stand[0] + 56, B.stand[0] + 70], [0.96, 1], { ...clamp, easing: EASE })})`,
+        }}>
+          <span style={{ fontSize: 30, fontWeight: 800, color: T.acc }}>B</span>
+          <span style={{ fontSize: 16, color: "#8d8d8d" }}>vs</span>
+          <span style={{ fontSize: 30, fontWeight: 800, color: "#fff" }}>D</span>
+          <div style={{ width: 1, height: 30, background: "rgba(251,191,36,.3)" }} />
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#fbbf24" }}>{finalTime} GRAND FINAL</div>
+            <div style={{ fontSize: 13, color: "#9a8a5a" }}>best of 3 — that&apos;s the whole play-off</div>
+          </div>
         </div>
       </AbsoluteFill>
 

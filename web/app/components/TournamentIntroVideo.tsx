@@ -25,7 +25,7 @@ import { GAME_THEME, type GameKey } from "@/app/lib/gameTheme";
 const Player = dynamic(() => import("@remotion/player").then(m => m.Player), { ssr: false });
 
 const MAIN_FRAMES = 900;   // 30s
-const PERKS_FRAMES = 450;  // 15s — loops twice against the main film
+const PERKS_FRAMES = 600;  // 20s
 const FPS = 30;
 
 type Props = { game?: GameKey; tournament: any; finalTime?: string };
@@ -41,7 +41,7 @@ const shortLabel = (iso?: string) => {
   return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 };
 
-export default function TournamentIntroVideo({ game = "cs2", tournament, finalTime = "22:30" }: Props) {
+export default function TournamentIntroVideo({ game = "cs2", tournament, finalTime = "17:00" }: Props) {
   const T = GAME_THEME[game];
   const wrapRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -128,7 +128,7 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
           />
         ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />)}
         <div className="tiv-cap">
-          <span style={{ fontSize: 11.5, color: "#666" }}>What else you get · 15s</span>
+          <span style={{ fontSize: 11.5, color: "#666" }}>Why play with IEsports · 20s</span>
         </div>
       </div>
     </div>

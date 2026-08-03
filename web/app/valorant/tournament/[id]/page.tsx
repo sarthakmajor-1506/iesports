@@ -1424,7 +1424,7 @@ function ValorantTournamentDetailInner() {
               {/* 30s explainer — upcoming tournaments only. Once play starts the
                   page is about results, not how to enter. */}
               {(tournament.status === "upcoming" || tournament.status === "active") && (
-                <TournamentIntroVideo game="valorant" tournament={tournament} finalTime="22:30" />
+                <TournamentIntroVideo game="valorant" tournament={tournament} finalTime="17:00" />
               )}
               {/* Stat tiles */}
               <div className="vtd-stat-tiles">
