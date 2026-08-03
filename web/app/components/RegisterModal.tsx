@@ -452,13 +452,20 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                 <div style={{ fontSize: 58, fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1, color: "#fff" }}>
                   ₹{entryFee}
                 </div>
-                <div style={body}>That&apos;s the whole entry fee. UPI or Net Banking through PayU, in a new tab.</div>
+                <div style={body}>UPI or Net Banking through PayU, in a new tab.</div>
 
-                <div style={{ ...panel, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: UI.dimmer, lineHeight: 1.6 }}>
-                    Setup comes after — your name, phone and {accountLabel}. About a minute.
+                {/* The refund is the only thing worth saying next to the amount.
+                    This panel previously spent its two lines on what happens
+                    afterwards, which is admin detail at the exact moment someone
+                    is deciding whether to part with money. */}
+                <div style={{ ...panel, background: "rgba(74,222,128,0.06)", borderColor: "rgba(74,222,128,0.28)", display: "flex", gap: 11, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 15, lineHeight: 1.3 }}>↩</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: UI.ok }}>Fully refundable</div>
+                    <div style={{ fontSize: 12, color: UI.dimmer, lineHeight: 1.6, marginTop: 3 }}>
+                      Withdraw any time before registration closes and you get the whole ₹{entryFee} back.
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: T.acc }}>Your slot is held as soon as payment clears.</div>
                 </div>
 
                 {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}

@@ -175,7 +175,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", marginTop: 10 }}>Claim your slot</div>
                 <Counter frame={frame} from={148} to={172} value={entryFee} />
                 <P>UPI or Net Banking through PayU.</P>
-                <div style={{ fontSize: 15, color: "#4ade80", marginTop: 4 }}>Withdraw before registration closes — 100% refund.</div>
+                <div style={{ fontSize: 15, color: "#4ade80", marginTop: 4 }}>Fully refundable before registration closes.</div>
                 <Button T={T} frame={frame} hoverAt={162} clickAt={178} label={`Pay ₹${entryFee}`} />
               </div>
             </Screen>
