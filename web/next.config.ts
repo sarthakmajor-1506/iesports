@@ -17,6 +17,17 @@ const nextConfig: NextConfig = {
     ],
   },
   poweredByHeader: false,
+  async redirects() {
+    // Draft Lab shipped at /draftlab while it was being playtested and is now
+    // simply "Draft", at /draft. Live-room invites are shared as links, so a code
+    // handed out before the move still has to work — a redirect keeps the query
+    // string, which a client-side push would drop.
+    return [
+      { source: "/draftlab", destination: "/draft", permanent: false },
+      { source: "/draftlab/duel", destination: "/draft", permanent: false },
+      { source: "/draftlab/guide", destination: "/draft/guide", permanent: false },
+    ];
+  },
   async headers() {
     // Baseline security headers (HSTS is already added by Vercel). No strict CSP
     // here yet — the app loads many third-party scripts (Firebase, gtag, Razorpay,
