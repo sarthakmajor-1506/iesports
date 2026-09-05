@@ -310,15 +310,13 @@ function Duel() {
             <div style={{ fontSize: 9, letterSpacing: 1.6, color: RED, fontWeight: 900, marginBottom: 4 }}>SOLO</div>
             <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.4, marginBottom: 3 }}>The Counterpicker</div>
             <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4, marginBottom: 10 }}>
-              It watches what you take and answers it.
+              It answers whatever you take.
             </div>
-            <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-              <div style={{ flex: "1 1 auto" }}>
-                <Segment dense value={format} onChange={setFormat} accent={RED}
-                  options={[{ v: "quick", label: "NO BANS" }, { v: "captains", label: "BANS" }]} />
-              </div>
-              <Btn tone="red" onClick={restart}>PLAY</Btn>
-            </div>
+            {/* Two rows, not three items across: at 320px a segment plus a
+                button squeezes the labels until they wrap or clip. */}
+            <Segment dense value={format} onChange={setFormat} accent={RED}
+              options={[{ v: "quick", label: "NO BANS" }, { v: "captains", label: "BANS" }]} />
+            <div style={{ marginTop: 7 }}><Btn full tone="red" onClick={restart}>PLAY</Btn></div>
           </div>
 
           <div style={{
@@ -329,17 +327,17 @@ function Duel() {
             <div style={{ fontSize: 9, letterSpacing: 1.6, color: GOLD, fontWeight: 900, marginBottom: 4 }}>LIVE · 30s A PICK</div>
             <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.4, marginBottom: 3 }}>Play a friend</div>
             <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4, marginBottom: 10 }}>
-              Both drafting at once on a clock, then the same three questions.
+              Draft head-to-head, then the same questions.
             </div>
-            <div style={{ display: "flex", gap: 7 }}>
-              <Btn tone="gold" onClick={async () => {
-                const d = await roomCall({ action: "create", name: steamName || name || "Host" });
-                if (d?.code) setLiveCode(d.code);
-              }}>CREATE</Btn>
+            <Btn full tone="gold" onClick={async () => {
+              const d = await roomCall({ action: "create", name: steamName || name || "Host" });
+              if (d?.code) setLiveCode(d.code);
+            }}>CREATE A ROOM</Btn>
+            <div style={{ display: "flex", gap: 7, marginTop: 7 }}>
               <Field value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
                 placeholder="CODE" autoCapitalize="characters"
-                style={{ flex: "1 1 auto", letterSpacing: 4, fontWeight: 900, textAlign: "center", padding: "8px 6px", minHeight: 38 }} />
+                style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 4, fontWeight: 900, textAlign: "center", padding: "8px 6px", minHeight: 38 }} />
               <Btn tone="dark" disabled={busy || codeInput.length < 4} onClick={async () => {
                 setBusy(true); setJoinError(null);
                 const j = await roomCall({ action: "join", code: codeInput, name: steamName || name || "Guest" });
