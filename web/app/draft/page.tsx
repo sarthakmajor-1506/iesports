@@ -8,7 +8,7 @@ import {
 } from "@/lib/draftbot";
 import type { Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
-import { authPost } from "@/app/lib/authFetch";
+import { getFirebaseAuth } from "@/lib/firebase";
 import {
   Shell, Band, Btn, Segment, Panel, Label, Field, Pips,
   RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
@@ -220,12 +220,19 @@ function Duel() {
   const submitScore = useCallback(async (mineIds: number[], theirIds: number[], q: QuizResult | null) => {
     if (!user) return;
     try {
-      const r = await authPost("/api/draftlab/leaderboard", {
-        uid: user.uid,
-        name: steamName || name || "Anonymous",
-        avatar: userProfile?.steamAvatar || null,
-        mine: mineIds, theirs: theirIds,
-        quizSeed: q?.seed ?? null, quizPicks: q?.picks ?? null, quizPoints: q?.points ?? 0,
+      const { auth } = await getFirebaseAuth();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const r = await fetch("/api/draftlab/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          uid: user.uid,
+          name: steamName || name || "Anonymous",
+          avatar: userProfile?.steamAvatar || null,
+          mine: mineIds, theirs: theirIds,
+          quizSeed: q?.seed ?? null, quizPicks: q?.picks ?? null, quizPoints: q?.points ?? 0,
+        }),
       });
       const d = await r.json();
       if (d?.scored) setScored(d.scored);

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
-import { verifyCaller } from "@/lib/apiAuth";
+import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
 import { buildQuiz, type Knowledge } from "@/lib/quiz";
 
@@ -43,6 +42,27 @@ async function getKnowledge() {
   return knowledgeCache;
 }
 
+/**
+ * Who is submitting this score?
+ *
+ * The uid in the body is never believed — it is checked against the Firebase ID
+ * token the browser sends. Deliberately self-contained rather than reusing the
+ * registration routes' `verifyCaller`: that helper belongs to the payment work,
+ * which is a separate unshipped changeset, and importing across the two is what
+ * broke the first production build of this feature.
+ */
+async function callerUid(req: NextRequest, claimed: string): Promise<string | null> {
+  const header = req.headers.get("authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token) return null;
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    return decoded.uid === claimed ? decoded.uid : null;
+  } catch {
+    return null;
+  }
+}
+
 const heroIds = (v: unknown): number[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is number => typeof x === "number" && Number.isInteger(x)))].slice(0, 5) : [];
 
@@ -65,8 +85,9 @@ export async function POST(req: NextRequest) {
     const uid = clean(body.uid, 64);
     if (!uid) return NextResponse.json({ error: "uid required" }, { status: 400 });
 
-    const caller = await verifyCaller(req, uid);
-    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
+    if (!(await callerUid(req, uid))) {
+      return NextResponse.json({ error: "Sign in and try again." }, { status: 401 });
+    }
 
     const mine = heroIds(body.mine);
     const theirs = heroIds(body.theirs);
