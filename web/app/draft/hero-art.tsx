@@ -138,7 +138,7 @@ function Card({
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
       <div style={{
-        position: "relative", height: h, borderRadius: 9, overflow: "hidden",
+        position: "relative", height: h, borderRadius: 5, overflow: "hidden",
         background: hero ? "#0c0a12" : "rgba(255,255,255,.02)",
         border: `1px solid ${latest ? accent : hero ? "rgba(255,255,255,.09)" : "rgba(255,255,255,.05)"}`,
         boxShadow: latest ? `0 0 0 1px ${accent}, 0 6px 20px -8px ${accent}` : "none",
@@ -178,15 +178,31 @@ function Card({
   );
 }
 
+/**
+ * A status pill — "PICKING…", "BANNING…", "READY" — with a pulsing dot when
+ * `active`. This is what turns an opponent from a label into a presence: the
+ * point isn't the text, it's that something on their side of the board is
+ * visibly alive while you're deciding.
+ */
+export function Presence({ text, color, active }: { text: string; color: string; active?: boolean }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 8.5, fontWeight: 900, letterSpacing: .5, color, flexShrink: 0 }}>
+      <span className={active ? "dl-turn" : undefined} style={{ width: 5, height: 5, borderRadius: 3, background: color, boxShadow: `0 0 6px ${color}` }} />
+      {text.toUpperCase()}
+    </span>
+  );
+}
+
 /** One side of the board: a labelled row of five cards. */
 export function TeamRow({
-  side, heroes, latest, label, note, hidden, motion = true, height = "clamp(72px, 20vw, 112px)",
+  side, heroes, latest, label, note, status, hidden, motion = true, height = "clamp(72px, 20vw, 112px)",
 }: {
   side: "them" | "you";
   heroes: LineupHero[];
   latest: number | null;
   label: string;
   note?: React.ReactNode;
+  status?: { text: string; active?: boolean };
   hidden?: boolean;
   motion?: boolean;
   height?: string;
@@ -199,6 +215,7 @@ export function TeamRow({
           <span style={{ width: 5, height: 5, borderRadius: 3, background: accent, boxShadow: `0 0 8px ${accent}`, flexShrink: 0 }} />
           {label}
         </span>
+        {status && <Presence text={status.text} color={accent} active={status.active} />}
         <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${accent}44, transparent)` }} />
         {note}
       </div>
@@ -213,32 +230,33 @@ export function TeamRow({
   );
 }
 
-/** Small square hero tiles. The one grid used by every screen that picks heroes. */
+/** Square hero tiles. The one grid used by every screen that picks heroes. */
 export function HeroGrid({
-  ids, byId, onPick, dim, min = "clamp(48px, 14vw, 62px)",
+  ids, byId, onPick, dim, min = "clamp(58px, 17vw, 76px)", labelSize,
 }: {
   ids: number[];
   byId: (id: number) => { img: string; name: string } | undefined;
   onPick: (id: number) => void;
   dim?: boolean;
   min?: string;
+  labelSize?: number;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 4 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 5 }}>
       {ids.map((id) => {
         const h = byId(id);
         if (!h) return null;
         return (
           <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
-            padding: 0, border: `1px solid ${LINE}`, borderRadius: 8, overflow: "hidden",
+            padding: 0, border: `1px solid ${LINE}`, borderRadius: 6, overflow: "hidden",
             background: "#0c0a12", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
             filter: dim ? "saturate(.4)" : undefined,
           }}>
             <HeroImg base={heroBase(h.img)} name={h.name} />
             <span style={{
-              position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, color: CREAM,
-              background: "linear-gradient(transparent, rgba(0,0,0,.95))", padding: "8px 2px 2px",
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 700,
+              position: "absolute", left: 0, right: 0, bottom: 0, fontSize: labelSize ?? 7.5, color: CREAM,
+              background: "linear-gradient(transparent, rgba(0,0,0,.95))", padding: "10px 3px 3px",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 800,
             }}>{h.name}</span>
           </button>
         );
@@ -276,8 +294,10 @@ export function DraftStyles() {
       @keyframes dl-pulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
       @keyframes dl-in { from { opacity:0; transform: translateY(8px) } to { opacity:1; transform:none } }
       @keyframes dl-sheen { from { background-position: -220% 0 } to { background-position: 320% 0 } }
+      @keyframes dl-lock { 0% { opacity:0; transform: translateY(-6px) scale(.92) } 12% { opacity:1; transform: translateY(0) scale(1.04) } 20% { transform: translateY(0) scale(1) } 82% { opacity:1 } 100% { opacity:0; transform: translateY(-4px) scale(.97) } }
       .dl-turn { animation: dl-pulse 1.3s ease-in-out infinite; }
       .dl-in { animation: dl-in .3s ease-out both; }
+      .dl-lock { animation: dl-lock 1.1s cubic-bezier(.2,.9,.3,1) both; }
       .dl-btn { transition: transform .07s, filter .15s; -webkit-tap-highlight-color: transparent; }
       .dl-btn:active:not(:disabled) { transform: scale(.96); filter: brightness(1.1); }
       .dl-pick { transition: transform .07s, border-color .12s; -webkit-tap-highlight-color: transparent; }

@@ -10,14 +10,15 @@ export type LiveRoom = {
   status: "waiting" | "drafting" | "done";
   host: { id: string; name: string };
   guest: { id: string; name: string } | null;
-  picks: { by: Seat; heroId: number; auto?: boolean }[];
+  /** Whether this room drafts with bans — set once, at creation. */
+  bans: boolean;
+  picks: { by: Seat; kind: "pick" | "ban"; heroId: number; auto?: boolean }[];
   turnIndex: number;
   deadline: number | null;
   quizHost?: { points: number; correct: number } | null;
   quizGuest?: { points: number; correct: number } | null;
 };
 
-export const TURNS: Seat[] = Array.from({ length: 10 }, (_, i) => (i % 2 === 0 ? "host" : "guest"));
 export const TURN_MS = 30_000;
 
 export function playerId() {
@@ -170,30 +171,34 @@ export function useTurnTimeout(
   }, [room, onExpire, enabled]);
 }
 
-/** Big turn clock. Turns red and pulses in the last five seconds. */
-export function TurnClock({ seconds, yours }: { seconds: number | null; yours: boolean }) {
+/**
+ * The turn clock. A live draft is the one place real urgency is earned — solo
+ * play against the bot is deliberately untimed, a study tool rather than a
+ * race — so this is built to be the loudest thing on screen when it is yours.
+ */
+export function TurnClock({ seconds, yours, size = 44 }: { seconds: number | null; yours: boolean; size?: number }) {
   if (seconds == null) return null;
   const urgent = seconds <= 5;
+  const warn = seconds <= 10;
+  const r = size / 2 - 3;
   const pct = Math.max(0, Math.min(1, seconds / (TURN_MS / 1000)));
-  const color = urgent ? "#e0453a" : yours ? "#c9a227" : "#8a7d7a";
+  const color = urgent ? "#e0453a" : warn ? "#e08a3a" : yours ? "#F5B93B" : "#6b6478";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-      <div style={{ position: "relative", width: 42, height: 42, flexShrink: 0 }}>
-        <svg width="42" height="42" viewBox="0 0 42 42" style={{ transform: "rotate(-90deg)" }}>
-          <circle cx="21" cy="21" r="18" fill="none" stroke="#2a2020" strokeWidth="4" />
-          <circle
-            cx="21" cy="21" r="18" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
-            strokeDasharray={`${2 * Math.PI * 18}`}
-            strokeDashoffset={`${2 * Math.PI * 18 * (1 - pct)}`}
-            style={{ transition: "stroke-dashoffset .22s linear, stroke .3s" }}
-          />
-        </svg>
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 15, fontWeight: 800, color, fontVariantNumeric: "tabular-nums",
-          animation: urgent ? "dl-pulse .7s ease-in-out infinite" : undefined,
-        }}>{Math.ceil(seconds)}</div>
-      </div>
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={`${2 * Math.PI * r}`}
+          strokeDashoffset={`${2 * Math.PI * r * (1 - pct)}`}
+          style={{ transition: "stroke-dashoffset .22s linear, stroke .3s", filter: urgent ? `drop-shadow(0 0 6px ${color})` : undefined }}
+        />
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size * 0.36, fontWeight: 900, color, fontVariantNumeric: "tabular-nums",
+        animation: urgent ? "dl-pulse .6s ease-in-out infinite" : undefined,
+      }}>{Math.ceil(seconds)}</div>
     </div>
   );
 }

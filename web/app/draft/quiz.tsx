@@ -215,7 +215,7 @@ export function QuizRound({
         {q.img && (
           <div style={{
             width: q.imgShape === "square" ? 76 : 92, height: q.imgShape === "square" ? 76 : 68,
-            margin: "0 auto 8px", borderRadius: 12, overflow: "hidden",
+            margin: "0 auto 8px", borderRadius: 8, overflow: "hidden",
             border: `1px solid ${LINE}`, background: "#0c0a12", boxShadow: `0 6px 22px -10px ${GOLD}`,
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -236,7 +236,7 @@ export function QuizRound({
               key={i} className="dl-btn" disabled={phase !== "asking"} onClick={() => answer(i)}
               style={{
                 display: "flex", alignItems: "center", gap: 8, textAlign: "left",
-                padding: optionsHaveArt ? "8px" : "11px 13px", borderRadius: 11,
+                padding: optionsHaveArt ? "8px" : "11px 13px", borderRadius: 8,
                 cursor: phase === "asking" ? "pointer" : "default",
                 background: tone ? `${tone}22` : PANEL_2, border: `1.5px solid ${tone ?? LINE}`,
                 color: CREAM, fontSize: 13.5, fontWeight: 700, minHeight: 44,
@@ -279,5 +279,5 @@ export function QuizRound({
 }
 
 const panel = (): React.CSSProperties => ({
-  background: PANEL, border: `1px solid ${LINE}`, borderRadius: 16, padding: "14px 13px",
+  background: PANEL, border: `1px solid ${LINE}`, borderRadius: 10, padding: "14px 13px",
 });

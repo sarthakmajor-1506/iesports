@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 /* ------------------------------------------------------------------ tokens */
@@ -248,7 +249,7 @@ export function Btn({
   const fs = size === "s" ? 11.5 : size === "l" ? 14 : 12.5;
   const mh = size === "s" ? 32 : size === "l" ? 46 : 38;
   const style: React.CSSProperties = {
-    width: full ? "100%" : undefined, padding: pad, borderRadius: 10, border: t.border,
+    width: full ? "100%" : undefined, padding: pad, borderRadius: 6, border: t.border,
     background: disabled ? "#221f2e" : t.bg, color: disabled ? DIM : t.fg,
     fontSize: fs, fontWeight: 900, letterSpacing: .4, textAlign: "center",
     cursor: disabled ? "not-allowed" : "pointer", textDecoration: "none",
@@ -263,7 +264,7 @@ export function Btn({
 export function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14,
+      background: PANEL, border: `1px solid ${LINE}`, borderRadius: 9,
       padding: "11px 12px", ...style,
     }}>{children}</div>
   );
@@ -279,10 +280,133 @@ export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       style={{
         width: "100%", background: "rgba(0,0,0,.4)", border: `1px solid ${LINE}`, color: CREAM,
-        padding: "9px 12px", borderRadius: 10, fontSize: 16, outline: "none", boxSizing: "border-box",
+        padding: "9px 12px", borderRadius: 7, fontSize: 16, outline: "none", boxSizing: "border-box",
         ...props.style,
       }}
     />
+  );
+}
+
+/**
+ * A small switch, not a two-way choice card.
+ *
+ * Bans went from a segmented "NO BANS / BANS" control — which looked like two
+ * equal modes rather than one option you flip — to this, and it now works
+ * identically in solo and in a live room: both create-time paths just carry a
+ * `bans: boolean` into the room or the local turn sequence.
+ */
+export function Toggle({
+  checked, onChange, label, color = GOLD,
+}: { checked: boolean; onChange: (v: boolean) => void; label: string; color?: string }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className="dl-btn"
+      role="switch"
+      aria-checked={checked}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none",
+        padding: 0, cursor: "pointer", color: checked ? color : MUTED,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: .5 }}>{label}</span>
+      <span style={{
+        width: 32, height: 17, borderRadius: 9, flexShrink: 0, position: "relative",
+        background: checked ? color : "rgba(255,255,255,.14)", transition: "background .15s",
+      }}>
+        <span style={{
+          position: "absolute", top: 2, left: checked ? 16 : 2, width: 13, height: 13, borderRadius: 7,
+          background: "#0b0810", transition: "left .15s cubic-bezier(.3,.9,.4,1.2)",
+        }} />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The single most important thing on a drafting screen: is it my turn?
+ *
+ * Everything else on the board is secondary to this — it sits first, largest,
+ * and is the only thing that pulses.
+ */
+export function TurnBanner({ active, label, accent = GOLD }: { active: boolean; label: string; accent?: string }) {
+  return (
+    <div className={active ? "dl-turn" : undefined} style={{
+      textAlign: "center", padding: "9px 10px", borderRadius: 8, marginTop: 8,
+      background: active ? `${accent}1e` : "rgba(255,255,255,.03)",
+      border: `1px solid ${active ? accent + "66" : LINE}`,
+    }}>
+      <span style={{
+        fontSize: "clamp(13px, 4vw, 16px)", fontWeight: 900, letterSpacing: .6,
+        color: active ? accent : MUTED,
+      }}>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * The pick → ban → pick progression, as a strip rather than plain dots.
+ *
+ * A sixteen-step bans draft does not fit on a phone at once, so the active step
+ * auto-scrolls to the centre and the rest is reachable by a swipe — the point is
+ * "where am I in this", not an inventory of every step.
+ */
+export function DraftTimeline({
+  seq, current, mineRole,
+}: { seq: { role: 0 | 1; kind: "pick" | "ban" }[]; current: number; mineRole: 0 | 1 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = trackRef.current?.children[current] as HTMLElement | undefined;
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [current]);
+  return (
+    <div
+      ref={trackRef}
+      style={{
+        display: "flex", gap: 4, overflowX: "auto", padding: "2px 1px 3px",
+        WebkitOverflowScrolling: "touch", scrollSnapType: "x proximity",
+      }}
+    >
+      {seq.map((s, i) => {
+        const mine = s.role === mineRole;
+        const c = mine ? GREEN : RED;
+        const done = i < current, active = i === current;
+        const dim = s.kind === "ban" ? 6 : 999;
+        return (
+          <div key={i} style={{
+            flexShrink: 0, width: active ? 20 : 13, height: active ? 20 : 13, borderRadius: dim,
+            background: active ? c : done ? `${c}4d` : "rgba(255,255,255,.07)",
+            border: `1px solid ${active ? c : done ? `${c}77` : LINE}`,
+            display: "grid", placeItems: "center", scrollSnapAlign: "center",
+            boxShadow: active ? `0 0 9px ${c}` : undefined,
+            transition: "width .18s, height .18s",
+          }}>
+            {s.kind === "ban" && (active || done) && (
+              <span style={{ fontSize: active ? 10 : 7, color: "#0b0810", fontWeight: 900, lineHeight: 1 }}>×</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A brief flash confirming what just happened — "LOCKED IN: RAZE", not a
+ * silent state change. Self-dismisses; callers don't need to clear it.
+ */
+export function LockToast({ text, tone = GOLD }: { text: string; tone?: string }) {
+  return (
+    <div style={{
+      position: "fixed", top: "calc(env(safe-area-inset-top) + 10px)", left: "50%", transform: "translateX(-50%)",
+      zIndex: 200, pointerEvents: "none",
+    }}>
+      <div className="dl-lock" style={{
+        background: tone, color: "#0b0810", fontWeight: 900, fontSize: 12.5, letterSpacing: .5,
+        padding: "8px 16px", borderRadius: 7, boxShadow: `0 10px 30px -6px ${tone}, 0 4px 16px rgba(0,0,0,.5)`,
+        whiteSpace: "nowrap",
+      }}>{text}</div>
+    </div>
   );
 }
 

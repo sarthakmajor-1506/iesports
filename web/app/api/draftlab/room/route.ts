@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { draftSequence, type SeqStep } from "@/lib/draftSequence";
 
 /**
  * Draft Lab — live rooms.
@@ -15,6 +16,9 @@ import { FieldValue } from "firebase-admin/firestore";
  * even if their clocks or frame rates differ. A late pick is rejected; either
  * player may then call `timeout`, which is how a disconnected opponent stops
  * being able to freeze the game forever.
+ *
+ * Bans use the same `draftSequence()` solo uses (role 0 = host, role 1 = guest),
+ * so the two modes cannot drift into different turn orders again.
  */
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
@@ -23,18 +27,18 @@ const newCode = () => Array.from({ length: 5 }, () => ALPHABET[Math.floor(Math.r
 const TURN_MS = 30_000;
 /** Grace for latency, so a pick sent just before the buzzer is not thrown away. */
 const SLACK_MS = 2_500;
-/** Ten alternating picks; host opens, guest closes. */
-const TURNS: ("host" | "guest")[] = Array.from({ length: 10 }, (_, i) => (i % 2 === 0 ? "host" : "guest"));
 
 const clean = (v: unknown, max = 24) =>
   typeof v === "string" ? v.trim().slice(0, max).replace(/[<>]/g, "") : "";
 
+type Move = { by: "host" | "guest"; kind: "pick" | "ban"; heroId: number; auto?: boolean };
 type Room = {
   code: string;
   status: "waiting" | "drafting" | "done";
   host: { id: string; name: string };
   guest: { id: string; name: string } | null;
-  picks: { by: "host" | "guest"; heroId: number; auto?: boolean }[];
+  bans: boolean;
+  picks: Move[];
   turnIndex: number;
   deadline: number | null;
   quizHost?: { points: number; correct: number } | null;
@@ -43,6 +47,8 @@ type Room = {
 
 const seatOf = (room: Room, id: string): "host" | "guest" | null =>
   room.host?.id === id ? "host" : room.guest?.id === id ? "guest" : null;
+
+const roleSeat = (step: SeqStep): "host" | "guest" => (step.role === 0 ? "host" : "guest");
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,6 +70,7 @@ export async function POST(req: NextRequest) {
         status: "waiting",
         host: { id: playerId, name: clean(body.name) || "Host" },
         guest: null,
+        bans: !!body.bans,
         picks: [],
         turnIndex: 0,
         deadline: null,
@@ -96,7 +103,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(out);
     }
 
-    /* ------------------------------------------------- pick, or time out */
+    /* ------------------------------------------------- pick, ban, or time out */
     if (action === "pick" || action === "timeout") {
       const heroId = typeof body.heroId === "number" ? body.heroId : null;
 
@@ -109,9 +116,11 @@ export async function POST(req: NextRequest) {
         const seat = seatOf(room, playerId);
         if (!seat) return { error: "You are not in this room", status: 403 };
 
+        const seq = draftSequence(!!room.bans);
         const turnIndex = room.picks.length;
-        if (turnIndex >= TURNS.length) return { error: "Draft already finished", status: 409 };
-        const whose = TURNS[turnIndex];
+        if (turnIndex >= seq.length) return { error: "Draft already finished", status: 409 };
+        const step = seq[turnIndex];
+        const whose = roleSeat(step);
         const expired = room.deadline != null && Date.now() > room.deadline + SLACK_MS;
 
         if (action === "pick") {
@@ -131,15 +140,15 @@ export async function POST(req: NextRequest) {
           if (chosen == null) return { error: "No hero available", status: 409 };
         }
 
-        const picks = [...room.picks, { by: whose, heroId: chosen, ...(action === "timeout" ? { auto: true } : {}) }];
-        const finished = picks.length >= TURNS.length;
+        const picks = [...room.picks, { by: whose, kind: step.kind, heroId: chosen, ...(action === "timeout" ? { auto: true } : {}) }];
+        const finished = picks.length >= seq.length;
         tx.update(ref, {
           picks,
           turnIndex: picks.length,
           status: finished ? "done" : "drafting",
           deadline: finished ? null : Date.now() + TURN_MS,
         });
-        return { ok: true, heroId: chosen, finished };
+        return { ok: true, heroId: chosen, kind: step.kind, finished };
       });
 
       if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
@@ -182,11 +191,12 @@ export async function GET(req: NextRequest) {
     const snap = await adminDb.collection("draftlabRooms").doc(code).get();
     if (!snap.exists) return NextResponse.json({ error: "No such room" }, { status: 404 });
     const d = snap.data() as Room;
+    const seq = draftSequence(!!d.bans);
     return NextResponse.json({
-      code: d.code, status: d.status, host: d.host, guest: d.guest,
+      code: d.code, status: d.status, host: d.host, guest: d.guest, bans: !!d.bans,
       picks: d.picks, turnIndex: d.turnIndex, deadline: d.deadline,
       quizHost: d.quizHost ?? null, quizGuest: d.quizGuest ?? null,
-      turns: TURNS, turnMs: TURN_MS,
+      turns: seq.length, turnMs: TURN_MS,
     });
   } catch (e) {
     console.error("[draftlab] room read failed:", e);

@@ -69,13 +69,17 @@ export function Result({
   return (
     <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
       <div style={{
-        borderRadius: 15, padding: "13px 13px",
+        borderRadius: 10, padding: "14px 14px",
         background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`,
         border: `1px solid ${won ? GREEN : RED}44`,
       }}>
+        <div style={{ fontSize: 9.5, letterSpacing: 2, color: won ? GREEN : RED, fontWeight: 900, opacity: .8, marginBottom: 5 }}>
+          DRAFT COMPLETE
+        </div>
         <div style={{
-          fontSize: "clamp(17px, 5.2vw, 22px)", fontWeight: 900, letterSpacing: -0.4,
-          color: won ? GREEN : RED, marginBottom: 11, lineHeight: 1.15,
+          fontSize: "clamp(19px, 5.8vw, 25px)", fontWeight: 900, letterSpacing: -0.4,
+          color: won ? GREEN : RED, marginBottom: 12, lineHeight: 1.12,
+          textShadow: `0 0 24px ${won ? GREEN : RED}33`,
         }}>
           {won ? `You out-drafted ${them}.` : `${them} out-drafted you.`}
         </div>
@@ -152,7 +156,7 @@ export function Result({
       </Panel>
 
       <div style={{
-        borderRadius: 14, padding: "12px 13px",
+        borderRadius: 10, padding: "12px 13px",
         background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33`,
       }}>
         <Label color={GOLD}>YOUR DRAFTING STYLE</Label>

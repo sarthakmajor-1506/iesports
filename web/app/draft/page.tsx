@@ -6,11 +6,12 @@ import {
   PERSONALITIES, botPick, botBan, banValue, playerWinProb, tempoMap,
   strongestCounter, type TempoRow,
 } from "@/lib/draftbot";
+import { draftSequence, type SeqRole } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Segment, Panel, Label, Field, Pips,
+  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, LockToast, Panel, Label, Field, Pips,
   RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
 } from "./ui";
 import { TeamRow, BanStrip, HeroGrid, DraftStyles, setRenderConcurrency } from "./hero-art";
@@ -20,24 +21,8 @@ import { LiveView } from "./live-view";
 import { Leaderboard } from "./leaderboard";
 import { useRoomActions } from "./live";
 
-type Slot = { by: "bot" | "you"; kind: "ban" | "pick" };
-
-const QUICK: Slot[] = Array.from({ length: 10 }, (_, i) => ({
-  by: (i % 2 === 0 ? "bot" : "you") as "bot" | "you",
-  kind: "pick" as const,
-}));
-
-/** Three bans each across two phases, snake picks, you close. */
-const CAPTAINS: Slot[] = [
-  { by: "bot", kind: "ban" }, { by: "you", kind: "ban" },
-  { by: "bot", kind: "ban" }, { by: "you", kind: "ban" },
-  { by: "bot", kind: "pick" }, { by: "you", kind: "pick" },
-  { by: "you", kind: "pick" }, { by: "bot", kind: "pick" },
-  { by: "bot", kind: "ban" }, { by: "you", kind: "ban" },
-  { by: "bot", kind: "pick" }, { by: "you", kind: "pick" },
-  { by: "you", kind: "pick" }, { by: "bot", kind: "pick" },
-  { by: "bot", kind: "pick" }, { by: "you", kind: "pick" },
-];
+/** Role 0 is the bot, role 1 is you — bot always opens, matching live's host. */
+const BOT: SeqRole = 0, YOU: SeqRole = 1;
 
 export type Ev = {
   by: "bot" | "you"; kind: "ban" | "pick"; heroId: number;
@@ -46,7 +31,7 @@ export type Ev = {
   deniedRank: number | null;
 };
 
-type Stage = "menu" | "drafting" | "quiz" | "done";
+type Stage = "menu" | "drafting" | "recap" | "quiz" | "done";
 const COUNTER = PERSONALITIES.find((p) => p.id === "counter")!;
 
 export default function DraftDuelPage() {
@@ -64,7 +49,8 @@ function Duel() {
   const [error, setError] = useState<string | null>(null);
 
   const [stage, setStage] = useState<Stage>("menu");
-  const [format, setFormat] = useState<"quick" | "captains">("quick");
+  const [bansOn, setBansOn] = useState(false);
+  const [liveBans, setLiveBans] = useState(false);
   const [liveCode, setLiveCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [name, setName] = useState("");
@@ -80,6 +66,13 @@ function Duel() {
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [scored, setScored] = useState<{ points: number; draftPoints: number; quizPoints: number } | null>(null);
   const [boardVersion, setBoardVersion] = useState(0);
+  const [lock, setLock] = useState<string | null>(null);
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashLock = (text: string) => {
+    if (lockTimer.current) clearTimeout(lockTimer.current);
+    setLock(text);
+    lockTimer.current = setTimeout(() => setLock(null), 1100);
+  };
 
   /**
    * Signed in? Then that is your name.
@@ -112,13 +105,14 @@ function Duel() {
   const engine: Engine | null = useMemo(() => (model ? buildEngine(model) : null), [model]);
   const tempos = useMemo(() => (model ? tempoMap(model as { tempo?: TempoRow[] }) : new Map()), [model]);
 
-  const SEQ = format === "captains" ? CAPTAINS : QUICK;
+  const SEQ = useMemo(() => draftSequence(bansOn), [bansOn]);
   const yours = useMemo(() => events.filter((e) => e.kind === "pick" && e.by === "you").map((e) => e.heroId), [events]);
   const theirs = useMemo(() => events.filter((e) => e.kind === "pick" && e.by === "bot").map((e) => e.heroId), [events]);
   const bans = useMemo(() => events.filter((e) => e.kind === "ban").map((e) => ({ by: e.by, heroId: e.heroId })), [events]);
 
   const turnIndex = events.length;
-  const slot = stage !== "drafting" || turnIndex >= SEQ.length ? null : SEQ[turnIndex];
+  const step = stage !== "drafting" || turnIndex >= SEQ.length ? null : SEQ[turnIndex];
+  const slot = step ? { by: (step.role === BOT ? "bot" : "you") as "bot" | "you", kind: step.kind } : null;
 
   const available = useMemo(() => {
     if (!model) return [];
@@ -170,7 +164,10 @@ function Duel() {
         if (v < worst) { worst = v; punishedBy = foe; }
       }
     }
+    const heroName = engine.heroById.get(heroId)?.name ?? "";
+    flashLock(kind === "ban" ? `BANNED ${heroName.toUpperCase()}` : `${by === "you" ? "LOCKED IN" : "THEY PICKED"} ${heroName.toUpperCase()}`);
     setEvents((e) => [...e, { by, kind, heroId, swing: (after - before) * 100, regret, bestAlt, rank, pool, punishedBy, answering, answerRate, deniedRank }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, yours, theirs, available]);
 
   useEffect(() => {
@@ -189,9 +186,9 @@ function Duel() {
     return () => clearTimeout(t);
   }, [stage, engine, slot, theirs, yours, available, tempos, rng, commit]);
 
-  // Draft over -> straight into the quiz round.
+  // Draft over -> a beat to see both full lineups before the questions.
   useEffect(() => {
-    if (stage === "drafting" && turnIndex >= SEQ.length) setStage("quiz");
+    if (stage === "drafting" && turnIndex >= SEQ.length) setStage("recap");
   }, [stage, turnIndex, SEQ.length]);
 
   const finalP = useMemo(
@@ -248,7 +245,7 @@ function Duel() {
     fetch("/api/draftlab/response", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "duel", format, scenarioId: `duel-counter-${format}`,
+        mode: "duel", format: bansOn ? "captains" : "quick", scenarioId: `duel-counter-${bansOn ? "captains" : "quick"}`,
         anonId: (() => { try { return localStorage.getItem("draftlab_anon") || "anon"; } catch { return "anon"; } })(),
         chosenHero: yours[0], chosenP: finalP,
         regretPP: events.filter((e) => e.kind === "pick" && e.by === "you").reduce((a, b) => a + b.regret, 0) / 5,
@@ -259,7 +256,7 @@ function Duel() {
         elapsedMs: Date.now() - startedAt,
       }),
     }).catch(() => {});
-  }, [stage, logged, finalP, yours, theirs, events, bans, format, startedAt, quiz, submitScore]);
+  }, [stage, logged, finalP, yours, theirs, events, bans, bansOn, startedAt, quiz, submitScore]);
 
   const restart = () => {
     setEvents([]); setSearch(""); setLogged(false); setQuiz(null); setScored(null);
@@ -276,7 +273,7 @@ function Duel() {
     return (
       <Shell tab="duel" head={<Band title="Draft Duel" />}>
         <DraftStyles />
-        <div className="dl-sheen" style={{ height: 130, borderRadius: 14, background: PANEL, marginTop: 12 }} />
+        <div className="dl-sheen" style={{ height: 130, borderRadius: 10, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -300,7 +297,7 @@ function Duel() {
             right={
               <span style={{
                 maxWidth: 130, fontSize: 10.5, fontWeight: 800, color: user ? GREEN : DIM,
-                border: `1px solid ${user ? GREEN + "55" : LINE}`, borderRadius: 8, padding: "4px 8px",
+                border: `1px solid ${user ? GREEN + "55" : LINE}`, borderRadius: 6, padding: "4px 8px",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>{user ? (steamName || name || "Signed in") : "Guest"}</span>
             } />
@@ -310,7 +307,7 @@ function Duel() {
 
         <div className="dl-in" style={{ display: "grid", gap: 9, paddingTop: 11 }}>
           <div style={{
-            position: "relative", overflow: "hidden", borderRadius: 15, padding: "13px 13px 12px",
+            position: "relative", overflow: "hidden", borderRadius: 10, padding: "13px 13px 12px",
             background: `linear-gradient(150deg, ${PANEL} 40%, ${RED}1e)`, border: `1px solid ${LINE}`,
           }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: RED, boxShadow: `0 0 14px ${RED}` }} />
@@ -319,15 +316,15 @@ function Duel() {
             <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4, marginBottom: 10 }}>
               It answers whatever you take.
             </div>
-            {/* Two rows, not three items across: at 320px a segment plus a
-                button squeezes the labels until they wrap or clip. */}
-            <Segment dense value={format} onChange={setFormat} accent={RED}
-              options={[{ v: "quick", label: "NO BANS" }, { v: "captains", label: "BANS" }]} />
-            <div style={{ marginTop: 7 }}><Btn full tone="red" onClick={restart}>PLAY</Btn></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Toggle checked={bansOn} onChange={setBansOn} label="BANS" color={RED} />
+              <span style={{ flex: "1 1 auto" }} />
+              <Btn tone="red" onClick={restart}>PLAY</Btn>
+            </div>
           </div>
 
           <div style={{
-            position: "relative", overflow: "hidden", borderRadius: 15, padding: "13px 13px 12px",
+            position: "relative", overflow: "hidden", borderRadius: 10, padding: "13px 13px 12px",
             background: `linear-gradient(150deg, ${PANEL} 40%, ${GOLD}1a)`, border: `1px solid ${LINE}`,
           }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: GOLD, boxShadow: `0 0 14px ${GOLD}` }} />
@@ -336,8 +333,11 @@ function Duel() {
             <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4, marginBottom: 10 }}>
               Draft head-to-head, then the same questions.
             </div>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+              <Toggle checked={liveBans} onChange={setLiveBans} label="BANS" />
+            </div>
             <Btn full tone="gold" onClick={async () => {
-              const d = await roomCall({ action: "create", name: steamName || name || "Host" });
+              const d = await roomCall({ action: "create", name: steamName || name || "Host", bans: liveBans });
               if (d?.code) setLiveCode(d.code);
             }}>CREATE A ROOM</Btn>
             <div style={{ display: "flex", gap: 7, marginTop: 7 }}>
@@ -373,6 +373,22 @@ function Duel() {
     );
   }
 
+  /* -------------------------------------------------------------- recap */
+  if (stage === "recap") {
+    return (
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
+        <DraftStyles />
+        <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
+          <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
+          <TeamRow side="you" label="YOU" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          {bans.length > 0 && <BanStrip bans={bans} byId={heroById} />}
+          <Btn full tone="gold" size="l" onClick={() => setStage("quiz")}>SEE THE QUESTIONS</Btn>
+        </div>
+      </Shell>
+    );
+  }
+
   /* -------------------------------------------------------------- quiz */
   if (stage === "quiz") {
     return (
@@ -400,21 +416,28 @@ function Duel() {
     const lastPick = [...events].reverse().find((e) => e.kind === "pick");
     const lastBotPick = [...events].reverse().find((e) => e.by === "bot" && e.kind === "pick");
     const lastBotBan = [...events].reverse().find((e) => e.by === "bot" && e.kind === "ban");
-    const totalPicks = SEQ.filter((s) => s.kind === "pick" && s.by === "you").length;
+    const botTurn = slot?.by === "bot";
+
+    const turnLabel = yourTurn
+      ? (banning ? "YOUR BAN — CHOOSE ONE TO REMOVE" : "YOUR PICK — LOCK ONE IN")
+      : (botThinking ? "COUNTERPICKER IS DECIDING…" : "OPPONENT'S TURN");
 
     return (
       <Shell
         tab={null}
         head={
-          <Band
-            compact accent={banning ? RED : yourTurn ? GOLD : MUTED} onBack={toMenu}
-            title="vs The Counterpicker"
-            sub={botThinking ? "They're thinking…" : yourTurn ? (banning ? "Ban a hero" : "Pick a hero") : "Waiting…"}
-            right={<Pips total={totalPicks} filled={yours.length} color={yourTurn ? GOLD : DIM} />}
+          <Band compact accent={banning ? RED : yourTurn ? GOLD : MUTED} onBack={toMenu}
+            title="vs The Counterpicker" sub={`Round ${turnIndex + 1} / ${SEQ.length}`}
+            right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? GOLD : DIM} />}
           >
+            <TurnBanner active={yourTurn} label={turnLabel} accent={banning ? RED : GOLD} />
+            <div style={{ marginTop: 8 }}>
+              <DraftTimeline seq={SEQ} current={Math.min(turnIndex, SEQ.length - 1)} mineRole={YOU} />
+            </div>
             <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
               <TeamRow side="them" label="THE COUNTERPICKER" motion={motion} height="clamp(52px, 15vw, 74px)"
                 heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
+                status={{ text: botTurn ? (banning ? "banning…" : "picking…") : "idle", active: botTurn }}
                 note={lastBotPick?.answering != null ? (
                   <span style={{ fontSize: 9, color: RED, textAlign: "right", lineHeight: 1.2 }}>
                     answers your {heroName(lastBotPick.answering)}
@@ -432,6 +455,7 @@ function Duel() {
         }
       >
         <DraftStyles />
+        {lock && <LockToast text={lock} tone={banning ? RED : GOLD} />}
         {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
           <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
             They banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your

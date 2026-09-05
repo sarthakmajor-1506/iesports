@@ -3,28 +3,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildEngine, rankCandidates, type DraftModel, type Engine } from "@/lib/draftlab";
 import { counterMap, playerWinProb, tempoMap, draftingStyle, type TempoRow } from "@/lib/draftbot";
+import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar,
+  Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline, LockToast,
   RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
 } from "./ui";
 import { TeamRow, HeroGrid, DraftStyles } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
-  TURNS, type Seat,
+  type Seat,
 } from "./live";
 
 /**
- * Live head-to-head: two people, alternating picks, 30 seconds a turn.
+ * Live head-to-head: two people, alternating picks (and, if the room was
+ * created with bans on, bans too), 30 seconds a turn.
  *
  * The room document is the single source of truth — this component renders it and
- * asks the API to change it, never the other way round.
- *
- * The board, the clock and the search box are pinned in the top band and only the
- * hero grid scrolls, because on a 30-second turn nothing that decides the pick
- * can be off-screen.
+ * asks the API to change it, never the other way round. The turn sequence comes
+ * from the same `draftSequence()` solo uses (role 0 = host, role 1 = guest), so
+ * the two modes cannot silently drift apart the way two hand-written sequences
+ * eventually would.
  */
 export function LiveView({
   model, knowledge, code, onLeave, motion, submitScore,
@@ -36,6 +37,10 @@ export function LiveView({
   const { call, error, setError } = useRoomActions();
   const [search, setSearch] = useState("");
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
+  const [recapDone, setRecapDone] = useState(false);
+  const [lock, setLock] = useState<string | null>(null);
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSeenPick = useRef(0);
 
   const engine: Engine = useMemo(() => buildEngine(model), [model]);
   const tempos = useMemo(() => tempoMap(model as { tempo?: TempoRow[] }), [model]);
@@ -45,12 +50,17 @@ export function LiveView({
   const seconds = useCountdown(room?.status === "drafting" ? room.deadline : null);
 
   const picks = useMemo(() => room?.picks ?? [], [room]);
+  const seq = useMemo(() => draftSequence(!!room?.bans), [room?.bans]);
   const turnIdx = picks.length;
-  const whose: Seat | null = turnIdx < TURNS.length ? TURNS[turnIdx] : null;
+  const step = turnIdx < seq.length ? seq[turnIdx] : null;
+  const whose: Seat | null = step ? (step.role === 0 ? "host" : "guest") : null;
   const myTurn = seat != null && whose === seat;
+  const banning = step?.kind === "ban";
+  const mineRole: 0 | 1 = seat === "guest" ? 1 : 0;
 
-  const mine = useMemo(() => picks.filter((p) => p.by === seat).map((p) => p.heroId), [picks, seat]);
-  const theirs = useMemo(() => picks.filter((p) => p.by !== seat).map((p) => p.heroId), [picks, seat]);
+  const mine = useMemo(() => picks.filter((p) => p.by === seat && p.kind === "pick").map((p) => p.heroId), [picks, seat]);
+  const theirs = useMemo(() => picks.filter((p) => p.by !== seat && p.kind === "pick").map((p) => p.heroId), [picks, seat]);
+  const bans = useMemo(() => picks.filter((p) => p.kind === "ban").map((p) => ({ by: (p.by === seat ? "you" : "bot") as "you" | "bot", heroId: p.heroId })), [picks, seat]);
 
   const available = useMemo(() => {
     const used = new Set(picks.map((p) => p.heroId));
@@ -62,6 +72,20 @@ export function LiveView({
     if (!room || seat == null) return [];
     return rankCandidates(engine, mine, theirs, available, 0).slice(0, 12).map((c) => c.heroId);
   }, [engine, mine, theirs, available, room, seat]);
+
+  // A brief "LOCKED IN: HERO" flash whenever a new move lands, ours or theirs.
+  useEffect(() => {
+    if (picks.length <= lastSeenPick.current) { lastSeenPick.current = picks.length; return; }
+    const p = picks[picks.length - 1];
+    lastSeenPick.current = picks.length;
+    const h = engine.heroById.get(p.heroId);
+    if (!h) return;
+    const mineMove = p.by === seat;
+    const text = p.kind === "ban" ? `BANNED ${h.name.toUpperCase()}` : `${mineMove ? "LOCKED IN" : "THEY PICKED"} ${h.name.toUpperCase()}`;
+    if (lockTimer.current) clearTimeout(lockTimer.current);
+    setLock(text);
+    lockTimer.current = setTimeout(() => setLock(null), 1100);
+  }, [picks, engine, seat]);
 
   /**
    * Take the open seat automatically.
@@ -113,7 +137,7 @@ export function LiveView({
     return (
       <Shell tab={null} head={<Band title={`Room ${code}`} compact onBack={onLeave} />}>
         <DraftStyles />
-        <div className="dl-sheen" style={{ height: 120, borderRadius: 14, background: PANEL, marginTop: 12 }} />
+        <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -140,11 +164,26 @@ export function LiveView({
       >
         <DraftStyles />
         <div className="dl-in" style={{ textAlign: "center", padding: "34px 0 0" }}>
-          <div style={{ fontSize: 10, letterSpacing: 1.6, color: GOLD, fontWeight: 900 }}>ROOM CODE</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.6, color: GOLD, fontWeight: 900 }}>ROOM CODE{room.bans ? " · BANS ON" : ""}</div>
           <div style={{ fontSize: "clamp(38px, 14vw, 62px)", fontWeight: 900, letterSpacing: 10, color: GOLD, margin: "8px 0 2px", lineHeight: 1, textShadow: `0 0 40px ${GOLD}44` }}>{code}</div>
           <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: MUTED, fontSize: 12.5 }}>
             <span className="dl-turn" style={{ color: GREEN }}>●</span> {room.host?.name} is ready
           </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  /* --------------------------------------------------------------- recap */
+  if (done && knowledge && !quiz && !recapDone) {
+    return (
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
+        <DraftStyles />
+        <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
+          <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
+          <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          <Btn full tone="gold" size="l" onClick={() => setRecapDone(true)}>SEE THE QUESTIONS</Btn>
         </div>
       </Shell>
     );
@@ -234,7 +273,7 @@ export function LiveView({
             <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={RED} engine={engine} />
           </Panel>
 
-          <div style={{ borderRadius: 14, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33` }}>
+          <div style={{ borderRadius: 10, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33` }}>
             <Label color={GOLD}>YOUR DRAFTING STYLE</Label>
             <div style={{ fontSize: 16, color: GOLD, fontWeight: 900 }}>{style.tag}</div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{style.line}</div>
@@ -248,37 +287,46 @@ export function LiveView({
   const q = search.trim().toLowerCase();
   const filtered = available.filter((id) => heroName(id).toLowerCase().includes(q));
   const lastPick = picks[picks.length - 1];
+  const turnLabel = myTurn
+    ? (banning ? "YOUR BAN — CHOOSE ONE TO REMOVE" : "YOUR PICK — LOCK IT IN")
+    : `${themName ?? "THEY"} ${banning ? "ARE BANNING…" : "ARE PICKING…"}`.toUpperCase();
 
   return (
     <Shell
       tab={null}
       head={
         <Band
-          compact accent={myTurn ? GOLD : RED} onBack={onLeave}
+          compact accent={banning ? RED : myTurn ? GOLD : MUTED} onBack={onLeave}
           title={`${meName} vs ${themName}`}
-          sub={`Live · ${10 - picks.length} picks left`}
-          right={
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: .5, color: myTurn ? GOLD : DIM }}>
-                {myTurn ? "YOUR PICK" : "THEIRS"}
-              </span>
-              <TurnClock seconds={seconds} yours={myTurn} />
-            </div>
-          }
+          sub={`Live · room ${code} · Round ${turnIdx + 1} / ${seq.length}`}
         >
-          <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
-            <TeamRow side="them" label={themName.toUpperCase()} motion={motion}
-              heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null} height="clamp(52px, 15vw, 74px)" />
-            <TeamRow side="you" label="YOU" motion={motion}
-              heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} height="clamp(52px, 15vw, 74px)" />
+          <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginTop: 8 }}>
+            <TurnClock seconds={seconds} yours={myTurn} size={50} />
+            <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+              <TurnBanner active={myTurn} label={turnLabel} accent={banning ? RED : GOLD} />
+            </div>
           </div>
-          <Field value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder={myTurn ? "Search heroes" : "Waiting for them…"} disabled={!myTurn}
-            style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: myTurn ? 1 : .4 }} />
+          <div style={{ marginTop: 8 }}>
+            <DraftTimeline seq={seq} current={Math.min(turnIdx, seq.length - 1)} mineRole={mineRole} />
+          </div>
+          <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
+            <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} motion={motion} height="clamp(52px, 15vw, 74px)"
+              heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
+              status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }} />
+            <TeamRow side="you" label="YOU" motion={motion} height="clamp(52px, 15vw, 74px)"
+              heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} />
+          </div>
+          <Field
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting for them…"}
+            disabled={!myTurn}
+            style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? RED : LINE }}
+          />
         </Band>
       }
     >
       <DraftStyles />
+      {lock && <LockToast text={lock} tone={banning ? RED : GOLD} />}
       {lastPick?.auto && (
         <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
           Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
@@ -286,7 +334,7 @@ export function LiveView({
       )}
       {error && <div style={{ color: RED, fontSize: 12, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
       <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .32, pointerEvents: myTurn ? "auto" : "none" }}>
-        <HeroGrid ids={filtered} byId={heroById} onPick={submit} />
+        <HeroGrid ids={filtered} byId={heroById} onPick={submit} dim={banning} />
       </div>
     </Shell>
   );

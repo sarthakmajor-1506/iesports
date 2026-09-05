@@ -9,6 +9,8 @@ import {
 } from "../ui";
 import { DraftStyles, HeroImg, heroBase } from "../hero-art";
 
+const ROLE_ORDER = ["Carry", "Support", "Nuker", "Disabler", "Durable", "Escape", "Initiator", "Pusher", "Jungler"];
+
 /**
  * Draft Picker — a tool, not a game.
  *
@@ -21,6 +23,10 @@ import { DraftStyles, HeroImg, heroBase } from "../hero-art";
  * The board and the side selector are pinned. Choosing a side is the single most
  * repeated action here, and in the previous version it lived at the bottom of a
  * long page, so every pick meant scrolling down to switch and back up to read.
+ *
+ * The result list is a grid of large hero cards, not a thin row of thumbnails —
+ * the picture should do most of the work, and a 48x32 crop next to a line of text
+ * read as a spreadsheet, not a competitive tool.
  */
 export default function PickerPage() {
   const [model, setModel] = useState<DraftModel | null>(null);
@@ -28,11 +34,19 @@ export default function PickerPage() {
   const [theirs, setTheirs] = useState<number[]>([]);
   const [side, setSide] = useState<"mine" | "theirs">("mine");
   const [search, setSearch] = useState("");
+  const [role, setRole] = useState("all");
 
   useEffect(() => { fetch("/draftlab/model.json").then((r) => r.json()).then(setModel).catch(() => {}); }, []);
 
   const engine: Engine | null = useMemo(() => (model ? buildEngine(model) : null), [model]);
   const tempos = useMemo(() => (model ? tempoMap(model as { tempo?: TempoRow[] }) : new Map()), [model]);
+
+  const roles = useMemo(() => {
+    if (!model) return [];
+    const seen = new Set<string>();
+    model.heroes.forEach((h) => h.roles.forEach((r) => seen.add(r)));
+    return ROLE_ORDER.filter((r) => seen.has(r));
+  }, [model]);
 
   const available = useMemo(() => {
     if (!model) return [];
@@ -62,7 +76,7 @@ export default function PickerPage() {
     return (
       <Shell tab="picker" head={<Band title="Draft Picker" />}>
         <DraftStyles />
-        <div className="dl-sheen" style={{ height: 120, borderRadius: 14, background: PANEL, marginTop: 12 }} />
+        <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -79,7 +93,10 @@ export default function PickerPage() {
     (from === "mine" ? setMine : setTheirs)((from === "mine" ? mine : theirs).filter((h) => h !== id));
 
   const q = search.trim().toLowerCase();
-  const list = (q ? ranked.filter((c) => heroName(c.heroId).toLowerCase().includes(q)) : ranked).slice(0, 60);
+  const list = ranked
+    .filter((c) => !q || heroName(c.heroId).toLowerCase().includes(q))
+    .filter((c) => role === "all" || heroById(c.heroId)?.roles.includes(role))
+    .slice(0, 60);
   const { theirsWin } = counterMap(engine, mine, theirs);
   // A one-hero-a-side board says nothing about pace; wait for a real shape.
   const dTempo = mine.length >= 3 && theirs.length >= 3 ? teamTempo(mine, tempos) - teamTempo(theirs, tempos) : 0;
@@ -96,7 +113,7 @@ export default function PickerPage() {
             (mine.length || theirs.length) ? (
               <button className="dl-btn" onClick={() => { setMine([]); setTheirs([]); }} style={{
                 background: "rgba(255,255,255,.07)", border: `1px solid ${LINE}`, color: MUTED,
-                borderRadius: 9, padding: "5px 10px", fontSize: 10.5, fontWeight: 900, cursor: "pointer", letterSpacing: .6,
+                borderRadius: 6, padding: "5px 10px", fontSize: 10.5, fontWeight: 900, cursor: "pointer", letterSpacing: .6,
               }}>RESET</button>
             ) : undefined
           }
@@ -131,6 +148,21 @@ export default function PickerPage() {
             <Field value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search heroes"
               style={{ flex: "1 1 auto", padding: "6px 10px", fontSize: 16, minHeight: 34 }} />
           </div>
+
+          {roles.length > 0 && (
+            <div style={{ display: "flex", gap: 4, marginTop: 7, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 1 }}>
+              {["all", ...roles].map((r) => {
+                const on = role === r;
+                return (
+                  <button key={r} className="dl-btn" onClick={() => setRole(r)} style={{
+                    flexShrink: 0, padding: "4px 9px", borderRadius: 6, cursor: "pointer",
+                    background: on ? accent : "transparent", color: on ? "#0b0810" : MUTED,
+                    border: `1px solid ${on ? accent : LINE}`, fontSize: 9.5, fontWeight: 900, letterSpacing: .4,
+                  }}>{r === "all" ? "ALL" : r.toUpperCase()}</button>
+                );
+              })}
+            </div>
+          )}
         </Band>
       }
     >
@@ -160,39 +192,56 @@ export default function PickerPage() {
         <div style={{ fontSize: 12.5, color: MUTED, padding: "10px 2px 20px" }}>
           {(side === "mine" ? mine : theirs).length >= 5
             ? "That side is full. Switch sides or reset."
-            : "No hero matches that search."}
+            : "Nothing matches that search."}
         </div>
       )}
 
-      <div style={{ display: "grid", gap: 4, paddingBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(88px, 27vw, 118px), 1fr))", gap: 8, paddingBottom: 16 }}>
         {list.map((c, i) => {
           const h = heroById(c.heroId)!;
-          const top = i === 0 && !q;
+          const top = i === 0 && !q && role === "all";
           return (
-            <div key={c.heroId} style={{
-              display: "flex", alignItems: "center", gap: 9, padding: "5px 8px 5px 5px", borderRadius: 10,
-              background: top ? `${accent}14` : PANEL, border: `1px solid ${top ? accent + "55" : LINE}`,
-            }}>
-              <button className="dl-pick" onClick={() => add(c.heroId)} aria-label={`Add ${h.name}`} style={{
-                width: 48, height: 32, flexShrink: 0, padding: 0, borderRadius: 6, overflow: "hidden",
-                border: `1px solid ${LINE}`, background: "#0c0a12", cursor: "pointer",
+            <div
+              key={c.heroId}
+              className="dl-pick"
+              onClick={() => add(c.heroId)}
+              role="button" tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter") add(c.heroId); }}
+              style={{
+                position: "relative", borderRadius: 9, overflow: "hidden", cursor: "pointer",
+                background: "#0c0a12", aspectRatio: "3 / 4",
+                border: `1px solid ${top ? accent + "88" : LINE}`,
+                boxShadow: top ? `0 0 0 1px ${accent}, 0 8px 22px -10px ${accent}` : undefined,
+              }}
+            >
+              <HeroImg base={heroBase(h.img)} name={h.name} />
+
+              <span style={{
+                position: "absolute", top: 5, left: 5, background: "rgba(6,5,10,.72)",
+                border: `1px solid ${LINE}`, borderRadius: 6, padding: "2px 5px",
               }}>
-                <HeroImg base={heroBase(h.img)} name={h.name} shape="crop" position="50% 20%" />
-              </button>
-              <button className="dl-btn" onClick={() => add(c.heroId)} style={{
-                flex: "1 1 auto", minWidth: 0, background: "none", border: "none", padding: 0,
-                textAlign: "left", color: CREAM, cursor: "pointer",
+                <Delta v={c.delta} forThem={side === "theirs"} size={11} />
+              </span>
+
+              <a
+                href={`/draft/guide?hero=${c.heroId}`} aria-label={`About ${h.name}`}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute", top: 5, right: 5, width: 20, height: 20, borderRadius: 10,
+                  background: "rgba(6,5,10,.72)", border: `1px solid ${LINE}`,
+                  display: "grid", placeItems: "center", color: DIM, fontSize: 10.5, fontWeight: 900, textDecoration: "none",
+                }}
+              >i</a>
+
+              <div style={{
+                position: "absolute", left: 0, right: 0, bottom: 0,
+                background: "linear-gradient(transparent, rgba(4,3,7,.96) 55%)", padding: "20px 6px 6px",
               }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
-                <div style={{ fontSize: 9.5, color: DIM, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: .3 }}>
-                  {h.roles.slice(0, 3).join(" · ").toUpperCase()}
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.name}</div>
+                <div style={{ fontSize: 8.5, color: DIM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: .3, marginTop: 1 }}>
+                  {h.roles.slice(0, 2).join(" · ").toUpperCase()}
                 </div>
-              </button>
-              <Delta v={c.delta} forThem={side === "theirs"} />
-              <a href={`/draft/guide?hero=${c.heroId}`} aria-label={`About ${h.name}`} style={{
-                width: 24, height: 24, flexShrink: 0, borderRadius: 12, display: "grid", placeItems: "center",
-                border: `1px solid ${LINE}`, color: DIM, fontSize: 11, fontWeight: 900, textDecoration: "none",
-              }}>i</a>
+              </div>
             </div>
           );
         })}
@@ -222,14 +271,14 @@ function Slots({
           <div key={i} style={{ flex: "1 1 0", minWidth: 0 }}>
             {h ? (
               <button onClick={() => onRemove(id)} className="dl-pick" title={`Remove ${h.name}`} style={{
-                width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 7, overflow: "hidden",
+                width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 6, overflow: "hidden",
                 border: `1px solid ${accent}88`, background: "#0c0a12", cursor: "pointer", display: "block",
               }}>
                 <HeroImg base={heroBase(h.img)} name={h.name} />
               </button>
             ) : (
               <div style={{
-                aspectRatio: "1 / 1", borderRadius: 7, border: `1px dashed ${accent}44`,
+                aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${accent}44`,
                 display: "grid", placeItems: "center", color: `${accent}55`, fontSize: 11,
               }}>◆</div>
             )}
