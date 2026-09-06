@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Label, Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, ALLY, R_CARD, R_CHIP } from "./ui";
+import { Label, Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, ALLY, R_CARD, R_CHIP, alpha,
+} from "./ui";
 import { Skeleton } from "./theme";
 
 export type LeaderRow = {
@@ -43,8 +44,8 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
       {rows == null && <Skeleton h={130} />}
 
       {rows != null && rows.length === 0 && (
-        <Panel style={{ padding: "20px 16px", textAlign: "center", background: `linear-gradient(160deg, ${PANEL}, rgba(245,166,35,.07))`, border: `1px solid ${GOLD}2e` }}>
-          <div style={{ fontSize: 30, marginBottom: 8, filter: `drop-shadow(0 0 14px ${GOLD}88)` }}>👑</div>
+        <Panel style={{ padding: "20px 16px", textAlign: "center", background: `linear-gradient(160deg, ${PANEL}, rgba(245,166,35,.07))`, border: `1px solid ${alpha(GOLD, 18)}` }}>
+          <div style={{ fontSize: 30, marginBottom: 8, filter: `drop-shadow(0 0 14px ${alpha(GOLD, 53)})` }}>👑</div>
           <div style={{ fontSize: 15, color: CREAM, fontWeight: 800, marginBottom: 5 }}>First place is empty.</div>
           <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 14px" }}>
             Play {minGames} drafts signed in and it is yours. Your score is the model&apos;s verdict on your five heroes
@@ -83,7 +84,7 @@ function Row({ r, rank, me }: { r: LeaderRow; rank: number | null; me?: boolean 
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 9, padding: "6px 9px 6px 6px", borderRadius: R_CHIP,
-      background: me ? `${GOLD}14` : PANEL, border: `1px solid ${me ? GOLD + "55" : LINE}`, boxShadow: me ? `0 0 20px -10px ${GOLD}` : "none",
+      background: me ? `${alpha(GOLD, 8)}` : PANEL, border: `1px solid ${me ? GOLD + "55" : LINE}`, boxShadow: me ? `0 0 20px -10px ${GOLD}` : "none",
     }}>
       <span style={{
         width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center",

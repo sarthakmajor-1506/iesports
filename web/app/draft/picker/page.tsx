@@ -5,7 +5,7 @@ import { buildEngine, evaluate, rankCandidates, type DraftModel, type Engine } f
 import { counterMap, tempoMap, teamTempo, type TempoRow } from "@/lib/draftbot";
 import {
   Shell, Band, Segment, Field, Panel, Label, Delta,
-  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
+  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
 } from "../ui";
 import { HeroImg, heroBase } from "../hero-art";
 
@@ -161,7 +161,7 @@ export default function PickerPage() {
                 return (
                   <button key={r} className="dl-btn" onClick={() => setRole(r)} style={{
                     flexShrink: 0, padding: "4px 9px", borderRadius: 6, cursor: "pointer",
-                    background: on ? accent : "transparent", color: on ? "#0b0810" : MUTED,
+                    background: on ? accent : "transparent", color: on ? "var(--tile)" : MUTED,
                     border: `1px solid ${on ? accent : LINE}`, fontSize: 9.5, fontWeight: 900, letterSpacing: .4,
                   }}>{r === "all" ? "ALL" : r.toUpperCase()}</button>
                 );
@@ -215,7 +215,7 @@ export default function PickerPage() {
               key={c.heroId} className="dl-pick" onClick={() => add(c.heroId)} title={`${h.name} · ${c.delta >= 0 ? "+" : ""}${c.delta.toFixed(1)}%`}
               style={{
                 position: "relative", borderRadius: R_CHIP, overflow: "hidden", cursor: "pointer", padding: 0,
-                background: "#0A0D14", aspectRatio: "1 / 1",
+                background: "var(--tile)", aspectRatio: "1 / 1",
                 // Glow intensity tracks the size of the swing, so the strongest
                 // options are findable without reading a single number.
                 border: `1px solid ${strength > .12 ? accent : LINE}`,
@@ -264,7 +264,7 @@ function Slots({
           <span style={{ width: 4, height: 4, borderRadius: 2, background: accent, boxShadow: `0 0 6px ${accent}` }} />
           {label}
         </span>
-        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${accent}40, transparent)` }} />
+        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(accent, 25)}, transparent)` }} />
         <span style={{ fontSize: 8.5, color: DIM, fontWeight: 800 }}>{ids.length}/5</span>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
@@ -276,8 +276,8 @@ function Slots({
               {h ? (
                 <button onClick={() => onRemove(id)} className="dl-pick" title={`Remove ${h.name}`} style={{
                   width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 6, overflow: "hidden",
-                  border: `1px solid ${accent}99`, background: "#0c0a12", cursor: "pointer", display: "block",
-                  position: "relative", boxShadow: `0 0 0 1px ${accent}22`,
+                  border: `1px solid ${alpha(accent, 60)}`, background: "var(--tile)", cursor: "pointer", display: "block",
+                  position: "relative", boxShadow: `0 0 0 1px ${alpha(accent, 13)}`,
                 }}>
                   <HeroImg base={heroBase(h.img)} name={h.name} />
                   <span style={{
@@ -288,8 +288,8 @@ function Slots({
                 </button>
               ) : (
                 <button onClick={onEmpty} className="dl-pick" aria-label={`Add to ${label}`} style={{
-                  width: "100%", aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${accent}44`,
-                  display: "grid", placeItems: "center", color: `${accent}55`, fontSize: 13,
+                  width: "100%", aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${alpha(accent, 27)}`,
+                  display: "grid", placeItems: "center", color: `${alpha(accent, 33)}`, fontSize: 13,
                   background: "transparent", cursor: "pointer",
                 }}>+</button>
               )}

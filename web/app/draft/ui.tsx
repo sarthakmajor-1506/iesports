@@ -1,38 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { DraftTheme, DotaAtmosphere, FONT } from "./theme";
-import { useMuted } from "./sound";
+import { useMuted, useLight } from "./sound";
 
 /* ------------------------------------------------------------------ tokens
  *
- * These mirror the CSS custom properties in `theme.tsx`. Both exist because the
- * app builds translucent variants by concatenation — `${ENEMY}44` — which a
- * `var()` cannot do. Keep the two files in step.
+ * Every colour is a CSS variable defined in `theme.tsx`, so swapping the palette
+ * is one class on the frame — no context, no re-render, no prop drilling. Sizes
+ * stay plain numbers, because they do not change between themes.
  */
 
-export const BG = "#101318";
-export const PANEL = "#191E25";      // elevated surface
-export const PANEL_2 = "#222831";    // secondary surface
-export const LINE = "rgba(200,166,93,0.14)";
-export const LINE_HI = "rgba(200,166,93,0.30)";
-export const CREAM = "#DDE1E4";
-export const MUTED = "#8C949E";
-export const DIM = "#5D656F";
+export const BG = "var(--bg)";
+export const PANEL = "var(--surface)";      // elevated surface
+export const PANEL_2 = "var(--surface-2)";  // secondary surface
+export const LINE = "var(--line)";
+export const LINE_HI = "var(--line-hi)";
+export const CREAM = "var(--text)";
+export const MUTED = "var(--muted)";
+export const DIM = "var(--dim)";
 
 /** The two sides, as Dota colours them. */
-export const RADIANT = "#A2B93B";
-export const DIRE = "#C8402C";
+export const RADIANT = "var(--radiant)";
+export const DIRE = "var(--dire)";
 /** Dota's ornament gold — every frame, rule and highlight in the client. */
-export const GOLD = "#C8A65D";
+export const GOLD = "var(--gold)";
 
-export const GREEN = "#7FD44C";      // success, correct, positive delta
-export const DANGER = "#D6412B";     // ban, wrong
+export const GREEN = "var(--success)";     // success, correct, positive delta
+export const DANGER = "var(--danger)";     // ban, wrong
 export const ALLY = RADIANT;         // your side is always Radiant
 export const ENEMY = DIRE;           // theirs is always Dire
 export const RED = DIRE;
-export const BLUE = "#4BA9E8";
+export const BLUE = "var(--int)";
 
 export const GLOW_PRIMARY = "0 0 24px rgba(200, 64, 44, 0.42)";
 export const GLOW_GOLD = "0 0 22px rgba(200, 166, 93, 0.38)";
@@ -42,7 +42,19 @@ export const GLOW_SUCCESS = "0 0 22px rgba(162, 185, 59, 0.40)";
 export const R_CARD = 4, R_BTN = 3, R_CHIP = 3;
 
 /** Attribute colours, as the client paints them. */
-export const ATTR = { str: "#E04A3F", agi: "#9BC44E", int: "#4BA9E8", all: "#C77DDA" } as const;
+export const ATTR = { str: "var(--str)", agi: "var(--agi)", int: "var(--int)", all: "var(--uni)" } as const;
+
+/**
+ * A translucent variant of any colour, including a CSS variable.
+ *
+ * The app used to build these by appending two hex digits to a constant, which
+ * only works while the constant is a hex literal — and that is precisely what
+ * made a second theme impossible, since `var(--gold)44` is not a colour at all.
+ * `color-mix()` takes a variable happily, so the palette can now be swapped by a
+ * class without touching a single call site.
+ */
+export const alpha = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
 export const attrColor = (a: string) => ATTR[a as keyof typeof ATTR] ?? ATTR.all;
 export const attrName = (a: string) => (a === "str" ? "STRENGTH" : a === "agi" ? "AGILITY" : a === "int" ? "INTELLIGENCE" : "UNIVERSAL");
 
@@ -86,6 +98,7 @@ export function Shell({
   /** Dial the drifting Radiant/Dire lights down on busy screens. */
   atmos?: number;
 }) {
+  useLight();
   return (
     <div className="dl-app" style={{
       height: "100dvh", background: BG, color: CREAM, fontFamily: FONT,
@@ -130,7 +143,7 @@ export function Band({
   return (
     <div style={{
       flex: "0 0 auto", position: "relative", zIndex: 20,
-      background: `linear-gradient(180deg, ${accent}26 0%, ${accent}0d 46%, rgba(11,14,20,0) 100%)`,
+      background: `linear-gradient(180deg, ${alpha(accent, 15)} 0%, ${alpha(accent, 5)} 46%, rgba(11,14,20,0) 100%)`,
       borderBottom: `1px solid ${LINE}`,
       backdropFilter: "blur(10px)",
       padding: `calc(10px + env(safe-area-inset-top)) 12px ${children ? 11 : 10}px`,
@@ -200,7 +213,7 @@ export function TabBar({ active }: { active: Tab }) {
   return (
     <nav style={{
       flex: "0 0 auto", display: "flex", gap: 4, zIndex: 30,
-      borderTop: `1px solid ${LINE}`, background: "rgba(8,11,18,.92)", backdropFilter: "blur(14px)",
+      borderTop: `1px solid ${LINE}`, background: "var(--chrome)", backdropFilter: "blur(14px)",
       padding: "7px 8px calc(7px + env(safe-area-inset-bottom))",
     }}>
       {TABS.map((t) => {
@@ -244,7 +257,7 @@ export function Segment<T extends string>({
   return (
     <div style={{
       display: "flex", gap: 3, padding: 3, borderRadius: R_BTN,
-      background: "rgba(0,0,0,.32)", border: `1px solid ${LINE}`,
+      background: "var(--field)", border: `1px solid ${LINE}`,
     }}>
       {options.map((o) => {
         const on = o.v === value;
@@ -288,7 +301,7 @@ export function Btn({
   const flat = tone === "ghost" || tone === "dark";
   const style: React.CSSProperties = {
     width: full ? "100%" : undefined, padding: pad, borderRadius: R_BTN, border: t.border,
-    background: disabled ? "#1B2130" : t.bg, color: disabled ? DIM : t.fg,
+    background: disabled ? "var(--disabled)" : t.bg, color: disabled ? DIM : t.fg,
     fontSize: fs, fontWeight: 800, letterSpacing: .3, textAlign: "center",
     cursor: disabled ? "not-allowed" : "pointer", textDecoration: "none",
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
@@ -318,7 +331,7 @@ export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       style={{
-        width: "100%", background: "rgba(0,0,0,.32)", border: `1px solid ${LINE}`, color: CREAM,
+        width: "100%", background: "var(--field)", border: `1px solid ${LINE}`, color: CREAM,
         padding: "11px 13px", borderRadius: R_BTN, fontSize: 16, outline: "none", boxSizing: "border-box",
         fontFamily: "inherit",
         ...props.style,
@@ -376,6 +389,30 @@ export function SoundToggle() {
   );
 }
 
+/** Sun/moon switch, sitting next to the speaker. One tap, and it persists. */
+export function ThemeToggle() {
+  const [light, setLight] = useLight();
+  return (
+    <button
+      onClick={() => setLight(!light)} className="dl-btn"
+      aria-label={light ? "Switch to dark theme" : "Switch to light theme"}
+      title={light ? "Light theme" : "Dark theme"}
+      style={{
+        width: 32, height: 32, borderRadius: R_CHIP, background: PANEL_2, border: `1px solid ${LINE}`,
+        color: light ? GOLD : MUTED, cursor: "pointer", display: "grid", placeItems: "center", padding: 0,
+      }}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {light ? (
+          <><circle cx="12" cy="12" r="4.2" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" /></>
+        ) : (
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.6 6.6 0 0 0 10.5 10.5z" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
 /**
  * The single most important thing on a drafting screen: is it my turn?
  * It sits first, largest, and is the only thing that pulses.
@@ -384,7 +421,7 @@ export function TurnBanner({ active, label, accent = GOLD }: { active: boolean; 
   return (
     <div className={active ? "dl-turn" : undefined} style={{
       textAlign: "center", padding: "11px 10px", borderRadius: R_BTN, marginTop: 9,
-      background: active ? `${accent}1f` : "rgba(255,255,255,.025)",
+      background: active ? `${alpha(accent, 12)}` : "rgba(255,255,255,.025)",
       border: `1px solid ${active ? accent + "59" : LINE}`,
       boxShadow: active ? `0 0 26px -10px ${accent}` : "none",
     }}>
@@ -423,8 +460,8 @@ export function DraftTimeline({
           <div key={i} style={{
             flexShrink: 0, width: active ? 22 : 14, height: active ? 22 : 14,
             borderRadius: s.kind === "ban" ? 4 : 999,
-            background: active ? c : done ? `${c}4d` : "rgba(255,255,255,.06)",
-            border: `1px solid ${active ? c : done ? `${c}80` : LINE}`,
+            background: active ? c : done ? `${alpha(c, 30)}` : "rgba(255,255,255,.06)",
+            border: `1px solid ${active ? c : done ? `${alpha(c, 50)}` : LINE}`,
             display: "grid", placeItems: "center", scrollSnapAlign: "center",
             boxShadow: active ? `0 0 12px -2px ${c}` : undefined,
             transition: "width var(--t) var(--ease), height var(--t) var(--ease)",
@@ -460,11 +497,11 @@ export function VersusBar({ p, left, right, small }: { p: number; left: string; 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${ALLY}55` }}>
+        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${alpha(ALLY, 33)}` }}>
           {pct.toFixed(1)}%
         </span>
         <span style={{ fontSize: 9, letterSpacing: 1.2, color: MUTED, fontWeight: 800 }}>{left} · {right}</span>
-        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${ENEMY}55` }}>
+        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${alpha(ENEMY, 33)}` }}>
           {(100 - pct).toFixed(1)}%
         </span>
       </div>

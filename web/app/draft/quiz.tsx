@@ -5,7 +5,8 @@ import {
   buildQuiz, scoreAnswer, QUIZ_SECONDS, MAX_POINTS,
   type Knowledge, type Question,
 } from "@/lib/quiz";
-import { Btn, Label, Pips, CountUp, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, DANGER, ENEMY, R_CARD, R_BTN, R_CHIP } from "./ui";
+import { Btn, Label, Pips, CountUp, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, DANGER, ENEMY, R_CARD, R_BTN, R_CHIP, alpha,
+} from "./ui";
 import { Burst } from "./theme";
 import { play } from "./sound";
 
@@ -170,7 +171,7 @@ export function QuizRound({
       <div style={{ ...panel(), textAlign: "center", padding: "44px 16px" }}>
         <div key={countdown} style={{
           fontSize: 72, fontWeight: 900, color: GOLD, lineHeight: 1,
-          animation: "dl-slam .5s cubic-bezier(.2,.9,.3,1.3)", textShadow: `0 0 40px ${GOLD}66`,
+          animation: "dl-slam .5s cubic-bezier(.2,.9,.3,1.3)", textShadow: `0 0 40px ${alpha(GOLD, 40)}`,
         }}>{countdown === 0 ? "GO" : countdown}</div>
       </div>
     );
@@ -188,7 +189,7 @@ export function QuizRound({
         {result.rounds.map((r, i) => (
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 9,
-            background: r.correct ? `${GREEN}14` : `${DANGER}14`, marginBottom: 4,
+            background: r.correct ? `${alpha(GREEN, 8)}` : `${alpha(DANGER, 8)}`, marginBottom: 4,
           }}>
             <span style={{ fontSize: 13, color: r.correct ? GREEN : DANGER, fontWeight: 800 }}>{r.correct ? "✓" : "✕"}</span>
             <span style={{ fontSize: 11.5, color: CREAM, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prompt}</span>
@@ -234,7 +235,7 @@ export function QuizRound({
           <div style={{
             width: q.imgShape === "square" ? 76 : 92, height: q.imgShape === "square" ? 76 : 68,
             margin: "0 auto 10px", borderRadius: R_CHIP, overflow: "hidden",
-            border: `1px solid ${LINE}`, background: "#0A0D14", boxShadow: `0 8px 26px -10px ${GOLD}`,
+            border: `1px solid ${LINE}`, background: "var(--tile)", boxShadow: `0 8px 26px -10px ${GOLD}`,
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={q.img} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
@@ -256,7 +257,7 @@ export function QuizRound({
                 display: "flex", alignItems: "center", gap: 8, textAlign: "left",
                 padding: optionsHaveArt ? "9px" : "13px 14px", borderRadius: R_BTN,
                 cursor: phase === "asking" ? "pointer" : "default",
-                background: tone ? `${tone}22` : PANEL_2, border: `1.5px solid ${tone ?? LINE}`,
+                background: tone ? `${alpha(tone, 13)}` : PANEL_2, border: `1.5px solid ${tone ?? LINE}`,
                 color: CREAM, fontSize: 13.5, fontWeight: 700, minHeight: 50,
                 boxShadow: tone ? `0 0 18px -6px ${tone}` : "none",
                 flexDirection: optionsHaveArt ? "column" : "row",
@@ -283,7 +284,7 @@ export function QuizRound({
         <div className="dl-in" style={{ marginTop: 10, textAlign: "center" }}>
           {/* A correct answer that ran the clock out still scores 0, but calling
               that a "miss" tells the player they were wrong when they were not. */}
-          <div style={{ fontSize: 19, fontWeight: 900, color: gained ? GOLD : chosen != null && q.options[chosen].correct ? GREEN : MUTED, textShadow: gained ? `0 0 22px ${GOLD}66` : undefined }}>
+          <div style={{ fontSize: 19, fontWeight: 900, color: gained ? GOLD : chosen != null && q.options[chosen].correct ? GREEN : MUTED, textShadow: gained ? `0 0 22px ${alpha(GOLD, 40)}` : undefined }}>
             {gained ? `+${gained}`
               : chosen == null ? "OUT OF TIME"
               : q.options[chosen].correct ? "RIGHT — BUT TOO SLOW"

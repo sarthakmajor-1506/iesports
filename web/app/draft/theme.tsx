@@ -11,7 +11,7 @@
  * pages.
  *
  * The JS constants in `ui.tsx` mirror these values, because a lot of the app
- * builds translucent variants by string concatenation (`${DIRE}55`), which a
+ * builds translucent variants by string concatenation (`${alpha(DIRE, 33)}`), which a
  * `var()` cannot do. The hex values in the two files must stay in step.
  */
 
@@ -26,6 +26,11 @@ export function DraftTheme() {
         --surface:   #191E25;
         --surface-2: #222831;
         --overlay:   rgba(10, 13, 17, 0.93);
+        --chrome:    rgba(10, 13, 17, 0.92);
+        --tile:      #0A0D14;
+        --field:     rgba(0,0,0,0.32);
+        --disabled:  #1B2130;
+        --hairline:  rgba(200,166,93,.34);
 
         /* the two sides */
         --radiant:   #A2B93B;
@@ -70,7 +75,52 @@ export function DraftTheme() {
         color-scheme: dark;
       }
 
-      html, body { background: #101318; overscroll-behavior: none; }
+      /*
+       * Light mode — warm stone and parchment rather than white, so it still
+       * reads as Dota rather than as a document. The accents darken, because
+       * #A2B93B on parchment is roughly 2:1 against the text it sits beside;
+       * keeping the dark values here would have shipped a theme nobody could
+       * read. The surfaces beneath hero art stay dark in both, since the art
+       * itself is dark and a light bed shows as a halo around every portrait.
+       */
+      html[data-draft-theme="light"] .dl-app {
+        --bg:        #E7E3D9;
+        --surface:   #F4F1EA;
+        --surface-2: #DED8CA;
+        --overlay:   rgba(244, 241, 234, 0.93);
+
+        --radiant:   #5E7317;
+        --radiant-h: #71891F;
+        --dire:      #B33320;
+        --dire-h:    #CA3D27;
+
+        --gold:      #8A6A20;
+        --gold-h:    #A5812C;
+
+        --str:       #B93529;
+        --agi:       #5E7317;
+        --int:       #1E6FA8;
+        --uni:       #8A44A0;
+
+        --success:   #3E7D18;
+        --danger:    #B62A17;
+
+        --text:      #1A1D22;
+        --muted:     #565D66;
+        --dim:       #7C848E;
+
+        --line:      rgba(70, 55, 22, 0.18);
+        --line-hi:   rgba(70, 55, 22, 0.34);
+
+        --chrome:    rgba(244, 241, 234, 0.92);
+        --tile:      #CFC9BB;
+
+        --glow-radiant: 0 0 18px rgba(94, 115, 23, 0.28);
+        --glow-dire:    0 0 18px rgba(179, 51, 32, 0.30);
+        --glow-gold:    0 0 16px rgba(138, 106, 32, 0.28);
+      }
+
+      html, body { overscroll-behavior: none; }
 
       /* ---------------------------------------------------------- surfaces */
 
@@ -86,7 +136,7 @@ export function DraftTheme() {
       .dl-card { position: relative; }
       .dl-card::before {
         content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(200,166,93,.34) 22%, rgba(200,166,93,.34) 78%, transparent);
+        background: linear-gradient(90deg, transparent, var(--hairline) 22%, var(--hairline) 78%, transparent);
         pointer-events: none;
       }
 
@@ -157,6 +207,7 @@ export function DraftTheme() {
       }
       /* A faint diagonal weave panning behind everything, like the client's stonework. */
       @keyframes dl-weave { from { background-position: 0 0 } to { background-position: 120px 120px } }
+      html[data-draft-theme="light"] .dl-atmos { opacity: .55; }
 
       .dl-in     { animation: dl-in .32s var(--ease) both; }
       .dl-turn   { animation: dl-pulse 1.3s ease-in-out infinite; }

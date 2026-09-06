@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { Knowledge, KHero, KItem } from "@/lib/quiz";
 import {
   Shell, Band, Segment, Field, Panel, Label,
-  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, BLUE, attrColor,
+  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, BLUE, attrColor, alpha,
 } from "../ui";
 import { HeroImg, heroRender } from "../hero-art";
 import { Skeleton } from "../theme";
@@ -101,7 +101,7 @@ function Guide() {
                 return (
                   <button key={a.v} className="dl-btn" onClick={() => setAttr(a.v)} style={{
                     flex: "1 1 0", padding: "4px 2px", borderRadius: 7, cursor: "pointer",
-                    background: on ? c : "transparent", color: on ? "#0b0810" : MUTED,
+                    background: on ? c : "transparent", color: on ? "var(--tile)" : MUTED,
                     border: `1px solid ${on ? c : LINE}`, fontSize: 9.5, fontWeight: 900, letterSpacing: .5,
                   }}>{a.label}</button>
                 );
@@ -117,7 +117,7 @@ function Guide() {
           {heroes.map((h) => (
             <button key={h.id} className="dl-pick" onClick={() => setHero(h)} style={{
               padding: 0, border: `1px solid ${LINE}`, borderRadius: 5, overflow: "hidden",
-              background: "#0c0a12", cursor: "pointer", position: "relative", aspectRatio: "3 / 4",
+              background: "var(--tile)", cursor: "pointer", position: "relative", aspectRatio: "3 / 4",
             }}>
               <HeroImg base={h.base} name={h.name} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "linear-gradient(transparent, rgba(4,3,7,.95))", padding: "11px 3px 3px" }}>
@@ -140,7 +140,7 @@ function Guide() {
             }}>
               <ItemImg item={i} w={42} h={31} />
               <span style={{ flex: "1 1 auto", fontSize: 13, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.n}</span>
-              {i.neutral && <span style={{ fontSize: 8.5, color: GREEN, border: `1px solid ${GREEN}55`, borderRadius: 4, padding: "1px 4px", fontWeight: 800, flexShrink: 0 }}>T{i.tier}</span>}
+              {i.neutral && <span style={{ fontSize: 8.5, color: GREEN, border: `1px solid ${alpha(GREEN, 33)}`, borderRadius: 4, padding: "1px 4px", fontWeight: 800, flexShrink: 0 }}>T{i.tier}</span>}
               <span style={{ fontSize: 12, fontWeight: 900, color: GOLD, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{i.cost}</span>
             </button>
           ))}
@@ -218,7 +218,7 @@ function HeroDetail({ hero, onBack }: { hero: KHero; onBack: () => void }) {
             <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.img} alt="" loading="lazy" style={{
-                width: 42, height: 42, borderRadius: 9, flexShrink: 0, background: "#0c0a12",
+                width: 42, height: 42, borderRadius: 9, flexShrink: 0, background: "var(--tile)",
                 border: `1px solid ${a.ult ? GOLD : a.innate ? c : LINE}`,
                 objectFit: "cover",
               }} />
@@ -309,7 +309,7 @@ function Attr({ label, v, g, on, color }: { label: string; v: number; g: number;
   return (
     <div style={{
       flex: "1 1 0", borderRadius: 10, padding: "7px 4px", textAlign: "center", minWidth: 0,
-      background: on ? `${color}1c` : PANEL, border: `1px solid ${on ? color + "66" : LINE}`,
+      background: on ? `${alpha(color, 11)}` : PANEL, border: `1px solid ${on ? color + "66" : LINE}`,
     }}>
       <div style={{ fontSize: 13, fontWeight: 900, color: on ? color : CREAM, fontVariantNumeric: "tabular-nums" }}>
         {v}<span style={{ fontSize: 10, color: MUTED, fontWeight: 700 }}> +{g}</span>
@@ -324,7 +324,7 @@ function Tag({ children, color, solid }: { children: React.ReactNode; color: str
     <span style={{
       fontSize: 8.5, fontWeight: 900, letterSpacing: .5, borderRadius: 4, padding: "2px 4px",
       color: solid ? "#140f06" : color, background: solid ? color : "transparent",
-      border: solid ? "none" : `1px solid ${color}66`,
+      border: solid ? "none" : `1px solid ${alpha(color, 40)}`,
     }}>{children}</span>
   );
 }
@@ -336,7 +336,7 @@ function ItemDetail({ k, item, onBack, onOpen }: { k: Knowledge; item: KItem; on
   return (
     <Shell tab="guide" head={<Band title={item.n} compact onBack={onBack} sub={`${item.cost} gold${item.qual ? ` · ${item.qual}` : ""}`} />}>
 
-      <Panel style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${GOLD}33` }}>
+      <Panel style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${alpha(GOLD, 20)}` }}>
         <ItemImg item={item} w={64} h={48} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis" }}>{item.n}</div>

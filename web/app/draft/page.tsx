@@ -11,12 +11,12 @@ import type { Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips, SoundToggle,
-  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, DANGER, ALLY, R_CARD, R_BTN, R_CHIP,
+  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
+  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, DANGER, ALLY, R_CARD, R_BTN, R_CHIP, alpha,
 } from "./ui";
 import { Skeleton } from "./theme";
 import { play } from "./sound";
-import { TeamRow, BanStrip, DraftColumn, AttributePool, setRenderConcurrency } from "./hero-art";
+import { TeamRow, BanStrip, HeroGrid, setRenderConcurrency } from "./hero-art";
 import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
@@ -293,11 +293,12 @@ function Duel() {
           <Band title="Draft Duel" compact sub="Draft, then three questions"
             right={
               <>
+                <ThemeToggle />
                 <SoundToggle />
                 <span style={{
                   maxWidth: 108, fontSize: 10.5, fontWeight: 800, color: user ? GREEN : DIM,
                   border: `1px solid ${user ? GREEN + "44" : LINE}`, borderRadius: R_CHIP, padding: "5px 9px",
-                  background: user ? `${GREEN}12` : PANEL_2,
+                  background: user ? `${alpha(GREEN, 7)}` : PANEL_2,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>{user ? (steamName || name || "Signed in") : "Guest"}</span>
               </>
@@ -412,58 +413,54 @@ function Duel() {
 
     return (
       <Shell
-        tab={null} pad={false} atmos={0.55}
+        tab={null} atmos={0.4}
         head={
-          <Band compact accent={banning ? DANGER : yourTurn ? GOLD : MUTED} onBack={toMenu}
-            title="RADIANT vs DIRE" sub={`Round ${turnIndex + 1} of ${SEQ.length}`}
+          /*
+           * One line of chrome, not four. The banner, the timeline and the ban
+           * strip used to stack above the board and cost roughly a third of the
+           * screen before a single hero was visible. The turn now lives in the
+           * title, where it is read anyway, and the accent carries the state.
+           */
+          <Band compact onBack={toMenu}
+            accent={banning ? DANGER : yourTurn ? GOLD : MUTED}
+            title={
+              <span style={{ color: banning ? DANGER : yourTurn ? GOLD : MUTED }}>{turnLabel}</span>
+            }
+            sub={`Round ${turnIndex + 1} of ${SEQ.length}${bans.length ? ` · ${bans.length} banned` : ""}`}
             right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? GOLD : DIM} />}
-          >
-            <TurnBanner active={yourTurn} label={turnLabel} accent={banning ? DANGER : GOLD} />
-            <div style={{ marginTop: 8 }}>
-              <DraftTimeline seq={SEQ} current={Math.min(turnIndex, SEQ.length - 1)} mineRole={YOU} />
-            </div>
-            {bans.length > 0 && <div style={{ marginTop: 8 }}><BanStrip bans={bans} byId={heroById} /></div>}
-          </Band>
+          />
         }
       >
-        {/*
-          Dota's own shape: Radiant down one side, Dire down the other, the hero
-          pool between them. The columns are narrow because they are status —
-          every pixel they take comes out of the grid, which is the part in use.
-        */}
-        <div style={{ display: "flex", gap: 6, padding: "9px 8px 16px", alignItems: "flex-start" }}>
-          <DraftColumn
-            side="radiant" label="RADIANT" motion={motion}
-            heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null}
-            active={yourTurn} status={yourTurn ? (banning ? "banning" : "picking") : "you"}
-          />
-
-          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-            <Field value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder={yourTurn ? (banning ? "Search — banning" : "Search heroes") : "Waiting…"}
-              disabled={!yourTurn}
-              style={{
-                padding: "7px 10px", minHeight: 34, fontSize: 15, marginBottom: 9,
-                opacity: yourTurn ? 1 : .4, borderColor: banning && yourTurn ? DANGER : LINE,
-              }} />
-
-            {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
-              <div style={{ fontSize: 10, color: DANGER, marginBottom: 8, lineHeight: 1.35 }}>
-                Dire banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
-                {lastBotBan.deniedRank === 1 ? " best" : ` #${lastBotBan.deniedRank}`} option.
-              </div>
-            )}
-
-            <div style={{ opacity: yourTurn ? 1 : .34, pointerEvents: yourTurn ? "auto" : "none" }}>
-              <AttributePool ids={filtered} byId={poolHero} onPick={act} dim={banning} />
-            </div>
-          </div>
-
-          <DraftColumn
-            side="dire" label="DIRE" motion={motion}
+        <div style={{ display: "grid", gap: 8, paddingTop: 9 }}>
+          <TeamRow side="them" label="DIRE" motion={motion} height="clamp(96px, 29vw, 148px)"
             heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
-            active={botTurn} status={botTurn ? (banning ? "banning" : "picking") : "bot"}
-          />
+            status={{ text: botTurn ? (banning ? "banning…" : "picking…") : "idle", active: botTurn }}
+            note={lastBotPick?.answering != null ? (
+              <span style={{ fontSize: 9, color: ENEMY, textAlign: "right", lineHeight: 1.2 }}>
+                answers your {heroName(lastBotPick.answering)}
+              </span>
+            ) : undefined} />
+          <TeamRow side="you" label="RADIANT" motion={motion} height="clamp(96px, 29vw, 148px)"
+            heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null} />
+        </div>
+
+        <Field value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder={yourTurn ? (banning ? "Search — banning" : "Search heroes") : "Waiting for Dire…"}
+          disabled={!yourTurn}
+          style={{
+            marginTop: 9, padding: "8px 11px", minHeight: 36,
+            opacity: yourTurn ? 1 : .4, borderColor: banning && yourTurn ? DANGER : LINE,
+          }} />
+
+        {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
+          <div style={{ fontSize: 11, color: DANGER, padding: "8px 2px 0", lineHeight: 1.35 }}>
+            Dire banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
+            {lastBotBan.deniedRank === 1 ? " best" : ` #${lastBotBan.deniedRank}`} option.
+          </div>
+        )}
+
+        <div style={{ padding: "9px 0 16px", opacity: yourTurn ? 1 : .34, pointerEvents: yourTurn ? "auto" : "none" }}>
+          <HeroGrid ids={filtered} byId={heroById} onPick={act} dim={banning} min="clamp(56px, 17vw, 74px)" labelSize={8} />
         </div>
       </Shell>
     );
@@ -497,8 +494,8 @@ function ModeTile({
     <button className="dl-btn dl-card" onClick={() => { play("pick"); onClick(); }} style={{
       flex: "1 1 0", minWidth: 0, textAlign: "left", cursor: "pointer",
       position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "14px 12px 13px",
-      background: `linear-gradient(158deg, ${PANEL} 34%, ${accent}26)`,
-      border: `1px solid ${accent}3d`, color: CREAM,
+      background: `linear-gradient(158deg, ${PANEL} 34%, ${alpha(accent, 15)})`,
+      border: `1px solid ${alpha(accent, 24)}`, color: CREAM,
       boxShadow: `0 10px 34px -18px ${accent}, 0 0 0 1px rgba(255,255,255,.02) inset`,
     }}>
       <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent, boxShadow: `0 0 18px ${accent}` }} />
@@ -507,7 +504,7 @@ function ModeTile({
       <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.35, marginBottom: 11, minHeight: 27 }}>{sub}</div>
       <span style={{
         display: "block", textAlign: "center", padding: "9px 6px", borderRadius: R_BTN,
-        background: `linear-gradient(180deg, ${accent}, ${accent}CC)`, color: accent === GOLD ? "#1A1103" : "#FFF",
+        background: `linear-gradient(180deg, ${accent}, ${alpha(accent, 80)})`, color: accent === GOLD ? "#1A1103" : "#FFF",
         fontSize: 11.5, fontWeight: 800, letterSpacing: .5, boxShadow: `0 0 22px -6px ${accent}`,
       }}>{cta}</span>
     </button>

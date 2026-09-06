@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, DIM, R_CHIP, attrColor, attrName } from "./ui";
+import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, DIM, R_CHIP, attrColor, attrName, alpha,
+} from "./ui";
 
 /**
  * Hero art — one place, one fallback chain.
@@ -144,7 +145,7 @@ function Card({
         className={hero && !hidden ? "dl-drop" : undefined}
         style={{
           position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden",
-          background: hero ? "#0A0D14" : "rgba(255,255,255,.018)",
+          background: hero ? "var(--tile)" : "rgba(255,255,255,.018)",
           border: `1px solid ${latest ? accent : hero ? "rgba(255,255,255,.10)" : "rgba(255,255,255,.05)"}`,
           boxShadow: latest ? `0 0 0 1px ${accent}, 0 10px 30px -10px ${accent}, 0 0 22px -8px ${accent}` : "none",
         }}
@@ -184,7 +185,7 @@ function Card({
               <>
                 <span key={`f${hero.id}`} className="dl-flash" style={{
                   position: "absolute", inset: 0, pointerEvents: "none",
-                  background: `linear-gradient(180deg, ${accent}00, ${accent}70)`,
+                  background: `linear-gradient(180deg, ${alpha(accent, 0)}, ${alpha(accent, 44)})`,
                 }} />
                 <span key={`r${hero.id}`} style={{
                   position: "absolute", inset: -2, pointerEvents: "none", borderRadius: "inherit",
@@ -237,7 +238,7 @@ export function TeamRow({
           {label}
         </span>
         {status && <Presence text={status.text} color={accent} active={status.active} />}
-        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${accent}44, transparent)` }} />
+        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(accent, 27)}, transparent)` }} />
         {note}
       </div>
       <div style={{ display: "flex", gap: 4 }}>
@@ -276,11 +277,11 @@ export function HeroGrid({
         return (
           <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
             padding: 0, border: `1px solid ${dim ? DANGER + "3d" : LINE}`, borderRadius: R_CHIP, overflow: "hidden",
-            background: "#0A0D14", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
+            background: "var(--tile)", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
             filter: dim ? "saturate(.45) brightness(.9)" : undefined,
           }}>
             <HeroImg base={heroBase(h.img)} name={h.name} />
-            {dim && <span style={{ position: "absolute", inset: 0, background: `${DANGER}1f`, pointerEvents: "none" }} />}
+            {dim && <span style={{ position: "absolute", inset: 0, background: `${alpha(DANGER, 12)}`, pointerEvents: "none" }} />}
             <span style={{
               position: "absolute", left: 0, right: 0, bottom: 0, fontSize: labelSize ?? 7.5, color: CREAM,
               background: "linear-gradient(transparent, rgba(6,9,15,.96))", padding: "10px 3px 3px",
@@ -351,7 +352,7 @@ export function DraftColumn({
     }}>
       <div className="dl-cut-s" style={{
         textAlign: "center", padding: "3px 2px 4px",
-        background: active ? `${accent}2e` : `${accent}12`,
+        background: active ? `${alpha(accent, 18)}` : `${alpha(accent, 7)}`,
         borderBottom: `2px solid ${accent}`,
         boxShadow: active ? `0 0 16px -4px ${accent}` : "none",
       }}>
@@ -374,8 +375,8 @@ export function DraftColumn({
             className={hero ? "dl-drop dl-cut-s" : "dl-cut-s"}
             style={{
               position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
-              background: hero ? "#0C1015" : "rgba(200,166,93,.035)",
-              border: `1px solid ${isLatest ? accent : hero ? `${accent}55` : "rgba(200,166,93,.16)"}`,
+              background: hero ? "var(--tile)" : "rgba(200,166,93,.035)",
+              border: `1px solid ${isLatest ? accent : hero ? `${alpha(accent, 33)}` : "rgba(200,166,93,.16)"}`,
               boxShadow: isLatest ? `0 0 0 1px ${accent}, 0 0 18px -4px ${accent}` : "none",
             }}
           >
@@ -390,7 +391,7 @@ export function DraftColumn({
                 }}>{hero.name}</span>
                 {isLatest && (
                   <>
-                    <span className="dl-flash" style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${accent}00, ${accent}70)` }} />
+                    <span className="dl-flash" style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${alpha(accent, 0)}, ${alpha(accent, 44)})` }} />
                     <span style={{ position: "absolute", inset: -2, border: `2px solid ${accent}`, animation: "dl-ring .6s var(--ease) both" }} />
                   </>
                 )}
@@ -398,7 +399,7 @@ export function DraftColumn({
             ) : (
               <span style={{
                 position: "absolute", inset: 0, display: "grid", placeItems: "center",
-                color: `${accent}33`, fontSize: 13, fontWeight: 800,
+                color: `${alpha(accent, 20)}`, fontSize: 13, fontWeight: 800,
               }}>{i + 1}</span>
             )}
           </div>
@@ -438,7 +439,7 @@ export function AttributePool({
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <span style={{ width: 7, height: 7, background: c, boxShadow: `0 0 7px ${c}`, flexShrink: 0 }} />
               <span style={{ fontSize: 7.5, fontWeight: 800, letterSpacing: 1.1, color: c }}>{attrName(g.attr)}</span>
-              <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${c}3d, transparent)` }} />
+              <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(c, 24)}, transparent)` }} />
               <span style={{ fontSize: 7.5, color: DIM, fontWeight: 700 }}>{g.list.length}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 3 }}>
@@ -447,12 +448,12 @@ export function AttributePool({
                 return (
                   <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
                     padding: 0, position: "relative", aspectRatio: "1 / 1", cursor: "pointer", overflow: "hidden",
-                    background: "#0C1015", border: `1px solid ${dim ? `${DANGER}45` : "rgba(200,166,93,.13)"}`,
+                    background: "var(--tile)", border: `1px solid ${dim ? `${alpha(DANGER, 27)}` : "rgba(200,166,93,.13)"}`,
                     borderLeft: `2px solid ${dim ? DANGER : c}`,
                     filter: dim ? "saturate(.4) brightness(.85)" : undefined,
                   }}>
                     <HeroImg base={heroBase(h.img)} name={h.name} />
-                    {dim && <span style={{ position: "absolute", inset: 0, background: `${DANGER}26`, pointerEvents: "none" }} />}
+                    {dim && <span style={{ position: "absolute", inset: 0, background: `${alpha(DANGER, 15)}`, pointerEvents: "none" }} />}
                     <span style={{
                       position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: CREAM, fontWeight: 800,
                       background: "linear-gradient(transparent, rgba(8,11,15,.97))", padding: "8px 1px 2px",

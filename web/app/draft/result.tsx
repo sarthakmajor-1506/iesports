@@ -5,7 +5,7 @@ import { counterMap, teamTempo, draftingStyle, type TempoRow, type CounterEdge }
 import { useEffect, useState } from "react";
 import {
   Band, Btn, Panel, Label, VersusBar, CountUp,
-  CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
+  CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
 } from "./ui";
 import { Burst } from "./theme";
 import { play } from "./sound";
@@ -34,7 +34,7 @@ export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu
   return (
     <div style={{
       flex: "0 0 auto", display: "flex", gap: 8, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
-      borderTop: `1px solid ${LINE}`, background: "rgba(8,11,18,.94)", backdropFilter: "blur(14px)",
+      borderTop: `1px solid ${LINE}`, background: "var(--chrome)", backdropFilter: "blur(14px)",
     }}>
       <div style={{ flex: 2 }}><Btn full size="l" tone="red" onClick={onAgain}>PLAY AGAIN</Btn></div>
       <div style={{ flex: 1 }}><Btn full size="l" tone="ghost" onClick={onMenu}>MENU</Btn></div>
@@ -133,7 +133,7 @@ export function Result({
 
       <div style={{
         borderRadius: 10, padding: "12px 13px",
-        background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33`,
+        background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${alpha(GOLD, 20)}`,
       }}>
         <Label color={GOLD}>YOUR DRAFTING STYLE</Label>
         <div style={{ fontSize: 16, color: GOLD, fontWeight: 900, letterSpacing: -0.2 }}>{style.tag}</div>
@@ -241,7 +241,7 @@ function ScoreReveal({
           {quiz.rounds.map((r, i) => (
             <span key={i} style={{
               width: 34, height: 34, borderRadius: R_CHIP, display: "grid", placeItems: "center",
-              background: r.correct ? `${GREEN}1f` : `${DANGER}1f`,
+              background: r.correct ? `${alpha(GREEN, 12)}` : `${alpha(DANGER, 12)}`,
               border: `1px solid ${r.correct ? GREEN : DANGER}55`,
               color: r.correct ? GREEN : DANGER, fontSize: 12, fontWeight: 800,
             }}>{r.correct ? `+${r.points}` : "0"}</span>

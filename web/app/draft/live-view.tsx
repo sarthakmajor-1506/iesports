@@ -8,9 +8,9 @@ import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
   Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline,
-  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
+  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
 } from "./ui";
-import { TeamRow, BanStrip, DraftColumn, AttributePool } from "./hero-art";
+import { TeamRow, BanStrip, HeroGrid } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -138,7 +138,7 @@ export function LiveView({
         tab={null}
         head={<Band title="Live room" compact accent={GOLD} onBack={onLeave} sub="Share the code — the draft starts the moment they join" />}
         foot={
-          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "#0b0910" }}>
+          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "var(--chrome)" }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={() => navigator.clipboard?.writeText(code)}>COPY CODE</Btn></div>
             <div style={{ flex: 1 }}><Btn full tone="dark" onClick={() => navigator.clipboard?.writeText(link)}>COPY LINK</Btn></div>
           </div>
@@ -146,7 +146,7 @@ export function LiveView({
       >
           <div className="dl-in" style={{ textAlign: "center", padding: "34px 0 0" }}>
           <div style={{ fontSize: 10, letterSpacing: 1.6, color: GOLD, fontWeight: 900 }}>ROOM CODE{room.bans ? " · BANS ON" : ""}</div>
-          <div style={{ fontSize: "clamp(38px, 14vw, 62px)", fontWeight: 900, letterSpacing: 10, color: GOLD, margin: "8px 0 2px", lineHeight: 1, textShadow: `0 0 40px ${GOLD}44` }}>{code}</div>
+          <div style={{ fontSize: "clamp(38px, 14vw, 62px)", fontWeight: 900, letterSpacing: 10, color: GOLD, margin: "8px 0 2px", lineHeight: 1, textShadow: `0 0 40px ${alpha(GOLD, 27)}` }}>{code}</div>
           <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: MUTED, fontSize: 12.5 }}>
             <span className="dl-turn" style={{ color: GREEN }}>●</span> {room.host?.name} is ready
           </div>
@@ -196,7 +196,7 @@ export function LiveView({
         tab={null}
         head={<Band compact accent={won ? GREEN : ENEMY} title={won ? `You beat ${themName}` : `${themName} beat you`} />}
         foot={
-          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "#0b0910" }}>
+          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "var(--chrome)" }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={onLeave}>BACK TO DUEL</Btn></div>
           </div>
         }
@@ -207,7 +207,7 @@ export function LiveView({
           </Panel>
 
           {quiz && (
-            <Panel style={{ background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${GOLD}44` }}>
+            <Panel style={{ background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${alpha(GOLD, 27)}` }}>
               <Label color={GOLD}>QUIZ ROUND</Label>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -251,7 +251,7 @@ export function LiveView({
             <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
           </Panel>
 
-          <div style={{ borderRadius: 10, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33` }}>
+          <div style={{ borderRadius: 10, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${alpha(GOLD, 20)}` }}>
             <Label color={GOLD}>YOUR DRAFTING STYLE</Label>
             <div style={{ fontSize: 16, color: GOLD, fontWeight: 900 }}>{style.tag}</div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{style.line}</div>
@@ -271,57 +271,45 @@ export function LiveView({
 
   return (
     <Shell
-      tab={null} pad={false} atmos={0.55}
+      tab={null} atmos={0.4}
       head={
+        /*
+         * One line, with the clock in the header slot rather than a band of its
+         * own. Live is the mode with the least room to spare — the seconds and
+         * the heroes are what matter, and chrome between them is a cost.
+         */
         <Band
           compact accent={banning ? DANGER : myTurn ? GOLD : MUTED} onBack={onLeave}
-          title={`${meName} vs ${themName}`}
-          sub={`Live · room ${code} · Round ${turnIdx + 1} / ${seq.length}`}
-        >
-          <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginTop: 8 }}>
-            <TurnClock seconds={seconds} yours={myTurn} size={62} />
-            <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-              <TurnBanner active={myTurn} label={turnLabel} accent={banning ? DANGER : GOLD} />
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <DraftTimeline seq={seq} current={Math.min(turnIdx, seq.length - 1)} mineRole={mineRole} />
-          </div>
-          {bans.length > 0 && <div style={{ marginTop: 8 }}><BanStrip bans={bans} byId={heroById} /></div>}
-        </Band>
+          title={<span style={{ color: banning ? DANGER : myTurn ? GOLD : MUTED }}>{turnLabel}</span>}
+          sub={`Round ${turnIdx + 1} of ${seq.length} · room ${code}`}
+          right={<TurnClock seconds={seconds} yours={myTurn} size={40} />}
+        />
       }
     >
-      {/* The same Radiant / pool / Dire shape the solo board uses. */}
-      <div style={{ display: "flex", gap: 6, padding: "9px 8px 16px", alignItems: "flex-start" }}>
-        <DraftColumn
-          side="radiant" label={(meName ?? "YOU").toUpperCase()} motion={motion}
-          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null}
-          active={myTurn} status={myTurn ? (banning ? "banning" : "picking") : "you"}
-        />
-
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-          <Field
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting…"}
-            disabled={!myTurn}
-            style={{ padding: "7px 10px", minHeight: 34, fontSize: 15, marginBottom: 9, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
-          />
-          {lastPick?.auto && (
-            <div style={{ fontSize: 10, color: ENEMY, marginBottom: 8, lineHeight: 1.35 }}>
-              Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
-            </div>
-          )}
-          {error && <div style={{ color: ENEMY, fontSize: 10.5, marginBottom: 8 }} onClick={() => setError(null)}>{error}</div>}
-          <div style={{ opacity: myTurn ? 1 : .34, pointerEvents: myTurn ? "auto" : "none" }}>
-            <AttributePool ids={filtered} byId={poolHero} onPick={submit} dim={banning} />
-          </div>
-        </div>
-
-        <DraftColumn
-          side="dire" label={(themName ?? "DIRE").toUpperCase()} motion={motion}
+      <div style={{ display: "grid", gap: 8, paddingTop: 9 }}>
+        <TeamRow side="them" label={(themName ?? "DIRE").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
           heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
-          active={!myTurn} status={!myTurn ? (banning ? "banning" : "picking") : "them"}
-        />
+          status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }} />
+        <TeamRow side="you" label={(meName ?? "YOU").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
+          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} />
+      </div>
+
+      <Field
+        value={search} onChange={(e) => setSearch(e.target.value)}
+        placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting for them…"}
+        disabled={!myTurn}
+        style={{ marginTop: 9, padding: "8px 11px", minHeight: 36, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
+      />
+
+      {lastPick?.auto && (
+        <div style={{ fontSize: 11, color: ENEMY, padding: "8px 2px 0", lineHeight: 1.35 }}>
+          Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
+        </div>
+      )}
+      {error && <div style={{ color: ENEMY, fontSize: 11, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
+
+      <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .34, pointerEvents: myTurn ? "auto" : "none" }}>
+        <HeroGrid ids={filtered} byId={heroById} onPick={submit} dim={banning} min="clamp(56px, 17vw, 74px)" labelSize={8} />
       </div>
     </Shell>
   );

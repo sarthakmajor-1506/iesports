@@ -114,3 +114,53 @@ export function useMuted(): [boolean, (m: boolean) => void] {
   const set = useCallback((v: boolean) => { setMuted(v); if (!v) play("pick"); }, []);
   return [m, set];
 }
+
+/* ------------------------------------------------------------------ theme */
+
+const THEME_KEY = "draft_theme";
+let light = false;
+const themeListeners = new Set<(l: boolean) => void>();
+
+/**
+ * The theme is applied as an attribute on <html>, and the CSS keys off that.
+ *
+ * The obvious version — React state driving a className on the frame — was
+ * subtly broken: the flag is read by two components (the frame and the toggle),
+ * each held its own `useState`, and the server render has no localStorage, so
+ * they hydrated with different values and disagreed about which way the switch
+ * pointed. One attribute on the document has no such split: whoever sets it,
+ * every rule in the sheet sees the same value on the next paint.
+ */
+function apply(l: boolean) {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.draftTheme = l ? "light" : "dark";
+}
+
+export function isLight() { return light; }
+
+export function setLight(l: boolean) {
+  light = l;
+  apply(l);
+  try { localStorage.setItem(THEME_KEY, l ? "light" : "dark"); } catch {}
+  themeListeners.forEach((fn) => fn(l));
+}
+
+/**
+ * Reads the stored preference on mount rather than during render, so the server
+ * and the first client paint always agree. The cost is one frame in the default
+ * theme before a light-mode player's choice lands, which is cheaper than the
+ * hydration mismatch the alternative produced.
+ */
+export function useLight(): [boolean, (l: boolean) => void] {
+  const [l, setL] = useState(light);
+  useEffect(() => {
+    let stored = false;
+    try { stored = localStorage.getItem(THEME_KEY) === "light"; } catch { stored = false; }
+    if (stored !== light) { light = stored; }
+    apply(light);
+    setL(light);
+    themeListeners.add(setL);
+    return () => { themeListeners.delete(setL); };
+  }, []);
+  return [l, useCallback((v: boolean) => setLight(v), [])];
+}
