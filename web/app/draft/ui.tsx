@@ -88,9 +88,10 @@ export function Shell({
 /**
  * The band at the top of every screen.
  *
- * Coloured, not black, so the app reads as a game rather than a document — and so
- * the pinned controls inside it are visibly a separate layer from the list that
- * scrolls under them.
+ * The title is centred and the back button and right slot float over it, rather
+ * than sitting in a row that pushes the title off-centre. Every screen therefore
+ * has its name in the same place regardless of whether it has a back arrow, which
+ * is what makes a set of screens read as one app instead of a set of pages.
  */
 export function Band({
   title, sub, right, onBack, accent = GOLD, children, compact,
@@ -105,22 +106,30 @@ export function Band({
       borderBottom: `1px solid ${LINE}`,
       padding: `calc(9px + env(safe-area-inset-top)) 12px ${children ? 10 : 9}px`,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, minHeight: compact ? 28 : 32 }}>
+      <div style={{ position: "relative", minHeight: compact ? 30 : 34, display: "grid", placeItems: "center" }}>
+        <div style={{ maxWidth: "68%", textAlign: "center" }}>
+          <div style={{
+            fontSize: compact ? 15 : 17, fontWeight: 900, letterSpacing: .2,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15,
+          }}>{title}</div>
+          {sub && (
+            <div style={{ fontSize: 10, color: MUTED, marginTop: 2, letterSpacing: .3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
+          )}
+        </div>
+
         {onBack && (
           <button onClick={onBack} aria-label="Back" className="dl-btn" style={{
-            width: 30, height: 30, flexShrink: 0, borderRadius: 9,
+            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+            width: 30, height: 30, borderRadius: 6,
             background: "rgba(255,255,255,.07)", border: `1px solid ${LINE}`, color: CREAM,
             fontSize: 16, cursor: "pointer", display: "grid", placeItems: "center", padding: 0, lineHeight: 1,
           }}>‹</button>
         )}
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-          <div style={{
-            fontSize: compact ? 15 : 17, fontWeight: 900, letterSpacing: -0.35,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15,
-          }}>{title}</div>
-          {sub && <div style={{ fontSize: 10.5, color: MUTED, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
-        </div>
-        {right}
+        {right && (
+          <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center" }}>
+            {right}
+          </div>
+        )}
       </div>
       {children}
     </div>
@@ -387,25 +396,6 @@ export function DraftTimeline({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-/**
- * A brief flash confirming what just happened — "LOCKED IN: RAZE", not a
- * silent state change. Self-dismisses; callers don't need to clear it.
- */
-export function LockToast({ text, tone = GOLD }: { text: string; tone?: string }) {
-  return (
-    <div style={{
-      position: "fixed", top: "calc(env(safe-area-inset-top) + 10px)", left: "50%", transform: "translateX(-50%)",
-      zIndex: 200, pointerEvents: "none",
-    }}>
-      <div className="dl-lock" style={{
-        background: tone, color: "#0b0810", fontWeight: 900, fontSize: 12.5, letterSpacing: .5,
-        padding: "8px 16px", borderRadius: 7, boxShadow: `0 10px 30px -6px ${tone}, 0 4px 16px rgba(0,0,0,.5)`,
-        whiteSpace: "nowrap",
-      }}>{text}</div>
     </div>
   );
 }

@@ -24,9 +24,10 @@ const ROLE_ORDER = ["Carry", "Support", "Nuker", "Disabler", "Durable", "Escape"
  * repeated action here, and in the previous version it lived at the bottom of a
  * long page, so every pick meant scrolling down to switch and back up to read.
  *
- * The result list is a grid of large hero cards, not a thin row of thumbnails —
- * the picture should do most of the work, and a 48x32 crop next to a line of text
- * read as a spreadsheet, not a competitive tool.
+ * Size follows commitment, not browsing. The five heroes you have put on the
+ * board are the big pictures; the pool underneath is a dense grid you scan. An
+ * earlier version had this exactly backwards — huge candidate cards above a row
+ * of 33px chips for the heroes actually chosen.
  */
 export default function PickerPage() {
   const [model, setModel] = useState<DraftModel | null>(null);
@@ -128,11 +129,15 @@ export default function PickerPage() {
             <span style={{ fontSize: 19, fontWeight: 900, color: RED, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((1 - (p ?? 0.5)) * 100).toFixed(1)}%</span>
           </div>
 
-          {/* The board: ten slots, yours and theirs, always on screen. */}
-          <div style={{ display: "flex", gap: 3, alignItems: "center", margin: "8px 0" }}>
-            <Slots ids={mine} accent={GREEN} onRemove={(id) => remove(id, "mine")} heroById={heroById} />
-            <span style={{ fontSize: 8.5, color: DIM, fontWeight: 900, flexShrink: 0, padding: "0 1px" }}>VS</span>
-            <Slots ids={theirs} accent={RED} onRemove={(id) => remove(id, "theirs")} heroById={heroById} />
+          {/* The board: one row a side, so a chosen hero is a picture you can
+              actually read. Ten slots across a phone made each one a 33px chip —
+              the heroes you have committed to should be the biggest thing here,
+              not the pool you are still browsing. */}
+          <div style={{ display: "grid", gap: 6, margin: "9px 0 8px" }}>
+            <Slots label="YOUR TEAM" ids={mine} accent={GREEN} onRemove={(id) => remove(id, "mine")} heroById={heroById}
+              onEmpty={() => setSide("mine")} />
+            <Slots label="ENEMY" ids={theirs} accent={RED} onRemove={(id) => remove(id, "theirs")} heroById={heroById}
+              onEmpty={() => setSide("theirs")} />
           </div>
 
           <div style={{ display: "flex", gap: 6 }}>
@@ -196,53 +201,36 @@ export default function PickerPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(88px, 27vw, 118px), 1fr))", gap: 8, paddingBottom: 16 }}>
+      {/* The pool is deliberately dense. It is a list you scan, not a list you
+          admire — the heroes worth looking at are the ones already on the board
+          above, and every row of tiles saved here is a row of options seen. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(50px, 15vw, 64px), 1fr))", gap: 4, paddingBottom: 16 }}>
         {list.map((c, i) => {
           const h = heroById(c.heroId)!;
           const top = i === 0 && !q && role === "all";
           return (
-            <div
-              key={c.heroId}
-              className="dl-pick"
-              onClick={() => add(c.heroId)}
-              role="button" tabIndex={0}
-              onKeyDown={(e) => { if (e.key === "Enter") add(c.heroId); }}
+            <button
+              key={c.heroId} className="dl-pick" onClick={() => add(c.heroId)} title={`${h.name} · ${c.delta >= 0 ? "+" : ""}${c.delta.toFixed(1)}%`}
               style={{
-                position: "relative", borderRadius: 9, overflow: "hidden", cursor: "pointer",
-                background: "#0c0a12", aspectRatio: "3 / 4",
-                border: `1px solid ${top ? accent + "88" : LINE}`,
-                boxShadow: top ? `0 0 0 1px ${accent}, 0 8px 22px -10px ${accent}` : undefined,
+                position: "relative", borderRadius: 5, overflow: "hidden", cursor: "pointer", padding: 0,
+                background: "#0c0a12", aspectRatio: "1 / 1",
+                border: `1px solid ${top ? accent : LINE}`,
+                boxShadow: top ? `0 0 0 1px ${accent}, 0 0 14px -4px ${accent}` : undefined,
               }}
             >
               <HeroImg base={heroBase(h.img)} name={h.name} />
-
               <span style={{
-                position: "absolute", top: 5, left: 5, background: "rgba(6,5,10,.72)",
-                border: `1px solid ${LINE}`, borderRadius: 6, padding: "2px 5px",
+                position: "absolute", top: 0, left: 0, right: 0, padding: "2px 3px",
+                background: "linear-gradient(rgba(4,3,7,.88), transparent)", textAlign: "left",
               }}>
-                <Delta v={c.delta} forThem={side === "theirs"} size={11} />
+                <Delta v={c.delta} forThem={side === "theirs"} size={9} />
               </span>
-
-              <a
-                href={`/draft/guide?hero=${c.heroId}`} aria-label={`About ${h.name}`}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  position: "absolute", top: 5, right: 5, width: 20, height: 20, borderRadius: 10,
-                  background: "rgba(6,5,10,.72)", border: `1px solid ${LINE}`,
-                  display: "grid", placeItems: "center", color: DIM, fontSize: 10.5, fontWeight: 900, textDecoration: "none",
-                }}
-              >i</a>
-
-              <div style={{
-                position: "absolute", left: 0, right: 0, bottom: 0,
-                background: "linear-gradient(transparent, rgba(4,3,7,.96) 55%)", padding: "20px 6px 6px",
-              }}>
-                <div style={{ fontSize: 11.5, fontWeight: 800, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.name}</div>
-                <div style={{ fontSize: 8.5, color: DIM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: .3, marginTop: 1 }}>
-                  {h.roles.slice(0, 2).join(" · ").toUpperCase()}
-                </div>
-              </div>
-            </div>
+              <span style={{
+                position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, color: CREAM, fontWeight: 800,
+                background: "linear-gradient(transparent, rgba(4,3,7,.96))", padding: "9px 2px 2px",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>{h.name}</span>
+            </button>
           );
         })}
       </div>
@@ -255,36 +243,54 @@ export default function PickerPage() {
   );
 }
 
-/** Five slots for one team. Tap a filled one to take it back off the board. */
+/** One team's five slots. Tap a filled one to take it back off the board. */
 function Slots({
-  ids, accent, onRemove, heroById,
+  label, ids, accent, onRemove, onEmpty, heroById,
 }: {
-  ids: number[]; accent: string; onRemove: (id: number) => void;
+  label: string; ids: number[]; accent: string;
+  onRemove: (id: number) => void; onEmpty: () => void;
   heroById: (id: number) => { img: string; name: string } | undefined;
 }) {
   return (
-    <div style={{ display: "flex", gap: 3, flex: "1 1 0", minWidth: 0 }}>
-      {Array.from({ length: 5 }).map((_, i) => {
-        const id = ids[i];
-        const h = id != null ? heroById(id) : null;
-        return (
-          <div key={i} style={{ flex: "1 1 0", minWidth: 0 }}>
-            {h ? (
-              <button onClick={() => onRemove(id)} className="dl-pick" title={`Remove ${h.name}`} style={{
-                width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 6, overflow: "hidden",
-                border: `1px solid ${accent}88`, background: "#0c0a12", cursor: "pointer", display: "block",
-              }}>
-                <HeroImg base={heroBase(h.img)} name={h.name} />
-              </button>
-            ) : (
-              <div style={{
-                aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${accent}44`,
-                display: "grid", placeItems: "center", color: `${accent}55`, fontSize: 11,
-              }}>◆</div>
-            )}
-          </div>
-        );
-      })}
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+        <span style={{ fontSize: 8.5, letterSpacing: 1.3, fontWeight: 900, color: accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 4, height: 4, borderRadius: 2, background: accent, boxShadow: `0 0 6px ${accent}` }} />
+          {label}
+        </span>
+        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${accent}40, transparent)` }} />
+        <span style={{ fontSize: 8.5, color: DIM, fontWeight: 800 }}>{ids.length}/5</span>
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {Array.from({ length: 5 }).map((_, i) => {
+          const id = ids[i];
+          const h = id != null ? heroById(id) : null;
+          return (
+            <div key={i} style={{ flex: "1 1 0", minWidth: 0 }}>
+              {h ? (
+                <button onClick={() => onRemove(id)} className="dl-pick" title={`Remove ${h.name}`} style={{
+                  width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 6, overflow: "hidden",
+                  border: `1px solid ${accent}99`, background: "#0c0a12", cursor: "pointer", display: "block",
+                  position: "relative", boxShadow: `0 0 0 1px ${accent}22`,
+                }}>
+                  <HeroImg base={heroBase(h.img)} name={h.name} />
+                  <span style={{
+                    position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7.5, color: CREAM, fontWeight: 800,
+                    background: "linear-gradient(transparent, rgba(4,3,7,.95))", padding: "10px 2px 2px",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{h.name}</span>
+                </button>
+              ) : (
+                <button onClick={onEmpty} className="dl-pick" aria-label={`Add to ${label}`} style={{
+                  width: "100%", aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${accent}44`,
+                  display: "grid", placeItems: "center", color: `${accent}55`, fontSize: 13,
+                  background: "transparent", cursor: "pointer",
+                }}>+</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

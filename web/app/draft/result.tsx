@@ -117,8 +117,8 @@ export function Result({
         </Panel>
       )}
 
-      <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 18vw, 92px)" />
-      <TeamRow side="them" label={them.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 18vw, 92px)" />
+      <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
+      <TeamRow side="them" label={them.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
 
       {theirBest && theirBest.swing < -0.4 && (
         <Beat color={RED} label="THE PICK THAT HURT">

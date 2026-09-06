@@ -114,18 +114,18 @@ function Guide() {
       <DraftStyles />
 
       {tab === "heroes" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(74px, 23vw, 96px), 1fr))", gap: 6, padding: "10px 0 16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(52px, 15vw, 66px), 1fr))", gap: 4, padding: "10px 0 16px" }}>
           {heroes.map((h) => (
             <button key={h.id} className="dl-pick" onClick={() => setHero(h)} style={{
-              padding: 0, border: `1px solid ${LINE}`, borderRadius: 10, overflow: "hidden",
+              padding: 0, border: `1px solid ${LINE}`, borderRadius: 5, overflow: "hidden",
               background: "#0c0a12", cursor: "pointer", position: "relative", aspectRatio: "3 / 4",
             }}>
               <HeroImg base={h.base} name={h.name} />
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "linear-gradient(transparent, rgba(4,3,7,.95))", padding: "13px 4px 4px" }}>
-                <div style={{ fontSize: 9.5, fontWeight: 800, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.name}</div>
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "linear-gradient(transparent, rgba(4,3,7,.95))", padding: "11px 3px 3px" }}>
+                <div style={{ fontSize: 8, fontWeight: 800, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.name}</div>
               </div>
               <span style={{
-                position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: 4,
+                position: "absolute", top: 3, right: 3, width: 6, height: 6, borderRadius: 3,
                 background: attrColor(h.attr), boxShadow: `0 0 7px ${attrColor(h.attr)}`,
               }} />
             </button>

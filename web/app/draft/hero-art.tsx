@@ -164,13 +164,23 @@ function Card({
               position: "absolute", left: 0, right: 0, bottom: 0, height: "46%",
               background: "linear-gradient(transparent, rgba(4,3,7,.94))", pointerEvents: "none",
             }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "0 2px 3px", textAlign: "center" }}>
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "0 3px 4px", textAlign: "center" }}>
               <span style={{
-                fontSize: "clamp(6.5px, 2.1vw, 9px)", color: CREAM, textTransform: "uppercase", fontWeight: 800,
+                fontSize: "clamp(7px, 2.3vw, 10px)", color: CREAM, textTransform: "uppercase", fontWeight: 800,
                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block",
-                textShadow: "0 1px 4px #000",
+                textShadow: "0 1px 4px #000", letterSpacing: .2,
               }}>{hero.name}</span>
             </div>
+            {/* The lock-in. This replaced a toast pinned to the top of the
+                viewport, which floated over the header and read as a browser
+                notification rather than something the game did. Confirmation
+                belongs on the card that just filled. */}
+            {latest && (
+              <span key={hero.id} className="dl-flash" style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                background: `linear-gradient(180deg, ${accent}00, ${accent}66)`,
+              }} />
+            )}
           </>
         )}
       </div>
@@ -195,7 +205,7 @@ export function Presence({ text, color, active }: { text: string; color: string;
 
 /** One side of the board: a labelled row of five cards. */
 export function TeamRow({
-  side, heroes, latest, label, note, status, hidden, motion = true, height = "clamp(72px, 20vw, 112px)",
+  side, heroes, latest, label, note, status, hidden, motion = true, height = "clamp(84px, 24vw, 124px)",
 }: {
   side: "them" | "you";
   heroes: LineupHero[];
@@ -232,7 +242,7 @@ export function TeamRow({
 
 /** Square hero tiles. The one grid used by every screen that picks heroes. */
 export function HeroGrid({
-  ids, byId, onPick, dim, min = "clamp(58px, 17vw, 76px)", labelSize,
+  ids, byId, onPick, dim, min = "clamp(46px, 13.5vw, 60px)", labelSize,
 }: {
   ids: number[];
   byId: (id: number) => { img: string; name: string } | undefined;
@@ -294,10 +304,10 @@ export function DraftStyles() {
       @keyframes dl-pulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
       @keyframes dl-in { from { opacity:0; transform: translateY(8px) } to { opacity:1; transform:none } }
       @keyframes dl-sheen { from { background-position: -220% 0 } to { background-position: 320% 0 } }
-      @keyframes dl-lock { 0% { opacity:0; transform: translateY(-6px) scale(.92) } 12% { opacity:1; transform: translateY(0) scale(1.04) } 20% { transform: translateY(0) scale(1) } 82% { opacity:1 } 100% { opacity:0; transform: translateY(-4px) scale(.97) } }
+      @keyframes dl-flash { 0% { opacity:.95 } 100% { opacity:0 } }
       .dl-turn { animation: dl-pulse 1.3s ease-in-out infinite; }
       .dl-in { animation: dl-in .3s ease-out both; }
-      .dl-lock { animation: dl-lock 1.1s cubic-bezier(.2,.9,.3,1) both; }
+      .dl-flash { animation: dl-flash .55s ease-out both; }
       .dl-btn { transition: transform .07s, filter .15s; -webkit-tap-highlight-color: transparent; }
       .dl-btn:active:not(:disabled) { transform: scale(.96); filter: brightness(1.1); }
       .dl-pick { transition: transform .07s, border-color .12s; -webkit-tap-highlight-color: transparent; }

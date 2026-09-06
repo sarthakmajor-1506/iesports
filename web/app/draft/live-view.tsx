@@ -7,7 +7,7 @@ import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline, LockToast,
+  Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline,
   RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
 } from "./ui";
 import { TeamRow, HeroGrid, DraftStyles } from "./hero-art";
@@ -38,9 +38,6 @@ export function LiveView({
   const [search, setSearch] = useState("");
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [recapDone, setRecapDone] = useState(false);
-  const [lock, setLock] = useState<string | null>(null);
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSeenPick = useRef(0);
 
   const engine: Engine = useMemo(() => buildEngine(model), [model]);
   const tempos = useMemo(() => tempoMap(model as { tempo?: TempoRow[] }), [model]);
@@ -72,20 +69,6 @@ export function LiveView({
     if (!room || seat == null) return [];
     return rankCandidates(engine, mine, theirs, available, 0).slice(0, 12).map((c) => c.heroId);
   }, [engine, mine, theirs, available, room, seat]);
-
-  // A brief "LOCKED IN: HERO" flash whenever a new move lands, ours or theirs.
-  useEffect(() => {
-    if (picks.length <= lastSeenPick.current) { lastSeenPick.current = picks.length; return; }
-    const p = picks[picks.length - 1];
-    lastSeenPick.current = picks.length;
-    const h = engine.heroById.get(p.heroId);
-    if (!h) return;
-    const mineMove = p.by === seat;
-    const text = p.kind === "ban" ? `BANNED ${h.name.toUpperCase()}` : `${mineMove ? "LOCKED IN" : "THEY PICKED"} ${h.name.toUpperCase()}`;
-    if (lockTimer.current) clearTimeout(lockTimer.current);
-    setLock(text);
-    lockTimer.current = setTimeout(() => setLock(null), 1100);
-  }, [picks, engine, seat]);
 
   /**
    * Take the open seat automatically.
@@ -180,9 +163,9 @@ export function LiveView({
       <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
         <DraftStyles />
         <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
-          <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
-          <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(70px, 20vw, 100px)" />
+          <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <Btn full tone="gold" size="l" onClick={() => setRecapDone(true)}>SEE THE QUESTIONS</Btn>
         </div>
       </Shell>
@@ -258,8 +241,8 @@ export function LiveView({
             </div>
           )}
 
-          <TeamRow side="you" label={meName.toUpperCase()} heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 18vw, 92px)" />
-          <TeamRow side="them" label={themName.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 18vw, 92px)" />
+          <TeamRow side="you" label={meName.toUpperCase()} heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
+          <TeamRow side="them" label={themName.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
 
           <Panel style={{ padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
@@ -310,10 +293,10 @@ export function LiveView({
             <DraftTimeline seq={seq} current={Math.min(turnIdx, seq.length - 1)} mineRole={mineRole} />
           </div>
           <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
-            <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} motion={motion} height="clamp(52px, 15vw, 74px)"
+            <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} motion={motion} height="clamp(78px, 23vw, 116px)"
               heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
               status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }} />
-            <TeamRow side="you" label="YOU" motion={motion} height="clamp(52px, 15vw, 74px)"
+            <TeamRow side="you" label="YOU" motion={motion} height="clamp(78px, 23vw, 116px)"
               heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} />
           </div>
           <Field
@@ -326,7 +309,6 @@ export function LiveView({
       }
     >
       <DraftStyles />
-      {lock && <LockToast text={lock} tone={banning ? RED : GOLD} />}
       {lastPick?.auto && (
         <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
           Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
