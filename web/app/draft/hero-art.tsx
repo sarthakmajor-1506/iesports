@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, R_CHIP } from "./ui";
+import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, DIM, R_CHIP, attrColor, attrName } from "./ui";
 
 /**
  * Hero art — one place, one fallback chain.
@@ -315,3 +315,156 @@ export function BanStrip({ bans, byId }: { bans: { by: "bot" | "you"; heroId: nu
 
 /** @deprecated The design system now lives in theme.tsx and is rendered by Shell. */
 export function DraftStyles() { return null; }
+
+/* ------------------------------------------------- the Dota draft board */
+
+/**
+ * One side's five slots, stacked vertically, flanking the pool.
+ *
+ * This is the shape Dota's own draft takes: Radiant down the left, Dire down the
+ * right, the hero grid between them. The rows-above-a-grid layout this replaced
+ * was readable but generic — the vertical columns are most of what makes a
+ * drafting screen recognisable at a glance.
+ *
+ * The columns stay deliberately narrow. They are status, not the interaction;
+ * every pixel they take comes out of the pool, which is the thing being used.
+ */
+export function DraftColumn({
+  side, label, heroes, latest, active, status, motion = true, width = 58,
+}: {
+  side: "radiant" | "dire";
+  label: string;
+  heroes: LineupHero[];
+  latest: number | null;
+  active?: boolean;
+  status?: string;
+  motion?: boolean;
+  width?: number;
+}) {
+  const accent = side === "radiant" ? ALLY : ENEMY;
+  return (
+    // Sticky, because a team column that scrolls away defeats the point of
+    // flanking the pool with it — in the client both sides are always on screen.
+    <div style={{
+      width, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3,
+      position: "sticky", top: 0, alignSelf: "flex-start", zIndex: 2,
+    }}>
+      <div className="dl-cut-s" style={{
+        textAlign: "center", padding: "3px 2px 4px",
+        background: active ? `${accent}2e` : `${accent}12`,
+        borderBottom: `2px solid ${accent}`,
+        boxShadow: active ? `0 0 16px -4px ${accent}` : "none",
+      }}>
+        <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: .6, color: accent, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {label}
+        </div>
+        {status && (
+          <div className={active ? "dl-turn" : undefined} style={{ fontSize: 7, color: active ? accent : DIM, fontWeight: 700, letterSpacing: .3 }}>
+            {status}
+          </div>
+        )}
+      </div>
+
+      {Array.from({ length: 5 }).map((_, i) => {
+        const hero = heroes[i];
+        const isLatest = hero != null && hero.id === latest;
+        return (
+          <div
+            key={hero?.id ?? `e${i}`}
+            className={hero ? "dl-drop dl-cut-s" : "dl-cut-s"}
+            style={{
+              position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
+              background: hero ? "#0C1015" : "rgba(200,166,93,.035)",
+              border: `1px solid ${isLatest ? accent : hero ? `${accent}55` : "rgba(200,166,93,.16)"}`,
+              boxShadow: isLatest ? `0 0 0 1px ${accent}, 0 0 18px -4px ${accent}` : "none",
+            }}
+          >
+            {hero ? (
+              <>
+                <HeroArt base={heroBase(hero.img)} name={hero.name} phase={i} animate={motion} />
+                <span style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: CREAM,
+                  fontWeight: 800, letterSpacing: .2, textAlign: "center",
+                  background: "linear-gradient(transparent, rgba(8,11,15,.96))", padding: "8px 1px 2px",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>{hero.name}</span>
+                {isLatest && (
+                  <>
+                    <span className="dl-flash" style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${accent}00, ${accent}70)` }} />
+                    <span style={{ position: "absolute", inset: -2, border: `2px solid ${accent}`, animation: "dl-ring .6s var(--ease) both" }} />
+                  </>
+                )}
+              </>
+            ) : (
+              <span style={{
+                position: "absolute", inset: 0, display: "grid", placeItems: "center",
+                color: `${accent}33`, fontSize: 13, fontWeight: 800,
+              }}>{i + 1}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The hero pool, grouped by primary attribute.
+ *
+ * Dota's grid is organised by attribute and players navigate it that way — "I
+ * need a strength offlaner" is a section, not a search. Every tile carries its
+ * attribute colour on the left edge, which is how the client marks them too.
+ */
+export function AttributePool({
+  ids, byId, onPick, dim, min = "clamp(42px, 12vw, 54px)",
+}: {
+  ids: number[];
+  byId: (id: number) => { img: string; name: string; attr: string } | undefined;
+  onPick: (id: number) => void;
+  dim?: boolean;
+  min?: string;
+}) {
+  const order: string[] = ["str", "agi", "int", "all"];
+  const groups = order
+    .map((a) => ({ attr: a, list: ids.filter((id) => byId(id)?.attr === a) }))
+    .filter((g) => g.list.length > 0);
+
+  return (
+    <div style={{ display: "grid", gap: 9 }}>
+      {groups.map((g) => {
+        const c = attrColor(g.attr);
+        return (
+          <div key={g.attr}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ width: 7, height: 7, background: c, boxShadow: `0 0 7px ${c}`, flexShrink: 0 }} />
+              <span style={{ fontSize: 7.5, fontWeight: 800, letterSpacing: 1.1, color: c }}>{attrName(g.attr)}</span>
+              <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${c}3d, transparent)` }} />
+              <span style={{ fontSize: 7.5, color: DIM, fontWeight: 700 }}>{g.list.length}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 3 }}>
+              {g.list.map((id) => {
+                const h = byId(id)!;
+                return (
+                  <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
+                    padding: 0, position: "relative", aspectRatio: "1 / 1", cursor: "pointer", overflow: "hidden",
+                    background: "#0C1015", border: `1px solid ${dim ? `${DANGER}45` : "rgba(200,166,93,.13)"}`,
+                    borderLeft: `2px solid ${dim ? DANGER : c}`,
+                    filter: dim ? "saturate(.4) brightness(.85)" : undefined,
+                  }}>
+                    <HeroImg base={heroBase(h.img)} name={h.name} />
+                    {dim && <span style={{ position: "absolute", inset: 0, background: `${DANGER}26`, pointerEvents: "none" }} />}
+                    <span style={{
+                      position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: CREAM, fontWeight: 800,
+                      background: "linear-gradient(transparent, rgba(8,11,15,.97))", padding: "8px 1px 2px",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>{h.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

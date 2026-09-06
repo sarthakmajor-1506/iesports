@@ -3,14 +3,15 @@
 /**
  * Draft — the design system.
  *
- * Every colour, radius, glow and easing in the app is defined once here as a CSS
- * custom property and consumed everywhere else. The token block is scoped to
- * `.dl-app` rather than `:root` on purpose: this is one route inside a larger
- * site, and a global `:root` override would leak a game's palette into the
- * tournament pages.
+ * Dota's own client is the reference: desaturated slate rather than black, warm
+ * gold ornament, Radiant green against Dire red, and corners that are chamfered
+ * rather than rounded. Every value lives here once as a CSS custom property,
+ * scoped to `.dl-app` rather than `:root` — this is one route inside a larger
+ * site, and a global override would leak a game's palette into the tournament
+ * pages.
  *
  * The JS constants in `ui.tsx` mirror these values, because a lot of the app
- * builds translucent variants by string concatenation (`${ACCENT}55`), which a
+ * builds translucent variants by string concatenation (`${DIRE}55`), which a
  * `var()` cannot do. The hex values in the two files must stay in step.
  */
 
@@ -20,40 +21,48 @@ export function DraftTheme() {
   return (
     <style>{`
       .dl-app {
-        /* surfaces */
-        --bg:        #0B0E14;
-        --surface:   #12161F;
-        --surface-2: #181D28;
-        --overlay:   rgba(8, 11, 18, 0.92);
+        /* surfaces — Dota's slate, never pure black */
+        --bg:        #101318;
+        --surface:   #191E25;
+        --surface-2: #222831;
+        --overlay:   rgba(10, 13, 17, 0.93);
 
-        /* accents */
-        --primary:   #FF3B3B;
-        --primary-h: #FF5555;
-        --gold:      #F5A623;
-        --gold-h:    #FFBE4D;
-        --success:   #00E676;
-        --danger:    #FF1744;
-        --ally:      #00B0FF;
-        --enemy:     #FF5252;
+        /* the two sides */
+        --radiant:   #A2B93B;
+        --radiant-h: #BCD452;
+        --dire:      #C8402C;
+        --dire-h:    #E05138;
+
+        /* Dota's ornament gold */
+        --gold:      #C8A65D;
+        --gold-h:    #E3BF74;
+
+        /* attributes, as the client colours them */
+        --str:       #E04A3F;
+        --agi:       #9BC44E;
+        --int:       #4BA9E8;
+        --uni:       #C77DDA;
+
+        --success:   #7FD44C;
+        --danger:    #D6412B;
 
         /* text */
-        --text:      #E8EAED;
-        --muted:     #8B95A8;
-        --dim:       #5C6577;
+        --text:      #DDE1E4;
+        --muted:     #8C949E;
+        --dim:       #5D656F;
 
         /* lines */
-        --line:      rgba(255,255,255,0.06);
-        --line-hi:   rgba(255,255,255,0.12);
+        --line:      rgba(200,166,93,0.14);
+        --line-hi:   rgba(200,166,93,0.30);
 
         /* glows */
-        --glow-primary: 0 0 24px rgba(255, 59, 59, 0.45);
-        --glow-gold:    0 0 24px rgba(245, 166, 35, 0.40);
-        --glow-success: 0 0 20px rgba(0, 230, 118, 0.35);
+        --glow-radiant: 0 0 24px rgba(162, 185, 59, 0.40);
+        --glow-dire:    0 0 24px rgba(200, 64, 44, 0.42);
+        --glow-gold:    0 0 22px rgba(200, 166, 93, 0.38);
 
-        /* radii */
-        --r-card: 16px;
-        --r-btn:  12px;
-        --r-chip: 8px;
+        --r-card: 4px;
+        --r-btn:  3px;
+        --r-chip: 3px;
 
         --ease: cubic-bezier(.22, .9, .3, 1);
         --t:    170ms;
@@ -61,20 +70,29 @@ export function DraftTheme() {
         color-scheme: dark;
       }
 
-      html, body { background: #0B0E14; overscroll-behavior: none; }
+      html, body { background: #101318; overscroll-behavior: none; }
 
       /* ---------------------------------------------------------- surfaces */
 
       /*
-       * The 1px top highlight that keeps a dark card from reading as a hole.
-       * Done with a pseudo-element rather than a border so it does not fight the
-       * card's own border colour on hover.
+       * Chamfered corners. Dota's panels are cut, not rounded, and this single
+       * detail does more to place the interface in that world than any colour
+       * choice — a 16px radius reads as a web app no matter what is painted on it.
        */
+      .dl-cut  { clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+      .dl-cut-s { clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+
+      /* The hairline of gold along the top edge that keeps a dark panel from reading as a hole. */
       .dl-card { position: relative; }
       .dl-card::before {
         content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,.08) 22%, rgba(255,255,255,.08) 78%, transparent);
-        pointer-events: none; border-radius: inherit;
+        background: linear-gradient(90deg, transparent, rgba(200,166,93,.34) 22%, rgba(200,166,93,.34) 78%, transparent);
+        pointer-events: none;
+      }
+
+      /* An ornamental divider — a gold rule that fades out from a centre diamond. */
+      .dl-rule {
+        height: 1px; background: linear-gradient(90deg, transparent, rgba(200,166,93,.32), transparent);
       }
 
       /* ------------------------------------------------------ interactions */
@@ -87,21 +105,21 @@ export function DraftTheme() {
       }
       .dl-btn:active:not(:disabled) { transform: scale(.965); }
       @media (hover: hover) {
-        .dl-btn:hover:not(:disabled) { transform: scale(1.02); filter: brightness(1.08); }
+        .dl-btn:hover:not(:disabled) { transform: scale(1.02); filter: brightness(1.1); }
       }
 
       .dl-pick {
         transition: transform var(--t) var(--ease), border-color var(--t) var(--ease),
-                    box-shadow var(--t) var(--ease);
+                    box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
         -webkit-tap-highlight-color: transparent;
       }
-      .dl-pick:active { transform: scale(.92); }
+      .dl-pick:active { transform: scale(.9); }
       @media (hover: hover) {
         .dl-pick:hover {
-          transform: scale(1.045);
-          border-color: rgba(255,255,255,.28) !important;
-          box-shadow: 0 8px 26px -10px rgba(0,0,0,.9), 0 0 18px -4px rgba(255,255,255,.18);
-          z-index: 2;
+          transform: scale(1.06);
+          filter: brightness(1.15);
+          box-shadow: 0 6px 22px -8px #000, 0 0 16px -3px rgba(200,166,93,.65);
+          z-index: 3;
         }
       }
 
@@ -114,34 +132,40 @@ export function DraftTheme() {
 
       /* A hero landing in a slot: drops in, overshoots, settles. */
       @keyframes dl-drop {
-        0%   { opacity:0; transform: translateY(-22px) scale(.9) }
-        55%  { opacity:1; transform: translateY(4px) scale(1.035) }
+        0%   { opacity:0; transform: translateY(-20px) scale(.9) }
+        55%  { opacity:1; transform: translateY(4px) scale(1.03) }
         75%  { transform: translateY(-2px) scale(.995) }
         100% { transform: none }
       }
       @keyframes dl-flash  { 0% { opacity:.9 } 100% { opacity:0 } }
-
-      /* The ban stamp — slams down, rotates in, holds. */
-      @keyframes dl-stamp {
-        0%   { opacity:0; transform: scale(2.4) rotate(-18deg) }
-        60%  { opacity:1; transform: scale(.92) rotate(-11deg) }
-        100% { opacity:1; transform: scale(1) rotate(-11deg) }
-      }
-
+      @keyframes dl-ring   { 0% { opacity:.7; transform: scale(.84) } 100% { opacity:0; transform: scale(1.45) } }
       @keyframes dl-urgent { 0%,100% { transform: scale(1) } 50% { transform: scale(1.07) } }
       @keyframes dl-burst  { 0% { opacity:1; transform: translate(0,0) scale(1) } 100% { opacity:0; transform: translate(var(--dx), var(--dy)) scale(.35) } }
-      @keyframes dl-float  { 0%,100% { transform: translateY(0) translateX(0); opacity:var(--o) } 50% { transform: translateY(-26px) translateX(8px); opacity:calc(var(--o) * 2) } }
-      @keyframes dl-ring   { 0% { opacity:.65; transform: scale(.82) } 100% { opacity:0; transform: scale(1.5) } }
+
+      /*
+       * The ambient drift. Two enormous soft lights, Radiant from one corner and
+       * Dire from the other, breathing past each other on a slow cycle. Cheap
+       * because it is two elements moving on the compositor, not a particle loop.
+       */
+      @keyframes dl-drift-a {
+        0%,100% { transform: translate3d(-8%, -6%, 0) scale(1) }
+        50%     { transform: translate3d(6%, 8%, 0) scale(1.14) }
+      }
+      @keyframes dl-drift-b {
+        0%,100% { transform: translate3d(7%, 9%, 0) scale(1.1) }
+        50%     { transform: translate3d(-6%, -7%, 0) scale(1) }
+      }
+      /* A faint diagonal weave panning behind everything, like the client's stonework. */
+      @keyframes dl-weave { from { background-position: 0 0 } to { background-position: 120px 120px } }
 
       .dl-in     { animation: dl-in .32s var(--ease) both; }
       .dl-turn   { animation: dl-pulse 1.3s ease-in-out infinite; }
       .dl-drop   { animation: dl-drop .5s var(--ease) both; }
       .dl-flash  { animation: dl-flash .6s ease-out both; }
-      .dl-stamp  { animation: dl-stamp .42s var(--ease) both; }
-      .dl-urgent { animation: dl-urgent .62s ease-in-out infinite; }
+      .dl-urgent { animation: dl-urgent .55s ease-in-out infinite; }
 
       .dl-sheen {
-        background: linear-gradient(100deg, transparent 38%, rgba(255,255,255,.09) 50%, transparent 62%);
+        background: linear-gradient(100deg, transparent 38%, rgba(200,166,93,.10) 50%, transparent 62%);
         background-size: 220% 100%;
         animation: dl-sheen 1.7s linear infinite;
       }
@@ -150,55 +174,60 @@ export function DraftTheme() {
 
       /*
        * Low-end phones and anyone who asked for less motion get the layout with
-       * none of the movement. The particle field is removed outright rather than
-       * frozen — a static dot field is just noise.
+       * none of the movement. The atmosphere is removed outright rather than
+       * frozen — a static wash is just a muddier background.
        */
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
-        .dl-particles { display: none !important; }
+        .dl-atmos { display: none !important; }
       }
     `}</style>
   );
 }
 
 /**
- * The drifting field behind the home screen.
+ * The background.
  *
- * Deliberately CSS-only and fixed at fourteen nodes: a canvas particle system
- * would run a requestAnimationFrame loop on every phone that opens the menu, to
- * render something nobody is meant to consciously notice.
+ * Radiant light bleeding in from one corner and Dire from the other, drifting
+ * slowly past each other, over a faint diagonal weave. It is doing the job a
+ * looping video of the Dota map would do, for none of the bytes and none of the
+ * battery: three composited layers, no script, no per-frame work.
+ *
+ * `weight` lets a screen dial it down — the draft board wants atmosphere, not
+ * competition with the heroes on it.
  */
-const NODES = [
-  [6, 18, 3, 15, 0], [18, 72, 2, 19, 3], [31, 34, 4, 17, 6], [44, 84, 2, 21, 1],
-  [57, 22, 3, 16, 4], [69, 61, 2, 20, 8], [78, 12, 4, 18, 2], [88, 47, 3, 22, 5],
-  [12, 52, 2, 23, 7], [37, 8, 2, 17, 9], [63, 91, 3, 19, 2], [93, 77, 2, 24, 6],
-  [25, 96, 3, 20, 4], [50, 45, 2, 18, 11],
-] as const;
-
-export function ParticleField({ tint = "255,59,59" }: { tint?: string }) {
+export function DotaAtmosphere({ weight = 1 }: { weight?: number }) {
   return (
-    <div className="dl-particles" aria-hidden style={{
+    <div className="dl-atmos" aria-hidden style={{
       position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0,
     }}>
-      {NODES.map(([left, top, size, dur, delay], i) => (
-        <span key={i} style={{
-          position: "absolute", left: `${left}%`, top: `${top}%`,
-          width: size, height: size, borderRadius: "50%",
-          background: `rgba(${tint}, .9)`,
-          boxShadow: `0 0 ${size * 4}px rgba(${tint}, .7)`,
-          ["--o" as string]: "0.10",
-          animation: `dl-float ${dur}s ease-in-out ${delay}s infinite`,
-          opacity: 0.1,
-        }} />
-      ))}
+      <div style={{
+        position: "absolute", inset: "-30%",
+        background: `radial-gradient(closest-side, rgba(162,185,59,${0.16 * weight}), transparent 72%)`,
+        animation: "dl-drift-a 34s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      <div style={{
+        position: "absolute", inset: "-30%",
+        background: `radial-gradient(closest-side, rgba(200,64,44,${0.17 * weight}), transparent 72%)`,
+        animation: "dl-drift-b 41s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      <div style={{
+        position: "absolute", inset: 0, opacity: 0.5 * weight,
+        backgroundImage:
+          "repeating-linear-gradient(45deg, rgba(200,166,93,.030) 0 1px, transparent 1px 14px)," +
+          "repeating-linear-gradient(-45deg, rgba(255,255,255,.016) 0 1px, transparent 1px 22px)",
+        animation: "dl-weave 90s linear infinite",
+      }} />
     </div>
   );
 }
 
 /**
- * A one-shot particle burst. Twenty spans thrown outward on a fixed set of
- * angles — enough to register as a celebration, cheap enough to fire on a phone
- * mid-animation without dropping the frame the score is counting on.
+ * A one-shot particle burst — twenty spans thrown outward on fixed angles.
+ * Enough to register as a celebration, cheap enough to fire mid-animation on a
+ * phone without dropping the frame the score is counting on.
  */
 export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string; n?: number; spread?: number; size?: number }) {
   return (
@@ -208,7 +237,7 @@ export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string;
         const d = spread * (0.55 + ((i * 37) % 45) / 100);
         return (
           <span key={i} style={{
-            position: "absolute", width: size, height: size, borderRadius: 2, background: color,
+            position: "absolute", width: size, height: size, background: color,
             boxShadow: `0 0 10px ${color}`,
             ["--dx" as string]: `${Math.cos(a) * d}px`,
             ["--dy" as string]: `${Math.sin(a) * d}px`,
@@ -220,12 +249,11 @@ export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string;
   );
 }
 
-/** Elegant skeleton block, matching the card surface rather than a grey bar. */
-export function Skeleton({ h = 120, r = "var(--r-card)", style }: { h?: number | string; r?: string; style?: React.CSSProperties }) {
+/** Skeleton block matching the panel surface rather than a grey bar. */
+export function Skeleton({ h = 120, style }: { h?: number | string; style?: React.CSSProperties }) {
   return (
-    <div className="dl-sheen" style={{
-      height: h, borderRadius: r, background: "var(--surface)",
-      border: "1px solid var(--line)", ...style,
+    <div className="dl-sheen dl-cut" style={{
+      height: h, background: "var(--surface)", border: "1px solid var(--line)", ...style,
     }} />
   );
 }

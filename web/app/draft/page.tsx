@@ -14,9 +14,9 @@ import {
   Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips, SoundToggle,
   RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, DANGER, ALLY, R_CARD, R_BTN, R_CHIP,
 } from "./ui";
-import { ParticleField, Skeleton } from "./theme";
+import { Skeleton } from "./theme";
 import { play } from "./sound";
-import { TeamRow, BanStrip, HeroGrid, setRenderConcurrency } from "./hero-art";
+import { TeamRow, BanStrip, DraftColumn, AttributePool, setRenderConcurrency } from "./hero-art";
 import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
@@ -277,6 +277,7 @@ function Duel() {
   const heroById = (id: number) => engine.heroById.get(id);
   const heroName = (id: number) => heroById(id)?.name ?? `#${id}`;
   const heroOf = (id: number) => { const h = heroById(id)!; return { id, img: h.img, name: h.name }; };
+  const poolHero = (id: number) => { const h = heroById(id); return h ? { img: h.img, name: h.name, attr: h.attr } : undefined; };
 
   if (liveCode) {
     return <LiveView model={model} knowledge={knowledge} code={liveCode} motion={motion} submitScore={submitScore}
@@ -303,8 +304,6 @@ function Duel() {
             } />
         }
       >
-        <ParticleField tint="255,59,59" />
-
         <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 13, position: "relative", zIndex: 1 }}>
           {/* Two ways in, one switch. The previous menu was two paragraph-heavy
               cards each carrying its own bans control, which made bans look like
@@ -409,48 +408,62 @@ function Duel() {
 
     const turnLabel = yourTurn
       ? (banning ? "YOUR BAN — CHOOSE ONE TO REMOVE" : "YOUR PICK — LOCK ONE IN")
-      : (botThinking ? "COUNTERPICKER IS DECIDING…" : "OPPONENT'S TURN");
+      : (botThinking ? "DIRE IS DECIDING…" : "DIRE'S TURN");
 
     return (
       <Shell
-        tab={null}
+        tab={null} pad={false} atmos={0.55}
         head={
-          <Band compact accent={banning ? RED : yourTurn ? GOLD : MUTED} onBack={toMenu}
-            title="vs The Counterpicker" sub={`Round ${turnIndex + 1} / ${SEQ.length}`}
+          <Band compact accent={banning ? DANGER : yourTurn ? GOLD : MUTED} onBack={toMenu}
+            title="RADIANT vs DIRE" sub={`Round ${turnIndex + 1} of ${SEQ.length}`}
             right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? GOLD : DIM} />}
           >
-            <TurnBanner active={yourTurn} label={turnLabel} accent={banning ? RED : GOLD} />
+            <TurnBanner active={yourTurn} label={turnLabel} accent={banning ? DANGER : GOLD} />
             <div style={{ marginTop: 8 }}>
               <DraftTimeline seq={SEQ} current={Math.min(turnIndex, SEQ.length - 1)} mineRole={YOU} />
             </div>
-            <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
-              <TeamRow side="them" label="THE COUNTERPICKER" motion={motion} height="clamp(78px, 23vw, 116px)"
-                heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
-                status={{ text: botTurn ? (banning ? "banning…" : "picking…") : "idle", active: botTurn }}
-                note={lastBotPick?.answering != null ? (
-                  <span style={{ fontSize: 9, color: RED, textAlign: "right", lineHeight: 1.2 }}>
-                    answers your {heroName(lastBotPick.answering)}
-                  </span>
-                ) : undefined} />
-              <TeamRow side="you" label="YOU" motion={motion} height="clamp(78px, 23vw, 116px)"
-                heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null} />
-            </div>
-            {bans.length > 0 && <div style={{ marginTop: 7 }}><BanStrip bans={bans} byId={heroById} /></div>}
-            <Field value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder={yourTurn ? (banning ? "Search — banning" : "Search heroes") : "Waiting for them…"}
-              disabled={!yourTurn}
-              style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: yourTurn ? 1 : .4, borderColor: banning && yourTurn ? RED : LINE }} />
+            {bans.length > 0 && <div style={{ marginTop: 8 }}><BanStrip bans={bans} byId={heroById} /></div>}
           </Band>
         }
       >
-        {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
-          <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
-            They banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
-            {lastBotBan.deniedRank === 1 ? " best" : ` #${lastBotBan.deniedRank}`} option.
+        {/*
+          Dota's own shape: Radiant down one side, Dire down the other, the hero
+          pool between them. The columns are narrow because they are status —
+          every pixel they take comes out of the grid, which is the part in use.
+        */}
+        <div style={{ display: "flex", gap: 6, padding: "9px 8px 16px", alignItems: "flex-start" }}>
+          <DraftColumn
+            side="radiant" label="RADIANT" motion={motion}
+            heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null}
+            active={yourTurn} status={yourTurn ? (banning ? "banning" : "picking") : "you"}
+          />
+
+          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+            <Field value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder={yourTurn ? (banning ? "Search — banning" : "Search heroes") : "Waiting…"}
+              disabled={!yourTurn}
+              style={{
+                padding: "7px 10px", minHeight: 34, fontSize: 15, marginBottom: 9,
+                opacity: yourTurn ? 1 : .4, borderColor: banning && yourTurn ? DANGER : LINE,
+              }} />
+
+            {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
+              <div style={{ fontSize: 10, color: DANGER, marginBottom: 8, lineHeight: 1.35 }}>
+                Dire banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
+                {lastBotBan.deniedRank === 1 ? " best" : ` #${lastBotBan.deniedRank}`} option.
+              </div>
+            )}
+
+            <div style={{ opacity: yourTurn ? 1 : .34, pointerEvents: yourTurn ? "auto" : "none" }}>
+              <AttributePool ids={filtered} byId={poolHero} onPick={act} dim={banning} />
+            </div>
           </div>
-        )}
-        <div style={{ padding: "9px 0 16px", opacity: yourTurn ? 1 : .32, pointerEvents: yourTurn ? "auto" : "none" }}>
-          <HeroGrid ids={filtered} byId={heroById} onPick={act} dim={banning} />
+
+          <DraftColumn
+            side="dire" label="DIRE" motion={motion}
+            heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
+            active={botTurn} status={botTurn ? (banning ? "banning" : "picking") : "bot"}
+          />
         </div>
       </Shell>
     );

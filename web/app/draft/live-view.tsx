@@ -10,7 +10,7 @@ import {
   Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline,
   CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
 } from "./ui";
-import { TeamRow, HeroGrid } from "./hero-art";
+import { TeamRow, BanStrip, DraftColumn, AttributePool } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -126,6 +126,7 @@ export function LiveView({
   const heroById = (id: number) => engine.heroById.get(id);
   const heroName = (id: number) => heroById(id)?.name ?? `#${id}`;
   const heroOf = (id: number) => { const h = heroById(id)!; return { id, img: h.img, name: h.name }; };
+  const poolHero = (id: number) => { const h = heroById(id); return h ? { img: h.img, name: h.name, attr: h.attr } : undefined; };
   const meName = (seat === "host" ? room.host?.name : room.guest?.name) ?? "You";
   const themName = (seat === "host" ? room.guest?.name : room.host?.name) ?? "Them";
 
@@ -270,7 +271,7 @@ export function LiveView({
 
   return (
     <Shell
-      tab={null}
+      tab={null} pad={false} atmos={0.55}
       head={
         <Band
           compact accent={banning ? DANGER : myTurn ? GOLD : MUTED} onBack={onLeave}
@@ -286,30 +287,41 @@ export function LiveView({
           <div style={{ marginTop: 8 }}>
             <DraftTimeline seq={seq} current={Math.min(turnIdx, seq.length - 1)} mineRole={mineRole} />
           </div>
-          <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
-            <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} motion={motion} height="clamp(78px, 23vw, 116px)"
-              heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
-              status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }} />
-            <TeamRow side="you" label="YOU" motion={motion} height="clamp(78px, 23vw, 116px)"
-              heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} />
-          </div>
-          <Field
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting for them…"}
-            disabled={!myTurn}
-            style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
-          />
+          {bans.length > 0 && <div style={{ marginTop: 8 }}><BanStrip bans={bans} byId={heroById} /></div>}
         </Band>
       }
     >
-      {lastPick?.auto && (
-        <div style={{ fontSize: 11.5, color: ENEMY, padding: "8px 2px 0" }}>
-          Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
+      {/* The same Radiant / pool / Dire shape the solo board uses. */}
+      <div style={{ display: "flex", gap: 6, padding: "9px 8px 16px", alignItems: "flex-start" }}>
+        <DraftColumn
+          side="radiant" label={(meName ?? "YOU").toUpperCase()} motion={motion}
+          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null}
+          active={myTurn} status={myTurn ? (banning ? "banning" : "picking") : "you"}
+        />
+
+        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+          <Field
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting…"}
+            disabled={!myTurn}
+            style={{ padding: "7px 10px", minHeight: 34, fontSize: 15, marginBottom: 9, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
+          />
+          {lastPick?.auto && (
+            <div style={{ fontSize: 10, color: ENEMY, marginBottom: 8, lineHeight: 1.35 }}>
+              Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
+            </div>
+          )}
+          {error && <div style={{ color: ENEMY, fontSize: 10.5, marginBottom: 8 }} onClick={() => setError(null)}>{error}</div>}
+          <div style={{ opacity: myTurn ? 1 : .34, pointerEvents: myTurn ? "auto" : "none" }}>
+            <AttributePool ids={filtered} byId={poolHero} onPick={submit} dim={banning} />
+          </div>
         </div>
-      )}
-      {error && <div style={{ color: ENEMY, fontSize: 12, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
-      <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .32, pointerEvents: myTurn ? "auto" : "none" }}>
-        <HeroGrid ids={filtered} byId={heroById} onPick={submit} dim={banning} />
+
+        <DraftColumn
+          side="dire" label={(themName ?? "DIRE").toUpperCase()} motion={motion}
+          heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
+          active={!myTurn} status={!myTurn ? (banning ? "banning" : "picking") : "them"}
+        />
       </div>
     </Shell>
   );

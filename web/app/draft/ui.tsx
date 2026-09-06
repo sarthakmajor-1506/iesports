@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { DraftTheme, FONT } from "./theme";
+import { DraftTheme, DotaAtmosphere, FONT } from "./theme";
 import { useMuted } from "./sound";
 
 /* ------------------------------------------------------------------ tokens
@@ -12,30 +12,39 @@ import { useMuted } from "./sound";
  * `var()` cannot do. Keep the two files in step.
  */
 
-export const BG = "#0B0E14";
-export const PANEL = "#12161F";      // elevated surface
-export const PANEL_2 = "#181D28";    // secondary surface
-export const LINE = "rgba(255,255,255,0.06)";
-export const LINE_HI = "rgba(255,255,255,0.12)";
-export const CREAM = "#E8EAED";
-export const MUTED = "#8B95A8";
-export const DIM = "#5C6577";
+export const BG = "#101318";
+export const PANEL = "#191E25";      // elevated surface
+export const PANEL_2 = "#222831";    // secondary surface
+export const LINE = "rgba(200,166,93,0.14)";
+export const LINE_HI = "rgba(200,166,93,0.30)";
+export const CREAM = "#DDE1E4";
+export const MUTED = "#8C949E";
+export const DIM = "#5D656F";
 
-export const RED = "#FF3B3B";        // primary CTA / solo
-export const GOLD = "#F5A623";       // secondary / live
-export const GREEN = "#00E676";      // success, correct, positive delta
-export const DANGER = "#FF1744";     // ban, wrong
-export const ALLY = "#00B0FF";       // your side
-export const ENEMY = "#FF5252";      // their side
-export const BLUE = ALLY;
+/** The two sides, as Dota colours them. */
+export const RADIANT = "#A2B93B";
+export const DIRE = "#C8402C";
+/** Dota's ornament gold — every frame, rule and highlight in the client. */
+export const GOLD = "#C8A65D";
 
-export const GLOW_PRIMARY = "0 0 24px rgba(255, 59, 59, 0.45)";
-export const GLOW_GOLD = "0 0 24px rgba(245, 166, 35, 0.40)";
-export const GLOW_SUCCESS = "0 0 20px rgba(0, 230, 118, 0.35)";
+export const GREEN = "#7FD44C";      // success, correct, positive delta
+export const DANGER = "#D6412B";     // ban, wrong
+export const ALLY = RADIANT;         // your side is always Radiant
+export const ENEMY = DIRE;           // theirs is always Dire
+export const RED = DIRE;
+export const BLUE = "#4BA9E8";
 
-export const R_CARD = 16, R_BTN = 12, R_CHIP = 8;
+export const GLOW_PRIMARY = "0 0 24px rgba(200, 64, 44, 0.42)";
+export const GLOW_GOLD = "0 0 22px rgba(200, 166, 93, 0.38)";
+export const GLOW_SUCCESS = "0 0 22px rgba(162, 185, 59, 0.40)";
 
-export const attrColor = (a: string) => (a === "str" ? ENEMY : a === "agi" ? GREEN : a === "int" ? ALLY : "#C77DFF");
+/** Chamfered, not rounded — the single strongest Dota tell in the whole UI. */
+export const R_CARD = 4, R_BTN = 3, R_CHIP = 3;
+
+/** Attribute colours, as the client paints them. */
+export const ATTR = { str: "#E04A3F", agi: "#9BC44E", int: "#4BA9E8", all: "#C77DDA" } as const;
+export const attrColor = (a: string) => ATTR[a as keyof typeof ATTR] ?? ATTR.all;
+export const attrName = (a: string) => (a === "str" ? "STRENGTH" : a === "agi" ? "AGILITY" : a === "int" ? "INTELLIGENCE" : "UNIVERSAL");
 
 export function anonId() {
   if (typeof window === "undefined") return "server";
@@ -65,7 +74,7 @@ export function anonId() {
  * renders the theme itself so no page has to remember to.
  */
 export function Shell({
-  head, children, foot, tab, pad = true, glow,
+  head, children, foot, tab, pad = true, glow, atmos = 1,
 }: {
   head?: React.ReactNode;
   children: React.ReactNode;
@@ -74,6 +83,8 @@ export function Shell({
   pad?: boolean;
   /** Ambient colour wash behind the stage, e.g. the winner's colour on a result. */
   glow?: string;
+  /** Dial the drifting Radiant/Dire lights down on busy screens. */
+  atmos?: number;
 }) {
   return (
     <div className="dl-app" style={{
@@ -89,6 +100,7 @@ export function Shell({
           : `radial-gradient(120% 50% at 50% 0%, rgba(255,255,255,.028), ${BG} 60%)`,
         boxShadow: "0 0 90px rgba(0,0,0,.85)",
       }}>
+        <DotaAtmosphere weight={atmos} />
         {head}
         <div style={{
           flex: "1 1 auto", minHeight: 0, overflowY: "auto", overscrollBehavior: "contain",
@@ -283,13 +295,14 @@ export function Btn({
     boxShadow: disabled || flat ? "none" : glow === false ? `0 6px 18px -10px ${t.shadow}` : t.shadow,
     minHeight: mh,
   };
-  if (href) return <a className="dl-btn" href={href} style={style}>{children}</a>;
-  return <button className="dl-btn" onClick={onClick} disabled={disabled} style={style}>{children}</button>;
+  const cut = flat ? "dl-btn dl-cut-s" : "dl-btn dl-cut-s";
+  if (href) return <a className={cut} href={href} style={style}>{children}</a>;
+  return <button className={cut} onClick={onClick} disabled={disabled} style={style}>{children}</button>;
 }
 
 export function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className="dl-card" style={{
+    <div className="dl-card dl-cut" style={{
       background: PANEL, border: `1px solid ${LINE}`, borderRadius: R_CARD,
       padding: "13px 14px", ...style,
     }}>{children}</div>
