@@ -11,10 +11,12 @@ import type { Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips,
-  RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
+  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips, SoundToggle,
+  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, DANGER, ALLY, R_CARD, R_BTN, R_CHIP,
 } from "./ui";
-import { TeamRow, BanStrip, HeroGrid, DraftStyles, setRenderConcurrency } from "./hero-art";
+import { ParticleField, Skeleton } from "./theme";
+import { play } from "./sound";
+import { TeamRow, BanStrip, HeroGrid, setRenderConcurrency } from "./hero-art";
 import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
@@ -36,7 +38,7 @@ const COUNTER = PERSONALITIES.find((p) => p.id === "counter")!;
 
 export default function DraftDuelPage() {
   return (
-    <Suspense fallback={<Shell tab="duel" head={<Band title="Draft Duel" />}><DraftStyles /></Shell>}>
+    <Suspense fallback={<Shell tab="duel" head={<Band title="Draft Duel" />}><Skeleton h={150} style={{ marginTop: 13 }} /></Shell>}>
       <Duel />
     </Suspense>
   );
@@ -65,6 +67,7 @@ function Duel() {
   const [botThinking, setBotThinking] = useState(false);
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [scored, setScored] = useState<{ points: number; draftPoints: number; quizPoints: number } | null>(null);
+  const [personalBest, setPersonalBest] = useState(false);
   const [boardVersion, setBoardVersion] = useState(0);
 
   /**
@@ -164,6 +167,7 @@ function Duel() {
     if (stage !== "drafting" || !engine || !slot || slot.by !== "bot") return;
     setBotThinking(true);
     const t = setTimeout(() => {
+      play(slot.kind === "ban" ? "ban" : "pick");
       if (slot.kind === "ban") {
         const b = botBan(engine, COUNTER, theirs, yours, available, rng);
         commit("bot", "ban", b.heroId, b.playerRank);
@@ -188,6 +192,7 @@ function Duel() {
 
   const act = (heroId: number) => {
     if (!engine || !slot || slot.by !== "you") return;
+    play(slot.kind === "ban" ? "ban" : "pick");
     if (slot.kind === "ban") {
       const v = banValue(engine, heroId, theirs, yours, available);
       commit("you", "ban", heroId, v.rankForThem);
@@ -223,6 +228,7 @@ function Duel() {
       });
       const d = await r.json();
       if (d?.scored) setScored(d.scored);
+      if (d?.personalBest) setPersonalBest(true);
       setBoardVersion((v) => v + 1);
     } catch { /* the leaderboard is never allowed to break the game loop */ }
   }, [user, steamName, name, userProfile]);
@@ -250,20 +256,20 @@ function Duel() {
 
   const restart = () => {
     setEvents([]); setSearch(""); setLogged(false); setQuiz(null); setScored(null);
+    setPersonalBest(false);
     setStartedAt(Date.now()); rngState.current = Math.floor(Math.random() * 0xffffffff);
     setStage("drafting");
   };
-  const toMenu = () => { setEvents([]); setQuiz(null); setScored(null); setLogged(false); setStage("menu"); };
+  const toMenu = () => { setEvents([]); setQuiz(null); setScored(null); setPersonalBest(false); setLogged(false); setStage("menu"); };
   const saveName = (n: string) => { setName(n); try { localStorage.setItem("draftlab_name", n); } catch {} };
 
   if (error) {
-    return <Shell tab="duel" head={<Band title="Draft Duel" />}><DraftStyles /><Panel style={{ marginTop: 12 }}><span style={{ color: RED, fontSize: 13 }}>{error}</span></Panel></Shell>;
+    return <Shell tab="duel" head={<Band title="Draft Duel" />}><Panel style={{ marginTop: 13 }}><span style={{ color: ENEMY, fontSize: 13 }}>{error}</span></Panel></Shell>;
   }
   if (!model || !engine) {
     return (
       <Shell tab="duel" head={<Band title="Draft Duel" />}>
-        <DraftStyles />
-        <div className="dl-sheen" style={{ height: 130, borderRadius: 10, background: PANEL, marginTop: 12 }} />
+        <Skeleton h={150} style={{ marginTop: 13 }} />
       </Shell>
     );
   }
@@ -285,32 +291,40 @@ function Duel() {
         head={
           <Band title="Draft Duel" compact sub="Draft, then three questions"
             right={
-              <span style={{
-                maxWidth: 130, fontSize: 10.5, fontWeight: 800, color: user ? GREEN : DIM,
-                border: `1px solid ${user ? GREEN + "55" : LINE}`, borderRadius: 6, padding: "4px 8px",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>{user ? (steamName || name || "Signed in") : "Guest"}</span>
+              <>
+                <SoundToggle />
+                <span style={{
+                  maxWidth: 108, fontSize: 10.5, fontWeight: 800, color: user ? GREEN : DIM,
+                  border: `1px solid ${user ? GREEN + "44" : LINE}`, borderRadius: R_CHIP, padding: "5px 9px",
+                  background: user ? `${GREEN}12` : PANEL_2,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{user ? (steamName || name || "Signed in") : "Guest"}</span>
+              </>
             } />
         }
       >
-        <DraftStyles />
+        <ParticleField tint="255,59,59" />
 
-        <div className="dl-in" style={{ display: "grid", gap: 9, paddingTop: 12 }}>
+        <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 13, position: "relative", zIndex: 1 }}>
           {/* Two ways in, one switch. The previous menu was two paragraph-heavy
               cards each carrying its own bans control, which made bans look like
               a property of a mode rather than a property of the draft. */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <ModeTile accent={RED} kicker="SOLO" title="Counterpicker" sub="It answers what you take" onClick={restart} />
+          <div style={{ display: "flex", gap: 9 }}>
+            <ModeTile accent={RED} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
+              cta="PLAY" onClick={restart} />
             <ModeTile accent={GOLD} kicker="LIVE · 30s" title="Play a friend" sub="Head to head, on a clock"
+              cta="CREATE ROOM"
               onClick={async () => {
                 const d = await roomCall({ action: "create", name: steamName || name || "Host", bans: bansOn });
                 if (d?.code) setLiveCode(d.code);
               }} />
           </div>
 
-          <div style={{
-            display: "flex", justifyContent: "center", alignItems: "center", gap: 9,
-            padding: "9px 12px", borderRadius: 8, background: PANEL, border: `1px solid ${LINE}`,
+          <Pulse />
+
+          <div className="dl-card" style={{
+            display: "flex", justifyContent: "center", alignItems: "center", gap: 10,
+            padding: "8px 12px", borderRadius: R_CARD, background: PANEL, border: `1px solid ${LINE}`,
           }}>
             <Toggle checked={bansOn} onChange={setBansOn} label="BANS" />
             <span style={{ fontSize: 10, color: DIM, letterSpacing: .3 }}>
@@ -318,11 +332,11 @@ function Duel() {
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: 7 }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <Field value={codeInput}
               onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
               placeholder="ROOM CODE" autoCapitalize="characters"
-              style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 3, fontWeight: 900, textAlign: "center", padding: "8px 6px", minHeight: 40 }} />
+              style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 3, fontWeight: 800, textAlign: "center", minHeight: 44 }} />
             <Btn tone="dark" disabled={busy || codeInput.length < 4} onClick={async () => {
               setBusy(true); setJoinError(null);
               const j = await roomCall({ action: "join", code: codeInput, name: steamName || name || "Guest" });
@@ -330,7 +344,7 @@ function Duel() {
               if (j?.ok) setLiveCode(codeInput); else setJoinError("No room with that code.");
             }}>{busy ? "…" : "JOIN"}</Btn>
           </div>
-          {joinError && <div style={{ color: RED, fontSize: 11.5, textAlign: "center" }}>{joinError}</div>}
+          {joinError && <div style={{ color: ENEMY, fontSize: 11.5, textAlign: "center" }}>{joinError}</div>}
 
           {!user && (
             <Panel style={{ padding: "9px 11px", display: "flex", alignItems: "center", gap: 9 }}>
@@ -354,7 +368,6 @@ function Duel() {
   if (stage === "recap") {
     return (
       <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
-        <DraftStyles />
         <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
@@ -370,7 +383,6 @@ function Duel() {
   if (stage === "quiz") {
     return (
       <Shell tab={null} head={<Band title="Draft locked" compact accent={GOLD} sub="Now the questions" />}>
-        <DraftStyles />
         <div style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
           <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 19vw, 92px)" />
           {knowledge ? (
@@ -431,7 +443,6 @@ function Duel() {
           </Band>
         }
       >
-        <DraftStyles />
         {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
           <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
             They banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
@@ -453,9 +464,8 @@ function Duel() {
       head={<ResultBand won={won} onMenu={toMenu} />}
       foot={<ResultActions onAgain={restart} onMenu={toMenu} />}
     >
-      <DraftStyles />
       <Result engine={engine} events={events} yours={yours} theirs={theirs} finalP={finalP}
-        quiz={quiz} tempos={tempos} motion={motion} scored={scored} />
+        quiz={quiz} tempos={tempos} motion={motion} scored={scored} personalBest={personalBest} />
     </Shell>
   );
 }
@@ -463,24 +473,69 @@ function Duel() {
 /**
  * One of the two ways into a game.
  *
- * Deliberately terse: a kicker, a name, and one line. The old cards carried a
- * blurb, a bans control and a button each, which made the first screen of a game
- * read like a pricing page.
+ * Terse on purpose: a kicker, a name, one line, and the verb. The accent bar and
+ * its glow are the whole identity of the mode — red for solo, gold for live —
+ * so the two are distinguishable at a glance before any text is read.
  */
 function ModeTile({
-  accent, kicker, title, sub, onClick,
-}: { accent: string; kicker: string; title: string; sub: string; onClick: () => void }) {
+  accent, kicker, title, sub, cta, onClick,
+}: { accent: string; kicker: string; title: string; sub: string; cta: string; onClick: () => void }) {
   return (
-    <button className="dl-btn" onClick={onClick} style={{
+    <button className="dl-btn dl-card" onClick={() => { play("pick"); onClick(); }} style={{
       flex: "1 1 0", minWidth: 0, textAlign: "left", cursor: "pointer",
-      position: "relative", overflow: "hidden", borderRadius: 8, padding: "12px 11px 13px",
-      background: `linear-gradient(155deg, ${PANEL} 38%, ${accent}22)`,
-      border: `1px solid ${accent}55`, color: CREAM,
+      position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "14px 12px 13px",
+      background: `linear-gradient(158deg, ${PANEL} 34%, ${accent}26)`,
+      border: `1px solid ${accent}3d`, color: CREAM,
+      boxShadow: `0 10px 34px -18px ${accent}, 0 0 0 1px rgba(255,255,255,.02) inset`,
     }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent, boxShadow: `0 0 14px ${accent}` }} />
-      <div style={{ fontSize: 8.5, letterSpacing: 1.5, color: accent, fontWeight: 900, marginBottom: 5 }}>{kicker}</div>
-      <div style={{ fontSize: "clamp(15px, 4.4vw, 18px)", fontWeight: 900, letterSpacing: -0.3, lineHeight: 1.1, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.35 }}>{sub}</div>
+      <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent, boxShadow: `0 0 18px ${accent}` }} />
+      <div style={{ fontSize: 8.5, letterSpacing: 1.6, color: accent, fontWeight: 800, marginBottom: 6 }}>{kicker}</div>
+      <div style={{ fontSize: "clamp(15px, 4.4vw, 18px)", fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.1, marginBottom: 5 }}>{title}</div>
+      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.35, marginBottom: 11, minHeight: 27 }}>{sub}</div>
+      <span style={{
+        display: "block", textAlign: "center", padding: "9px 6px", borderRadius: R_BTN,
+        background: `linear-gradient(180deg, ${accent}, ${accent}CC)`, color: accent === GOLD ? "#1A1103" : "#FFF",
+        fontSize: 11.5, fontWeight: 800, letterSpacing: .5, boxShadow: `0 0 22px -6px ${accent}`,
+      }}>{cta}</span>
     </button>
+  );
+}
+
+/**
+ * "What's happening right now", from real aggregate counts.
+ *
+ * Renders nothing at all when both numbers are zero rather than inventing
+ * activity — an empty game that claims to be busy is the fastest way to teach
+ * someone the numbers on the rest of the screen are decorative too.
+ */
+function Pulse() {
+  const [p, setP] = useState<{ live: number | null; today: number | null } | null>(null);
+  useEffect(() => {
+    let stop = false;
+    const load = () => fetch("/api/draftlab/pulse", { cache: "no-store" })
+      .then((r) => r.json()).then((d) => { if (!stop) setP(d); }).catch(() => {});
+    load();
+    const t = setInterval(load, 20000);
+    return () => { stop = true; clearInterval(t); };
+  }, []);
+
+  const live = p?.live ?? 0, today = p?.today ?? 0;
+  if (!live && !today) return null;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+      fontSize: 10.5, color: MUTED, letterSpacing: .3,
+    }}>
+      <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7 }}>
+        <span className="dl-turn" style={{
+          position: "absolute", inset: 0, borderRadius: 4,
+          background: live ? GREEN : DIM, boxShadow: live ? `0 0 10px ${GREEN}` : "none",
+        }} />
+      </span>
+      {live > 0 && <span><b style={{ color: CREAM, fontWeight: 800 }}>{live}</b> {live === 1 ? "draft" : "drafts"} live now</span>}
+      {live > 0 && today > 0 && <span style={{ color: DIM }}>·</span>}
+      {today > 0 && <span><b style={{ color: CREAM, fontWeight: 800 }}>{today}</b> played today</span>}
+    </div>
   );
 }

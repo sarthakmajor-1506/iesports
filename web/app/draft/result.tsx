@@ -2,10 +2,13 @@
 
 import { type Engine } from "@/lib/draftlab";
 import { counterMap, teamTempo, draftingStyle, type TempoRow, type CounterEdge } from "@/lib/draftbot";
+import { useEffect, useState } from "react";
 import {
-  Band, Btn, Panel, Label, VersusBar,
-  RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
+  Band, Btn, Panel, Label, VersusBar, CountUp,
+  CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
 } from "./ui";
+import { Burst } from "./theme";
+import { play } from "./sound";
 import { TeamRow, HeroImg, heroBase } from "./hero-art";
 
 export type ResultEv = {
@@ -23,29 +26,31 @@ export type ResultEv = {
  * breakdown, so playing again meant reading the post-mortem first.
  */
 export function ResultBand({ won, onMenu }: { won: boolean; onMenu: () => void }) {
-  return <Band compact accent={won ? GREEN : RED} onBack={onMenu}
+  return <Band compact accent={won ? GREEN : ENEMY} onBack={onMenu}
     title={won ? "You won the draft" : "You lost the draft"} />;
 }
 
 export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu: () => void }) {
   return (
     <div style={{
-      flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))",
-      borderTop: `1px solid ${LINE}`, background: "#0b0910",
+      flex: "0 0 auto", display: "flex", gap: 8, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+      borderTop: `1px solid ${LINE}`, background: "rgba(8,11,18,.94)", backdropFilter: "blur(14px)",
     }}>
-      <div style={{ flex: 2 }}><Btn full tone="gold" onClick={onAgain}>REMATCH</Btn></div>
-      <div style={{ flex: 1 }}><Btn full tone="ghost" onClick={onMenu}>MENU</Btn></div>
+      <div style={{ flex: 2 }}><Btn full size="l" tone="red" onClick={onAgain}>PLAY AGAIN</Btn></div>
+      <div style={{ flex: 1 }}><Btn full size="l" tone="ghost" onClick={onMenu}>MENU</Btn></div>
     </div>
   );
 }
 
 export function Result({
-  engine, events, yours, theirs, finalP, quiz, tempos, motion, scored,
+  engine, events, yours, theirs, finalP, quiz, tempos, motion, scored, personalBest,
 }: {
   engine: Engine; events: ResultEv[]; yours: number[]; theirs: number[]; finalP: number | null;
   quiz: { points: number; correct: number; rounds: { correct: boolean; points: number }[] } | null;
   tempos: Map<number, TempoRow>; motion: boolean;
   scored: { points: number; draftPoints: number; quizPoints: number } | null;
+  /** Server-decided, against the row as it stood before this game. */
+  personalBest?: boolean;
 }) {
   const heroName = (id: number) => engine.heroById.get(id)?.name ?? `#${id}`;
   const heroOf = (id: number) => { const h = engine.heroById.get(id)!; return { id, img: h.img, name: h.name }; };
@@ -71,57 +76,28 @@ export function Result({
       <div style={{
         borderRadius: 10, padding: "14px 14px",
         background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`,
-        border: `1px solid ${won ? GREEN : RED}44`,
+        border: `1px solid ${won ? GREEN : ENEMY}44`,
       }}>
-        <div style={{ fontSize: 9.5, letterSpacing: 2, color: won ? GREEN : RED, fontWeight: 900, opacity: .8, marginBottom: 5 }}>
+        <div style={{ fontSize: 9.5, letterSpacing: 2, color: won ? GREEN : ENEMY, fontWeight: 900, opacity: .8, marginBottom: 5 }}>
           DRAFT COMPLETE
         </div>
         <div style={{
           fontSize: "clamp(19px, 5.8vw, 25px)", fontWeight: 900, letterSpacing: -0.4,
-          color: won ? GREEN : RED, marginBottom: 12, lineHeight: 1.12,
-          textShadow: `0 0 24px ${won ? GREEN : RED}33`,
+          color: won ? GREEN : ENEMY, marginBottom: 12, lineHeight: 1.12,
+          textShadow: `0 0 24px ${won ? GREEN : ENEMY}33`,
         }}>
           {won ? `You out-drafted ${them}.` : `${them} out-drafted you.`}
         </div>
         <VersusBar p={p} left="YOU" right={them.toUpperCase()} />
       </div>
 
-      {(quiz || scored) && (
-        <Panel style={{ background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${GOLD}44`, padding: "10px 12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div>
-              <Label color={GOLD} style={{ marginBottom: 2 }}>{scored ? "SCORE THIS GAME" : "QUIZ ROUND"}</Label>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-                <span style={{ fontSize: 28, fontWeight: 900, color: GOLD, lineHeight: 1 }}>
-                  {scored ? scored.points : quiz?.points ?? 0}
-                </span>
-                {scored
-                  ? <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{scored.draftPoints} draft + {scored.quizPoints} quiz</span>
-                  : <span style={{ fontSize: 12, color: MUTED, fontWeight: 700 }}>/ {(quiz?.rounds.length ?? 3) * 10}</span>}
-              </div>
-            </div>
-            <span style={{ flex: "1 1 auto" }} />
-            {quiz && (
-              <div style={{ display: "flex", gap: 4 }}>
-                {quiz.rounds.map((r, i) => (
-                  <span key={i} style={{
-                    width: 30, height: 30, borderRadius: 9, display: "grid", placeItems: "center",
-                    background: r.correct ? `${GREEN}22` : `${RED}22`,
-                    border: `1px solid ${r.correct ? GREEN : RED}55`,
-                    color: r.correct ? GREEN : RED, fontSize: 11.5, fontWeight: 900,
-                  }}>{r.correct ? `+${r.points}` : "0"}</span>
-                ))}
-              </div>
-            )}
-          </div>
-        </Panel>
-      )}
+      {(quiz || scored) && <ScoreReveal scored={scored} quiz={quiz} personalBest={personalBest} />}
 
       <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
       <TeamRow side="them" label={them.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
 
       {theirBest && theirBest.swing < -0.4 && (
-        <Beat color={RED} label="THE PICK THAT HURT">
+        <Beat color={DANGER} label="THE PICK THAT HURT">
           Their <b>{heroName(theirBest.heroId)}</b> took {Math.abs(theirBest.swing).toFixed(1)} points off your draft.
         </Beat>
       )}
@@ -146,13 +122,13 @@ export function Result({
       <Panel style={{ padding: "10px 12px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
           <Label style={{ marginBottom: 0 }}>THE COUNTER WAR</Label>
-          <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : RED }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
             {yoursWin.length} — {theirsWin.length}
           </span>
         </div>
         <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
         <div style={{ height: 8 }} />
-        <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={RED} engine={engine} />
+        <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
       </Panel>
 
       <div style={{
@@ -197,6 +173,95 @@ export function Col({ title, rows, color, engine }: { title: string; rows: Count
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The payoff.
+ *
+ * A score that simply appears reads as data; a score that climbs reads as an
+ * outcome. The count-up drives the whole beat — the breakdown fades in behind it
+ * and the fanfare fires when it lands, so the moment has an ending rather than
+ * just a final value.
+ *
+ * The confetti is gated on a real personal best, decided by the server against
+ * the row as it stood before this game. Celebrating every result would make the
+ * celebration mean nothing, which is the same reason the win estimate is honest.
+ */
+function ScoreReveal({
+  scored, quiz, personalBest,
+}: {
+  scored: { points: number; draftPoints: number; quizPoints: number } | null;
+  quiz: { points: number; correct: number; rounds: { correct: boolean; points: number }[] } | null;
+  personalBest?: boolean;
+}) {
+  const total = scored ? scored.points : quiz?.points ?? 0;
+  const [landed, setLanded] = useState(false);
+
+  useEffect(() => {
+    if (!landed) return;
+    if (personalBest) play("win");
+  }, [landed, personalBest]);
+
+  return (
+    <div className="dl-card" style={{
+      position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "18px 15px 15px",
+      background: `linear-gradient(155deg, ${PANEL} 40%, rgba(245,166,35,.10))`,
+      border: `1px solid ${personalBest && landed ? GOLD : GOLD + "3d"}`,
+      boxShadow: personalBest && landed ? "0 0 34px -12px rgba(245,166,35,.75)" : "none",
+      textAlign: "center",
+    }}>
+      {landed && personalBest && <Burst color={GOLD} n={26} spread={120} />}
+
+      <Label color={GOLD} style={{ marginBottom: 6 }}>{scored ? "SCORE THIS GAME" : "QUIZ ROUND"}</Label>
+
+      <div style={{
+        fontSize: "clamp(46px, 15vw, 68px)", fontWeight: 800, color: GOLD, lineHeight: 1,
+        letterSpacing: -2, textShadow: `0 0 40px rgba(245,166,35,.45)`,
+      }}>
+        <CountUp to={total} dur={1200} onDone={() => setLanded(true)} />
+      </div>
+
+      {landed && personalBest && (
+        <div className="dl-in" style={{ marginTop: 8, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, color: GOLD }}>
+          ★ PERSONAL BEST
+        </div>
+      )}
+
+      {scored && (
+        <div className="dl-in" style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <Breakdown label="DRAFT" value={scored.draftPoints} color={ALLY} />
+          <Breakdown label="QUESTIONS" value={scored.quizPoints} color={GREEN} />
+        </div>
+      )}
+
+      {quiz && (
+        <div style={{ display: "flex", gap: 5, justifyContent: "center", marginTop: 12 }}>
+          {quiz.rounds.map((r, i) => (
+            <span key={i} style={{
+              width: 34, height: 34, borderRadius: R_CHIP, display: "grid", placeItems: "center",
+              background: r.correct ? `${GREEN}1f` : `${DANGER}1f`,
+              border: `1px solid ${r.correct ? GREEN : DANGER}55`,
+              color: r.correct ? GREEN : DANGER, fontSize: 12, fontWeight: 800,
+            }}>{r.correct ? `+${r.points}` : "0"}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Breakdown({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{
+      flex: "1 1 0", background: PANEL_2, border: `1px solid ${LINE}`, borderRadius: R_CHIP,
+      padding: "10px 8px", textAlign: "center",
+    }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+        <CountUp to={value} dur={900} />
+      </div>
+      <div style={{ fontSize: 8.5, letterSpacing: 1.1, color: DIM, fontWeight: 800, marginTop: 4 }}>{label}</div>
     </div>
   );
 }

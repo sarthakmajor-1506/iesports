@@ -182,7 +182,9 @@ export function TurnClock({ seconds, yours, size = 44 }: { seconds: number | nul
   const warn = seconds <= 10;
   const r = size / 2 - 3;
   const pct = Math.max(0, Math.min(1, seconds / (TURN_MS / 1000)));
-  const color = urgent ? "#e0453a" : warn ? "#e08a3a" : yours ? "#F5B93B" : "#6b6478";
+  // green while there is time, amber at ten, red at five — the colour is the
+  // warning, so it lands before the number is read.
+  const color = urgent ? "#FF1744" : warn ? "#F5A623" : yours ? "#00E676" : "#5C6577";
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
@@ -197,7 +199,7 @@ export function TurnClock({ seconds, yours, size = 44 }: { seconds: number | nul
       <div style={{
         position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: size * 0.36, fontWeight: 900, color, fontVariantNumeric: "tabular-nums",
-        animation: urgent ? "dl-pulse .6s ease-in-out infinite" : undefined,
+        animation: urgent ? "dl-urgent .55s ease-in-out infinite" : undefined,
       }}>{Math.ceil(seconds)}</div>
     </div>
   );

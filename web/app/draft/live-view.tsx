@@ -8,9 +8,9 @@ import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
   Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline,
-  RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
+  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
 } from "./ui";
-import { TeamRow, HeroGrid, DraftStyles } from "./hero-art";
+import { TeamRow, HeroGrid } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -111,16 +111,14 @@ export function LiveView({
   if (err) {
     return (
       <Shell tab={null} head={<Band title="Live room" compact onBack={onLeave} />}>
-        <DraftStyles />
-        <Panel style={{ marginTop: 12 }}><div style={{ color: RED, fontSize: 13 }}>{err}</div></Panel>
+          <Panel style={{ marginTop: 12 }}><div style={{ color: ENEMY, fontSize: 13 }}>{err}</div></Panel>
       </Shell>
     );
   }
   if (!room) {
     return (
       <Shell tab={null} head={<Band title={`Room ${code}`} compact onBack={onLeave} />}>
-        <DraftStyles />
-        <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
+          <div className="dl-sheen" style={{ height: 120, borderRadius: 16, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -145,8 +143,7 @@ export function LiveView({
           </div>
         }
       >
-        <DraftStyles />
-        <div className="dl-in" style={{ textAlign: "center", padding: "34px 0 0" }}>
+          <div className="dl-in" style={{ textAlign: "center", padding: "34px 0 0" }}>
           <div style={{ fontSize: 10, letterSpacing: 1.6, color: GOLD, fontWeight: 900 }}>ROOM CODE{room.bans ? " · BANS ON" : ""}</div>
           <div style={{ fontSize: "clamp(38px, 14vw, 62px)", fontWeight: 900, letterSpacing: 10, color: GOLD, margin: "8px 0 2px", lineHeight: 1, textShadow: `0 0 40px ${GOLD}44` }}>{code}</div>
           <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: MUTED, fontSize: 12.5 }}>
@@ -161,8 +158,7 @@ export function LiveView({
   if (done && knowledge && !quiz && !recapDone) {
     return (
       <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
-        <DraftStyles />
-        <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
+          <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
           <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
@@ -184,8 +180,7 @@ export function LiveView({
     if (knowledge && !quiz) {
       return (
         <Shell tab={null} head={<Band title="Draft closed" compact accent={GOLD} sub="Now the questions" />}>
-          <DraftStyles />
-          <div style={{ paddingTop: 10 }}>
+              <div style={{ paddingTop: 10 }}>
             {/* Both players derive the same three questions from the room code, so
                 nothing about the paper has to cross the network and neither can peek. */}
             <QuizRound knowledge={knowledge} seed={`room-${code}`}
@@ -198,16 +193,15 @@ export function LiveView({
     return (
       <Shell
         tab={null}
-        head={<Band compact accent={won ? GREEN : RED} title={won ? `You beat ${themName}` : `${themName} beat you`} />}
+        head={<Band compact accent={won ? GREEN : ENEMY} title={won ? `You beat ${themName}` : `${themName} beat you`} />}
         foot={
           <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "#0b0910" }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={onLeave}>BACK TO DUEL</Btn></div>
           </div>
         }
       >
-        <DraftStyles />
-        <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
-          <Panel style={{ background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`, border: `1px solid ${won ? GREEN : RED}44` }}>
+          <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
+          <Panel style={{ background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`, border: `1px solid ${won ? GREEN : ENEMY}44` }}>
             <VersusBar p={finalP} left={meName.toUpperCase()} right={themName.toUpperCase()} />
           </Panel>
 
@@ -221,7 +215,7 @@ export function LiveView({
                 </div>
                 <div style={{ fontSize: 12, color: DIM, fontWeight: 800 }}>vs</div>
                 <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                  <div style={{ fontSize: 10.5, color: RED, fontWeight: 800, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{themName}</div>
+                  <div style={{ fontSize: 10.5, color: ENEMY, fontWeight: 800, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{themName}</div>
                   <div style={{ fontSize: 26, fontWeight: 900, color: oppQuiz ? CREAM : DIM, lineHeight: 1 }}>{oppQuiz ? oppQuiz.points : "…"}</div>
                 </div>
               </div>
@@ -247,13 +241,13 @@ export function LiveView({
           <Panel style={{ padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
               <Label style={{ marginBottom: 0 }}>THE COUNTER WAR</Label>
-              <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : RED }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
                 {yoursWin.length} — {theirsWin.length}
               </span>
             </div>
             <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
             <div style={{ height: 8 }} />
-            <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={RED} engine={engine} />
+            <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
           </Panel>
 
           <div style={{ borderRadius: 10, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${GOLD}33` }}>
@@ -279,14 +273,14 @@ export function LiveView({
       tab={null}
       head={
         <Band
-          compact accent={banning ? RED : myTurn ? GOLD : MUTED} onBack={onLeave}
+          compact accent={banning ? DANGER : myTurn ? GOLD : MUTED} onBack={onLeave}
           title={`${meName} vs ${themName}`}
           sub={`Live · room ${code} · Round ${turnIdx + 1} / ${seq.length}`}
         >
           <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginTop: 8 }}>
-            <TurnClock seconds={seconds} yours={myTurn} size={50} />
+            <TurnClock seconds={seconds} yours={myTurn} size={62} />
             <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-              <TurnBanner active={myTurn} label={turnLabel} accent={banning ? RED : GOLD} />
+              <TurnBanner active={myTurn} label={turnLabel} accent={banning ? DANGER : GOLD} />
             </div>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -303,18 +297,17 @@ export function LiveView({
             value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting for them…"}
             disabled={!myTurn}
-            style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? RED : LINE }}
+            style={{ marginTop: 8, padding: "7px 11px", minHeight: 34, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
           />
         </Band>
       }
     >
-      <DraftStyles />
       {lastPick?.auto && (
-        <div style={{ fontSize: 11.5, color: RED, padding: "8px 2px 0" }}>
+        <div style={{ fontSize: 11.5, color: ENEMY, padding: "8px 2px 0" }}>
           Time ran out — <strong style={{ color: CREAM }}>{heroName(lastPick.heroId)}</strong> was picked automatically.
         </div>
       )}
-      {error && <div style={{ color: RED, fontSize: 12, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
+      {error && <div style={{ color: ENEMY, fontSize: 12, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
       <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .32, pointerEvents: myTurn ? "auto" : "none" }}>
         <HeroGrid ids={filtered} byId={heroById} onPick={submit} dim={banning} />
       </div>

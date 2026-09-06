@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Label, Panel, RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD } from "./ui";
+import { Label, Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, ALLY, R_CARD, R_CHIP } from "./ui";
+import { Skeleton } from "./theme";
 
 export type LeaderRow = {
   uid: string; name: string; avatar: string | null;
@@ -39,14 +40,18 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
         <span style={{ fontSize: 9.5, color: DIM, letterSpacing: .4 }}>AVG PER GAME · {minGames}+ GAMES</span>
       </div>
 
-      {rows == null && <div className="dl-sheen" style={{ height: 120, borderRadius: 12, background: PANEL }} />}
+      {rows == null && <Skeleton h={130} />}
 
       {rows != null && rows.length === 0 && (
-        <Panel style={{ padding: "14px 13px" }}>
-          <div style={{ fontSize: 13, color: CREAM, fontWeight: 700, marginBottom: 3 }}>Nobody is on the board yet.</div>
-          <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.45 }}>
-            Sign in and play {minGames} drafts to claim first place. Your score is the model&apos;s verdict on your five
-            heroes plus what you scored on the questions.
+        <Panel style={{ padding: "20px 16px", textAlign: "center", background: `linear-gradient(160deg, ${PANEL}, rgba(245,166,35,.07))`, border: `1px solid ${GOLD}2e` }}>
+          <div style={{ fontSize: 30, marginBottom: 8, filter: `drop-shadow(0 0 14px ${GOLD}88)` }}>👑</div>
+          <div style={{ fontSize: 15, color: CREAM, fontWeight: 800, marginBottom: 5 }}>First place is empty.</div>
+          <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 14px" }}>
+            Play {minGames} drafts signed in and it is yours. Your score is the model&apos;s verdict on your five heroes
+            plus what you scored on the questions.
+          </div>
+          <div style={{ display: "inline-block", minWidth: 170 }}>
+            <Btn full tone="gold" href="/login">SIGN IN TO COMPETE</Btn>
           </div>
         </Panel>
       )}
@@ -77,8 +82,8 @@ function Row({ r, rank, me }: { r: LeaderRow; rank: number | null; me?: boolean 
   const medal = rank === 1 ? GOLD : rank === 2 ? "#c9cdd6" : rank === 3 ? "#c58a4d" : null;
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 9, padding: "6px 9px 6px 6px", borderRadius: 10,
-      background: me ? `${GOLD}14` : PANEL, border: `1px solid ${me ? GOLD + "55" : LINE}`,
+      display: "flex", alignItems: "center", gap: 9, padding: "6px 9px 6px 6px", borderRadius: R_CHIP,
+      background: me ? `${GOLD}14` : PANEL, border: `1px solid ${me ? GOLD + "55" : LINE}`, boxShadow: me ? `0 0 20px -10px ${GOLD}` : "none",
     }}>
       <span style={{
         width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center",
@@ -100,7 +105,7 @@ function Row({ r, rank, me }: { r: LeaderRow; rank: number | null; me?: boolean 
       </div>
 
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: r.avg >= 60 ? GREEN : r.avg >= 45 ? CREAM : RED, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: r.avg >= 60 ? GREEN : r.avg >= 45 ? CREAM : ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
           {r.avg.toFixed(1)}
         </div>
         <div style={{ fontSize: 8.5, color: DIM, letterSpacing: .5, fontWeight: 800 }}>BEST {r.best}</div>

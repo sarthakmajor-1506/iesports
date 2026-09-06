@@ -5,9 +5,9 @@ import { buildEngine, evaluate, rankCandidates, type DraftModel, type Engine } f
 import { counterMap, tempoMap, teamTempo, type TempoRow } from "@/lib/draftbot";
 import {
   Shell, Band, Segment, Field, Panel, Label, Delta,
-  RED, CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD,
+  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP,
 } from "../ui";
-import { DraftStyles, HeroImg, heroBase } from "../hero-art";
+import { HeroImg, heroBase } from "../hero-art";
 
 const ROLE_ORDER = ["Carry", "Support", "Nuker", "Disabler", "Durable", "Escape", "Initiator", "Pusher", "Jungler"];
 
@@ -76,8 +76,7 @@ export default function PickerPage() {
   if (!model || !engine) {
     return (
       <Shell tab="picker" head={<Band title="Draft Picker" />}>
-        <DraftStyles />
-        <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
+          <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -101,7 +100,8 @@ export default function PickerPage() {
   const { theirsWin } = counterMap(engine, mine, theirs);
   // A one-hero-a-side board says nothing about pace; wait for a real shape.
   const dTempo = mine.length >= 3 && theirs.length >= 3 ? teamTempo(mine, tempos) - teamTempo(theirs, tempos) : 0;
-  const accent = side === "mine" ? GREEN : RED;
+  const accent = side === "mine" ? ALLY : ENEMY;
+  const best = list.length ? Math.max(...list.map((c) => c.delta)) : 0;
 
   return (
     <Shell
@@ -122,11 +122,11 @@ export default function PickerPage() {
           {/* Always occupies its space, so adding the first hero does not shove
               the whole list down under the thumb that just tapped it. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "9px 0 8px", visibility: p == null ? "hidden" : "visible" }}>
-            <span style={{ fontSize: 19, fontWeight: 900, color: GREEN, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((p ?? 0.5) * 100).toFixed(1)}%</span>
-            <div style={{ flex: "1 1 auto", height: 7, background: `linear-gradient(90deg, #7a231d, ${RED})`, borderRadius: 5, overflow: "hidden", border: `1px solid ${LINE}` }}>
-              <div style={{ width: `${(p ?? 0.5) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${GREEN}, #2b8f4c)`, boxShadow: `0 0 12px ${GREEN}`, transition: "width .5s ease" }} />
+            <span style={{ fontSize: 19, fontWeight: 900, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((p ?? 0.5) * 100).toFixed(1)}%</span>
+            <div style={{ flex: "1 1 auto", height: 7, background: `linear-gradient(90deg, #7a231d, ${ENEMY})`, borderRadius: 5, overflow: "hidden", border: `1px solid ${LINE}` }}>
+              <div style={{ width: `${(p ?? 0.5) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${ALLY}, #0087C7)`, boxShadow: `0 0 14px ${ALLY}`, transition: "width .5s ease" }} />
             </div>
-            <span style={{ fontSize: 19, fontWeight: 900, color: RED, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((1 - (p ?? 0.5)) * 100).toFixed(1)}%</span>
+            <span style={{ fontSize: 19, fontWeight: 900, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((1 - (p ?? 0.5)) * 100).toFixed(1)}%</span>
           </div>
 
           {/* The board: one row a side, so a chosen hero is a picture you can
@@ -134,9 +134,9 @@ export default function PickerPage() {
               the heroes you have committed to should be the biggest thing here,
               not the pool you are still browsing. */}
           <div style={{ display: "grid", gap: 6, margin: "9px 0 8px" }}>
-            <Slots label="YOUR TEAM" ids={mine} accent={GREEN} onRemove={(id) => remove(id, "mine")} heroById={heroById}
+            <Slots label="YOUR TEAM" ids={mine} accent={ALLY} onRemove={(id) => remove(id, "mine")} heroById={heroById}
               onEmpty={() => setSide("mine")} />
-            <Slots label="ENEMY" ids={theirs} accent={RED} onRemove={(id) => remove(id, "theirs")} heroById={heroById}
+            <Slots label="ENEMY" ids={theirs} accent={ENEMY} onRemove={(id) => remove(id, "theirs")} heroById={heroById}
               onEmpty={() => setSide("theirs")} />
           </div>
 
@@ -145,8 +145,8 @@ export default function PickerPage() {
               <Segment
                 dense value={side} onChange={setSide}
                 options={[
-                  { v: "mine", label: "ALLY", accent: GREEN, dot: GREEN },
-                  { v: "theirs", label: "ENEMY", accent: RED, dot: RED },
+                  { v: "mine", label: "ALLY", accent: ALLY, dot: ALLY },
+                  { v: "theirs", label: "ENEMY", accent: ENEMY, dot: ENEMY },
                 ]}
               />
             </div>
@@ -171,13 +171,12 @@ export default function PickerPage() {
         </Band>
       }
     >
-      <DraftStyles />
 
       {(theirsWin.length > 0 || Math.abs(dTempo) > 0.12) && (
         <Panel style={{ margin: "10px 0 8px", padding: "9px 11px" }}>
           {theirsWin.slice(0, 2).map((r, i) => (
             <div key={i} style={{ fontSize: 11.5, color: MUTED, padding: "1px 0" }}>
-              <b style={{ color: RED }}>{heroName(r.attacker)}</b> is beating your <b style={{ color: CREAM }}>{heroName(r.defender)}</b>
+              <b style={{ color: ENEMY }}>{heroName(r.attacker)}</b> is beating your <b style={{ color: CREAM }}>{heroName(r.defender)}</b>
               {r.winRate != null && ` · ${(r.winRate * 100).toFixed(0)}%`}
             </div>
           ))}
@@ -208,14 +207,21 @@ export default function PickerPage() {
         {list.map((c, i) => {
           const h = heroById(c.heroId)!;
           const top = i === 0 && !q && role === "all";
+          // Normalised against the best delta on screen, so the scale is relative
+          // to this board rather than an absolute that is meaningless at 5 picks.
+          const strength = best > 0 ? Math.max(0, c.delta) / best : 0;
           return (
             <button
               key={c.heroId} className="dl-pick" onClick={() => add(c.heroId)} title={`${h.name} · ${c.delta >= 0 ? "+" : ""}${c.delta.toFixed(1)}%`}
               style={{
-                position: "relative", borderRadius: 5, overflow: "hidden", cursor: "pointer", padding: 0,
-                background: "#0c0a12", aspectRatio: "1 / 1",
-                border: `1px solid ${top ? accent : LINE}`,
-                boxShadow: top ? `0 0 0 1px ${accent}, 0 0 14px -4px ${accent}` : undefined,
+                position: "relative", borderRadius: R_CHIP, overflow: "hidden", cursor: "pointer", padding: 0,
+                background: "#0A0D14", aspectRatio: "1 / 1",
+                // Glow intensity tracks the size of the swing, so the strongest
+                // options are findable without reading a single number.
+                border: `1px solid ${strength > .12 ? accent : LINE}`,
+                boxShadow: strength > .12
+                  ? `0 0 ${(8 + strength * 20).toFixed(0)}px -4px ${accent}${top ? ", 0 0 0 1px " + accent : ""}`
+                  : undefined,
               }}
             >
               <HeroImg base={heroBase(h.img)} name={h.name} />

@@ -132,6 +132,10 @@ export async function POST(req: NextRequest) {
     const row = await adminDb.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const prev = snap.exists ? snap.data()! : {};
+      // Whether this beat their own record has to be decided against the row as it
+      // stood BEFORE this game is folded in, or every game is a personal best.
+      const wasBest = points > (prev.best ?? 0) && (prev.games ?? 0) > 0;
+      const first = (prev.games ?? 0) === 0;
       const games = (prev.games ?? 0) + 1;
       const total = (prev.points ?? 0) + points;
       const next = {
@@ -147,13 +151,14 @@ export async function POST(req: NextRequest) {
         lastAt: new Date(),
       };
       tx.set(ref, next, { merge: true });
-      return next;
+      return { ...next, wasBest, first };
     });
 
     return NextResponse.json({
       ok: true,
       scored: { draftPoints, quizPoints, quizCorrect, points, winProb: +(p * 100).toFixed(1) },
       you: { ...row, ranked: row.games >= MIN_GAMES },
+      personalBest: row.wasBest, firstGame: row.first,
     });
   } catch (e) {
     console.error("[draftlab] leaderboard submit failed:", e);

@@ -5,7 +5,9 @@ import {
   buildQuiz, scoreAnswer, QUIZ_SECONDS, MAX_POINTS,
   type Knowledge, type Question,
 } from "@/lib/quiz";
-import { Btn, Label, Pips, RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD } from "./ui";
+import { Btn, Label, Pips, CountUp, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, DANGER, ENEMY, R_CARD, R_BTN, R_CHIP } from "./ui";
+import { Burst } from "./theme";
+import { play } from "./sound";
 
 export type QuizResult = {
   points: number;
@@ -96,6 +98,7 @@ export function QuizRound({
     const pts = scoreAnswer(isCorrect, left);
     setChosen(optionIndex);
     setGained(pts);
+    play(isCorrect ? "correct" : "wrong");
 
     const next: QuizResult = {
       points: result.points + pts,
@@ -117,6 +120,17 @@ export function QuizRound({
       setPhase("asking");
     }, 1500);
   }, [phase, q, result, idx, questions.length, finish, seed]);
+
+  /*
+   * A tick for each of the last three seconds. Driven off a whole-second
+   * boundary rather than the rAF loop, so it fires three times, not sixty.
+   */
+  const tickedAt = useRef(-1);
+  useEffect(() => {
+    if (phase !== "asking") { tickedAt.current = -1; return; }
+    const sec = Math.ceil(msLeft / 1000);
+    if (sec <= 3 && sec > 0 && tickedAt.current !== sec) { tickedAt.current = sec; play("tick"); }
+  }, [phase, msLeft]);
 
   /* The clock. */
   useEffect(() => {
@@ -174,9 +188,9 @@ export function QuizRound({
         {result.rounds.map((r, i) => (
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 9,
-            background: r.correct ? `${GREEN}14` : `${RED}14`, marginBottom: 4,
+            background: r.correct ? `${GREEN}14` : `${DANGER}14`, marginBottom: 4,
           }}>
-            <span style={{ fontSize: 13, color: r.correct ? GREEN : RED, fontWeight: 900 }}>{r.correct ? "✓" : "✕"}</span>
+            <span style={{ fontSize: 13, color: r.correct ? GREEN : DANGER, fontWeight: 800 }}>{r.correct ? "✓" : "✕"}</span>
             <span style={{ fontSize: 11.5, color: CREAM, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prompt}</span>
             <span style={{ fontSize: 13, fontWeight: 900, color: r.points ? GOLD : DIM, fontVariantNumeric: "tabular-nums" }}>+{r.points}</span>
           </div>
@@ -194,20 +208,24 @@ export function QuizRound({
   const optionsHaveArt = q.options.some((o) => o.img);
 
   return (
-    <div style={panel()}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+    <div style={{ ...panel(), position: "relative", overflow: "hidden" }}>
+      {showing && chosen != null && q.options[chosen].correct && <Burst color={GREEN} />}
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 9 }}>
         <Pips total={3} filled={idx + 1} color={GOLD} />
+        <span style={{ fontSize: 12, fontWeight: 800, color: GOLD, fontVariantNumeric: "tabular-nums" }}>
+          <CountUp to={result.points} dur={520} /> pts
+        </span>
         <span style={{ flex: "1 1 auto" }} />
         <span style={{
-          fontSize: 21, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: urgent ? RED : GOLD,
+          fontSize: 21, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: urgent ? DANGER : GOLD,
           animation: urgent && !showing ? "dl-pulse .6s ease-in-out infinite" : undefined,
         }}>{secs.toFixed(1)}</span>
       </div>
-      <div style={{ height: 5, background: "#241f33", borderRadius: 4, overflow: "hidden", marginBottom: 12 }}>
+      <div style={{ height: 5, background: "rgba(255,255,255,.07)", borderRadius: 4, overflow: "hidden", marginBottom: 12 }}>
         <div style={{
           width: `${frac * 100}%`, height: "100%",
-          background: urgent ? RED : `linear-gradient(90deg, ${GOLD}, #d99a22)`,
-          boxShadow: `0 0 12px ${urgent ? RED : GOLD}`,
+          background: urgent ? DANGER : `linear-gradient(90deg, ${GOLD}, #D68A12)`,
+          boxShadow: `0 0 14px ${urgent ? DANGER : GOLD}`,
         }} />
       </div>
 
@@ -215,8 +233,8 @@ export function QuizRound({
         {q.img && (
           <div style={{
             width: q.imgShape === "square" ? 76 : 92, height: q.imgShape === "square" ? 76 : 68,
-            margin: "0 auto 8px", borderRadius: 8, overflow: "hidden",
-            border: `1px solid ${LINE}`, background: "#0c0a12", boxShadow: `0 6px 22px -10px ${GOLD}`,
+            margin: "0 auto 10px", borderRadius: R_CHIP, overflow: "hidden",
+            border: `1px solid ${LINE}`, background: "#0A0D14", boxShadow: `0 8px 26px -10px ${GOLD}`,
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={q.img} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
@@ -230,16 +248,16 @@ export function QuizRound({
         {q.options.map((o, i) => {
           const isChosen = chosen === i;
           const reveal = showing && (o.correct || isChosen);
-          const tone = !reveal ? null : o.correct ? GREEN : RED;
+          const tone = !reveal ? null : o.correct ? GREEN : DANGER;
           return (
             <button
               key={i} className="dl-btn" disabled={phase !== "asking"} onClick={() => answer(i)}
               style={{
                 display: "flex", alignItems: "center", gap: 8, textAlign: "left",
-                padding: optionsHaveArt ? "8px" : "11px 13px", borderRadius: 8,
+                padding: optionsHaveArt ? "9px" : "13px 14px", borderRadius: R_BTN,
                 cursor: phase === "asking" ? "pointer" : "default",
                 background: tone ? `${tone}22` : PANEL_2, border: `1.5px solid ${tone ?? LINE}`,
-                color: CREAM, fontSize: 13.5, fontWeight: 700, minHeight: 44,
+                color: CREAM, fontSize: 13.5, fontWeight: 700, minHeight: 50,
                 boxShadow: tone ? `0 0 18px -6px ${tone}` : "none",
                 flexDirection: optionsHaveArt ? "column" : "row",
               }}
@@ -265,7 +283,7 @@ export function QuizRound({
         <div className="dl-in" style={{ marginTop: 10, textAlign: "center" }}>
           {/* A correct answer that ran the clock out still scores 0, but calling
               that a "miss" tells the player they were wrong when they were not. */}
-          <div style={{ fontSize: 19, fontWeight: 900, color: gained ? GOLD : chosen != null && q.options[chosen].correct ? GREEN : MUTED }}>
+          <div style={{ fontSize: 19, fontWeight: 900, color: gained ? GOLD : chosen != null && q.options[chosen].correct ? GREEN : MUTED, textShadow: gained ? `0 0 22px ${GOLD}66` : undefined }}>
             {gained ? `+${gained}`
               : chosen == null ? "OUT OF TIME"
               : q.options[chosen].correct ? "RIGHT — BUT TOO SLOW"
@@ -279,5 +297,5 @@ export function QuizRound({
 }
 
 const panel = (): React.CSSProperties => ({
-  background: PANEL, border: `1px solid ${LINE}`, borderRadius: 10, padding: "14px 13px",
+  background: PANEL, border: `1px solid ${LINE}`, borderRadius: R_CARD, padding: "16px 15px",
 });

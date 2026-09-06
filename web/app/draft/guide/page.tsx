@@ -7,7 +7,8 @@ import {
   Shell, Band, Segment, Field, Panel, Label,
   RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, BLUE, attrColor,
 } from "../ui";
-import { DraftStyles, HeroImg, heroRender } from "../hero-art";
+import { HeroImg, heroRender } from "../hero-art";
+import { Skeleton } from "../theme";
 
 /**
  * Draft Guide — the reference half of the app.
@@ -23,7 +24,7 @@ import { DraftStyles, HeroImg, heroRender } from "../hero-art";
  */
 export default function GuidePage() {
   return (
-    <Suspense fallback={<Shell tab="guide" head={<Band title="Draft Guide" />}><DraftStyles /></Shell>}>
+    <Suspense fallback={<Shell tab="guide" head={<Band title="Draft Guide" />}><Skeleton h={160} style={{ marginTop: 13 }} /></Shell>}>
       <Guide />
     </Suspense>
   );
@@ -71,8 +72,7 @@ function Guide() {
   if (!k) {
     return (
       <Shell tab="guide" head={<Band title="Draft Guide" />}>
-        <DraftStyles />
-        <div className="dl-sheen" style={{ height: 140, borderRadius: 14, background: PANEL, marginTop: 12 }} />
+          <div className="dl-sheen" style={{ height: 140, borderRadius: 14, background: PANEL, marginTop: 12 }} />
       </Shell>
     );
   }
@@ -111,7 +111,6 @@ function Guide() {
         </Band>
       }
     >
-      <DraftStyles />
 
       {tab === "heroes" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(52px, 15vw, 66px), 1fr))", gap: 4, padding: "10px 0 16px" }}>
@@ -178,7 +177,6 @@ function HeroDetail({ hero, onBack }: { hero: KHero; onBack: () => void }) {
   return (
     <Shell tab="guide" head={<Band title={hero.name} compact accent={c} onBack={onBack}
       sub={`${hero.attr === "all" ? "Universal" : hero.attr.toUpperCase()} · ${hero.atk} · ${hero.roles.join(", ")}`} />}>
-      <DraftStyles />
 
       <Showcase hero={hero} />
 
@@ -337,7 +335,6 @@ function ItemDetail({ k, item, onBack, onOpen }: { k: Knowledge; item: KItem; on
   const buildsInto = k.items.filter((i) => i.components?.includes(item.k));
   return (
     <Shell tab="guide" head={<Band title={item.n} compact onBack={onBack} sub={`${item.cost} gold${item.qual ? ` · ${item.qual}` : ""}`} />}>
-      <DraftStyles />
 
       <Panel style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${GOLD}33` }}>
         <ItemImg item={item} w={64} h={48} />

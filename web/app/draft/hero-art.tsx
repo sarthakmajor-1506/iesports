@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RED, GREEN, CREAM, LINE, MUTED, GOLD } from "./ui";
+import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, R_CHIP } from "./ui";
 
 /**
  * Hero art — one place, one fallback chain.
@@ -137,38 +137,43 @@ function Card({
 }: { hero?: LineupHero; accent: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string }) {
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
-      <div style={{
-        position: "relative", height: h, borderRadius: 5, overflow: "hidden",
-        background: hero ? "#0c0a12" : "rgba(255,255,255,.02)",
-        border: `1px solid ${latest ? accent : hero ? "rgba(255,255,255,.09)" : "rgba(255,255,255,.05)"}`,
-        boxShadow: latest ? `0 0 0 1px ${accent}, 0 6px 20px -8px ${accent}` : "none",
-        animation: latest ? "dl-slam .45s cubic-bezier(.2,.9,.3,1.3)" : undefined,
-      }}>
+      <div
+        // Keyed on the hero so the drop replays when a slot fills, not on every
+        // re-render of a slot that was already occupied.
+        key={hero?.id ?? "empty"}
+        className={hero && !hidden ? "dl-drop" : undefined}
+        style={{
+          position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden",
+          background: hero ? "#0A0D14" : "rgba(255,255,255,.018)",
+          border: `1px solid ${latest ? accent : hero ? "rgba(255,255,255,.10)" : "rgba(255,255,255,.05)"}`,
+          boxShadow: latest ? `0 0 0 1px ${accent}, 0 10px 30px -10px ${accent}, 0 0 22px -8px ${accent}` : "none",
+        }}
+      >
         {hero && !hidden && <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion} />}
 
         {hero && hidden && (
           <div style={{
             position: "absolute", inset: 0, display: "grid", placeItems: "center",
             background: "repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 7px, transparent 7px 14px)",
-            color: MUTED, fontSize: 22, fontWeight: 900,
+            color: MUTED, fontSize: 22, fontWeight: 800,
           }}>?</div>
         )}
 
         {!hero && (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,.1)", fontSize: 16 }}>◆</div>
+          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,.09)", fontSize: 15 }}>◆</div>
         )}
 
         {hero && !hidden && (
           <>
             <div style={{
-              position: "absolute", left: 0, right: 0, bottom: 0, height: "46%",
-              background: "linear-gradient(transparent, rgba(4,3,7,.94))", pointerEvents: "none",
+              position: "absolute", left: 0, right: 0, bottom: 0, height: "48%",
+              background: "linear-gradient(transparent, rgba(6,9,15,.95))", pointerEvents: "none",
             }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "0 3px 4px", textAlign: "center" }}>
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "0 4px 5px", textAlign: "center" }}>
               <span style={{
                 fontSize: "clamp(7px, 2.3vw, 10px)", color: CREAM, textTransform: "uppercase", fontWeight: 800,
                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block",
-                textShadow: "0 1px 4px #000", letterSpacing: .2,
+                textShadow: "0 1px 5px #000", letterSpacing: .3,
               }}>{hero.name}</span>
             </div>
             {/* The lock-in. This replaced a toast pinned to the top of the
@@ -176,10 +181,16 @@ function Card({
                 notification rather than something the game did. Confirmation
                 belongs on the card that just filled. */}
             {latest && (
-              <span key={hero.id} className="dl-flash" style={{
-                position: "absolute", inset: 0, pointerEvents: "none",
-                background: `linear-gradient(180deg, ${accent}00, ${accent}66)`,
-              }} />
+              <>
+                <span key={`f${hero.id}`} className="dl-flash" style={{
+                  position: "absolute", inset: 0, pointerEvents: "none",
+                  background: `linear-gradient(180deg, ${accent}00, ${accent}70)`,
+                }} />
+                <span key={`r${hero.id}`} style={{
+                  position: "absolute", inset: -2, pointerEvents: "none", borderRadius: "inherit",
+                  border: `2px solid ${accent}`, animation: "dl-ring .6s var(--ease) both",
+                }} />
+              </>
             )}
           </>
         )}
@@ -217,7 +228,7 @@ export function TeamRow({
   motion?: boolean;
   height?: string;
 }) {
-  const accent = side === "them" ? RED : GREEN;
+  const accent = side === "them" ? ENEMY : ALLY;
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
@@ -240,7 +251,13 @@ export function TeamRow({
   );
 }
 
-/** Square hero tiles. The one grid used by every screen that picks heroes. */
+/**
+ * Square hero tiles. The one grid used by every screen that picks heroes.
+ *
+ * `dim` is the ban phase: the whole pool goes desaturated under a red wash, so
+ * the mode you are in is legible from the grid itself rather than only from the
+ * banner above it — you are about to remove a hero, not take one.
+ */
 export function HeroGrid({
   ids, byId, onPick, dim, min = "clamp(46px, 13.5vw, 60px)", labelSize,
 }: {
@@ -258,14 +275,15 @@ export function HeroGrid({
         if (!h) return null;
         return (
           <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
-            padding: 0, border: `1px solid ${LINE}`, borderRadius: 6, overflow: "hidden",
-            background: "#0c0a12", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
-            filter: dim ? "saturate(.4)" : undefined,
+            padding: 0, border: `1px solid ${dim ? DANGER + "3d" : LINE}`, borderRadius: R_CHIP, overflow: "hidden",
+            background: "#0A0D14", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
+            filter: dim ? "saturate(.45) brightness(.9)" : undefined,
           }}>
             <HeroImg base={heroBase(h.img)} name={h.name} />
+            {dim && <span style={{ position: "absolute", inset: 0, background: `${DANGER}1f`, pointerEvents: "none" }} />}
             <span style={{
               position: "absolute", left: 0, right: 0, bottom: 0, fontSize: labelSize ?? 7.5, color: CREAM,
-              background: "linear-gradient(transparent, rgba(0,0,0,.95))", padding: "10px 3px 3px",
+              background: "linear-gradient(transparent, rgba(6,9,15,.96))", padding: "10px 3px 3px",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 800,
             }}>{h.name}</span>
           </button>
@@ -287,7 +305,7 @@ export function BanStrip({ bans, byId }: { bans: { by: "bot" | "you"; heroId: nu
           <div key={i} title={`${h.name} — banned by ${b.by === "you" ? "you" : "them"}`}
             style={{ position: "relative", width: 26, height: 16, borderRadius: 3, overflow: "hidden" }}>
             <HeroImg base={heroBase(h.img)} shape="crop" position="50% 22%" style={{ filter: "grayscale(1) brightness(.38)" }} />
-            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: b.by === "you" ? GREEN : RED, fontSize: 12, fontWeight: 900 }}>×</div>
+            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: b.by === "you" ? ALLY : ENEMY, fontSize: 12, fontWeight: 800 }}>×</div>
           </div>
         );
       })}
@@ -295,27 +313,5 @@ export function BanStrip({ bans, byId }: { bans: { by: "bot" | "you"; heroId: nu
   );
 }
 
-export function DraftStyles() {
-  return (
-    <style>{`
-      html, body { background: #07060a; overscroll-behavior: none; }
-      @keyframes dl-idle { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
-      @keyframes dl-slam { 0% { opacity:0; transform: scale(.86) translateY(10px) } 60% { transform: scale(1.03) } 100% { opacity:1; transform:none } }
-      @keyframes dl-pulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
-      @keyframes dl-in { from { opacity:0; transform: translateY(8px) } to { opacity:1; transform:none } }
-      @keyframes dl-sheen { from { background-position: -220% 0 } to { background-position: 320% 0 } }
-      @keyframes dl-flash { 0% { opacity:.95 } 100% { opacity:0 } }
-      .dl-turn { animation: dl-pulse 1.3s ease-in-out infinite; }
-      .dl-in { animation: dl-in .3s ease-out both; }
-      .dl-flash { animation: dl-flash .55s ease-out both; }
-      .dl-btn { transition: transform .07s, filter .15s; -webkit-tap-highlight-color: transparent; }
-      .dl-btn:active:not(:disabled) { transform: scale(.96); filter: brightness(1.1); }
-      .dl-pick { transition: transform .07s, border-color .12s; -webkit-tap-highlight-color: transparent; }
-      .dl-pick:active { transform: scale(.9); border-color: ${GOLD} !important; }
-      @media (hover: hover) { .dl-pick:hover { border-color: ${GOLD} !important; } }
-      .dl-sheen { background: linear-gradient(100deg, transparent 38%, rgba(255,255,255,.16) 50%, transparent 62%); background-size: 220% 100%; animation: dl-sheen 2.6s linear infinite; }
-      ::-webkit-scrollbar { width: 0; height: 0; }
-      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
-    `}</style>
-  );
-}
+/** @deprecated The design system now lives in theme.tsx and is rendered by Shell. */
+export function DraftStyles() { return null; }
