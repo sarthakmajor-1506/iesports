@@ -9,6 +9,8 @@
 // answers 402 when a tournament needs paying for, so the client never has to
 // decide what is free, and a mispriced client can't skip the charge.
 
+import { authHeaders } from "@/app/lib/authFetch";
+
 export type CheckoutGame = "dota2" | "dota_solo" | "valorant" | "cs2";
 export type CheckoutMode = "solo" | "team_create" | "team_join";
 
@@ -62,6 +64,8 @@ export async function startPayuCheckout(args: {
   game: CheckoutGame;
   tournamentId: string;
   mode?: CheckoutMode;
+  /** team_create only: the name being bought. Stored on the payment, validated server-side. */
+  teamName?: string;
   /** Open PayU in a second tab and leave this page intact. */
   newTab?: boolean;
 }): Promise<CheckoutOutcome> {
@@ -72,14 +76,17 @@ export async function startPayuCheckout(args: {
   const tab = args.newTab ? window.open("", "_blank") : null;
 
   try {
+    // The tab above was opened before this await, so signing the request costs
+    // nothing: the popup blocker has already been satisfied by the gesture.
     const res = await fetch("/api/payments/payu/initiate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         uid: args.uid,
         game: args.game,
         tournamentId: args.tournamentId,
         mode: args.mode || "solo",
+        ...(args.teamName ? { teamName: args.teamName } : {}),
         // Where to send the player once PayU is done with them.
         returnTo: `${window.location.pathname}${window.location.search}`,
       }),

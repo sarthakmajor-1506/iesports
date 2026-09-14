@@ -16,7 +16,8 @@ import * as path from "path";
 import * as fs from "fs";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { PAID_GAMES, paidEntryId, type PaidGame } from "@/lib/paidEntry";
+import { PAID_GAMES, paidEntryId, entitlementIdForPayment, type PaidGame } from "@/lib/paidEntry";
+import { internalHeaders } from "@/lib/apiAuth";
 
 config({ path: path.resolve(__dirname, "../../.env.local") });
 
@@ -100,7 +101,9 @@ async function build() {
 
   const res = await fetch(`${base}/api/payments/payu/initiate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // These routes verify their caller now. A script has no player token, so it
+    // identifies itself with the shared internal secret instead.
+    headers: internalHeaders(),
     body: JSON.stringify({ uid, game, tournamentId: id, mode }),
   });
   const data: any = await res.json();
@@ -150,7 +153,15 @@ async function show() {
 
   const p: any = snap.data();
   const ent = await db.collection("paidEntries").doc(`${p.game}__${p.tournamentId}__${p.uid}`).get();
-  console.log(`\npaidEntries doc: ${ent.exists ? "GRANTED" : "not granted"}`);
+  const entData: any = ent.data() || {};
+  console.log(`\npaidEntries doc: ${
+    !ent.exists ? "not granted"
+    : entData.voided === true ? `VOIDED (${entData.voidReason || "no reason recorded"})`
+    : "GRANTED"
+  }`);
+
+  const refund = await db.collection("refunds").doc(txnid).get();
+  if (refund.exists) console.dir({ refund: refund.data() }, { depth: 4 });
 }
 
 async function payments() {
@@ -233,9 +244,25 @@ async function reconcile() {
     const cfg = PAID_GAMES[p.game as PaidGame];
     if (!cfg) { console.log(`  ?? ${d.id} unknown game "${p.game}"`); continue; }
 
-    const ent = await db.collection("paidEntries").doc(paidEntryId(p.game, p.tournamentId, p.uid)).get();
+    const ent = await db.collection("paidEntries").doc(entitlementIdForPayment(p)).get();
     const user = await db.collection("users").doc(p.uid).get();
-    const registered = ((user.data() as any)?.[cfg.registeredField] || []).includes(p.tournamentId);
+    // A team payment is done when its team exists. The captain being on the
+    // roster proves nothing: a player who paid solo before the switch already was.
+    const registered = p.mode === "team_create"
+      ? !!p.team?.teamId
+      : ((user.data() as any)?.[cfg.registeredField] || []).includes(p.tournamentId);
+
+    // Someone who withdrew is not a broken registration, they are a refund.
+    // Repairing them would put a player who quit back into the tournament and
+    // spend their refund on a slot they did not ask for.
+    const refund = await db.collection("refunds").doc(d.id).get();
+    const withdrawn = refund.exists && (refund.data() as any)?.status === "owed";
+    if (withdrawn) {
+      const r = refund.data() as any;
+      console.log(`  HOLD [${env.padEnd(4)}] ₹${String(p.amount).padEnd(5)} ${d.id}  ${p.game}/${p.tournamentId}  ${p.uid}`);
+      console.log(`        withdrew — refund owed ₹${r.amount}${r.upiId ? ` to ${r.upiId}` : " (NO UPI ON FILE)"}`);
+      continue;
+    }
 
     // Since payment moved ahead of profile setup, "paid but not registered" is
     // an expected transient state, not a fault: the player is mid-setup. It is
@@ -247,7 +274,9 @@ async function reconcile() {
       !u.fullName || !(u.phone || u.phoneNumber) || !u.discordId ||
       (p.game === "valorant" ? !u.riotGameName : !u.steamId);
 
-    const missingEntitlement = !ent.exists;
+    // A voided entitlement is a withdrawal, handled above, so anything reaching
+    // here with one is genuinely missing its claim to a slot.
+    const missingEntitlement = !ent.exists || (ent.data() as any)?.voided === true;
     const missingRegistration = !registered && !profileIncomplete;
     const awaitingSetup = !registered && profileIncomplete;
     const ok = !missingEntitlement && !missingRegistration;
@@ -268,7 +297,7 @@ async function reconcile() {
   // for free. Reported, never auto-deleted — revoking access is a human call.
   const paidKeys = new Set(paidSnap.docs.map(d => {
     const p: any = d.data();
-    return paidEntryId(p.game, p.tournamentId, p.uid);
+    return entitlementIdForPayment(p);
   }));
   const orphans = entitlementSnap.docs.filter(d => !paidKeys.has(d.id));
 
@@ -285,12 +314,15 @@ async function reconcile() {
     for (const t of tournaments.docs) {
       const fee = Number((t.data() as any).entryFee) || 0;
       if (fee <= 0) continue;
+      // Team tournaments charge the captain once; teammates join free, so a
+      // member with no payment of their own is the design, not a freeloader.
+      if ((t.data() as any).registrationMode === "team") continue;
 
       const players = await t.ref.collection(cfg.playersSubcollection).get();
       const freeloaders: string[] = [];
       for (const p of players.docs) {
         const ent = await db.collection("paidEntries").doc(paidEntryId(game, t.id, p.id)).get();
-        if (!ent.exists) freeloaders.push(p.id);
+        if (!ent.exists || (ent.data() as any)?.voided === true) freeloaders.push(p.id);
       }
       if (!freeloaders.length) continue;
 
@@ -304,6 +336,59 @@ async function reconcile() {
   }
   if (!unbilled) console.log(`  none`);
   else console.log(`  → ₹${unbilled} of entry fees unbilled`);
+
+  // ── Two paid payments behind one seat ──────────────────────────────────
+  // `initiate` blocks a second checkout once an entitlement exists, but a
+  // player with two tabs (or a retry while the first was still settling) can
+  // create both before either settles. Both then land as `paid`, both grant the
+  // same idempotent entitlement, and the second registration answers "already
+  // registered" and is marked OK. Every other check here reports that as fine,
+  // which is exactly how a genuine double charge would stay invisible.
+  console.log(`\n=== charged twice for one seat ===`);
+  const seatCharges: Record<string, { txnid: string; amount: number; env: string }[]> = {};
+  for (const d of paidSnap.docs) {
+    const p: any = d.data();
+    if (!PAID_GAMES[p.game as PaidGame]) continue;
+    const key = entitlementIdForPayment(p);
+    (seatCharges[key] ||= []).push({ txnid: d.id, amount: Number(p.amount) || 0, env: payuEnvOf(p) });
+  }
+  let doubleCharged = 0;
+  for (const [key, charges] of Object.entries(seatCharges)) {
+    if (charges.length < 2) continue;
+    // Sandbox retries against a test merchant are not somebody's money.
+    const live = charges.filter(c => c.env === "live");
+    if (live.length < 2) continue;
+    doubleCharged += live.slice(1).reduce((a, c) => a + c.amount, 0);
+    console.log(`  ${key}`);
+    for (const c of live) console.log(`      ₹${c.amount}  ${c.txnid}`);
+  }
+  if (!doubleCharged) console.log(`  none`);
+  else console.log(`  → ₹${doubleCharged} taken beyond one seat each. Refund the extras.`);
+
+  // ── Slot counters vs the actual roster ─────────────────────────────────
+  // `slotsBooked` is what the tournament page shows and what capacity is
+  // checked against, but it is a cache of the players subcollection. When it
+  // drifts, the page lies to players and a slot goes unsellable. This is what
+  // was missing when Horizon read 3/20 with two players in it.
+  console.log(`\n=== slot counters vs roster ===`);
+  let drifted = 0;
+  for (const [, cfg] of Object.entries(PAID_GAMES)) {
+    const tournaments = await db.collection(cfg.collection).get();
+    for (const t of tournaments.docs) {
+      const data = t.data() as any;
+      const players = await t.ref.collection(cfg.playersSubcollection).get();
+      const booked = Number(data.slotsBooked) || 0;
+      if (booked === players.size) continue;
+      drifted++;
+      console.log(`  ${cfg.label} — ${data.name || t.id}   slotsBooked=${booked}  actual=${players.size}`);
+      if (APPLY) {
+        await t.ref.update({ slotsBooked: players.size });
+        console.log(`      → corrected to ${players.size}`);
+      }
+    }
+  }
+  if (!drifted) console.log(`  none`);
+  else if (!APPLY) console.log(`  → re-run with --apply to correct these`);
 
   console.log(`\n=== summary ===`);
   console.log(`  paid payments      ${paidSnap.size}`);
@@ -323,8 +408,11 @@ async function reconcile() {
     const cfg = PAID_GAMES[b.p.game as PaidGame];
     const endpoint = cfg.endpoints[(b.p.mode || "solo") as keyof typeof cfg.endpoints];
 
-    await db.collection("paidEntries").doc(paidEntryId(b.p.game, b.p.tournamentId, b.p.uid)).set(
-      { game: b.p.game, tournamentId: b.p.tournamentId, uid: b.p.uid, txnid: b.txnid, amount: b.p.amount, paidAt: b.p.settledAt || new Date().toISOString() },
+    await db.collection("paidEntries").doc(entitlementIdForPayment(b.p)).set(
+      {
+        game: b.p.game, tournamentId: b.p.tournamentId, uid: b.p.uid, txnid: b.txnid, amount: b.p.amount, paidAt: b.p.settledAt || new Date().toISOString(),
+        ...(b.p.mode === "team_create" ? { kind: "team", teamName: b.p.teamName } : {}),
+      },
       { merge: true }
     );
 
@@ -333,11 +421,11 @@ async function reconcile() {
     try {
       const res = await fetch(`${base}${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: b.p.tournamentId, uid: b.p.uid }),
+        headers: internalHeaders(),
+        body: JSON.stringify({ tournamentId: b.p.tournamentId, uid: b.p.uid, ...(b.p.mode === "team_create" ? { txnid: b.txnid } : {}) }),
       });
       const data: any = await res.json().catch(() => ({}));
-      const ok = res.ok || /already registered|already in/i.test(data?.error || "");
+      const ok = res.ok || (b.p.mode !== "team_create" && /already registered|already in/i.test(data?.error || ""));
       await db.collection("payments").doc(b.txnid).set(
         { registration: { ok, attemptedAt: new Date().toISOString(), endpoint, error: ok ? null : data?.error || `HTTP ${res.status}`, repairedBy: "reconcile" } },
         { merge: true }

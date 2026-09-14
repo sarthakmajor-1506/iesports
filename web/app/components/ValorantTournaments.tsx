@@ -226,7 +226,7 @@ export default function ValorantTournaments() {
                             </div>
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Entry</span>
-                              <span className="vt-meta-val">{t.entryFee === 0 ? "Free" : `₹${t.entryFee}`}</span>
+                              <span className="vt-meta-val">{t.entryFee === 0 ? "Free" : `₹${t.entryFee}${(t as any).registrationMode === "team" ? " / team" : ""}`}</span>
                             </div>
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Format</span>

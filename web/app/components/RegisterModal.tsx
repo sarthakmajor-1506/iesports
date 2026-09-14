@@ -22,6 +22,16 @@
  * Riot verification state is never shown to players. A linked Riot ID is
  * "done" as far as this flow is concerned; whether we have reviewed the rank is
  * an internal matter and lives in the admin panel only.
+ *
+ * TEAM REGISTRATION (Valorant, `registrationMode: "team"`) runs a different
+ * order, on purpose:
+ *
+ *   Discord  →  name, phone, Riot ID  →  create a team (pay)  |  join with a code (free)
+ *
+ * Setup comes BEFORE the money here. The team and its code are created the
+ * instant the captain's payment settles, with the captain as its first player,
+ * and that needs a Riot ID. Taking ₹2000 first would strand a paid team with
+ * no code for the other four to use.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -32,6 +42,7 @@ import { db, getFirebaseAuth } from "@/lib/firebase";
 import type { ConfirmationResult } from "firebase/auth";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
 import { startPayuCheckout, type CheckoutMode } from "@/app/lib/payuCheckout";
+import { authFetch, authPost } from "@/app/lib/authFetch";
 import { GAME_THEME, UI, type GameKey } from "@/app/lib/gameTheme";
 
 const COUNTRIES = [
@@ -49,14 +60,30 @@ type Props = {
   dotaProfile: any;
   game?: "dota2" | "valorant" | "cs2";
   isSubstitute?: boolean;
+  /** Team tournaments: a code arriving from an invite link (?join=CODE). */
+  joinCode?: string;
   onClose: () => void;
   onSuccess: () => void;
 };
 
 /** "auto" lets the flow pick the right screen from what is already done. */
-type Stage = "auto" | "checking" | "gate" | "fee" | "waiting" | "hub" | "name" | "phone" | "done";
+type Stage = "auto" | "checking" | "gate" | "fee" | "waiting" | "hub" | "name" | "phone" | "done"
+  | "teamChoice" | "teamCreate" | "teamJoin" | "teamDone";
 
-export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, onClose, onSuccess }: Props) {
+type TeamState = {
+  teamSize: number;
+  totalTeams: number;
+  teamsRegistered: number;
+  team: { id: string; name: string; isCaptain: boolean; memberCount: number; code: string | null } | null;
+  pendingTeamPayment: { txnid: string; teamName: string } | null;
+};
+
+type CodePreview = {
+  teamName: string; memberCount: number; teamSize: number; full: boolean; closed: boolean;
+  alreadyMember: boolean; members: { riotGameName: string; isCaptain: boolean }[];
+};
+
+export default function RegisterModal({ tournament, user, dotaProfile, game = "dota2", isSubstitute = false, joinCode, onClose, onSuccess }: Props) {
   const { riotData, userProfile } = useAuth();
   const router = useRouter();
 
@@ -92,6 +119,21 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   const [hasPaid, setHasPaid] = useState(false);
   const [entitlementLoaded, setEntitlementLoaded] = useState(entryFee <= 0);
   const [watchTxnid, setWatchTxnid] = useState<string | null>(null);
+
+  // ── Team registration state ────────────────────────────────────────────
+  const teamMode = isValorant && tournament?.registrationMode === "team" && !isSubstitute;
+  const codeKey = `pendingTeamCode:${tournament?.id}`;
+  const [teamState, setTeamState] = useState<TeamState | null>(null);
+  const [teamLoaded, setTeamLoaded] = useState(!teamMode);
+  const [teamNameInput, setTeamNameInput] = useState("");
+  const [codeInput, setCodeInput] = useState(() => {
+    if (!teamMode) return "";
+    if (joinCode) return joinCode.toUpperCase();
+    try { return localStorage.getItem(`pendingTeamCode:${tournament?.id}`) || ""; } catch { return ""; }
+  });
+  const [preview, setPreview] = useState<CodePreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
+  const [copied, setCopied] = useState<"" | "code" | "link">("");
 
   // ── Phone OTP ──────────────────────────────────────────────────────────
   const [phoneStep, setPhoneStep] = useState<"phone" | "otp">("phone");
@@ -165,11 +207,60 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [user]);
 
+  // A code from an invite link has to survive the Discord and Riot hops, which
+  // reload this page, so it is parked in localStorage until the join succeeds.
+  useEffect(() => {
+    if (!teamMode || !joinCode) return;
+    try { localStorage.setItem(codeKey, joinCode.toUpperCase()); } catch {}
+  }, [teamMode, joinCode, codeKey]);
+
+  const loadTeam = async () => {
+    if (!teamMode || !user) { setTeamLoaded(true); return; }
+    try {
+      const r = await authFetch(`/api/valorant/team/me?tournamentId=${encodeURIComponent(tournament.id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" });
+      const d = await r.json();
+      if (r.ok && d.teamRegistration) {
+        setTeamState(d);
+        // On a team now — an invite code parked earlier must not prefill a join later.
+        if (d.team) { try { localStorage.removeItem(codeKey); } catch {} }
+      }
+    } catch {}
+    finally { setTeamLoaded(true); }
+  };
+  useEffect(() => { loadTeam(); }, [user, tournament?.id, teamMode]);
+
+  // Paid, team not created yet: settlement is finishing it. Keep asking.
+  useEffect(() => {
+    if (!teamMode || !teamState?.pendingTeamPayment || teamState.team) return;
+    const i = setInterval(loadTeam, 3000);
+    return () => clearInterval(i);
+  }, [teamMode, teamState?.pendingTeamPayment?.txnid, teamState?.team?.id]);
+
+  // Look the code up as soon as it is complete, so the player sees WHICH team
+  // before joining it.
+  useEffect(() => {
+    if (!teamMode || !user) return;
+    const code = codeInput.replace(/[^A-Z0-9]/g, "");
+    setPreview(null); setPreviewError("");
+    if (code.length !== 6) return;
+    let cancelled = false;
+    authPost("/api/valorant/team/join", { uid: user.uid, code, preview: true })
+      .then(async r => {
+        const d = await r.json();
+        if (cancelled) return;
+        if (!r.ok) { setPreviewError(d.error || "Couldn't find that team"); return; }
+        if (d.tournamentId !== tournament.id) { setPreviewError(`That code is for ${d.tournamentName}, not this tournament.`); return; }
+        setPreview(d);
+      })
+      .catch(() => { if (!cancelled) setPreviewError("Couldn't check that code. Try again."); });
+    return () => { cancelled = true; };
+  }, [codeInput, teamMode, user, tournament?.id]);
+
   // Has this player already bought a slot?
   useEffect(() => {
-    if (entryFee <= 0 || !user || isSubstitute) return;
+    if (entryFee <= 0 || !user || isSubstitute || teamMode) return;
     let cancelled = false;
-    fetch(`/api/payments/entitlement?game=${gameKey}&tournamentId=${encodeURIComponent(tournament.id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+    authFetch(`/api/payments/entitlement?game=${gameKey}&tournamentId=${encodeURIComponent(tournament.id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
       .then(r => r.json())
       .then(d => { if (!cancelled) { setHasPaid(!!d.paid); setEntitlementLoaded(true); } })
       .catch(() => { if (!cancelled) setEntitlementLoaded(true); });
@@ -185,9 +276,13 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         const res = await fetch(`/api/payments/status?txnid=${encodeURIComponent(watchTxnid)}`, { cache: "no-store" });
         const d = await res.json();
         if (cancelled || !res.ok) return;
-        if (d.status === "paid") { setWatchTxnid(null); setHasPaid(true); setLoading(false); setStage("hub"); }
-        else if (d.status === "failed") { setWatchTxnid(null); setLoading(false); setStage("fee"); setError("That payment didn't go through. Nothing was charged."); }
-        else if (d.status === "review") { setWatchTxnid(null); setLoading(false); setStage("fee"); setError("Your payment needs a manual check — we'll sort it out. Don't pay again."); }
+        const payStage: Stage = teamMode ? "teamCreate" : "fee";
+        if (d.status === "paid") {
+          setWatchTxnid(null); setHasPaid(true); setLoading(false);
+          if (teamMode) { await loadTeam(); setStage("teamDone"); onSuccess(); } else setStage("hub");
+        }
+        else if (d.status === "failed") { setWatchTxnid(null); setLoading(false); setStage(payStage); setError("That payment didn't go through. Nothing was charged."); }
+        else if (d.status === "review") { setWatchTxnid(null); setLoading(false); setStage(payStage); setError("Your payment needs a manual check — we'll sort it out. Don't pay again."); }
       } catch {}
     };
     const interval = setInterval(check, 3000);
@@ -201,12 +296,21 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
   // then guesses — and the guess is always "not connected", which flashed
   // "Connect Discord" at players who connected it weeks ago. A brief spinner is
   // honest; a wrong screen is not.
-  const ready = profileLoaded && (entryFee <= 0 || isSubstitute || entitlementLoaded);
+  const ready = profileLoaded && (teamMode ? teamLoaded : (entryFee <= 0 || isSubstitute || entitlementLoaded));
+  const hasCode = codeInput.replace(/[^A-Z0-9]/g, "").length > 0;
 
   const resolved: Stage =
     stage !== "auto" ? stage
     : !ready ? "checking"
     : !hasDiscord ? "gate"
+    // Team tournaments: a team already exists (or is being made from a payment
+    // that cleared) beats everything; then setup; then the actual choice.
+    : teamMode ? (
+        teamState?.team || teamState?.pendingTeamPayment ? "teamDone"
+        : !setupComplete ? "hub"
+        : hasCode ? "teamJoin"
+        : "teamChoice"
+      )
     // Substitutes never pay. They take the slot of someone who already paid and
     // didn't show, so charging them would collect the entry fee twice for one
     // seat. They still complete every detail up front, so they can be dropped
@@ -313,6 +417,62 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
     setHasPaid(true); setLoading(false); setStage("hub");
   };
 
+  // ── Team actions ───────────────────────────────────────────────────────
+  const teamNameClean = teamNameInput.replace(/\s+/g, " ").trim();
+
+  const payForTeam = async () => {
+    if (teamNameClean.length < 2) { setError("Give your team a name first."); return; }
+    setLoading(true); setError("");
+    const outcome = await startPayuCheckout({
+      uid: user.uid, game: "valorant", tournamentId: tournament.id,
+      mode: "team_create", teamName: teamNameClean, newTab: true,
+    });
+    if (outcome.kind === "redirecting") return;
+    if (outcome.kind === "popup") { setStage("waiting"); setWatchTxnid(outcome.txnid); return; }
+    if (outcome.kind === "error") { setError(outcome.error); setLoading(false); return; }
+    // Already paid for a team — show where that stands instead of charging again.
+    setLoading(false); await loadTeam(); setStage("auto");
+  };
+
+  const joinWithCode = async () => {
+    const code = codeInput.replace(/[^A-Z0-9]/g, "");
+    setLoading(true); setError("");
+    try {
+      const res = await authPost("/api/valorant/team/join", { uid: user.uid, code });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Couldn't join that team");
+      try { localStorage.removeItem(codeKey); } catch {}
+      await loadTeam();
+      onSuccess();
+      setStage("teamDone");
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  /** A payment cleared but the team didn't get made. Retrying never charges. */
+  const retryTeamCreate = async () => {
+    const txnid = teamState?.pendingTeamPayment?.txnid;
+    if (!txnid) return;
+    setLoading(true); setError("");
+    try {
+      const res = await authPost("/api/valorant/team/create", { tournamentId: tournament.id, uid: user.uid, txnid });
+      const d = await res.json();
+      if (!res.ok) throw new Error(`${d.error || "Couldn't create the team"}. Your payment is safe — message us on Discord.`);
+      await loadTeam();
+      onSuccess();
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const inviteLink = teamState?.team?.code
+    ? `${typeof window !== "undefined" ? window.location.origin : "https://www.iesports.in"}/valorant/tournament/${tournament.id}?join=${teamState.team.code}`
+    : "";
+
+  const copy = async (what: "code" | "link") => {
+    const text = what === "code" ? teamState?.team?.code || "" : inviteLink;
+    try { await navigator.clipboard.writeText(text); setCopied(what); setTimeout(() => setCopied(""), 2000); } catch {}
+  };
+
   const finish = async () => {
     setLoading(true); setError(""); setWarning("");
     try {
@@ -327,10 +487,7 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
         onSuccess(); setStage("done"); return;
       }
       const endpoint = isCS2 ? "/api/cs2/solo" : isValorant ? "/api/valorant/solo" : "/api/teams/solo";
-      const res = await fetch(endpoint, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: tournament.id, uid: user.uid }),
-      });
+      const res = await authPost(endpoint, { tournamentId: tournament.id, uid: user.uid });
       const d = await res.json();
       if (res.status === 402 && d?.requiresPayment) { setStage("fee"); setHasPaid(false); return; }
       if (!res.ok && !/already registered|already in/i.test(d?.error || "")) throw new Error(d.error);
@@ -508,6 +665,10 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
                     ? (setupComplete
                         ? "You're set. Join the list and we'll call you the moment a slot frees up."
                         : `${tasksDone} of 3 done. We take these now so you can be dropped straight into a team if someone drops out — no fee, their slot is already paid for.`)
+                    : teamMode
+                      ? (setupComplete
+                          ? "Everything's linked. Next: create your team or join one."
+                          : `${tasksDone} of 3 done — every player on a team needs these before the team can take them.`)
                     : setupComplete
                       ? "Everything's linked. Lock in your place below."
                       : `${tasksDone} of 3 done — we need these to run your matches and pay out.`}
@@ -535,11 +696,186 @@ export default function RegisterModal({ tournament, user, dotaProfile, game = "d
 
                 {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
 
-                <button onClick={finish} disabled={!setupComplete || loading} style={setupComplete && !loading ? cta : ctaMuted}>
+                <button onClick={teamMode ? () => setStage("auto") : finish} disabled={!setupComplete || loading} style={setupComplete && !loading ? cta : ctaMuted}>
                   {loading ? "Finishing…"
-                    : setupComplete ? (isSubstitute ? "Join the substitute list" : "Complete registration")
+                    : setupComplete ? (teamMode ? "Continue →" : isSubstitute ? "Join the substitute list" : "Complete registration")
                     : `${3 - tasksDone} left`}
                 </button>
+              </div>
+            )}
+
+            {/* A team screen with nothing to show would be a blank modal. */}
+            {teamMode && !teamState && ["teamChoice", "teamCreate", "teamDone"].includes(resolved) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "20px 0" }}>
+                <div style={h1}>Couldn&apos;t load registration</div>
+                <div style={body}>Check your connection and try again.</div>
+                <button onClick={() => { setTeamLoaded(false); loadTeam(); }} style={cta}>Try again</button>
+              </div>
+            )}
+
+            {/* ═══ TEAM — CHOOSE ═══ */}
+            {resolved === "teamChoice" && teamState && (() => {
+              const teamsLeft = Math.max(0, teamState.totalTeams - teamState.teamsRegistered);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
+                  <div style={eyebrow}>TEAM ENTRY{teamState.totalTeams ? ` · ${teamsLeft} OF ${teamState.totalTeams} TEAM SLOTS LEFT` : ""}</div>
+                  <div style={h1}>Enter as a team</div>
+                  <div style={body}>
+                    {entryFee > 0 ? `₹${entryFee} per team of ${teamState.teamSize}. ` : ""}
+                    The captain names the team{entryFee > 0 ? " and pays once" : ""}, then shares a code. Teammates join free with it.
+                  </div>
+
+                  {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
+
+                  <button onClick={() => { setError(""); setStage("teamCreate"); }} disabled={teamsLeft <= 0 && teamState.totalTeams > 0}
+                    style={teamsLeft <= 0 && teamState.totalTeams > 0 ? ctaMuted : cta}>
+                    {teamsLeft <= 0 && teamState.totalTeams > 0 ? "All team slots are taken" : "Create a team"}
+                  </button>
+                  <button onClick={() => { setError(""); setStage("teamJoin"); }} style={{ ...cta, background: UI.surface, color: "#fff", border: `1px solid ${UI.border}`, boxShadow: "none" }}>
+                    I have a team code
+                  </button>
+                </div>
+              );
+            })()}
+
+            {/* ═══ TEAM — CREATE (name and price on one screen) ═══ */}
+            {resolved === "teamCreate" && teamState && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <button onClick={() => { setError(""); setStage("teamChoice"); }} style={{ alignSelf: "flex-start", background: "none", border: 0, color: UI.faint, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>← Back</button>
+                <div style={h1}>Create your team</div>
+                <input autoFocus value={teamNameInput} placeholder="Team name" maxLength={24}
+                  style={{ ...field, textTransform: "uppercase", fontWeight: 700, letterSpacing: ".04em" }}
+                  onChange={e => { setTeamNameInput(e.target.value); setError(""); }}
+                  onKeyDown={e => { if (e.key === "Enter" && teamNameClean.length >= 2 && !loading) payForTeam(); }} />
+                <div style={{ fontSize: 11.5, color: UI.faint, marginTop: -6 }}>On the bracket and the stream. You&apos;re the captain.</div>
+
+                {entryFee > 0 && (
+                  <>
+                    <div style={{ fontSize: 58, fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1, color: "#fff", marginTop: 6 }}>
+                      ₹{entryFee}
+                    </div>
+                    <div style={body}>
+                      Covers all {teamState.teamSize} players — teammates join free. UPI or Net Banking through PayU, in a new tab.
+                    </div>
+                  </>
+                )}
+
+                {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
+
+                <button onClick={entryFee > 0 ? payForTeam : async () => {
+                  setLoading(true); setError("");
+                  try {
+                    const res = await authPost("/api/valorant/team/create", { tournamentId: tournament.id, uid: user.uid, teamName: teamNameClean });
+                    const d = await res.json();
+                    if (!res.ok) throw new Error(d.error || "Couldn't create the team");
+                    await loadTeam(); onSuccess(); setStage("teamDone");
+                  } catch (e: any) { setError(e.message); } finally { setLoading(false); }
+                }} disabled={loading || teamNameClean.length < 2} style={!loading && teamNameClean.length >= 2 ? cta : ctaMuted}>
+                  {loading ? (entryFee > 0 ? "Opening PayU…" : "Creating…") : entryFee > 0 ? `Pay ₹${entryFee}` : "Create team"}
+                </button>
+              </div>
+            )}
+
+            {/* ═══ TEAM — JOIN ═══ */}
+            {resolved === "teamJoin" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <button onClick={() => { setError(""); setCodeInput(""); try { localStorage.removeItem(codeKey); } catch {} setStage("teamChoice"); }} style={{ alignSelf: "flex-start", background: "none", border: 0, color: UI.faint, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>← Back</button>
+                <div style={h1}>Join a team</div>
+                <div style={body}>Enter the 6-character code your captain sent you. Joining is free.</div>
+                <input autoFocus value={codeInput} placeholder="ABC123" maxLength={6} inputMode="text" autoCapitalize="characters"
+                  style={{ ...field, textAlign: "center", fontSize: 24, fontWeight: 800, letterSpacing: ".3em", textTransform: "uppercase" }}
+                  onChange={e => { setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)); setError(""); }} />
+
+                {previewError && <p style={{ color: UI.bad, fontSize: 12.5 }}>{previewError}</p>}
+
+                {preview && (
+                  <div style={{ ...panel, display: "flex", flexDirection: "column", gap: 9 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>{preview.teamName}</div>
+                      <div style={{ fontSize: 12, color: preview.full ? UI.bad : UI.dim, fontWeight: 700 }}>{preview.memberCount}/{preview.teamSize}</div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {preview.members.map((m, i) => (
+                        <span key={i} style={{ fontSize: 11.5, color: UI.dim, background: "#141414", border: `1px solid ${UI.border}`, borderRadius: 100, padding: "3px 9px" }}>
+                          {m.riotGameName}{m.isCaptain ? " · C" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
+
+                {(() => {
+                  const blocked = !preview || preview.full || preview.closed || preview.alreadyMember;
+                  const label = !preview ? "Join team"
+                    : preview.alreadyMember ? "You're already on this team"
+                    : preview.closed ? "Registration has closed"
+                    : preview.full ? "This team is full"
+                    : `Join ${preview.teamName}`;
+                  return (
+                    <button onClick={joinWithCode} disabled={blocked || loading} style={!blocked && !loading ? cta : ctaMuted}>
+                      {loading ? "Joining…" : label}
+                    </button>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ═══ TEAM — DONE / YOUR TEAM ═══ */}
+            {resolved === "teamDone" && teamState && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
+                {teamState.team ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, color: UI.ok, fontSize: 11.5, letterSpacing: ".1em", fontWeight: 700 }}>
+                      ✓ {teamState.team.isCaptain ? "TEAM REGISTERED · CAPTAIN" : "YOU'RE ON THE TEAM"}
+                    </div>
+                    <div style={h1}>{teamState.team.name}</div>
+                    <div style={body}>
+                      {teamState.team.memberCount >= teamState.teamSize
+                        ? `All ${teamState.teamSize} players are in. Check Discord for match calls.`
+                        : `${teamState.team.memberCount} of ${teamState.teamSize} players. Send the code to the ${teamState.teamSize - teamState.team.memberCount} still missing.`}
+                    </div>
+
+                    {teamState.team.code && teamState.team.memberCount < teamState.teamSize && (
+                      <>
+                        <button onClick={() => copy("code")} style={{ ...panel, cursor: "pointer", fontFamily: "inherit", textAlign: "center", borderColor: T.line }}>
+                          <div style={{ fontSize: 11, letterSpacing: ".14em", color: UI.faint, fontWeight: 600 }}>TEAM CODE</div>
+                          <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: ".25em", color: T.acc, marginTop: 4 }}>{teamState.team.code}</div>
+                          <div style={{ fontSize: 11.5, color: copied === "code" ? UI.ok : UI.faint, marginTop: 4 }}>{copied === "code" ? "Copied" : "Tap to copy"}</div>
+                        </button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => copy("link")} style={{ ...cta, flex: 1, padding: 13, fontSize: 13.5 }}>
+                            {copied === "link" ? "Link copied" : "Copy invite link"}
+                          </button>
+                          <a href={`https://wa.me/?text=${encodeURIComponent(`Join ${teamState.team.name} for ${tournament.name} on iesports — code ${teamState.team.code}\n${inviteLink}`)}`}
+                            target="_blank" rel="noreferrer"
+                            style={{ ...cta, flex: 1, padding: 13, fontSize: 13.5, background: "#1c1c1c", color: "#fff", boxShadow: "none", textAlign: "center", textDecoration: "none", border: `1px solid ${UI.border}` }}>
+                            WhatsApp
+                          </a>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: UI.faint, textAlign: "center", lineHeight: 1.6 }}>
+                          The code is also in your Discord DMs. Only people on the team can see it.
+                        </div>
+                      </>
+                    )}
+
+                    <button onClick={onClose} style={{ ...cta, background: UI.surface, color: "#fff", border: `1px solid ${UI.border}`, boxShadow: "none" }}>Done</button>
+                  </>
+                ) : teamState.pendingTeamPayment ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, color: UI.ok, fontSize: 11.5, letterSpacing: ".1em", fontWeight: 700 }}>✓ PAYMENT RECEIVED</div>
+                    <div style={h1}>Setting up {teamState.pendingTeamPayment.teamName}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, ...body }}>
+                      <div style={{ width: 16, height: 16, flex: "none", borderRadius: "50%", border: `2px solid ${UI.border}`, borderTopColor: T.acc, animation: "reg-spin .8s linear infinite" }} />
+                      Your team code appears here in a moment. You won&apos;t be charged again.
+                    </div>
+                    {error && <p style={{ color: UI.bad, fontSize: 12.5 }}>{error}</p>}
+                    <button onClick={retryTeamCreate} disabled={loading} style={{ ...(loading ? ctaMuted : cta), background: loading ? "#1c1c1c" : UI.surface, color: "#fff", border: `1px solid ${UI.border}`, boxShadow: "none" }}>
+                      {loading ? "Trying…" : "Taking too long? Try again"}
+                    </button>
+                  </>
+                ) : null}
               </div>
             )}
 

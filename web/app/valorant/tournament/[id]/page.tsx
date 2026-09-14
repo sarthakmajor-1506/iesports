@@ -17,6 +17,8 @@ import TournamentIntroVideo from "@/app/components/TournamentIntroVideo";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import { readCache, writeCache } from "@/lib/pageCache";
 import TournamentWrap from "@/app/components/TournamentWrap";
+import WithdrawModal from "@/app/components/WithdrawModal";
+import { authFetch, authPost } from "@/app/lib/authFetch";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -499,14 +501,27 @@ function ValorantTournamentDetailInner() {
   // Setup gaps known BEFORE the player clicks Register, so the button can say
   // what the next step actually is instead of promising registration.
   const [needsDiscord, setNeedsDiscord] = useState(false);
+  // Withdrawing from a seat that was paid for owes the player money, so leaving
+  // is a screen now rather than a confirm() — it needs to say the amount and
+  // take a UPI ID to send it to.
+  const [refundOnWithdraw, setRefundOnWithdraw] = useState(false);
+  const [savedUpi, setSavedUpi] = useState<string | null>(null);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [unregError, setUnregError] = useState("");
   const [unregLoading, setUnregLoading] = useState(false);
+  // Team tournaments: an invite link (?join=CODE) opens registration straight
+  // onto that team.
+  const inviteCode = (searchParams.get("join") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
   const [showRegister, setShowRegister] = useState(() => {
-    if (typeof window !== "undefined" && searchParams.get("register") === "true") {
+    if (typeof window !== "undefined" && (searchParams.get("register") === "true" || !!inviteCode)) {
       try { localStorage.removeItem("pendingRegistration"); } catch {}
       return true;
     }
     return false;
   });
+  // Where this player stands in a team-registration tournament.
+  const [myTeam, setMyTeam] = useState<any>(null);
+  const [leaveLoading, setLeaveLoading] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showSubstituteRegister, setShowSubstituteRegister] = useState(false);
   const [countdown, setCountdown] = useState("");
@@ -538,6 +553,23 @@ function ValorantTournamentDetailInner() {
   const [wrapAvailable, setWrapAvailable] = useState(false);
   const [rankReports, setRankReports] = useState<any[]>([]);
 
+  // A captain back from a same-tab PayU checkout (?paid=) lands here with the
+  // team being created; open the modal so the code is the first thing they see.
+  const paidReturnHandled = useRef(false);
+  useEffect(() => {
+    if (paidReturnHandled.current || !user || !tournament || tournament.registrationMode !== "team" || !searchParams.get("paid")) return;
+    paidReturnHandled.current = true;
+    setShowRegister(true);
+  }, [user, tournament, searchParams]);
+
+  // An invite link opened while signed out: keep the code for after sign-in
+  // (the login round trip can drop the query string) and ask them to sign in.
+  useEffect(() => {
+    if (!inviteCode || authLoading) return;
+    try { localStorage.setItem(`pendingTeamCode:${id}`, inviteCode); } catch {}
+    if (!user) setShowLoginPrompt(true);
+  }, [inviteCode, authLoading, user, id]);
+
   // Auth resolves after mount, so this has to re-run when the user appears —
   // otherwise the first call no-ops and the button never learns what is missing.
   useEffect(() => { fetchEntitlement(); }, [user, id]);
@@ -545,9 +577,18 @@ function ValorantTournamentDetailInner() {
   /** Paid-but-incomplete is invisible in the players list, so ask directly. */
   const fetchEntitlement = () => {
     if (!id || !user) return;
-    fetch(`/api/payments/entitlement?game=valorant&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+    authFetch(`/api/valorant/team/me?tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(d => { setSetupPending(!!d.setupPending); setNeedsDiscord(Array.isArray(d.missing) && d.missing.includes("discord")); })
+      .then(d => setMyTeam(d?.teamRegistration ? d : null))
+      .catch(() => {});
+    authFetch(`/api/payments/entitlement?game=valorant&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => {
+        setSetupPending(!!d.setupPending);
+        setNeedsDiscord(Array.isArray(d.missing) && d.missing.includes("discord"));
+        setRefundOnWithdraw(!!d.refundOnWithdraw);
+        setSavedUpi(d.upiId || null);
+      })
       .catch(() => {});
   };
 
@@ -649,24 +690,49 @@ function ValorantTournamentDetailInner() {
 
   const getUserTeam = () => { if (!user) return null; return teams.find((t: any) => (t.members || []).some((m: any) => m.uid === user.uid)); };
 
-  const handleUnregister = async () => {
+  const handleUnregister = async (upiId?: string) => {
     if (!user || !id) return;
-    if (!confirm("Are you sure you want to unregister from this tournament?")) return;
     setUnregLoading(true);
+    setUnregError("");
     try {
-      const res = await fetch("/api/valorant/unregister", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
-      });
+      const res = await authPost("/api/valorant/unregister", { tournamentId: id, uid: user.uid, upiId });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
+      setShowWithdraw(false);
+      if (data.refund?.owed) {
+        setToastMsg(`Withdrawn. ₹${data.refund.amount} refund is queued.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 4000);
+      }
       refetchData(true);
+      fetchEntitlement();
     } catch (e: any) {
-      alert(e.message || "Failed to unregister");
+      setUnregError(e.message || "Failed to unregister");
     } finally {
       setUnregLoading(false);
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!user || !id || !myTeam?.team) return;
+    if (!confirm(`Leave ${myTeam.team.name}? You can join another team with its code.`)) return;
+    setLeaveLoading(true);
+    try {
+      const res = await authPost("/api/valorant/team/leave", { tournamentId: id, uid: user.uid });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setToastMsg(`You left ${data.teamName}.`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      refetchData(true);
+      fetchEntitlement();
+    } catch (e: any) {
+      setToastMsg(e.message || "Couldn't leave the team");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+    } finally {
+      setLeaveLoading(false);
     }
   };
 
@@ -761,7 +827,14 @@ function ValorantTournamentDetailInner() {
   })();
 
   const canRegister = !regClosed && !isRegistered && slotsLeft > 0 && isRegOpen;
-  // Canonical "tournament is over" check — matches ended/completed/endDate-passed
+
+  // ── Team registration ──
+  // Registered means "on a team".
+  const teamMode = tournament.registrationMode === "team";
+  const teamSize = Number(tournament.teamSize) || 5;
+  const totalTeams = Number(tournament.totalTeams) || Math.floor((tournament.totalSlots || 0) / teamSize);
+  const onTeam = teamMode && !!myTeam?.team;
+  const teamPending = teamMode && !myTeam?.team && !!myTeam?.pendingTeamPayment;  // Canonical "tournament is over" check — matches ended/completed/endDate-passed
   // used elsewhere (featured-tournaments route). Literal status==="ended" alone
   // missed tournaments marked "completed", which let Join as Substitute keep
   // showing after the tournament was fully done.
@@ -1256,6 +1329,42 @@ function ValorantTournamentDetailInner() {
                       >Leaderboard</button>
                     </div>
                   </>
+                ) : teamMode ? (
+                  <>
+                    {!regClosed && isRegOpen && !onTeam && (
+                      <button className="vtd-reg-btn" onClick={() => {
+                        if (!user) { setShowLoginPrompt(true); return; }
+                        setShowRegister(true);
+                      }}>{teamPending ? "Team being set up →" : "Register a team →"}</button>
+                    )}
+                    {onTeam && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <div className="vtd-reg-done">✓ {myTeam.team.name}{myTeam.team.memberCount < teamSize ? ` · ${myTeam.team.memberCount}/${teamSize}` : ""}</div>
+                        {!regClosed && myTeam.team.memberCount < teamSize && (
+                          <button onClick={() => setShowRegister(true)} style={{ padding: "10px 20px", background: "rgba(60,203,255,0.12)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)", borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                            Invite teammates
+                          </button>
+                        )}
+                        {!regClosed && !myTeam.team.isCaptain && tournament.status === "upcoming" && (
+                          <button onClick={handleLeaveTeam} disabled={leaveLoading} style={{ padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#d07070", border: "1px solid rgba(208,112,112,0.3)", borderRadius: 100, fontSize: "0.82rem", fontWeight: 700, cursor: leaveLoading ? "default" : "pointer", fontFamily: "inherit", opacity: leaveLoading ? 0.6 : 1 }}>
+                            {leaveLoading ? "Leaving..." : "Leave team"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {!isRegOpen && !onTeam && (
+                      <div style={{ padding: "10px 22px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, color: "#8A8880" }}>
+                        Opens {formatDate(schedule.registrationOpens)} · {formatTime(schedule.registrationOpens)}
+                      </div>
+                    )}
+                    {regClosed && isRegOpen && (
+                      <button
+                        className="vtd-hero-compact-btn"
+                        onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
+                        style={{ padding: "10px 24px", background: "rgba(96,165,250,0.12)", color: "#60A5FA", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 100, fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+                      >View Matches</button>
+                    )}
+                  </>
                 ) : (
                   <>
                     {canRegister && <button className="vtd-reg-btn" onClick={() => {
@@ -1270,7 +1379,7 @@ function ValorantTournamentDetailInner() {
                         <div className="vtd-reg-done">✓ Registered</div>
                         {!regClosed && !tournament?.bracketsComputed && tournament?.status === "upcoming" && (
                           <button
-                            onClick={handleUnregister}
+                            onClick={() => { setUnregError(""); setShowWithdraw(true); }}
                             disabled={unregLoading}
                             style={{
                               padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#d07070",
@@ -1405,7 +1514,11 @@ function ValorantTournamentDetailInner() {
           </div>
           {/* Slots info strip */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, padding: "10px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, fontSize: "0.82rem", color: "#8A8880", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} players</span>
+            {teamMode ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Shield size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{teams.length}</strong> / {totalTeams} teams · {teamSize} players each</span>
+            ) : (
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Users size={14} strokeWidth={2} /> <strong style={{ color: "#E6E6E6" }}>{tournament.slotsBooked}</strong> / {tournament.totalSlots} players</span>
+            )}
             {isEnded ? (
               <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={14} strokeWidth={2} /> {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}</span>
@@ -1435,7 +1548,7 @@ function ValorantTournamentDetailInner() {
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.05s" }}>
                   <div className="vtd-stat-tile-icon"><Coins size={24} color="#8A8880" /></div>
-                  <div className="vtd-stat-tile-val">{tournament.entryFee === 0 ? "Free" : `₹${tournament.entryFee}`}</div>
+                  <div className="vtd-stat-tile-val">{tournament.entryFee === 0 ? "Free" : `₹${tournament.entryFee}${teamMode ? " / team" : ""}`}</div>
                   <div className="vtd-stat-tile-lbl">Entry Fee</div>
                 </div>
                 {tournament.prizePool && tournament.prizePool !== "0" && (
@@ -1627,7 +1740,7 @@ function ValorantTournamentDetailInner() {
           {activeTab === "teams" && (
             <div className="vtd-tab-pane" ref={tabContentRef}>
               {teams.length === 0 ? (
-                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Teams</span><TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} /></div><div className="vtd-empty"><Shield size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">Teams not generated yet</span><span className="vtd-empty-sub">Teams will be shuffled after registration closes.</span></div></div>
+                <div className="vtd-card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><span className="vtd-card-label" style={{ marginBottom: 0 }}>Teams</span><TabSharePopover tabKey="teams" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} /></div><div className="vtd-empty"><Shield size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">{teamMode ? "No teams registered yet" : "Teams not generated yet"}</span><span className="vtd-empty-sub">{teamMode ? "Captains register a team and share its code with their teammates." : "Teams will be shuffled after registration closes."}</span></div></div>
               ) : (
                 <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -1685,7 +1798,7 @@ function ValorantTournamentDetailInner() {
                         );})}
                       </div>
                       <div className="vtd-team-box-footer">
-                        <span>{team.members?.length || 0} players</span>
+                        <span>{teamMode ? `${team.members?.length || 0}/${teamSize} players` : `${team.members?.length || 0} players`}</span>
                         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                           {canEdit && !isEditing && (
                             <button className="vtd-team-edit-btn" onClick={() => { setEditingTeamId(team.id); setNewTeamName(team.teamName); setTeamNameError(""); }}>
@@ -2226,8 +2339,20 @@ function ValorantTournamentDetailInner() {
         </div>
       </div>
 
-      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); setSetupPending(false); refetchData(true); }} />}
+      {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" joinCode={inviteCode || undefined} onClose={() => { setShowRegister(false); if (teamMode) fetchEntitlement(); }} onSuccess={() => { if (!teamMode) setIsRegistered(true); setSetupPending(false); refetchData(true); fetchEntitlement(); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="valorant" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
+
+      {showWithdraw && user && (
+        <WithdrawModal
+          tournamentName={tournament?.name || "this tournament"}
+          refundAmount={refundOnWithdraw ? Number(tournament?.entryFee) || 0 : 0}
+          upiId={savedUpi}
+          loading={unregLoading}
+          error={unregError}
+          onCancel={() => { setShowWithdraw(false); setUnregError(""); }}
+          onConfirm={(upi) => handleUnregister(upi)}
+        />
+      )}
 
       {/* ═══ WAITLIST POPUP ═══ */}
       {waitlistOpen && waitlistData.length > 0 && (

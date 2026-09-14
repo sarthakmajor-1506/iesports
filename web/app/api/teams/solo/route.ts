@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAndStoreRank } from "@/lib/opendota";
-import { FieldValue } from "firebase-admin/firestore";
 import { requirePaidEntry } from "@/lib/paidEntry";
+import { claimSoloSlot } from "@/lib/registrationSlots";
+import { verifyCaller } from "@/lib/apiAuth";
 
 
 export async function POST(req: NextRequest) {
   try {
     const { tournamentId, uid } = await req.json();
     if (!tournamentId || !uid) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
     // Check not already registered
     const existing = await adminDb.collection("teams")
@@ -48,19 +52,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No slots left in your bracket" }, { status: 400 });
     }
 
-    // Add to solo pool (legacy global collection)
-    await adminDb.collection("soloPool").add({
+    // Player document, the global counter, the per-bracket counter and the
+    // user's tournament array in one transaction. These used to be four
+    // separate writes, with the counters read outside and written back, which
+    // silently loses a registration whenever two land together.
+    const claim = await claimSoloSlot({
+      game: "dota2",
       tournamentId,
       uid,
-      bracket,
-      mmr,
-      status: "waiting",
-      registeredAt: new Date(),
-    });
-
-    // Also write to tournament's players subcollection (read by tournament detail page)
-    await adminDb.collection("tournaments").doc(tournamentId)
-      .collection("players").doc(uid).set({
+      player: {
         uid,
         fullName: userData.fullName || "",
         steamName: userData.steamName || "",
@@ -71,14 +71,25 @@ export async function POST(req: NextRequest) {
         discordId: userData.discordId || "",
         discordUsername: userData.discordUsername || "",
         registeredAt: new Date().toISOString(),
-      });
+      },
+      extraCounters: { [`brackets.${bracket}.slotsBooked`]: 1 },
+    });
 
-    await adminDb.collection("users").doc(uid).update({ registeredTournaments: FieldValue.arrayUnion(tournamentId) });
+    if (!claim.ok) {
+      if (claim.reason === "already_registered") return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
+      if (claim.reason === "full") return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
 
-    // Increment slotsBooked
-    await adminDb.collection("tournaments").doc(tournamentId).update({
-      slotsBooked: (tData.slotsBooked || 0) + 1,
-      [`brackets.${bracket}.slotsBooked`]: (tData.brackets?.[bracket]?.slotsBooked || 0) + 1,
+    // Legacy global pool, written only once the slot is actually held so a lost
+    // race cannot leave a stray pool entry behind.
+    await adminDb.collection("soloPool").add({
+      tournamentId,
+      uid,
+      bracket,
+      mmr,
+      status: "waiting",
+      registeredAt: new Date(),
     });
 
     return NextResponse.json({ success: true, bracket });

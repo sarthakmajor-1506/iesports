@@ -33,6 +33,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
+    // Registered teams were formed and paid for by their players. Shuffling
+    // would redistribute them, and `deleteExisting` would erase them outright
+    // while their join codes kept pointing at nothing.
+    if (tData.registrationMode === "team") {
+      return NextResponse.json({ error: "This tournament uses registered teams — shuffling is disabled." }, { status: 400 });
+    }
+
     // ── Delete existing teams, matches, standings if requested ───────────────
     // Dry-run never mutates Firestore, even when deleteExisting is set.
     if (deleteExisting && !dryRun) {

@@ -14,6 +14,8 @@ import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import TournamentIntroVideo from "@/app/components/TournamentIntroVideo";
 import CS2TournamentWrap from "@/app/components/CS2TournamentWrap";
+import WithdrawModal from "@/app/components/WithdrawModal";
+import { authFetch, authPost } from "@/app/lib/authFetch";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { canEditAnyTeam } from "@/lib/teamEditAdmins";
 import { sortCS2Standings } from "@/lib/recomputeCS2Standings";
@@ -500,6 +502,12 @@ function CS2TournamentDetailInner() {
   // Setup gaps known BEFORE the player clicks Register, so the button can say
   // what the next step actually is instead of promising registration.
   const [needsDiscord, setNeedsDiscord] = useState(false);
+  // Withdrawing from a paid seat owes the player money, so leaving is a screen
+  // that names the amount and takes a UPI ID rather than a confirm().
+  const [refundOnWithdraw, setRefundOnWithdraw] = useState(false);
+  const [savedUpi, setSavedUpi] = useState<string | null>(null);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [unregError, setUnregError] = useState("");
   const [unregLoading, setUnregLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
@@ -542,9 +550,14 @@ function CS2TournamentDetailInner() {
   /** Paid-but-incomplete is invisible in the players list, so ask directly. */
   const fetchEntitlement = () => {
     if (!id || !user) return;
-    fetch(`/api/payments/entitlement?game=cs2&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
+    authFetch(`/api/payments/entitlement?game=cs2&tournamentId=${encodeURIComponent(id)}&uid=${encodeURIComponent(user.uid)}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(d => { setSetupPending(!!d.setupPending); setNeedsDiscord(Array.isArray(d.missing) && d.missing.includes("discord")); })
+      .then(d => {
+        setSetupPending(!!d.setupPending);
+        setNeedsDiscord(Array.isArray(d.missing) && d.missing.includes("discord"));
+        setRefundOnWithdraw(!!d.refundOnWithdraw);
+        setSavedUpi(d.upiId || null);
+      })
       .catch(() => {});
   };
 
@@ -634,22 +647,20 @@ function CS2TournamentDetailInner() {
 
   const getUserTeam = () => { if (!user) return null; return teams.find((t: any) => (t.members || []).some((m: any) => m.uid === user.uid)); };
 
-  const handleUnregister = async () => {
+  const handleUnregister = async (upiId?: string) => {
     if (!user || !id) return;
-    if (!confirm("Are you sure you want to unregister from this tournament?")) return;
     setUnregLoading(true);
+    setUnregError("");
     try {
-      const res = await fetch("/api/cs2/unregister", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
-      });
+      const res = await authPost("/api/cs2/unregister", { tournamentId: id, uid: user.uid, upiId });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
+      setShowWithdraw(false);
       refetchData(true);
+      fetchEntitlement();
     } catch (e: any) {
-      alert(e.message || "Failed to unregister");
+      setUnregError(e.message || "Failed to unregister");
     } finally {
       setUnregLoading(false);
     }
@@ -1256,7 +1267,7 @@ function CS2TournamentDetailInner() {
                         <div className="csd-reg-done">✓ Registered</div>
                         {!regClosed && !tournament?.bracketsComputed && tournament?.status === "upcoming" && (
                           <button
-                            onClick={handleUnregister}
+                            onClick={() => { setUnregError(""); setShowWithdraw(true); }}
                             disabled={unregLoading}
                             style={{
                               padding: "10px 20px", background: "rgba(239,68,68,0.1)", color: "#d07070",
@@ -2093,6 +2104,19 @@ function CS2TournamentDetailInner() {
 
       {showRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" onClose={() => setShowRegister(false)} onSuccess={() => { setIsRegistered(true); setSetupPending(false); refetchData(true); }} />}
       {showSubstituteRegister && user && <RegisterModal tournament={tournament} user={user} dotaProfile={null} game="cs2" isSubstitute onClose={() => setShowSubstituteRegister(false)} onSuccess={() => { setOnWaitlist(true); refetchData(); }} />}
+
+      {showWithdraw && user && (
+        <WithdrawModal
+          tournamentName={tournament?.name || "this tournament"}
+          refundAmount={refundOnWithdraw ? Number(tournament?.entryFee) || 0 : 0}
+          upiId={savedUpi}
+          accent="#F5A524"
+          loading={unregLoading}
+          error={unregError}
+          onCancel={() => { setShowWithdraw(false); setUnregError(""); }}
+          onConfirm={(upi) => handleUnregister(upi)}
+        />
+      )}
 
       {/* ═══ LOGIN PROMPT ═══ */}
       {showLoginPrompt && !user && (

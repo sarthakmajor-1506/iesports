@@ -281,12 +281,55 @@ registeredCS2Tournaments: string[]             ← CS2
 
 ### Payments (PayU — see `docs/PAYMENTS_PAYU.md`)
 - `payments/{txnid}` — one doc per attempt, with the raw callback + PayU's verify response
-- `paidEntries/{game__tournamentId__uid}` — the entitlement; derived id, so granting twice is a no-op
+- `paidEntries/{game__tournamentId__uid}` — the entitlement; derived id, so granting twice is a no-op. `voided: true` after a withdrawal; always read it through `isLiveEntitlement()`, never `.exists`
 - `payuWebhookEvents/{id}` — every webhook delivery, stored before it is interpreted
+- `<tournament>/slotHolds/{uid}` — the seat, reserved at checkout so the last slot cannot be sold twice
+- `refunds/{txnid}` — what a withdrawal owes. The payout itself is manual, in the PayU dashboard
+- `users/{uid}.upiId` — payout destination. Server-written only (`/api/account/upi`), locked in `firestore.rules`
+- `paidEntries/{game__tournamentId__uid__team}` — a captain's team entitlement (team registration). A solo entitlement spent as credit carries `consumedBy`
+- `valorantTournaments/{id}/teamHolds/{uid}` — a team seat + name reserved at checkout
+- `valorantTeamCodes/{CODE}` — team join codes. Server-only; NEVER copy a code onto the team doc (teams are client-readable)
+
+Team registration (`registrationMode: "team"` on a Valorant tournament) is
+documented in `docs/PAYMENTS_PAYU.md` → "Team registration". Its logic lives in
+`lib/valorantTeams.ts`; routes are `/api/valorant/team/{create,join,leave,me}`.
 
 Registration routes call `requirePaidEntry()` from `lib/paidEntry.ts` before
 writing anything. It returns immediately for free tournaments, so the gate is
 inert until a tournament has an `entryFee`.
+
+### 12. Slot counting is transactional — CRITICAL
+`slotsBooked` is a cache of the players subcollection, and it is what the
+tournament page shows and what "is this full" is checked against. Never move it
+with a bare `FieldValue.increment` guarded by a separate read, and never
+read-then-write it. Both were in the codebase and both were wrong, in opposite
+directions: a duplicate PayU webhook double-counted a Valorant registration
+(Horizon read 3/20 with two players), and the Dota team routes lost updates.
+
+Registration and unregistration go through `lib/registrationSlots.ts`:
+
+```typescript
+const claim = await claimSoloSlot({ game, tournamentId, uid, player });
+if (!claim.ok) { /* already_registered | full | no_tournament */ }
+```
+
+One transaction writes the player document, moves the counter and updates the
+user's `registered*Tournaments` array. Anything that must happen exactly once
+per registration (rating history, Discord DMs) goes **after** the claim, never
+before it.
+
+### 13. Registration and payment routes verify their caller
+They take a `uid` in the body and must never believe it. Use `verifyCaller()`
+from `lib/apiAuth.ts`, which accepts the player's Firebase ID token (uid must
+match) or the internal secret for server-to-server calls from settlement:
+
+```typescript
+const caller = await verifyCaller(req, uid);
+if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
+```
+
+Browser call sites use `app/lib/authFetch.ts` (`authFetch` / `authPost`);
+server-side callers use `internalHeaders()`.
 
 ---
 
@@ -509,9 +552,10 @@ iesports is applying for a Riot Games Production API key to replace the interim 
 ### P4 — Future
 - ~~Razorpay payment gateway~~ → **PayU is LIVE** (`docs/PAYMENTS_PAYU.md`).
   Proven with real money; Valorant Horizon is charging ₹500. Remaining: ask PayU
-  to enable cards (only Net Banking + UPI are active) and UPI collect, settle the
-  two grandfathered Horizon registrations, and build an admin payments view for
-  reconciliation (ops currently runs `scripts/dev-tools/payuTools.ts reconcile`).
+  to enable cards (only Net Banking + UPI are active) and UPI collect, and build
+  an admin payments view for reconciliation (ops currently runs
+  `scripts/dev-tools/payuTools.ts reconcile`, plus a daily
+  `/api/cron/payments-watch` digest to Discord).
 - Call of Duty integration
 - Riot LoL / TFT / 2XKO support (after Valorant production app is approved — same product, additional game applications)
 

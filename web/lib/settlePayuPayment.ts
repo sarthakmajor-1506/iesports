@@ -14,7 +14,13 @@
 
 import { adminDb } from "@/lib/firebaseAdmin";
 import { verifyPayment, isResponseHashValid, payuConfig } from "@/lib/payu";
-import { grantPaidEntry, PAID_GAMES, PaidGame, RegistrationMode } from "@/lib/paidEntry";
+import { grantPaidEntry, grantTeamEntry, PAID_GAMES, PaidGame, RegistrationMode } from "@/lib/paidEntry";
+import { markHoldPaid } from "@/lib/registrationSlots";
+import { markTeamHoldPaid } from "@/lib/valorantTeams";
+import { internalHeaders } from "@/lib/apiAuth";
+
+/** How long a registration attempt may be in flight before another caller retries it. */
+const REGISTRATION_CLAIM_TTL_MS = 60_000;
 
 export type PaymentStatus = "initiated" | "paid" | "failed" | "pending" | "review";
 
@@ -123,7 +129,18 @@ export async function settlePayuPayment(args: {
     return { status, changed: true };
   });
 
-  if (committed.status === "paid") {
+  if (committed.status === "paid" && existing.mode === "team_create") {
+    await grantTeamEntry({
+      game: existing.game,
+      tournamentId: existing.tournamentId,
+      uid: existing.uid,
+      txnid,
+      amount: expectedAmount,
+      teamName: existing.teamName,
+    });
+    await markTeamHoldPaid(existing.tournamentId, existing.uid, txnid).catch(() => {});
+    await ensureRegistered(txnid, { ...existing, status: "paid" }, origin);
+  } else if (committed.status === "paid") {
     await grantPaidEntry({
       game: existing.game,
       tournamentId: existing.tournamentId,
@@ -131,6 +148,8 @@ export async function settlePayuPayment(args: {
       txnid,
       amount: expectedAmount,
     });
+    // The seat they reserved at checkout is now paid for, so it stops expiring.
+    await markHoldPaid(existing.game, existing.tournamentId, existing.uid, txnid).catch(() => {});
     await ensureRegistered(txnid, { ...existing, status: "paid" }, origin);
   }
 
@@ -152,48 +171,81 @@ export async function settlePayuPayment(args: {
  * happens exactly once and can never drift from the free path. The paid-entry
  * grant above is what lets that route's own gate through.
  *
- * Team modes are deliberately not auto-completed — creating or joining a team
- * needs a choice (and a code) the player makes on the site. Their entitlement
- * is already granted, so returning and clicking through just works.
+ * Team creation is completed here too: the captain chose the team name before
+ * paying and it is stored on the payment, so the team and its code exist the
+ * moment the money does. Joining a team is free and never reaches settlement.
+ * Dota team modes are still not auto-completed — their entitlement is granted
+ * and the player clicks through.
  */
 async function ensureRegistered(txnid: string, payment: any, origin?: string) {
   if (payment.registration?.ok) return;
 
   const mode: RegistrationMode = payment.mode || "solo";
-  if (mode !== "solo") return;
-
   const game = payment.game as PaidGame;
-  const endpoint = PAID_GAMES[game]?.endpoints?.solo;
+  const teamCreate = mode === "team_create" && game === "valorant";
+  if (mode !== "solo" && !teamCreate) return;
+
+  const endpoint = PAID_GAMES[game]?.endpoints?.[teamCreate ? "team_create" : "solo"];
   if (!endpoint) return;
 
   const base = origin || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const ref = adminDb.collection("payments").doc(txnid);
+
+  // ── Claim the attempt before making it ────────────────────────────────
+  // PayU delivers the same webhook more than once, seconds apart, and the
+  // browser callback can land in the middle of that. `registration.ok` is not
+  // written until the call below returns, so every one of those deliveries used
+  // to read it as false and fire its own registration. Two of them arriving
+  // together is what counted one player twice in Horizon.
+  //
+  // The claim is a transaction, so exactly one caller proceeds. It expires, so
+  // a crash mid-registration does not lock the payment out of ever completing.
+  const claimed = await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.data() || {};
+    if (data.registration?.ok) return false;
+
+    const inFlightAt = data.registration?.inFlightAt ? Date.parse(data.registration.inFlightAt) : 0;
+    if (inFlightAt && Date.now() - inFlightAt < REGISTRATION_CLAIM_TTL_MS) return false;
+
+    tx.set(ref, { registration: { ...(data.registration || {}), inFlightAt: new Date().toISOString() } }, { merge: true });
+    return true;
+  });
+
+  if (!claimed) return;
 
   try {
     const res = await fetch(`${base}${endpoint}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tournamentId: payment.tournamentId, uid: payment.uid }),
+      // Registration routes now require a caller. There is no player token in
+      // this path, so the server identifies itself with the shared secret.
+      headers: internalHeaders(),
+      body: JSON.stringify({ tournamentId: payment.tournamentId, uid: payment.uid, ...(teamCreate ? { txnid } : {}) }),
       cache: "no-store",
     });
     const data = await res.json().catch(() => ({}));
 
     // "Already registered" is a success from the payment's point of view — it
-    // means an earlier attempt (or the player themselves) got there first.
-    const ok = res.ok || /already registered|already in/i.test(data?.error || "");
+    // means an earlier attempt (or the player themselves) got there first. Not
+    // for a team, though: "already on a team" after paying for a new one means
+    // the money bought nothing, and must stay a failure a human sees.
+    const ok = res.ok || (!teamCreate && /already registered|already in/i.test(data?.error || ""));
 
-    await adminDb.collection("payments").doc(txnid).set({
+    await ref.set({
       registration: {
         ok,
         attemptedAt: new Date().toISOString(),
+        inFlightAt: null,
         endpoint,
         error: ok ? null : data?.error || `registration returned ${res.status}`,
       },
     }, { merge: true });
   } catch (e: any) {
-    await adminDb.collection("payments").doc(txnid).set({
+    await ref.set({
       registration: {
         ok: false,
         attemptedAt: new Date().toISOString(),
+        inFlightAt: null,
         endpoint,
         error: e?.message || "registration call failed",
       },

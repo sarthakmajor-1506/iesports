@@ -10,6 +10,7 @@ import { SoloTournament, SoloPlayer } from "@/lib/types";
 import { getTimeUntilDeadline } from "@/lib/soloTournaments";
 import { PRIZE_DISTRIBUTION, getPrizeForRank } from "@/lib/soloScoring";
 import { startPayuCheckout } from "@/app/lib/payuCheckout";
+import { authPost } from "@/app/lib/authFetch";
 
 // ── Hero map ─────────────────────────────────────────────────────────────────
 const HEROES: Record<number, string> = {
@@ -554,7 +555,7 @@ useEffect(() => {
     setRegistering(true); setError("");
     try {
       const post = async () => {
-        const r = await fetch("/api/solo/register", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ tournamentId:id, uid:user.uid }) });
+        const r = await authPost("/api/solo/register", { tournamentId: id, uid: user.uid });
         return { r, d: await r.json() };
       };
       let { r: res, d: data } = await post();

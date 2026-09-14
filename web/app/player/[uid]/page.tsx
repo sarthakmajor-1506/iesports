@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { authPost } from "@/app/lib/authFetch";
 import { triggerDiscordPrompt, hasDiscordAccount } from "@/app/components/DiscordAccountsPrompt";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ export default function PlayerProfile() {
   const [upiInput, setUpiInput] = useState("");
   const [upiSaving, setUpiSaving] = useState(false);
   const [upiSaved, setUpiSaved] = useState(false);
+  const [upiError, setUpiError] = useState("");
 
   // Display name state
   const [nameInput, setNameInput] = useState("");
@@ -252,13 +254,25 @@ export default function PlayerProfile() {
     setPhotoUploading(false);
   };
 
+  // A payout destination, so it goes through the server: it gets validated,
+  // timestamped and audited there, and `firestore.rules` locks the field
+  // against a direct client write.
   const saveUpi = async () => {
     if (!user || !upiInput.trim()) return;
     setUpiSaving(true);
-    await updateDoc(doc(db, "users", user.uid), { upiId: upiInput.trim() });
-    setUpiSaving(false);
-    setUpiSaved(true);
-    setTimeout(() => setUpiSaved(false), 2500);
+    setUpiError("");
+    try {
+      const res = await authPost("/api/account/upi", { uid: user.uid, upiId: upiInput.trim() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't save that");
+      setProfile(prev => prev ? { ...prev, upiId: data.upiId } : prev);
+      setUpiSaved(true);
+      setTimeout(() => setUpiSaved(false), 2500);
+    } catch (e: any) {
+      setUpiError(e.message || "Couldn't save that");
+    } finally {
+      setUpiSaving(false);
+    }
   };
 
   const displayName = profile?.riotGameName || profile?.discordUsername || profile?.steamName || "Unknown";
@@ -1023,7 +1037,8 @@ export default function PlayerProfile() {
               <div className="pp-section">
                 <span className="pp-section-label">Payout Details</span>
                 <p style={{ fontSize: "0.82rem", color: "#8A8880", marginBottom: 16, marginTop: 0 }}>
-                  Add your UPI ID so we can send prize payouts instantly after tournament results are confirmed.
+                  Where we send money that is owed to you: prize payouts after results are confirmed, and
+                  entry-fee refunds if you withdraw from a tournament. Optional until one of those happens.
                 </p>
                 <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
                   <input
@@ -1041,6 +1056,9 @@ export default function PlayerProfile() {
                     {upiSaving ? "Saving…" : upiSaved ? "✓ Saved" : "Save"}
                   </button>
                 </div>
+                {upiError && (
+                  <div style={{ marginTop: 10, fontSize: "0.75rem", color: "#f87171" }}>{upiError}</div>
+                )}
                 {profile.upiId && (
                   <div style={{ marginTop: 10, fontSize: "0.75rem", color: "#555550" }}>
                     Current: <span style={{ color: "#4ade80", fontWeight: 700 }}>{profile.upiId}</span>

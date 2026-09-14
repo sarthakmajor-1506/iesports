@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
 import { sendRegistrationDM } from "@/lib/discord";
 import { requirePaidEntry } from "@/lib/paidEntry";
+import { claimSoloSlot } from "@/lib/registrationSlots";
+import { verifyCaller } from "@/lib/apiAuth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,9 @@ export async function POST(req: NextRequest) {
     if (!tournamentId || !uid) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
+
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
     const userDoc = await adminDb.collection("users").doc(uid).get();
     const userData = userDoc.data();
@@ -54,24 +58,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
-    await adminDb.collection("cs2Tournaments").doc(tournamentId).collection("soloPlayers").doc(uid).set({
+    // Player document, slot counter and the user's tournament array move in one
+    // transaction. A duplicate PayU webhook or a double-clicked button loses the
+    // race here rather than counting the same player twice.
+    const claim = await claimSoloSlot({
+      game: "cs2",
+      tournamentId,
       uid,
-      steamId: userData.steamId,
-      steamName: userData.steamName || "",
-      steamAvatar: userData.steamAvatar || "",
-      cs2Rank: "",
-      cs2RankTier: 0,
-      skillLevel: 1,
-      registeredAt: new Date().toISOString(),
+      player: {
+        uid,
+        steamId: userData.steamId,
+        steamName: userData.steamName || "",
+        steamAvatar: userData.steamAvatar || "",
+        cs2Rank: "",
+        cs2RankTier: 0,
+        skillLevel: 1,
+        registeredAt: new Date().toISOString(),
+      },
     });
 
-    await adminDb.collection("cs2Tournaments").doc(tournamentId).update({
-      slotsBooked: FieldValue.increment(1),
-    });
-
-    await adminDb.collection("users").doc(uid).update({
-      registeredCS2Tournaments: FieldValue.arrayUnion(tournamentId),
-    });
+    if (!claim.ok) {
+      if (claim.reason === "already_registered") {
+        return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
+      }
+      if (claim.reason === "full") {
+        return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+      }
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
 
     const discordId = userData.discordId || (uid.startsWith("discord_") ? uid.replace("discord_", "") : "");
     if (discordId) {
@@ -84,7 +98,7 @@ export async function POST(req: NextRequest) {
         registrationDeadline: tData.registrationDeadline || "",
         format: tData.format || "shuffle",
         prizePool: tData.prizePool || "TBD",
-        slotsBooked: (tData.slotsBooked || 0) + 1,
+        slotsBooked: claim.slotsBooked,
         totalSlots: tData.totalSlots || 0,
         iesportsRank: "",
       }).catch(() => {});

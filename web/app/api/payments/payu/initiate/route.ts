@@ -16,15 +16,19 @@ import {
   sanitizeText, sanitizeName, resolveEmail, resolvePhone,
 } from "@/lib/payu";
 import {
-  PAID_GAMES, isPaidGame, entryFeeOf, loadTournament, paidEntryId,
-  type RegistrationMode,
+  PAID_GAMES, isPaidGame, entryFeeOf, loadTournament, paidEntryId, teamEntryId, isLiveEntitlement,
+  isTeamRegistration, type RegistrationMode,
 } from "@/lib/paidEntry";
+import { reserveSlotForCheckout, releaseHold } from "@/lib/registrationSlots";
+import { verifyCaller } from "@/lib/apiAuth";
+import { valorantProfileError } from "@/lib/valorantRegistration";
+import { cleanTeamName, findTeamFor, reserveTeamForCheckout, releaseTeamHold } from "@/lib/valorantTeams";
 
 const MODES: RegistrationMode[] = ["solo", "team_create", "team_join"];
 
 export async function POST(req: NextRequest) {
   try {
-    const { uid, game, tournamentId, mode = "solo", returnTo } = await req.json();
+    const { uid, game, tournamentId, mode = "solo", returnTo, teamName: rawTeamName } = await req.json();
 
     // Where to send the player after PayU. Caller-supplied, so it is restricted
     // to a same-site path: a bare "/..." that is not "//host" (which a browser
@@ -48,6 +52,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${PAID_GAMES[game].label} does not support ${mode} registration` }, { status: 400 });
     }
 
+    // Only the player themselves may start a checkout in their name.
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
+
     const tournament = await loadTournament(game, tournamentId);
     if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
@@ -57,32 +65,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ free: true, message: "This tournament is free — register directly." });
     }
 
+    // ── Team registration ────────────────────────────────────────────────
+    // On a team tournament the only thing for sale is a team, bought by its
+    // captain. Everyone else joins free with the code, so a solo checkout here
+    // would take money for a seat that belongs to no team.
+    const teamMode = game === "valorant" && isTeamRegistration(tournament);
+    if (teamMode && mode !== "team_create") {
+      return NextResponse.json({ error: "This tournament takes team registrations — create a team, or join one with a team code." }, { status: 400 });
+    }
+    if (game === "valorant" && !teamMode && mode === "team_create") {
+      return NextResponse.json({ error: "This tournament does not take team registrations" }, { status: 400 });
+    }
+
     // ── Already paid — don't take the money twice ────────────────────────
-    const entitlement = await adminDb.collection("paidEntries").doc(paidEntryId(game, tournamentId, uid)).get();
-    if (entitlement.exists) {
-      return NextResponse.json({ alreadyPaid: true, message: "You've already paid for this tournament." });
+    // A voided entitlement (the player withdrew and is owed a refund) does not
+    // count: they are free to buy back in.
+    const entitlement = await adminDb.collection("paidEntries")
+      .doc(teamMode ? teamEntryId(game, tournamentId, uid) : paidEntryId(game, tournamentId, uid)).get();
+    if (isLiveEntitlement(entitlement)) {
+      return NextResponse.json({ alreadyPaid: true, message: teamMode ? "You've already paid for a team in this tournament." : "You've already paid for this tournament." });
     }
 
     // ── Refuse to charge for a registration that cannot succeed ──────────
     if (tournament.registrationDeadline && new Date() > new Date(tournament.registrationDeadline)) {
       return NextResponse.json({ error: "Registration has closed for this tournament" }, { status: 400 });
     }
-    // Capacity has to count players who have paid but not yet finished setup.
-    // `slotsBooked` only moves when a registration completes, so on its own it
-    // would let the tournament oversell to everyone still in the setup step —
-    // and the ones who lose that race would already have paid.
-    if (tournament.totalSlots) {
-      const paidHolders = await adminDb.collection("paidEntries").where("tournamentId", "==", tournamentId).get();
-      const held = Math.max(Number(tournament.slotsBooked) || 0, paidHolders.size);
-      if (held >= Number(tournament.totalSlots)) {
-        return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
-      }
+    // Cheap first pass so an obviously full tournament is refused before any
+    // work is done. The authoritative check is the slot reservation below: this
+    // one reads outside a transaction and two players arriving together would
+    // both pass it. Team tournaments are capped by team count, checked there.
+    if (!teamMode && tournament.totalSlots && (Number(tournament.slotsBooked) || 0) >= Number(tournament.totalSlots)) {
+      return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
     }
 
     const userSnap = await adminDb.collection("users").doc(uid).get();
     const user = userSnap.data();
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    if ((user[PAID_GAMES[game].registeredField] || []).includes(tournamentId)) {
+
+    let teamName = "";
+    if (teamMode) {
+      if (await findTeamFor(tournamentId, uid)) {
+        return NextResponse.json({ error: "You're already on a team in this tournament" }, { status: 400 });
+      }
+      const cleaned = cleanTeamName(rawTeamName);
+      if (!cleaned.ok) return NextResponse.json({ error: cleaned.error }, { status: 400 });
+      teamName = cleaned.name;
+
+      // Unlike solo, the captain's profile is required BEFORE paying. The team
+      // and its code are created the moment the payment settles, with the
+      // captain as its first player, and that cannot succeed without a Riot ID.
+      // Seat-first-setup-after would take ₹2000 and leave a team with no code
+      // for teammates to use — the 11 Aug failure, times five.
+      const profileError = valorantProfileError(user);
+      if (profileError) return NextResponse.json({ error: profileError, needsProfile: true }, { status: 400 });
+    } else if ((user[PAID_GAMES[game].registeredField] || []).includes(tournamentId)) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
@@ -105,8 +141,44 @@ export async function POST(req: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
 
     const txnid = newTxnId();
+
+    // ── Reserve the seat before sending anyone to pay for it ──────────────
+    // Under "seat first, setup after" the money moves before the registration
+    // exists, so `slotsBooked` alone cannot protect the last slot: two players
+    // checking out at the same moment would both be charged and only one could
+    // get in. The hold is written inside a transaction that counts the other
+    // live holds, so the second player is told the tournament is full while
+    // that is still free to say. An unpaid hold expires on its own; a paid one
+    // lasts until the player registers or withdraws.
+    if (teamMode) {
+      const reserved = await reserveTeamForCheckout({ tournamentId, uid, txnid, teamName });
+      if (!reserved.ok) {
+        const msg: Record<string, [number, string]> = {
+          full: [400, "All team slots are taken"],
+          name_taken: [400, "That team name is taken — pick another"],
+          already_on_team: [400, "You're already on a team in this tournament"],
+          no_tournament: [404, "Tournament not found"],
+        };
+        const [status, error] = msg[reserved.reason];
+        return NextResponse.json({ error }, { status });
+      }
+    } else {
+      const reserved = await reserveSlotForCheckout({ game, tournamentId, uid, txnid });
+      if (!reserved.ok) {
+        return NextResponse.json(
+          { error: reserved.reason === "full" ? "Tournament is full" : "Tournament not found" },
+          { status: reserved.reason === "full" ? 400 : 404 }
+        );
+      }
+    }
+
     const amount = formatAmount(entryFee);
-    const productinfo = sanitizeText(`${PAID_GAMES[game].label} ${tournament.name || tournamentId}`, 90);
+    const productinfo = sanitizeText(
+      teamMode
+        ? `${PAID_GAMES[game].label} ${tournament.name || tournamentId} team ${teamName}`
+        : `${PAID_GAMES[game].label} ${tournament.name || tournamentId}`,
+      90
+    );
     const firstname = sanitizeName(user.fullName);
     const email = resolveEmail(user.email, uid);
     const phone = resolvePhone(user.phone || user.phoneNumber);
@@ -115,30 +187,40 @@ export async function POST(req: NextRequest) {
       txnid, amount, productinfo, firstname, email,
       udf1: game, udf2: tournamentId, udf3: uid, udf4: mode, udf5: "",
     };
-    const hash = requestHash(key, salt, fields);
 
-    await adminDb.collection("payments").doc(txnid).set({
-      txnid,
-      uid,
-      game,
-      tournamentId,
-      tournamentName: tournament.name || tournamentId,
-      mode,
-      amount: entryFee,          // authoritative — compared against PayU on settle
-      amountStr: amount,
-      currency: "INR",
-      status: "initiated",
-      // Which PayU environment took this money. Deliberately NOT `payuMode` —
-      // settlement stores the payment instrument (UPI / NB / CC) under that
-      // name, and letting the two share a field made sandbox rupees
-      // indistinguishable from real ones in the reconciliation report.
-      payuEnv: payuMode,
-      payuKey: key,              // which credential set was used; never the salt
-      returnTo: safeReturnTo,    // page to send the player back to afterwards
-      productinfo, firstname, email, phone,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    let hash: string;
+    try {
+      hash = requestHash(key, salt, fields);
+      await adminDb.collection("payments").doc(txnid).set({
+        txnid,
+        uid,
+        game,
+        tournamentId,
+        tournamentName: tournament.name || tournamentId,
+        mode,
+        amount: entryFee,          // authoritative — compared against PayU on settle
+        amountStr: amount,
+        ...(teamMode ? { teamName } : {}),
+        currency: "INR",
+        status: "initiated",
+        // Which PayU environment took this money. Deliberately NOT `payuMode` —
+        // settlement stores the payment instrument (UPI / NB / CC) under that
+        // name, and letting the two share a field made sandbox rupees
+        // indistinguishable from real ones in the reconciliation report.
+        payuEnv: payuMode,
+        payuKey: key,              // which credential set was used; never the salt
+        returnTo: safeReturnTo,    // page to send the player back to afterwards
+        productinfo, firstname, email, phone,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      // The seat is reserved but no checkout exists to fill it. Hand it back
+      // now rather than making the next player wait out the hold's expiry.
+      if (teamMode) await releaseTeamHold(tournamentId, uid);
+      else await releaseHold(game, tournamentId, uid);
+      throw e;
+    }
 
     return NextResponse.json({
       txnid,

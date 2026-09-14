@@ -2,14 +2,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
 import { fetchAndSyncPlayer } from "@/lib/fetchAndSyncPlayer";
 import { requirePaidEntry } from "@/lib/paidEntry";
+import { claimSoloSlot } from "@/lib/registrationSlots";
+import { verifyCaller } from "@/lib/apiAuth";
 
 export async function POST(req: NextRequest) {
   try {
     const { tournamentId, uid } = await req.json();
     if (!tournamentId || !uid) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
     const tDoc = await adminDb.collection("soloTournaments").doc(tournamentId).get();
     if (!tDoc.exists) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
@@ -58,9 +62,13 @@ export async function POST(req: NextRequest) {
       console.error("OpenDota sync failed (non-blocking):", syncErr.message);
     }
 
-    await adminDb
-      .collection("soloTournaments").doc(tournamentId)
-      .collection("players").doc(uid).set({
+    // Player document, slot counter and the user's tournament array in one
+    // transaction, so two concurrent calls cannot both count the same player.
+    const claim = await claimSoloSlot({
+      game: "dota_solo",
+      tournamentId,
+      uid,
+      player: {
         uid,
         steamId: userData.steamId,
         steamName: userData.steamName || "",
@@ -71,15 +79,14 @@ export async function POST(req: NextRequest) {
         smurfRiskScore: userData.smurfRiskScore || 0,
         disqualified: false,
         lastUpdated: new Date().toISOString(),
-      });
-
-    await adminDb.collection("soloTournaments").doc(tournamentId).update({
-      slotsBooked: FieldValue.increment(1),
+      },
     });
 
-    await adminDb.collection("users").doc(uid).update({
-      registeredSoloTournaments: FieldValue.arrayUnion(tournamentId),
-    });
+    if (!claim.ok) {
+      if (claim.reason === "already_registered") return NextResponse.json({ error: "You are already registered" }, { status: 400 });
+      if (claim.reason === "full") return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

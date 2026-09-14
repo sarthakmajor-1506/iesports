@@ -17,6 +17,8 @@ import RankReportBadge from "@/app/components/RankReportBadge";
 import ShareVideoCarousel from "@/app/components/ShareVideoCarousel";
 import { TournamentDetailLoader } from "@/app/components/TournamentLoader";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import WithdrawModal from "@/app/components/WithdrawModal";
+import { authPost } from "@/app/lib/authFetch";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Shield, Trophy, Swords, GitBranch, BarChart3,
@@ -697,6 +699,10 @@ function DotaTournamentDetailInner() {
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [unregLoading, setUnregLoading] = useState(false);
+  // Leaving a paid seat owes the player money, so withdrawing is a screen that
+  // names the amount and takes a UPI ID to send it to.
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [unregError, setUnregError] = useState("");
   const [showRegister, setShowRegister] = useState(() => {
     if (typeof window !== "undefined" && searchParams.get("register") === "true") {
       try { localStorage.removeItem("pendingRegistration"); } catch {}
@@ -883,22 +889,19 @@ function DotaTournamentDetailInner() {
   // Canonical "tournament is over" check — see same comment in the Valorant tournament page.
   const isEnded = tournament.status === "ended" || tournament.status === "completed" || (tournament.endDate && new Date() > new Date(tournament.endDate));
 
-  const handleUnregister = async () => {
+  const handleUnregister = async (upiId?: string) => {
     if (!user || !id) return;
-    if (!confirm("Are you sure you want to unregister from this tournament?")) return;
     setUnregLoading(true);
+    setUnregError("");
     try {
-      const res = await fetch("/api/dota/unregister", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: id, uid: user.uid }),
-      });
+      const res = await authPost("/api/dota/unregister", { tournamentId: id, uid: user.uid, upiId });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setIsRegistered(false);
+      setShowWithdraw(false);
       refetchData(false, true);
     } catch (e: any) {
-      alert(e.message || "Failed to unregister");
+      setUnregError(e.message || "Failed to unregister");
     } finally {
       setUnregLoading(false);
     }
@@ -1473,7 +1476,7 @@ function DotaTournamentDetailInner() {
                     </button>
                     {tournament.status === "upcoming" && !tournament.bracketsComputed && (
                       <button
-                        onClick={handleUnregister}
+                        onClick={() => { setUnregError(""); setShowWithdraw(true); }}
                         disabled={unregLoading}
                         style={{
                           padding: "10px 20px", background: "rgba(239,68,68,0.08)", color: "#ef4444",
@@ -2224,6 +2227,19 @@ function DotaTournamentDetailInner() {
           isSubstitute
           onClose={() => setShowSubstituteRegister(false)}
           onSuccess={() => { setOnWaitlist(true); refetchData(); }}
+        />
+      )}
+
+      {showWithdraw && user && (
+        <WithdrawModal
+          tournamentName={tournament?.name || "this tournament"}
+          refundAmount={Number(tournament?.entryFee) || 0}
+          upiId={null}
+          accent="#E8452F"
+          loading={unregLoading}
+          error={unregError}
+          onCancel={() => { setShowWithdraw(false); setUnregError(""); }}
+          onConfirm={(upi) => handleUnregister(upi)}
         />
       )}
 

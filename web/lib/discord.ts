@@ -57,6 +57,26 @@ export async function sendDM(discordId: string, content: string): Promise<{ ok: 
   return sendChannelMessage(dmChannel.id, content);
 }
 
+function getOpsChannelId() {
+  return process.env.OPS_CHANNEL_ID || process.env.LOBBY_CONTROL_CHANNEL_ID || process.env.RESULTS_CHANNEL_ID || "";
+}
+
+/**
+ * Operational alert for a human.
+ *
+ * Money states that need a person (a refund owed, a payment in `review`, a
+ * player who paid and never landed in a tournament) used to reach nobody: they
+ * were written to Firestore and waited to be remembered. This is the channel
+ * that turns them into something someone sees. If no ops channel is configured
+ * it is a silent no-op, because a missing channel must never fail the operation
+ * that raised the alert.
+ */
+export async function notifyOps(content: string): Promise<{ ok: boolean; error?: string }> {
+  const channelId = getOpsChannelId();
+  if (!channelId) return { ok: false, error: "No ops channel configured" };
+  return sendChannelMessage(channelId, content);
+}
+
 /** Send a per-game result to the Valorant channel. */
 export async function sendGameResult(opts: {
   team1Name: string;

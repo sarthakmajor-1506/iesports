@@ -3,12 +3,16 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAndStoreRank } from "@/lib/opendota";
 import { FieldValue } from "firebase-admin/firestore";
 import { requirePaidEntry } from "@/lib/paidEntry";
+import { verifyCaller } from "@/lib/apiAuth";
 
 
 export async function POST(req: NextRequest) {
   try {
     const { code, uid } = await req.json();
     if (!code || !uid) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
     // Find team by code
     const snap = await adminDb.collection("teams").where("teamCode", "==", code).get();
@@ -75,19 +79,24 @@ export async function POST(req: NextRequest) {
 
       await teamDoc.ref.update({ averageMMR: avgMMR, bracket: teamBracket });
 
+      // A full team books five slots at once. Reading the counters outside the
+      // write means two teams filling at the same moment overwrite each other
+      // and the tournament under-counts by five, so the whole move is one
+      // transaction with the arithmetic done on the value read inside it.
       const tournamentRef = adminDb.collection("tournaments").doc(team.tournamentId);
-      const tSnap = await tournamentRef.get();
-      if (tSnap.exists) {
+      await adminDb.runTransaction(async (tx) => {
+        const tSnap = await tx.get(tournamentRef);
+        if (!tSnap.exists) return;
         const tData = tSnap.data()!;
         const newBracketBooked = (tData.brackets?.[teamBracket]?.slotsBooked || 0) + 5;
         const newTotalBooked = (tData.slotsBooked || 0) + 5;
         const newTStatus = newTotalBooked >= tData.totalSlots ? "Full" : "Open";
-        await tournamentRef.update({
+        tx.update(tournamentRef, {
           slotsBooked: newTotalBooked,
           status: newTStatus,
           [`brackets.${teamBracket}.slotsBooked`]: newBracketBooked,
         });
-      }
+      });
     }
 
     return NextResponse.json({ success: true, bracket });

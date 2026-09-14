@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { PAID_GAMES, isPaidGame, entryFeeOf, loadTournament, paidEntryId } from "@/lib/paidEntry";
+import { PAID_GAMES, isPaidGame, entryFeeOf, loadTournament, paidEntryId, isLiveEntitlement } from "@/lib/paidEntry";
+import { verifyCaller } from "@/lib/apiAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,11 @@ export async function GET(req: NextRequest) {
   if (!isPaidGame(game) || !tournamentId || !uid) {
     return NextResponse.json({ error: "Missing or invalid game, tournamentId or uid" }, { status: 400 });
   }
+
+  // This answers "has this person paid, and what are they missing?", which is
+  // nobody else's business. It used to answer it for any uid a caller typed.
+  const caller = await verifyCaller(req, uid);
+  if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
   const cfg = PAID_GAMES[game];
 
@@ -44,14 +50,20 @@ export async function GET(req: NextRequest) {
   if (game === "valorant") { if (!(user as any).riotGameName) missing.push("riot"); }
   else if (!(user as any).steamId) missing.push("steam");
 
+  const paid = isLiveEntitlement(entitlement);
+
   return NextResponse.json({
     game,
     tournamentId,
     entryFee: entryFeeOf(tournament),
-    paid: entitlement.exists,
+    paid,
     registered,
     missing,
     // The state the tournament page renders as "Details pending".
-    setupPending: entitlement.exists && !registered,
+    setupPending: paid && !registered,
+    // Withdrawing from a seat they paid for owes them money, so the page needs
+    // to know whether to ask where to send it before it lets them leave.
+    refundOnWithdraw: paid && entryFeeOf(tournament) > 0,
+    upiId: (user as any).upiId || null,
   });
 }

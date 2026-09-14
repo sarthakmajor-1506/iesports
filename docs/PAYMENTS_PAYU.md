@@ -69,12 +69,32 @@ The UI derives everything else from that number:
 - the button reads `Continue — ₹500 →` rather than `Register`, so the click that
   leads to a payment never looks like the click that doesn't.
 
-`initiate` re-checks everything the registration route demands — profile
-completeness, Discord, Steam or a verified Riot ID, deadline, slots, prior
-registration — before creating a transaction. The UI only reaches payment after
-those checks pass anyway, but the endpoint is directly reachable, and taking
-money for a registration that is rejected seconds later is the worst failure
-this system has: the player is out of pocket and the refund is manual.
+`initiate` checks deadline, capacity, prior registration and Discord before
+creating a transaction, and reserves the slot (below) so the seat cannot be sold
+twice.
+
+**It deliberately does NOT check profile completeness.** The order is "seat
+first, setup after" (`RegisterModal.tsx`): the player pays to hold a slot and
+supplies name, phone and their game account afterwards, because four setup steps
+in front of the money leaked intent at every hop. Discord is the only
+prerequisite, since that is how we reach someone whose payment lands and whose
+setup never finishes.
+
+That ordering creates exactly one failure, and it is not hypothetical: on
+11 Aug a player paid ₹500, the registration fired straight after settlement
+failed with "Full name is required", and nobody told him for sixteen days. The
+mechanisms that make the trade acceptable are therefore not optional:
+
+- the slot is **held**, so what he paid for is still there;
+- `/api/cron/payments-watch` **DMs him** once his profile has been incomplete for
+  more than two hours, and again daily, with a link and "you will not be charged
+  again";
+- the tournament page shows him **"Details pending"** rather than "Register";
+- `reconcile` separates `WAIT` (mid-setup) from `FIX` (paid, complete, still not
+  in) so the report does not cry wolf on every player still filling in details.
+
+If you ever move payment back in front of setup, delete the nudge cron with it.
+Until then, a paid player who is not registered is on a clock.
 
 ## Checkout UX — and the three things not to "simplify"
 
@@ -141,6 +161,89 @@ None of this is controllable from our code: we send no `pg`, `bankcode`,
 `enforce_paymethod` or `drop_category`, so PayU renders everything the merchant
 account has enabled. Changing the available methods means asking PayU, not
 editing this repo.
+
+## Slot holds — why capacity is not just `slotsBooked`
+
+`slotsBooked` only moves when a registration completes. Under "seat first" the
+money moves before that, so counting only registrations would sell the last slot
+to everyone still in setup, and the ones who lost that race would already have
+paid.
+
+`initiate` therefore writes `slotHolds/{uid}` under the tournament, **inside a
+transaction that counts the other live holds**:
+
+```
+capacity used = slotsBooked + live holds (excluding this player's own)
+```
+
+- an unpaid hold expires after 20 minutes, so an abandoned checkout hands the
+  seat back on its own;
+- settlement calls `markHoldPaid`, and a paid hold never expires: the seat is
+  theirs until they register or withdraw;
+- `claimSoloSlot` deletes the hold as it increments `slotsBooked`, so a player is
+  never counted twice;
+- withdrawing releases it.
+
+The transaction is the point. Two players checking out for the last seat at the
+same instant serialise, and the second is told the tournament is full while that
+is still a free thing to say.
+
+Anyone who paid before holds existed has an entitlement and no hold, and would be
+invisible to this count. `scripts/dev-tools/backfillSlotHolds.ts` writes those
+once; it has been run, and is safe to re-run.
+
+## Withdrawals and refunds
+
+The registration screen promises, next to the price: "Withdraw any time before
+registration closes and you get the whole ₹500 back."
+
+**The refund itself is manual**, issued from the PayU dashboard. What is
+automatic is everything that stops it being forgotten. Unregistering a player who
+holds a paid entitlement now:
+
+1. releases the player document and the counter in one transaction;
+2. **voids the entitlement** (`voided: true`, never deleted, so the history
+   survives). Without this a refunded player keeps a free claim to a slot, since
+   `requirePaidEntry` only ever asked whether the document existed;
+3. releases the slot hold;
+4. writes `refunds/{txnid}` as `owed`, keyed by transaction id so a repeat
+   withdrawal cannot open two obligations for one payment;
+5. DMs the player, and posts to the ops channel with the amount and UPI ID.
+
+**Where the money goes.** We do not ask everyone for a UPI ID: an extra field in
+front of registration costs entries, and most players never need one. It is asked
+for at the two moments it is actually needed — the withdrawal screen, and prize
+payouts — and saved to the account afterwards so it is asked once. It is written
+only through `/api/account/upi` (validated, timestamped, with a `upiHistory`
+audit trail) and `firestore.rules` locks the field against a direct client write,
+because it is a payout destination.
+
+**`reconcile` used to undo withdrawals.** A withdrawn player looks exactly like a
+broken registration (paid, profile complete, not registered), so `--apply` would
+put them back into the tournament and spend their refund on a slot they had left.
+It now checks for an open refund first and reports them as `HOLD`.
+
+## Authentication
+
+Every route here verifies its caller. They take a `uid` and used to believe it,
+which with PayU live meant an unauthenticated POST could unregister a player who
+had paid ₹500, and `/api/payments/entitlement?uid=` would tell anyone whether a
+given account had paid and what it was missing.
+
+`lib/apiAuth.ts` accepts two callers:
+
+| Caller | How |
+|---|---|
+| the player's browser | `Authorization: Bearer <Firebase ID token>`, and the token's uid must match the `uid` in the request |
+| our own server | `x-iesports-internal: <secret>` — settlement and `payuTools` have no player token |
+
+The secret is `INTERNAL_API_SECRET`, falling back to `ADMIN_SECRET`, which is
+already set everywhere this runs. That fallback is deliberate: if the internal
+path could be misconfigured into failing, a deploy without a new env var would
+take money and never register anyone.
+
+Browser callers go through `app/lib/authFetch.ts`; server callers through
+`internalHeaders()`. Adding a new registration route means using one of them.
 
 ## Trust model
 
@@ -211,6 +314,15 @@ PAYU_TEST_KEY=…   PAYU_TEST_SALT=…
 PAYU_LIVE_KEY=…   PAYU_LIVE_SALT=…
 
 NEXT_PUBLIC_APP_URL=https://iesports.in   # becomes surl/furl — must be correct
+
+# Optional. Identifies our own server to the registration routes it calls during
+# settlement. Falls back to ADMIN_SECRET, which is already set, so nothing
+# breaks if this is never added.
+INTERNAL_API_SECRET=
+
+# Optional. Where the daily payments digest and refund alerts are posted.
+# Falls back to LOBBY_CONTROL_CHANNEL_ID, then RESULTS_CHANNEL_ID.
+OPS_CHANNEL_ID=
 ```
 
 Credentials live in **Dashboard → Developer → API Keys**, and the dashboard's
@@ -334,7 +446,18 @@ users/{uid}.registered*Tournaments     they actually hold one
 ```bash
 npx tsx scripts/dev-tools/payuTools.ts reconcile
 npx tsx scripts/dev-tools/payuTools.ts reconcile --base=https://www.iesports.in --apply
+
+# Slot counters vs the actual roster (also part of reconcile, and of the cron)
+npx tsx scripts/dev-tools/recountSlots.ts [--apply]
+
+# Holds for anyone who paid before holds existed. Idempotent.
+npx tsx scripts/dev-tools/backfillSlotHolds.ts [--apply]
 ```
+
+`reconcile` also reports two things it used to miss: **slot counters that
+disagree with the roster**, and **two paid live payments behind one seat** (a
+genuine double charge, which every other check reads as fine because the second
+registration answers "already registered" and is marked OK).
 
 It reports every paid payment, flags anyone paid-but-not-registered, separates
 **live rupees from sandbox rupees** (both live in the same collection — summing
@@ -376,6 +499,10 @@ or a duplicate webhook cannot change or re-grant anything.
 | Collection | Contents |
 |---|---|
 | `payments/{txnid}` | one document per attempt, including the raw callback and PayU's verify response |
+| ↳ `registration.inFlightAt` | the idempotency claim on the registration call. PayU delivers the same webhook more than once, seconds apart, and `registration.ok` is not written until the call returns, so every delivery used to read it as false and fire its own registration. Expires after 60s so a crash cannot lock a payment out forever. |
+| `<tournament>/slotHolds/{uid}` | the seat, reserved at checkout. Unpaid holds expire; paid ones do not. |
+| `refunds/{txnid}` | what a withdrawal owes. `owed` / `paid` / `cancelled`, with the UPI ID to send it to. |
+| `users/{uid}.upiId` | payout destination. Server-written only; `upiHistory` subcollection records every change. |
 | ↳ `payuEnv` | `test` or `live` — which merchant took the money. Not `payuMode`, which settlement uses for the instrument (UPI / NB / CC). They shared a field once and sandbox rupees became indistinguishable from real ones. |
 | `paidEntries/{game__tournament__uid}` | the entitlement — a derived id, so granting twice is a no-op |
 | `payuWebhookEvents` | every webhook delivery, stored before it is interpreted |
@@ -387,29 +514,116 @@ default, so no rule changes were needed and none should be added.
 
 ## Open items
 
-- **Two players are in Horizon without paying** — Aarush Kasarla
-  (`discord_851805821620715524`) and Aarav Jaiswal (`discord_903863107267481620`).
-  They registered before the gate shipped, so ₹1,000 is unbilled. Nothing has
-  been done to them: they cannot be re-charged by asking them to register again,
-  because the "already registered" guard stops them before payment. Grandfather
-  them, or unregister and ask them to re-enter.
+- **Harsh Chadha (`discord_336082463728205824`) has paid for Horizon and is not
+  in it.** ₹500, txn `IEMSOFXIIF1C6BB0D6FB`, 11 Aug. His registration failed on
+  "Full name is required" and nothing chased him for sixteen days. He has since
+  added a name and phone but still no Riot ID. His slot is held and he was DMed
+  on 27 Aug asking him to finish; the nudge cron takes it from here. If he never
+  links Riot, that becomes a refund conversation, not a silence.
 - **CS2 Prelims is set to ₹1**, left over from the live test. Restore to ₹500
   before that tournament is used for anything real.
 - **Ask PayU to enable cards** on live MID 13716014, and UPI collect if you want
   "Enter UPI ID" alongside the app buttons.
+- **No admin payments view yet.** `payuTools payments` and the daily ops digest
+  cover it for now.
 
 Run `reconcile` after any paid tournament closes; it answers "did everyone who
 paid get in, and is anyone in who didn't pay" in one command.
+
+## Fixed, 27 Aug 2026
+
+Horizon reported 3/20 players with two on the roster. Found by counting, not by
+an alert, which is why most of this work is about alerts.
+
+- **The counter was double-incremented by a duplicate webhook.** PayU delivered
+  the same success twice, 3 seconds apart. The money decision was
+  transaction-guarded and settled once, correctly, but `ensureRegistered` was
+  guarded only by `registration.ok`, which is not written until the registration
+  call returns. Both deliveries read it as false, both called
+  `/api/valorant/solo`, both passed its non-transactional "already registered?"
+  read, both wrote the same player document (hence one name) and both
+  incremented. Proof: two `seed` entries in that player's `rankHistory`, 0.9s
+  apart. Registration is now one transaction, and settlement claims the attempt
+  before making it.
+- **Every `slotsBooked` write is now transactional** (`lib/registrationSlots.ts`).
+  The counters were previously wrong in two different directions: solo routes
+  used a bare `FieldValue.increment` guarded by a separate read (double counts),
+  while `teams/solo`, `teams/create` and `teams/join` read the value and wrote it
+  back (loses updates). `recountSlots.ts` repairs history; `reconcile` and the
+  cron now check it.
+- **The last slot can no longer be sold twice** (slot holds, above).
+- **Withdrawals record what they owe** (refunds, above).
+- **Registration, unregistration and payment routes authenticate** (above).
+- **Nothing money-related waits to be remembered any more.**
+  `/api/cron/payments-watch` runs daily: it DMs paid-but-unregistered players,
+  and posts a digest of `review`, stale `pending`, refunds owed, paid-but-
+  complete-and-still-out, and any slot counter that disagrees with its roster.
+
+## Team registration — the captain pays once (Valorant)
+
+Added 14 Sep 2026 when Horizon switched from ₹500 per player (shuffled on the
+day) to ₹2000 per pre-formed team of 5. A tournament opts in with
+`registrationMode: "team"`, plus `teamSize` and `totalTeams`; `entryFee` is then
+the price of a **team**. `scripts/dev-tools/convertToTeamRegistration.ts` makes
+the switch.
+
+```
+captain: Discord → name, phone, Riot ID → team name + pay (one screen)
+      │  initiate: mode team_create, teamName stored on the payment,
+      │  team seat + name reserved in teamHolds (transaction)
+      ▼
+settlement → grantTeamEntry (paidEntries/…__team) → POST /api/valorant/team/create
+      │  team, code and captain's player doc created in ONE transaction,
+      │  keyed on the payment so a duplicate webhook returns the same team
+      ▼
+captain gets the code on screen and in a Discord DM
+teammates: Discord → setup → /api/valorant/team/join (free, transactional)
+```
+
+What is different from solo, and why:
+
+- **Setup comes before the money.** The team is created at settlement with the
+  captain as its first player, which needs a Riot ID. Taking ₹2000 first would
+  strand a paid team with no code for the other four. `initiate` refuses a team
+  checkout until the captain's profile is complete.
+- **Teams live in `valorantTournaments/{id}/teams/team-N`**, the collection the
+  shuffle writes, so fixtures, standings, brackets and the team page need no
+  second code path. Each member is still a `soloPlayers` doc (with `teamId`), so
+  `slotsBooked` keeps counting players and every existing check still holds.
+  Team capacity is counted from the teams collection against `totalTeams`.
+- **The code is never on the team doc.** Teams are readable by any signed-in
+  user; codes live in `valorantTeamCodes/{CODE}`, which the rules deny.
+- **Shuffle is disabled** on a team tournament — `deleteExisting` would erase
+  paid teams.
+- **Solo registration and solo checkout are refused** on a team tournament.
+
+### Solo entries from before a switch — kept separate
+
+Team registration has no notion of an earlier solo payment: no credit, no
+discount, every captain pays the full `entryFee`. When Horizon switched (14 Sep
+2026) the solo entries were cancelled outright by
+`scripts/ad-hoc/_horizonCancelSoloEntries.ts`: players removed from the roster,
+solo entitlements voided, `refunds/{txnid}` recorded as `owed` (method
+`manual` — Sarthak collects UPI IDs by DM reply or phone and pays from the PayU
+dashboard), DMs sent, and the change posted to #announcements.
+`convertToTeamRegistration.ts` refuses to run while any solo entry is still live,
+so the two never mix.
+
+`reconcile` and the payments cron look up a team payment's entitlement by
+`entitlementIdForPayment()` and treat it as done when `payment.team.teamId`
+exists.
+Not built for teams: a captain cannot disband or leave (admin conversation), and
+there is no self-serve team refund. Teammates can leave before close.
 
 ## What is not built
 
 - **Refunds.** Issue them from the PayU dashboard; nothing in the app reverses a
   `paidEntries` grant, so also unregister the player manually.
-- **Team-level pricing.** Every player pays for their own slot, including the
-  captain. There is no "captain pays for five".
-- **Auto-completion for team create/join.** After paying, the player returns and
-  clicks through — their entitlement is already granted, so it just works. Only
-  solo registration completes itself during settlement.
+- **Team-level pricing outside Valorant.** Dota teams still charge every player
+  for their own slot, including the captain.
+- **Auto-completion for Dota team create/join.** After paying, the player
+  returns and clicks through — their entitlement is already granted, so it just
+  works. Valorant team creation completes itself during settlement.
 - **An admin payments view.** Reconciliation is via
   `payuTools.ts payments` for now. This is the most obvious next thing to build
   once real money is flowing.
@@ -422,8 +636,11 @@ paid get in, and is anyone in who didn't pay" in one command.
    *that* something happened; the verify call tells you *what*.
 2. **A rejected callback and a forged callback look identical.** Which is why
    the hash mismatch path flags for review rather than failing the payment.
-3. **Never take money for a registration that cannot succeed.** `initiate`
-   re-checks deadline, slots and prior registration before charging.
+3. **Never take money for a seat that cannot exist.** `initiate` re-checks
+   deadline and prior registration, and reserves the slot in a transaction
+   before charging. It does not check profile completeness: setup comes after
+   the money on purpose, which is why the nudge cron is part of the payment
+   system and not a nice-to-have.
 4. **The amount comes from the database, never the request.**
 5. **A correct write the player cannot see is a bug.** Money makes cache
    staleness a trust problem, not a cosmetic one — any page a player lands on
@@ -432,3 +649,16 @@ paid get in, and is anyone in who didn't pay" in one command.
    therefore the app buttons players expect, only exist on mobile.
 7. **Every screen between the player and paying costs conversions.** Ask for
    money once, on one screen, and put nothing hedging next to the amount.
+8. **Anything that changes a count is a transaction.** Not a read-then-write,
+   and not a bare increment guarded by a separate read. Every external delivery
+   is at-least-once, so everything the money decision triggers has to be
+   idempotent too, not just the money decision itself.
+9. **Never show a player a derived counter you have not reconciled.**
+   `slotsBooked` is a cache of the roster. The tournament page rendered the
+   cache in its header and the truth in its Players tab, which is how a one
+   document drift became a visible contradiction on a public page.
+10. **A promise in the UI is a feature with an owner.** "Fully refundable" was
+    for a while the only part of the refund system that existed.
+11. **Every terminal-but-wrong state needs an owner and a clock.** `review`,
+    `registration.ok: false` and a stale `pending` all used to wait for somebody
+    to think of them.

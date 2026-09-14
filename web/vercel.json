@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/registration-close",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/payments-watch",
+      "schedule": "30 4 * * *"
     }
   ]
 }

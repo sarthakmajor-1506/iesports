@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
 import { recalcTiers } from "@/lib/recalcTiers";
 import { syncPlayerSnapshot } from "@/lib/valorantPlayerSnapshot";
-import { seedRating, floorCheck, ratingToRank, ratingToTier } from "@/lib/elo";
+import { ratingToRank } from "@/lib/elo";
 import { sendRegistrationDM } from "@/lib/discord";
-import { requirePaidEntry } from "@/lib/paidEntry";
-
-const HENRIK_BASE = "https://api.henrikdev.xyz/valorant";
-
-async function refreshRiotRank(region: string, name: string, tag: string) {
-  const apiKey = process.env.HENRIK_API_KEY || "";
-  const encodedName = encodeURIComponent(name);
-  const encodedTag = encodeURIComponent(tag);
-  const url = `${HENRIK_BASE}/v2/mmr/${region}/${encodedName}/${encodedTag}?api_key=${apiKey}`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/json", ...(apiKey ? { Authorization: apiKey } : {}) },
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data;
-}
+import { requirePaidEntry, isTeamRegistration } from "@/lib/paidEntry";
+import { claimSoloSlot } from "@/lib/registrationSlots";
+import { verifyCaller } from "@/lib/apiAuth";
+import { prepareValorantPlayer, valorantProfileError } from "@/lib/valorantRegistration";
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +16,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
+    // ── Who is asking ──────────────────────────────────────────────────────
+    // The player's own token, or our server finishing a paid registration.
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
+
     // ── Check user doc ─────────────────────────────────────────────────────
     const userDoc = await adminDb.collection("users").doc(uid).get();
     const userData = userDoc.data();
@@ -36,33 +28,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Validate mandatory fields
-    if (!userData.fullName) {
-      return NextResponse.json({ error: "Full name is required. Please update your profile." }, { status: 400 });
+    // Mandatory fields, and a linked Riot ID ("pending" verification is allowed)
+    const profileError = valorantProfileError(userData);
+    if (profileError) {
+      return NextResponse.json({ error: profileError }, { status: 400 });
     }
-    if (!userData.phone && !userData.phoneNumber) {
-      return NextResponse.json({ error: "Phone number is required. Please log in with your phone number." }, { status: 400 });
-    }
-    if (!userData.discordId) {
-      return NextResponse.json({ error: "Discord account is required. Please connect Discord first." }, { status: 400 });
-    }
-
-    // Check Riot ID is linked
-    if (!userData.riotGameName) {
-      return NextResponse.json({ error: "Connect your Riot ID first" }, { status: 400 });
-    }
-
-    // Check riotVerified — block "unlinked", allow "pending" with warning
     const riotVerified = userData.riotVerified || "unlinked";
-    if (riotVerified === "unlinked") {
-      return NextResponse.json({ error: "Connect your Riot ID first" }, { status: 400 });
-    }
 
     // ── Check tournament exists ────────────────────────────────────────────
     const tournamentDoc = await adminDb.collection("valorantTournaments").doc(tournamentId).get();
     const tData = tournamentDoc.data();
     if (!tData) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
+
+    // A team tournament is entered by creating or joining a team. Registering
+    // solo here would put a player on the roster who belongs to no team and
+    // paid nothing towards one.
+    if (isTeamRegistration(tData)) {
+      return NextResponse.json(
+        { error: "This tournament takes team registrations. Create a team or join one with a team code.", teamRegistration: true },
+        { status: 400 }
+      );
     }
 
     // Check slots
@@ -92,120 +79,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
     }
 
-    // ── Refresh Riot rank from interim Valorant rank API ────────────────
-    let currentRank = userData.riotRank || "";
-    let currentTier = userData.riotTier || 0;
-    let peakTier = userData.riotPeakTier || currentTier;
-    let peakRank = userData.riotPeakRank || currentRank;
-    let rankRefreshed = false;
+    // ── Refresh rank, seed or floor-check rating ──────────────────────────
+    // Nothing is written yet. Everything is computed first and committed only
+    // once the slot has actually been claimed, because this route can run
+    // twice at once (duplicate PayU webhook, double-clicked button) and the
+    // loser of that race must leave no trace behind. It used to write rating
+    // history before claiming, which is how one player ended up with two
+    // "seed" entries for a single registration.
+    const prepared = await prepareValorantPlayer(uid, userData);
+    const { iesportsRating, currentRank, rankRefreshed, ratingChanged } = prepared;
 
-    try {
-      const mmrData = await refreshRiotRank(
-        userData.riotRegion || "ap",
-        userData.riotGameName,
-        userData.riotTagLine || ""
-      );
-      if (mmrData) {
-        const newTier = mmrData.current_data?.currenttier || 0;
-        const newRank = mmrData.current_data?.currenttierpatched || "Unranked";
-        const apiPeakTier = mmrData.highest_rank?.tier || 0;
-        const apiPeakRank = mmrData.highest_rank?.patched_tier || "Unranked";
+    // ── Claim the slot ────────────────────────────────────────────────────
+    // One transaction writes the player document, moves `slotsBooked` and adds
+    // the tournament to the user's array. A second concurrent caller loses here
+    // and is told they are already registered, instead of quietly counting the
+    // same player twice.
+    const claim = await claimSoloSlot({
+      game: "valorant",
+      tournamentId,
+      uid,
+      player: prepared.player,
+    });
 
-        currentRank = newRank;
-        currentTier = newTier;
-        peakTier = Math.max(apiPeakTier, peakTier, newTier);
-        peakRank = peakTier === apiPeakTier ? apiPeakRank
-          : peakTier === (userData.riotPeakTier || 0) ? (userData.riotPeakRank || newRank)
-          : newRank;
-        rankRefreshed = true;
+    if (!claim.ok) {
+      if (claim.reason === "already_registered") {
+        return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 400 });
       }
-    } catch { /* proceed with stored rank data */ }
-
-    // ── Seed or floor-check IEsports rating ──────────────────────────────
-    let iesportsRating = userData.iesportsRating || 0;
-    let ratingChanged = false;
-
-    const userUpdate: Record<string, any> = {
-      riotRank: currentRank,
-      riotTier: currentTier,
-      riotPeakRank: peakRank,
-      riotPeakTier: peakTier,
-    };
-
-    if (!userData.iesportsRating) {
-      iesportsRating = seedRating(currentTier, peakTier);
-      userUpdate.iesportsRating = iesportsRating;
-      userUpdate.iesportsRank = ratingToRank(iesportsRating);
-      userUpdate.iesportsTier = ratingToTier(iesportsRating);
-      userUpdate.iesportsMatchesPlayed = userData.iesportsMatchesPlayed || 0;
-      ratingChanged = true;
-
-      await adminDb.collection("users").doc(uid).collection("rankHistory").add({
-        timestamp: new Date().toISOString(),
-        type: "seed",
-        ratingBefore: 0,
-        ratingAfter: iesportsRating,
-        delta: iesportsRating,
-      });
-    } else {
-      const bumped = floorCheck(iesportsRating, currentTier, peakTier);
-      if (bumped !== null) {
-        const before = iesportsRating;
-        iesportsRating = bumped;
-        userUpdate.iesportsRating = bumped;
-        userUpdate.iesportsRank = ratingToRank(bumped);
-        userUpdate.iesportsTier = ratingToTier(bumped);
-        ratingChanged = true;
-
-        await adminDb.collection("users").doc(uid).collection("rankHistory").add({
-          timestamp: new Date().toISOString(),
-          type: "riot_refresh",
-          ratingBefore: before,
-          ratingAfter: bumped,
-          delta: bumped - before,
-          riotRankBefore: userData.riotRank || "Unknown",
-          riotRankAfter: currentRank,
-          riotTierBefore: userData.riotTier || 0,
-          riotTierAfter: currentTier,
-        });
-      } else {
-        userUpdate.iesportsRank = ratingToRank(iesportsRating);
-        userUpdate.iesportsTier = ratingToTier(iesportsRating);
+      if (claim.reason === "full") {
+        return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
       }
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
-    await adminDb.collection("users").doc(uid).update(userUpdate);
-
-    // ── Write to soloPlayers subcollection ────────────────────────────────
-    await adminDb
-      .collection("valorantTournaments")
-      .doc(tournamentId)
-      .collection("soloPlayers")
-      .doc(uid)
-      .set({
-        uid,
-        riotGameName: userData.riotGameName,
-        riotTagLine: userData.riotTagLine || "",
-        riotAvatar: userData.riotAvatar || "",
-        riotRank: currentRank,
-        riotTier: currentTier,
-        iesportsRating,
-        iesportsRank: ratingToRank(iesportsRating),
-        iesportsTier: ratingToTier(iesportsRating),
-        skillLevel: 1,
-        bracket: null,
-        registeredAt: new Date().toISOString(),
-      });
-
-    // ── Update tournament slotsBooked ──────────────────────────────────────
-    await adminDb.collection("valorantTournaments").doc(tournamentId).update({
-      slotsBooked: FieldValue.increment(1),
-    });
-
-    // ── Update user's registered tournaments ───────────────────────────────
-    await adminDb.collection("users").doc(uid).update({
-      registeredValorantTournaments: FieldValue.arrayUnion(tournamentId),
-    });
+    // ── Everything below happens exactly once, after the claim ────────────
+    await adminDb.collection("users").doc(uid).update(prepared.userUpdate);
+    if (prepared.rankHistoryEntry) {
+      await adminDb.collection("users").doc(uid).collection("rankHistory").add(prepared.rankHistoryEntry);
+    }
 
     // ── Recalculate tiers for all players based on quantiles ──────────────
     await recalcTiers(tournamentId);
@@ -225,7 +135,7 @@ export async function POST(req: NextRequest) {
         registrationDeadline: tData.registrationDeadline || "",
         format: tData.format || "shuffle",
         prizePool: tData.prizePool || "TBD",
-        slotsBooked: (tData.slotsBooked || 0) + 1,
+        slotsBooked: claim.slotsBooked,
         totalSlots: tData.totalSlots || 0,
         iesportsRank: ratingToRank(iesportsRating),
       }).catch(() => {}); // never fail the registration

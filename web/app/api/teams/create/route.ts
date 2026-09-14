@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAndStoreRank } from "@/lib/opendota";
 import { FieldValue } from "firebase-admin/firestore";
 import { requirePaidEntry } from "@/lib/paidEntry";
+import { verifyCaller } from "@/lib/apiAuth";
 
 
 function generateCode() {
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest) {
   try {
     const { tournamentId, uid } = await req.json();
     if (!tournamentId || !uid) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const caller = await verifyCaller(req, uid);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
 
     // Check not already registered
     const existing = await adminDb.collection("teams")
