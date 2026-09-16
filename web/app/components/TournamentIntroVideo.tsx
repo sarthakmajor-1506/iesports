@@ -102,16 +102,32 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
       <style>{`
         .tiv-wrap { display:flex; flex-direction:column; gap:16px; align-items:center; margin:0 auto 30px; width:100%; }
         .tiv-col { width:100%; max-width:400px; }
-        .tiv-cap { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:9px; }
+        .tiv-cap { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:9px; }
+        .tiv-head { margin-bottom:14px; }
+        .tiv-title { font-size:26px; font-weight:900; color:#fff; letter-spacing:-.02em; line-height:1.12; margin-top:6px; }
+        .tiv-desc { font-size:14.5px; color:#a3a3a3; line-height:1.55; margin-top:7px; }
         /* Side by side only when there is genuinely room for two 4:5 frames. */
         @media (min-width: 940px) {
           .tiv-wrap { flex-direction:row; align-items:flex-start; justify-content:center; gap:22px; max-width:900px; }
           .tiv-col { flex:1 1 0; max-width:420px; }
+          .tiv-title { font-size:30px; }
+          /* Equal heading heights, so the two frames start on the same line. */
+          .tiv-head { min-height:132px; }
         }
       `}</style>
 
       {/* how it works */}
       <div className="tiv-col">
+        {/* What the film is about, above it and big enough to read before
+            pressing anything — the old caption was 11px grey under the frame. */}
+        <Heading
+          kicker={`Watch · 30s`}
+          title={teamMode ? "How team entry works" : "How it works"}
+          desc={teamMode
+            ? `Create a team or join one with a team code, then a BO${mainProps.groupBestOf} round robin and a BO${mainProps.finalBestOf} Grand Final.`
+            : `Register, get drawn into a team on the day, then a BO${mainProps.groupBestOf} round robin and a BO${mainProps.finalBestOf} Grand Final.`}
+          accent={T.acc}
+        />
         {frame(visible ? (
           <Player
             key={`m${replay}`}
@@ -124,7 +140,6 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
           />
         ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />, "#FFF7EA")}
         <div className="tiv-cap">
-          <span style={{ fontSize: 11.5, color: "#666" }}>{teamMode ? "How team entry works" : "How it works"} · 30s</span>
           <button onClick={() => setReplay(r => r + 1)} style={{
             background: "none", border: "1px solid #222", borderRadius: 100, padding: "5px 13px",
             color: "#888", fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
@@ -134,6 +149,12 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
 
       {/* what else you get */}
       <div className="tiv-col">
+        <Heading
+          kicker="Watch · 20s"
+          title="Why play with IEsports"
+          desc="Every match streamed live, your best plays cut into shorts, and an AI breakdown of your game — included in your entry."
+          accent={T.acc}
+        />
         {frame(visible ? (
           <Player
             key={`p${replay}`}
@@ -144,11 +165,18 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
             autoPlay loop controls={false}
             style={{ width: "100%", display: "block" }}
           />
-        ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />)}
-        <div className="tiv-cap">
-          <span style={{ fontSize: 11.5, color: "#666" }}>Why play with IEsports · 20s</span>
-        </div>
+        ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />, "#FFF7EA")}
       </div>
+    </div>
+  );
+}
+
+function Heading({ kicker, title, desc, accent }: { kicker: string; title: string; desc: string; accent: string }) {
+  return (
+    <div className="tiv-head">
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: accent }}>▶ {kicker}</div>
+      <div className="tiv-title">{title}</div>
+      <div className="tiv-desc">{desc}</div>
     </div>
   );
 }
