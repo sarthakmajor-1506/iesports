@@ -3,42 +3,39 @@
 /**
  * Tournament explainer — a product demo, not a slide deck.
  *
- * What makes a flagship product film work, and what this does:
+ * LOOK. Light and loud: a cream page, ink outlines, hard offset shadows,
+ * sticker labels and highlighter marks. It sits inside a dark tournament page,
+ * so it reads as the one playful object on it, and it stays legible at phone
+ * width where thin grey-on-black type did not.
  *
- *   ONE PERSISTENT SURFACE.  Screens change inside a single app frame that
- *   never disappears. Cutting to black between beats is what makes a video feel
- *   like slides; morphing inside a frame makes it feel like software.
+ * LAYOUT. Three fixed zones, the same in every beat:
  *
- *   A CURSOR THAT DRIVES IT.  Every interaction is performed — the pointer
- *   travels on eased arcs, the button lifts under it, the click lands, the UI
- *   responds. Nobody believes a claim about a flow they watch a caption assert.
+ *   header  (top 96)   sticker eyebrow + headline. ONE slot, handed from beat
+ *                      to beat in place, so the question being answered is
+ *                      always at the top and never drifts with the content.
+ *   body    (top 290)  the app card during sign-up, then the match-day panels.
+ *   footer             progress bar.
  *
- *   A CAMERA.  Scale and offset follow attention.
- *
- *   NEVER STATIC.  Slow drift under everything, springs with overshoot,
- *   numbers that count. A frozen frame reads as a bug.
- *
- * The tournament half is told from the PLAYER's side, not the organiser's.
- * "Round robin, every team plays every team" is a format description; "you
- * play three matches, guaranteed" is what someone deciding whether to spend
- * money actually wants to know.
+ * CURSOR. Buttons the cursor presses are anchored to the bottom of the app card
+ * rather than flowing after the content, so every click lands on a known y
+ * (BTN_Y / BTN2_Y) whatever the copy above it does. The old centred layout
+ * needed a hand-tuned y per screen, and silently missed when copy changed.
  *
  * TWO REGISTRATION MODES, and the film must match the one the tournament is
- * actually running — a video demonstrating a flow that no longer exists is
- * worse than no video:
+ * actually running:
  *
  *   solo  (CS2, and Valorant before 14 Sep 2026)
  *       pay per player, then teams are drawn at random on the day. The entry is
  *       refundable, so the film shows the Withdraw affordance.
  *
  *   team  (`registrationMode: "team"` — League of Rising Stars: Horizon)
- *       setup FIRST, then the captain names a team and pays once for all five;
- *       a 6-character code is issued and teammates join free with it. There is
- *       NO random draw — rosters are pre-formed — and no refund path (see
- *       api/valorant/team/leave: a teammate may leave, a captain may not), so
- *       neither is shown. Setup before money mirrors RegisterModal, where the
- *       order is deliberate: taking ₹2000 first would strand a paid team with
- *       no code for the other four to use.
+ *       details FIRST, then the captain names a team and pays once for all
+ *       five; a 6-character code is issued and teammates join free with it.
+ *       No random draw, no refund path (api/valorant/team/leave: a teammate may
+ *       leave, a captain may not), so neither is shown.
+ *
+ * The group-stage and final best-of come from the tournament (matchesPerRound,
+ * grandFinalBestOf) so the film cannot promise a format the fixtures don't use.
  *
  * 900 frames @ 30fps.
  */
@@ -73,7 +70,36 @@ export type ExplainerProps = {
   finalBestOf?: number;
 };
 
+// ── palette ────────────────────────────────────────────────────────────────
+// The game accent is only ever a FILL here (buttons, highlights, badges) with
+// ink on top. As text on cream, Valorant cyan and CS2 amber fail contrast.
+const INK = "#16131F";
+const PAPER = "#FFF7EA";
+const CARD = "#FFFFFF";
+const BODY = "#4E4858";
+const MUTED = "#8A8394";
+const LILAC = "#C9B6FF";
+const LEMON = "#FFE066";
+const PINK = "#FF9EC4";
+const MINT = "#A6F0C6";
+const GOLD = "#FFD24A";
+const OK_TEXT = "#0E7A43";
+const BAD_TEXT = "#C2412D";
+const FONT = "system-ui,-apple-system,'Segoe UI',sans-serif";
+
+// ── layout ─────────────────────────────────────────────────────────────────
 const DUR = 900;
+const PAD_X = 56;
+const HEADER_TOP = 96;
+const BODY_TOP = 290;
+const CARD_H = 490;
+const BAR_H = 34;
+/** Arrow over the label of a button anchored 24px off the card's bottom. */
+const BTN_Y = 716;
+/** Arrow over the upper of two stacked anchored buttons. */
+const BTN2_Y = 638;
+const BTN_H = 64;
+
 const YOU = "B";
 const TEAM_NAMES = ["A", "B", "C", "D"] as const;
 
@@ -124,6 +150,7 @@ const STANDINGS_BY_BO: Record<1 | 2, { t: string; p: number; rd: number }[]> = {
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const EASE = Easing.bezier(0.33, 1, 0.68, 1);
 const EASE_IO = Easing.bezier(0.65, 0, 0.35, 1);
+const BOUNCE = Easing.out(Easing.back(2.2));
 
 const track = (frame: number, keys: [number, number][], easing = EASE) => {
   if (frame <= keys[0][0]) return keys[0][1];
@@ -145,12 +172,8 @@ const win = (frame: number, a: number, b: number, r = 10) =>
 const typed = (frame: number, text: string, from: number, to: number) =>
   text.slice(0, Math.floor(interpolate(frame, [from, to], [0, text.length], clamp)));
 
-/**
- * Beat transition. Fading two full-bleed beats through each other printed one
- * on top of the other and was unreadable; carrying them on a continuous upward
- * travel keeps them spatially separated through the cross, and reads as an
- * advance rather than a dissolve.
- */
+/** A body panel arriving from below and leaving upward, so two panels crossing
+ *  stay spatially apart instead of printing one over the other. */
 const beat = (frame: number, a: number, b: number, r = 12) => {
   const enter = interpolate(frame, [a, a + r], [0, 1], { ...clamp, easing: EASE });
   const exit = interpolate(frame, [b - r, b], [0, 1], { ...clamp, easing: EASE });
@@ -159,8 +182,7 @@ const beat = (frame: number, a: number, b: number, r = 12) => {
 
 // ── beat boundaries ────────────────────────────────────────────────────────
 // Two timelines, both landing on 910. Team mode spends the frames the random
-// draw used to occupy on the code being issued and a teammate redeeming it —
-// which is the part of the new format people actually get wrong.
+// draw used to occupy on the code being issued and a teammate redeeming it.
 const B_SOLO = {
   hero: [-10, 76], discord: [70, 132], pay: [126, 198], payu: [192, 238],
   setup: [232, 292], done: [286, 332], reg: [326, 388],
@@ -197,65 +219,61 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
     ? Math.max(2, Math.min(4, totalTeams || Math.floor(totalSlots / size)))
     : Math.max(2, Math.min(4, Math.round(totalSlots / 5)));
 
-  const camScale = track(frame, [[0, 1.04], [56, 1.0], [150, 1.05], [230, 1.1], [300, 1.0], [430, 1.0], [500, 0.97], [900, 0.97]]);
-  const camY = track(frame, [[0, 18], [56, 0], [230, -22], [300, 0], [900, 0]]);
-  const drift = Math.sin(frame / 90) * 5;
+  // The body floats; the header does not — it is the fixed point of the film.
+  const float = Math.sin(frame / 45) * 3;
 
-  // Cursor lives INSIDE the camera, so it scales with the UI it operates —
-  // rendered outside, it slid off every button as the camera pushed in. The y
-  // values are each screen's button centre, which depends on how tall that
-  // screen's content is: change a screen's copy and its landing point moves.
   // Team mode parks the pointer off-frame across the details beat (frames
-  // 134–186): there is nothing to click there, and a cursor sitting still in
-  // the middle of a screen for two seconds reads as a frozen render.
+  // 134–186): nothing to click there, and a still cursor reads as a frozen render.
   const CLICKS = teamMode ? [48, 100, 218, 292] : [52, 106, 178];
   const CURSOR_OUT = teamMode ? 352 : 240;
   const cx = teamMode
     ? track(frame, [[0, 880], [20, 470], [42, 360], [48, 360], [58, 430], [90, 360], [100, 360], [112, 520], [134, 880], [186, 880], [198, 420], [212, 360], [218, 360], [228, 430], [272, 390], [286, 360], [292, 360], [302, 470], [348, 880]], EASE_IO)
     : track(frame, [[0, 880], [22, 470], [44, 360], [52, 360], [64, 430], [96, 360], [106, 360], [118, 440], [162, 360], [178, 360], [196, 480], [236, 880]], EASE_IO);
   const cy = teamMode
-    ? track(frame, [[0, 1050], [20, 660], [42, 550], [48, 550], [58, 600], [90, 494], [100, 494], [112, 560], [134, 1050], [186, 1050], [198, 560], [212, 472], [218, 472], [228, 530], [272, 620], [286, 570], [292, 570], [302, 650], [348, 1050]], EASE_IO)
-    : track(frame, [[0, 1050], [22, 660], [44, 550], [52, 550], [64, 600], [96, 477], [106, 477], [118, 520], [162, 549], [178, 549], [196, 640], [236, 1050]], EASE_IO);
+    ? track(frame, [[0, 1050], [20, 800], [42, BTN_Y], [48, BTN_Y], [58, 770], [90, BTN_Y], [100, BTN_Y], [112, 800], [134, 1050], [186, 1050], [198, 690], [212, BTN2_Y], [218, BTN2_Y], [228, 690], [272, 770], [286, BTN_Y], [292, BTN_Y], [302, 800], [348, 1050]], EASE_IO)
+    : track(frame, [[0, 1050], [22, 800], [44, BTN_Y], [52, BTN_Y], [64, 770], [96, BTN_Y], [106, BTN_Y], [118, 780], [162, BTN_Y], [178, BTN_Y], [196, 800], [236, 1050]], EASE_IO);
   const pressed = CLICKS.some(c => frame >= c && frame < c + 7);
 
   const productEnd = teamMode ? B_TEAM.join[1] : B_SOLO.reg[1];
   const productPhase = frame < productEnd + 6;
+  const payuWin = teamMode ? B_TEAM.payu : B_SOLO.payu;
+  const onPayu = frame >= payuWin[0] + 4 && frame < payuWin[1] - 4;
+
+  const headers = (teamMode ? teamHeaders : soloHeaders)({
+    T, tournamentName, dateLabel, prizePool, entryFee, totalSlots, teams,
+  });
 
   return (
-    <AbsoluteFill style={{ background: "#050506", fontFamily: "system-ui,-apple-system,'Segoe UI',sans-serif", overflow: "hidden" }}>
-      <AbsoluteFill style={{ background: `radial-gradient(90% 50% at 50% ${8 + drift}%, ${T.soft}, transparent 65%)` }} />
-      <AbsoluteFill style={{ background: `radial-gradient(70% 40% at ${20 - drift}% 95%, rgba(255,255,255,0.035), transparent 70%)` }} />
+    <AbsoluteFill style={{ background: PAPER, fontFamily: FONT, color: INK, overflow: "hidden" }}>
+      <Backdrop frame={frame} T={T} />
 
-      <div style={{ position: "absolute", top: 42, left: 58, right: 58, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 5 }}>
-        <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: ".2em", color: "#5a5a5a" }}>IESPORTS</span>
-        <span style={{ fontSize: 17, color: T.acc, letterSpacing: ".14em", fontWeight: 700 }}>{T.label}</span>
-      </div>
-      <div style={{ position: "absolute", bottom: 46, left: 58, right: 58, zIndex: 5 }}>
-        <div style={{ height: 3, background: "#161616", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${(frame / DUR) * 100}%`, background: T.acc, boxShadow: `0 0 14px ${T.glow}` }} />
+      {/* top bar */}
+      <div style={{ position: "absolute", top: 34, left: PAD_X, right: PAD_X, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <div style={{ width: 15, height: 15, background: T.acc, border: `2.5px solid ${INK}`, borderRadius: 3, transform: `rotate(${45 + frame * 0.8}deg)` }} />
+          <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: ".2em" }}>IESPORTS</span>
         </div>
+        <Sticker bg={T.acc} rot={3} size={14}>{T.label}</Sticker>
       </div>
 
-      <AbsoluteFill style={{ transform: `scale(${camScale}) translateY(${camY + drift * 0.4}px)`, transformOrigin: "50% 45%" }}>
+      {/* the header slot — every beat's title, always here */}
+      <div style={{ position: "absolute", top: HEADER_TOP, left: PAD_X, right: PAD_X, height: 180, zIndex: 5 }}>
+        {headers.map((h, i) => <Header key={i} frame={frame} spec={h} />)}
+      </div>
 
+      {/* body */}
+      <AbsoluteFill style={{ transform: `translateY(${float}px)` }}>
         {productPhase && (
           <div style={{
-            position: "absolute", left: 60, right: 60, top: 150, bottom: 190,
-            background: "linear-gradient(180deg,#0d0e10,#08090a)",
-            border: "1px solid #1b1d20", borderRadius: 26,
-            boxShadow: "0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset",
+            position: "absolute", left: PAD_X, right: PAD_X, top: BODY_TOP, height: CARD_H, boxSizing: "border-box",
+            background: CARD, border: `3px solid ${INK}`, borderRadius: 26, boxShadow: `8px 8px 0 ${INK}`,
             overflow: "hidden", opacity: win(frame, -10, productEnd + 4, 14),
           }}>
+            <BrowserBar url={onPayu ? "secure.payu.in" : "iesports.in"} />
             {teamMode ? (
-              <TeamSignup
-                frame={frame} T={T} tournamentName={tournamentName} dateLabel={dateLabel}
-                prizePool={prizePool} entryFee={entryFee} teamSize={size} totalTeams={teams}
-              />
+              <TeamSignup frame={frame} T={T} prizePool={prizePool} entryFee={entryFee} teamSize={size} totalTeams={teams} />
             ) : (
-              <SoloSignup
-                frame={frame} T={T} tournamentName={tournamentName} dateLabel={dateLabel}
-                prizePool={prizePool} entryFee={entryFee} totalSlots={totalSlots} deadlineLabel={deadlineLabel}
-              />
+              <SoloSignup frame={frame} T={T} prizePool={prizePool} entryFee={entryFee} totalSlots={totalSlots} deadlineLabel={deadlineLabel} />
             )}
           </div>
         )}
@@ -263,128 +281,185 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
         {!productPhase && (
           <MatchDay frame={frame} T={T} teamCount={teams} totalSlots={totalSlots} teamMode={teamMode}
             groupBo={groupBestOf} finalBo={finalBestOf}
-            finalTime={finalTime} prizePool={prizePool} entryFee={entryFee} dateLabel={dateLabel} />
+            finalTime={finalTime} entryFee={entryFee} dateLabel={dateLabel} />
         )}
 
         {frame <= CURSOR_OUT && (
           <div style={{
             position: "absolute", left: 0, top: 0, zIndex: 20,
             transform: `translate(${cx}px, ${cy}px) scale(${pressed ? 0.84 : 1})`,
-            filter: "drop-shadow(0 4px 10px rgba(0,0,0,.7))",
             opacity: interpolate(frame, [0, 14, CURSOR_OUT - 16, CURSOR_OUT - 2], [0, 1, 1, 0], clamp),
           }}>
             {CLICKS.map(c => {
               const t = frame - c;
               if (t < 0 || t > 22) return null;
               return <div key={c} style={{
-                position: "absolute", left: -22, top: -22, width: 44, height: 44, borderRadius: "50%",
-                border: `2px solid ${T.acc}`, transform: `scale(${interpolate(t, [0, 22], [0.3, 2.6], clamp)})`,
-                opacity: interpolate(t, [0, 22], [0.75, 0], clamp),
+                position: "absolute", left: -24, top: -24, width: 48, height: 48, borderRadius: "50%",
+                border: `3px solid ${INK}`, transform: `scale(${interpolate(t, [0, 22], [0.3, 2.4], clamp)})`,
+                opacity: interpolate(t, [0, 22], [0.9, 0], clamp),
               }} />;
             })}
-            <svg width="30" height="34" viewBox="0 0 30 34" fill="none">
-              <path d="M2 2L2 26L8.5 20.5L13 30L17.5 28L13 18.5L21 18L2 2Z" fill="#fff" stroke="#0a0a0a" strokeWidth="1.6" strokeLinejoin="round" />
+            <svg width="32" height="36" viewBox="0 0 30 34" fill="none" style={{ filter: `drop-shadow(3px 3px 0 ${INK})` }}>
+              <path d="M2 2L2 26L8.5 20.5L13 30L17.5 28L13 18.5L21 18L2 2Z" fill="#fff" stroke={INK} strokeWidth="2.2" strokeLinejoin="round" />
             </svg>
           </div>
         )}
       </AbsoluteFill>
+
+      {/* progress */}
+      <div style={{
+        position: "absolute", left: PAD_X, right: PAD_X, bottom: 40, height: 16, boxSizing: "border-box",
+        border: `2.5px solid ${INK}`, borderRadius: 100, background: CARD, overflow: "hidden", zIndex: 6,
+      }}>
+        <div style={{ height: "100%", width: `${(frame / DUR) * 100}%`, background: T.acc, borderRight: `2.5px solid ${INK}` }} />
+      </div>
     </AbsoluteFill>
+  );
+};
+
+// ── headers ────────────────────────────────────────────────────────────────
+
+type HeaderSpec = { a: number; b: number; eyebrow: string; bg: string; title: React.ReactNode; size?: number };
+
+type HeaderArgs = {
+  T: Theme; tournamentName: string; dateLabel: string; prizePool: string;
+  entryFee: number; totalSlots: number; teams: number;
+};
+
+/** Series name, then the event's own name on its own marked line — letting it
+ *  wrap freely stranded the "·" separator at the end of line one. */
+const nameTitle = (name: string, c: string) => {
+  const parts = name.split(/ - /);
+  return parts.length > 1
+    ? <>{parts.slice(0, -1).join(" · ")}<br /><Mark c={c}>{parts[parts.length - 1]}</Mark></>
+    : <>{name}</>;
+};
+
+/** Beats after sign-up read the same in both cuts. */
+const matchDayHeaders = (B: typeof B_SOLO | typeof B_TEAM, { T, dateLabel }: HeaderArgs): HeaderSpec[] => {
+  const weekday = (dateLabel.split(" ")[0] || "MATCH DAY").toUpperCase();
+  return [
+    { a: B.day[0], b: B.day[1], eyebrow: `${weekday} · THE WHOLE DAY`, bg: LEMON, title: <>One day, <Mark c={T.acc}>start to finish</Mark></> },
+    { a: B.mine[0], b: B.mine[1], eyebrow: "YOUR DAY", bg: LILAC, title: <>You play 3 matches. <Mark c={T.acc}>Guaranteed.</Mark></> },
+    { a: B.stand[0], b: B.stand[1], eyebrow: "HOW YOU QUALIFY", bg: MINT, title: <><Mark c={T.acc}>Top two</Mark> make the final</> },
+  ];
+};
+
+function soloHeaders(args: HeaderArgs): HeaderSpec[] {
+  const { T, tournamentName, dateLabel, entryFee, totalSlots, prizePool } = args;
+  const B = B_SOLO;
+  const M = (s: React.ReactNode) => <Mark c={T.acc}>{s}</Mark>;
+  return [
+    { a: B.hero[0], b: B.hero[1], eyebrow: dateLabel || "TOURNAMENT", bg: LEMON, title: nameTitle(tournamentName, T.acc), size: tournamentName.length > 20 ? 40 : 46 },
+    { a: B.discord[0], b: B.discord[1], eyebrow: "STEP 1 OF 3", bg: LILAC, title: <>Connect {M("Discord")}</> },
+    { a: B.pay[0], b: B.pay[1], eyebrow: "STEP 2 OF 3 · SLOT HELD", bg: LEMON, title: <>Claim your {M("slot")}</> },
+    { a: B.payu[0], b: B.payu[1], eyebrow: "PAYU · SECURE", bg: LILAC, title: <>Paying {M(`₹${inr(entryFee)}`)}</> },
+    { a: B.setup[0], b: B.setup[1], eyebrow: `✓ SLOT PAID · ₹${inr(entryFee)}`, bg: MINT, title: <>Finish {M("setup")}</> },
+    { a: B.done[0], b: B.done[1], eyebrow: "ALL SET", bg: MINT, title: <>You&apos;re {M("in")}</> },
+    { a: B.reg[0], b: B.reg[1], eyebrow: "YOUR SLOT", bg: LILAC, title: <>Your slot, {M("refundable")}</> },
+    { a: B.draw[0], b: B.draw[1], eyebrow: "TOURNAMENT DAY · 10:45", bg: PINK, title: <>Teams are drawn {M("at random")}</> },
+    ...matchDayHeaders(B, args),
+    { a: B.cta[0], b: B.cta[1], eyebrow: `₹${prizePool} PRIZE POOL`, bg: PINK, title: <>{totalSlots} slots.<br />{M(`₹${inr(entryFee)} each.`)}</> },
+  ];
+}
+
+function teamHeaders(args: HeaderArgs): HeaderSpec[] {
+  const { T, tournamentName, dateLabel, entryFee, teams, prizePool } = args;
+  const B = B_TEAM;
+  const M = (s: React.ReactNode) => <Mark c={T.acc}>{s}</Mark>;
+  return [
+    { a: B.hero[0], b: B.hero[1], eyebrow: dateLabel || "TOURNAMENT", bg: LEMON, title: nameTitle(tournamentName, T.acc), size: tournamentName.length > 20 ? 40 : 46 },
+    { a: B.discord[0], b: B.discord[1], eyebrow: "STEP 1 OF 2", bg: LILAC, title: <>Connect {M("Discord")}</> },
+    { a: B.setup[0], b: B.setup[1], eyebrow: "STEP 2 OF 2", bg: MINT, title: <>Your {M("details")}</> },
+    { a: B.choice[0], b: B.choice[1], eyebrow: `TEAM ENTRY · ${teams} TEAM SLOTS`, bg: PINK, title: <>Enter as a {M("team")}</> },
+    { a: B.create[0], b: B.create[1], eyebrow: "YOU'RE THE CAPTAIN", bg: LEMON, title: <>Create your {M("team")}</> },
+    { a: B.payu[0], b: B.payu[1], eyebrow: "PAYU · SECURE", bg: LILAC, title: <>Paying {M(`₹${inr(entryFee)}`)}</> },
+    { a: B.code[0], b: B.code[1], eyebrow: "✓ TEAM REGISTERED", bg: MINT, title: <>Share your {M("team code")}</> },
+    { a: B.join[0], b: B.join[1], eyebrow: "ON YOUR TEAMMATE'S PHONE", bg: PINK, title: <>Join with the {M("code")}</> },
+    ...matchDayHeaders(B, args),
+    { a: B.cta[0], b: B.cta[1], eyebrow: `₹${prizePool} PRIZE POOL`, bg: PINK, title: <>{teams} team slots.<br />{M(`₹${inr(entryFee)} per team.`)}</> },
+  ];
+}
+
+/**
+ * Headers hand over rather than cross-fade: the outgoing one is gone by b-2,
+ * which is where the next beat's header starts (beats overlap by 6 frames).
+ * Two titles never share the slot.
+ */
+const Header: React.FC<{ frame: number; spec: HeaderSpec }> = ({ frame, spec }) => {
+  const { a, b, eyebrow, bg, title, size = 46 } = spec;
+  const enter = a < 0 ? 1 : interpolate(frame, [a + 4, a + 14], [0, 1], { ...clamp, easing: EASE });
+  const exit = interpolate(frame, [b - 8, b - 2], [0, 1], { ...clamp, easing: EASE });
+  const o = enter * (1 - exit);
+  if (o <= 0.001) return null;
+  const pop = a < 0 ? 1 : interpolate(frame, [a + 4, a + 16], [0.6, 1], { ...clamp, easing: BOUNCE });
+  return (
+    <div style={{ position: "absolute", inset: 0, opacity: o, transform: `translateY(${(1 - enter) * 20 - exit * 20}px)` }}>
+      <Sticker bg={bg} rot={-2.5} pop={pop}>{eyebrow}</Sticker>
+      <div style={{ fontSize: size, fontWeight: 900, lineHeight: 1.06, letterSpacing: "-.03em", marginTop: 16 }}>{title}</div>
+    </div>
   );
 };
 
 // ── sign-up, per player (solo mode) ────────────────────────────────────────
 
-/** What both cuts need to draw the hero card. */
-type SignupProps = {
-  frame: number;
-  T: Theme;
-  tournamentName: string;
-  dateLabel: string;
-  prizePool: string;
-  entryFee: number;
-};
-
-const SoloSignup: React.FC<SignupProps & { totalSlots: number; deadlineLabel: string }> = ({
-  frame, T, tournamentName, dateLabel, prizePool, entryFee, totalSlots, deadlineLabel,
+const SoloSignup: React.FC<{ frame: number; T: Theme; prizePool: string; entryFee: number; totalSlots: number; deadlineLabel: string }> = ({
+  frame, T, prizePool, entryFee, totalSlots, deadlineLabel,
 }) => {
   const B = B_SOLO;
   return (
     <>
       <Screen o={win(frame, B.hero[0], B.hero[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Hero T={T} dateLabel={dateLabel} tournamentName={tournamentName}
-            stats={[["PRIZE", `₹${prizePool}`], ["SLOTS", String(totalSlots)], ["ENTRY", `₹${entryFee}`]]} />
-          <Button T={T} frame={frame} hoverAt={36} clickAt={52} label="Register →" />
+        <StatRow frame={frame} at={0} stats={[["PRIZE", `₹${prizePool}`, LEMON], ["SLOTS", String(totalSlots), LILAC], ["ENTRY", `₹${inr(entryFee)}`, MINT]]} />
+        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <Pill>5v5</Pill><Pill bg={T.soft}>Solo entry</Pill><Pill>{totalSlots} slots</Pill>
         </div>
+        <Text mt={16}>Sign up alone — you&apos;re drawn into a team on the day.</Text>
+        <Button T={T} frame={frame} hoverAt={36} clickAt={52} label="Register →" />
       </Screen>
 
       <Screen o={win(frame, B.discord[0], B.discord[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>STEP 1 OF 3</Eyebrow>
-          <H>Connect Discord</H>
-          <P>Brackets, match calls and your team all live there.</P>
-          <Button T={T} frame={frame} hoverAt={90} clickAt={106} label="Continue with Discord" brand="#5865F2" fg="#fff" />
-        </div>
+        <DiscordBody frame={frame} at={B.discord[0]} />
+        <Button T={T} frame={frame} hoverAt={90} clickAt={106} label="Continue with Discord" bg="#5865F2" fg="#fff" />
       </Screen>
 
       <Screen o={win(frame, B.pay[0], B.pay[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>STEP 2 OF 3 · SLOT HELD</Eyebrow>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", marginTop: 10 }}>Claim your slot</div>
-          <Counter frame={frame} from={148} to={172} value={entryFee} />
-          <P>UPI or Net Banking through PayU.</P>
-          <div style={{ fontSize: 15, color: "#4ade80", marginTop: 4 }}>Fully refundable before registration closes.</div>
-          <Button T={T} frame={frame} hoverAt={162} clickAt={178} label={`Pay ₹${entryFee}`} />
-        </div>
+        <Counter frame={frame} from={148} to={172} value={entryFee} />
+        <Text mt={8}>UPI or Net Banking through PayU.</Text>
+        <div style={{ marginTop: 16 }}><Sticker bg={MINT} rot={-2} size={14}>Fully refundable before registration closes</Sticker></div>
+        <Button T={T} frame={frame} hoverAt={162} clickAt={178} label={`Pay ₹${inr(entryFee)}`} />
       </Screen>
 
-      <PayuSheet frame={frame} T={T} o={win(frame, B.payu[0], B.payu[1], 10)} slideFrom={192} spinUntil={224} amount={entryFee} />
+      <PayuSheet frame={frame} o={win(frame, B.payu[0], B.payu[1], 10)} slideFrom={192} spinUntil={224} amount={entryFee} />
 
       <Screen o={win(frame, B.setup[0], B.setup[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <div style={{ fontSize: 14, letterSpacing: ".14em", color: "#4ade80", fontWeight: 800 }}>✓ SLOT PAID · ₹{entryFee}</div>
-          <H>Finish setup</H>
-          <Progress frame={frame} from={240} to={286} T={T} />
-          <div style={{ marginTop: 4 }}>
-            <Row done={frame > 248} label="Your name" value="saved" T={T} delay={248} frame={frame} />
-            <Row done={frame > 262} label="Phone" value="verified" T={T} delay={262} frame={frame} />
-            <Row done={frame > 276} label="Riot ID" value="linked" T={T} delay={276} frame={frame} />
-          </div>
-        </div>
+        <Progress frame={frame} from={240} to={286} T={T} />
+        <Row done={frame > 248} label="Your name" value="saved" delay={248} frame={frame} />
+        <Row done={frame > 262} label="Phone" value="verified" delay={262} frame={frame} />
+        <Row done={frame > 276} label="Riot ID" value="linked" delay={276} frame={frame} />
       </Screen>
 
       <Screen o={win(frame, B.done[0], B.done[1], 12)}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <Pop frame={frame} at={296}><div style={{ fontSize: 54 }}>🏆</div></Pop>
-          <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>You&apos;re in</div>
-          <div style={{ fontSize: 17, color: "#8d8d8d" }}>Everything from here happens on Discord.</div>
+        <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18 }}>
+          <Pop frame={frame} at={296}>
+            <div style={{ width: 120, height: 120, borderRadius: "50%", background: GOLD, border: `3px solid ${INK}`, boxShadow: `5px 5px 0 ${INK}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 60 }}>🏆</div>
+          </Pop>
+          <Text center>Everything from here happens on Discord.</Text>
         </div>
       </Screen>
 
-      {/* Your slot, as the tournament page shows it. Seeing Withdraw sitting
-          next to Registered is what tells a first-timer the money is not a
-          trapdoor. Solo only — team entries have no refund path. */}
+      {/* Seeing Withdraw next to Registered is what tells a first-timer the
+          money is not a trapdoor. Solo only — team entries have no refund path. */}
       <Screen o={win(frame, B.reg[0], B.reg[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>YOUR SLOT</Eyebrow>
-          <div style={{
-            marginTop: 16, padding: 18, borderRadius: 16, background: "#0f1113", border: "1px solid #1c1e21",
-            transform: `translateY(${interpolate(frame, [332, 346], [14, 0], { ...clamp, easing: EASE })}px)`,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Chip bg="rgba(74,222,128,.12)" bd="rgba(74,222,128,.4)" fg="#6fcf8a">✓ Registered</Chip>
-              <Chip bg="transparent" bd="#2a2a2a" fg="#8a8a8a">Withdraw</Chip>
-            </div>
-            <div style={{ height: 1, background: "#1a1c1f", margin: "16px 0" }} />
-            <KV k="Paid" v={`₹${entryFee}`} />
-            <KV k="Slot held until" v={deadlineLabel} mt={9} />
-          </div>
-          <div style={{
-            fontSize: 16, color: "#4ade80", marginTop: 16, lineHeight: 1.5,
-            opacity: interpolate(frame, [356, 370], [0, 1], clamp),
-          }}>
-            Changed your mind? Withdraw before registration closes — full ₹{entryFee} back.
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, transform: `translateY(${interpolate(frame, [332, 346], [14, 0], { ...clamp, easing: EASE })}px)` }}>
+          <ChipBtn bg={MINT} grow={false}>✓ Registered</ChipBtn>
+          <ChipBtn bg={CARD} grow={false}>Withdraw</ChipBtn>
+        </div>
+        <div style={{ borderTop: `2.5px dashed ${INK}`, margin: "20px 0 14px" }} />
+        <KV k="Paid" v={`₹${inr(entryFee)}`} />
+        <KV k="Slot held until" v={deadlineLabel} mt={10} />
+        <div style={{ fontSize: 17, fontWeight: 700, color: OK_TEXT, marginTop: 18, lineHeight: 1.45, opacity: interpolate(frame, [356, 370], [0, 1], clamp) }}>
+          Changed your mind? Withdraw before registration closes — full ₹{inr(entryFee)} back.
         </div>
       </Screen>
     </>
@@ -398,323 +473,379 @@ const SoloSignup: React.FC<SignupProps & { totalSlots: number; deadlineLabel: st
  * Discord → details → create a team (pay once) | join with a code (free).
  *
  * The code beat and the join beat are the two this film exists for. The last
- * one switches to the teammate's phone — same surface, relabelled — because
- * the question the new format raises is "so what do the other four do?".
+ * one switches to the teammate's phone — same card, relabelled — because the
+ * question the format raises is "so what do the other four do?".
  */
-const TeamSignup: React.FC<SignupProps & { teamSize: number; totalTeams: number }> = ({
-  frame, T, tournamentName, dateLabel, prizePool, entryFee, teamSize, totalTeams,
+const TeamSignup: React.FC<{ frame: number; T: Theme; prizePool: string; entryFee: number; teamSize: number; totalTeams: number }> = ({
+  frame, T, prizePool, entryFee, teamSize, totalTeams,
 }) => {
   const B = B_TEAM;
   const name = typed(frame, MY_TEAM, 250, 276);
   const nameCaret = frame < 280 && Math.floor(frame / 8) % 2 === 0;
 
   // The roster assembling once the code is redeemed: captain, then each joiner.
-  // It has to reach 5/5 with frames to spare — the payoff of the whole film
-  // landing inside the beat's own fade-out is the payoff not landing.
+  // It reaches 5/5 with frames to spare — a payoff landing inside the beat's
+  // own fade-out is a payoff not landing.
   const JOIN_AT = 464;
   const joined = Math.min(ROSTER.length, 1 + Math.max(0, Math.floor(interpolate(frame, [JOIN_AT, JOIN_AT + 22], [0, ROSTER.length - 1], clamp))));
+  const full = joined >= teamSize;
+  const copied = frame > 396;
 
   return (
     <>
       <Screen o={win(frame, B.hero[0], B.hero[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Hero T={T} dateLabel={dateLabel} tournamentName={tournamentName}
-            stats={[["PRIZE", `₹${prizePool}`], ["TEAMS", String(totalTeams)], ["PER TEAM", `₹${inr(entryFee)}`]]} />
-          <Button T={T} frame={frame} hoverAt={32} clickAt={48} label="Register →" />
+        <StatRow frame={frame} at={0} stats={[["PRIZE", `₹${prizePool}`, LEMON], ["TEAMS", String(totalTeams), LILAC], ["PER TEAM", `₹${inr(entryFee)}`, MINT]]} />
+        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <Pill>{teamSize}v{teamSize}</Pill><Pill bg={T.soft}>Team entry</Pill><Pill>{totalTeams} teams</Pill>
         </div>
+        <Text mt={16}>Bring your own five — the captain pays once, teammates join free.</Text>
+        <Button T={T} frame={frame} hoverAt={32} clickAt={48} label="Register →" />
       </Screen>
 
       <Screen o={win(frame, B.discord[0], B.discord[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>STEP 1 OF 2</Eyebrow>
-          <H>Connect Discord</H>
-          <P>Brackets, match calls and your team all live there.</P>
-          <Button T={T} frame={frame} hoverAt={84} clickAt={100} label="Continue with Discord" brand="#5865F2" fg="#fff" />
-        </div>
+        <DiscordBody frame={frame} at={B.discord[0]} />
+        <Button T={T} frame={frame} hoverAt={84} clickAt={100} label="Continue with Discord" bg="#5865F2" fg="#fff" />
       </Screen>
 
       {/* Details BEFORE the money — the team and its code are created the
           instant the captain's payment settles, and seating them as player one
           needs a Riot ID. */}
       <Screen o={win(frame, B.setup[0], B.setup[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>STEP 2 OF 2</Eyebrow>
-          <H>Your details</H>
-          <Progress frame={frame} from={126} to={176} T={T} />
-          <div style={{ marginTop: 4 }}>
-            <Row done={frame > 136} label="Your name" value="saved" T={T} delay={136} frame={frame} />
-            <Row done={frame > 150} label="Phone" value="verified" T={T} delay={150} frame={frame} />
-            <Row done={frame > 164} label="Riot ID" value="linked" T={T} delay={164} frame={frame} />
-          </div>
-        </div>
+        <Progress frame={frame} from={126} to={176} T={T} />
+        <Row done={frame > 136} label="Your name" value="saved" delay={136} frame={frame} />
+        <Row done={frame > 150} label="Phone" value="verified" delay={150} frame={frame} />
+        <Row done={frame > 164} label="Riot ID" value="linked" delay={164} frame={frame} />
       </Screen>
 
-      {/* The fork. This is the change: nobody is shuffled into a team any more. */}
+      {/* The fork. Nobody is shuffled into a team: you make one or join one. */}
       <Screen o={win(frame, B.choice[0], B.choice[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>TEAM ENTRY · {totalTeams} TEAM SLOTS</Eyebrow>
-          <H>Enter as a team</H>
-          <P>₹{inr(entryFee)} per team of {teamSize}. The captain names the team and pays once, then shares a code. Teammates join free with it.</P>
-          <Button T={T} frame={frame} hoverAt={204} clickAt={218} label="Create a team" />
-          <Button T={T} frame={frame} hoverAt={-1} clickAt={-1} label="I have a team code" ghost mt={14} />
-        </div>
+        <Text>
+          <b style={{ color: INK }}>₹{inr(entryFee)} per team of {teamSize}.</b> The captain names the team and pays once, then shares a code. Teammates join <b style={{ color: INK }}>free</b>.
+        </Text>
+        <SquadDots frame={frame} at={B.choice[0] + 8} T={T} size={teamSize} />
+        <Button T={T} frame={frame} hoverAt={204} clickAt={218} label="Create a team" bottom={24 + BTN_H + 14} />
+        <Button T={T} frame={frame} label="I have a team code" bg={CARD} />
       </Screen>
 
       <Screen o={win(frame, B.create[0], B.create[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <div style={{ fontSize: 34, fontWeight: 800, color: "#fff", letterSpacing: "-.02em" }}>Create your team</div>
-          <Field value={name} caret={nameCaret} placeholder="Team name" T={T} />
-          <div style={{ fontSize: 13, color: "#6a6a6a", marginTop: 8 }}>On the bracket and the stream. You&apos;re the captain.</div>
-          <div style={{ fontSize: 58, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1, color: "#fff", marginTop: 14 }}>
-            ₹{inr(entryFee)}
-          </div>
-          <P>Covers all {teamSize} players — teammates join free. UPI or Net Banking through PayU.</P>
-          <Button T={T} frame={frame} hoverAt={278} clickAt={292} label={`Pay ₹${inr(entryFee)}`} />
+        <Label>TEAM NAME</Label>
+        <Field value={name} caret={nameCaret} placeholder="Team name" />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 20 }}>
+          <div style={{ fontSize: 60, fontWeight: 900, lineHeight: 0.95, letterSpacing: "-.04em" }}>₹{inr(entryFee)}</div>
+          <Sticker bg={MINT} rot={-5} size={13}>covers all {teamSize}</Sticker>
         </div>
+        <Text mt={12} size={16}>Teammates join free. UPI or Net Banking through PayU.</Text>
+        <Button T={T} frame={frame} hoverAt={278} clickAt={292} label={`Pay ₹${inr(entryFee)}`} />
       </Screen>
 
-      <PayuSheet frame={frame} T={T} o={win(frame, B.payu[0], B.payu[1], 10)} slideFrom={306} spinUntil={336} amount={entryFee} />
+      <PayuSheet frame={frame} o={win(frame, B.payu[0], B.payu[1], 10)} slideFrom={306} spinUntil={336} amount={entryFee} />
 
       {/* The code, the moment it exists. */}
       <Screen o={win(frame, B.code[0], B.code[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <div style={{ fontSize: 14, letterSpacing: ".14em", color: "#4ade80", fontWeight: 800 }}>✓ TEAM REGISTERED · CAPTAIN</div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: "#fff", marginTop: 10, letterSpacing: ".01em" }}>{MY_TEAM}</div>
-          <div style={{ fontSize: 16, color: "#8d8d8d", lineHeight: 1.5, marginTop: 8 }}>
-            1 of {teamSize} players. Send the code to the {teamSize - 1} still missing.
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: ".01em" }}>{MY_TEAM}</div>
+          <Sticker bg={MINT} rot={3} size={13}>1/{teamSize} players</Sticker>
+        </div>
+        <Text mt={4} size={16}>Send the code to the {teamSize - 1} still missing.</Text>
+        <div style={{
+          marginTop: 14, padding: "14px 12px", borderRadius: 18, background: LEMON, border: `3px dashed ${INK}`, textAlign: "center",
+          opacity: interpolate(frame, [356, 370], [0, 1], clamp),
+          transform: `rotate(-1.2deg) scale(${interpolate(frame, [356, 372], [0.85, 1], { ...clamp, easing: BOUNCE })})`,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: ".18em" }}>TEAM CODE</div>
+          {/* textIndent cancels the trailing letter-space, which otherwise parks
+              a widely-tracked string half a space left of centre. */}
+          <div style={{ fontSize: 52, fontWeight: 900, letterSpacing: ".2em", textIndent: ".2em", lineHeight: 1.1, minHeight: 57, marginTop: 2 }}>
+            {typed(frame, DEMO_CODE, 364, 382)}
           </div>
-
-          <div style={{
-            marginTop: 16, padding: "18px 16px", borderRadius: 16, background: "#0f1113", border: `1px solid ${T.line}`,
-            textAlign: "center",
-            opacity: interpolate(frame, [356, 372], [0, 1], clamp),
-            transform: `scale(${interpolate(frame, [356, 372], [0.94, 1], { ...clamp, easing: EASE })})`,
-          }}>
-            <div style={{ fontSize: 12, letterSpacing: ".16em", color: "#6a6a6a", fontWeight: 700 }}>TEAM CODE</div>
-            {/* textIndent cancels the trailing letter-space, which otherwise
-                parks a widely-tracked string half a space left of centre. */}
-            <div style={{ fontSize: 46, fontWeight: 800, letterSpacing: ".22em", textIndent: ".22em", color: T.acc, marginTop: 6, textShadow: `0 0 26px ${T.glow}` }}>
-              {typed(frame, DEMO_CODE, 364, 382)}
-            </div>
-            <div style={{ fontSize: 13, color: frame > 396 ? "#4ade80" : "#6a6a6a", marginTop: 6 }}>
-              {frame > 396 ? "Copied" : "Tap to copy"}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, marginTop: 14, opacity: interpolate(frame, [386, 400], [0, 1], clamp) }}>
-            <Chip bg={`linear-gradient(180deg, ${T.acc}, ${T.acc2})`} bd="transparent" fg={T.ctaFg} grow>Copy invite link</Chip>
-            <Chip bg="#1c1c1c" bd="#2a2a2a" fg="#fff" grow>WhatsApp</Chip>
-          </div>
-          <div style={{ fontSize: 14, color: "#6a6a6a", marginTop: 12, textAlign: "center", opacity: interpolate(frame, [402, 414], [0, 1], clamp) }}>
-            It is in your Discord DMs too. Only the team can see it.
-          </div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: copied ? OK_TEXT : BODY }}>{copied ? "✓ Copied" : "Tap to copy"}</div>
+        </div>
+        <div style={{ fontSize: 14, color: MUTED, fontWeight: 600, marginTop: 12, textAlign: "center", opacity: interpolate(frame, [402, 414], [0, 1], clamp) }}>
+          It&apos;s in your Discord DMs too. Only the team can see it.
+        </div>
+        <div style={{ position: "absolute", left: 24, right: 24, bottom: 24, display: "flex", gap: 12, opacity: interpolate(frame, [386, 400], [0, 1], clamp) }}>
+          <ChipBtn bg={T.acc}>Copy invite link</ChipBtn>
+          <ChipBtn bg="#25D366">WhatsApp</ChipBtn>
         </div>
       </Screen>
 
       {/* The other four, on the other side of the code. */}
       <Screen o={win(frame, B.join[0], B.join[1], 12)}>
-        <div style={{ padding: "0 32px" }}>
-          <Eyebrow>ON YOUR TEAMMATE&apos;S PHONE</Eyebrow>
-          <H>Join a team</H>
-          <div style={{ fontSize: 16, color: "#8d8d8d", lineHeight: 1.5, marginTop: 8 }}>
-            Enter the {DEMO_CODE.length}-character code the captain sent. Joining is free.
+        <Text size={16}>
+          Your captain sent a <b style={{ color: INK }}>{DEMO_CODE.length}-character code</b>. Joining is <b style={{ color: INK }}>free</b>.
+        </Text>
+        <Field code mt={12} value={typed(frame, DEMO_CODE, 430, 450)} caret={frame < 452 && Math.floor(frame / 8) % 2 === 0} placeholder="ABC123" />
+        <div style={{
+          marginTop: 14, padding: "12px 14px", borderRadius: 16, border: `2.5px solid ${INK}`, background: PAPER,
+          opacity: interpolate(frame, [452, JOIN_AT], [0, 1], clamp),
+          transform: `translateY(${interpolate(frame, [452, JOIN_AT], [12, 0], { ...clamp, easing: EASE })}px)`,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: ".02em" }}>{MY_TEAM}</div>
+            <Sticker bg={full ? MINT : CARD} rot={full ? -4 : 0} size={13}>{joined}/{teamSize}</Sticker>
           </div>
-          <Field value={typed(frame, DEMO_CODE, 430, 450)} caret={frame < 452 && Math.floor(frame / 8) % 2 === 0}
-            placeholder="ABC123" T={T} code />
-
-          <div style={{
-            marginTop: 14, padding: 16, borderRadius: 15, background: "#0f1113", border: "1px solid #1c1e21",
-            opacity: interpolate(frame, [452, JOIN_AT], [0, 1], clamp),
-            transform: `translateY(${interpolate(frame, [452, JOIN_AT], [12, 0], { ...clamp, easing: EASE })}px)`,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>{MY_TEAM}</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: joined >= teamSize ? "#4ade80" : "#8d8d8d" }}>{joined}/{teamSize}</div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 11 }}>
-              {ROSTER.slice(0, joined).map((m, i) => (
-                <span key={m} style={{
-                  fontSize: 13.5, color: i === 0 ? T.acc : "#9a9a9a", background: "#141414",
-                  border: `1px solid ${i === 0 ? T.line : "#232323"}`, borderRadius: 100, padding: "5px 12px",
-                  transform: `scale(${i === 0 ? 1 : interpolate(frame, [JOIN_AT + (i - 1) * 6, JOIN_AT + 6 + (i - 1) * 6], [0.6, 1], clamp)})`,
-                }}>{m}{i === 0 ? " · C" : ""}</span>
-              ))}
-            </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+            {ROSTER.slice(0, joined).map((m, i) => (
+              <span key={m} style={{
+                fontSize: 14, fontWeight: 800, padding: "4px 11px", borderRadius: 100, border: `2px solid ${INK}`,
+                background: i === 0 ? T.acc : CARD,
+                transform: `scale(${i === 0 ? 1 : interpolate(frame, [JOIN_AT + (i - 1) * 6, JOIN_AT + 6 + (i - 1) * 6], [0.4, 1], { ...clamp, easing: BOUNCE })})`,
+              }}>{m}{i === 0 ? " · C" : ""}</span>
+            ))}
           </div>
-
-          <Button T={T} frame={frame} hoverAt={-1} clickAt={-1} mt={16}
-            label={joined >= teamSize ? `✓ All ${teamSize} players in` : `Join ${MY_TEAM}`}
-            brand={joined >= teamSize ? "rgba(74,222,128,.14)" : undefined}
-            glow={joined >= teamSize ? "rgba(74,222,128,.18)" : undefined}
-            fg={joined >= teamSize ? "#6fcf8a" : undefined} />
         </div>
+        <Button T={T} frame={frame} label={full ? `✓ All ${teamSize} players in` : `Join ${MY_TEAM}`} bg={full ? MINT : T.acc} />
       </Screen>
     </>
   );
 };
 
 // ── pieces ─────────────────────────────────────────────────────────────────
-const Screen: React.FC<{ o: number; children: React.ReactNode }> = ({ o, children }) => (
+
+const Backdrop: React.FC<{ frame: number; T: Theme }> = ({ frame, T }) => {
+  const d = Math.sin(frame / 70);
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{
+        backgroundImage: `radial-gradient(${INK}24 1.6px, transparent 1.8px)`,
+        backgroundSize: "26px 26px", backgroundPosition: `${frame * 0.12}px ${frame * 0.12}px`,
+      }} />
+      <div style={{ position: "absolute", width: 440, height: 440, borderRadius: "50%", background: LILAC, opacity: 0.5, right: -190 + d * 14, top: -210 }} />
+      <div style={{ position: "absolute", width: 380, height: 380, borderRadius: "50%", background: LEMON, opacity: 0.55, left: -200, bottom: -170 - d * 12 }} />
+      <div style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", background: T.acc, opacity: 0.3, right: 24, bottom: 120 + d * 10 }} />
+      <Sparkle x={632} y={100} s={30} rot={frame * 1.5} />
+      <Sparkle x={18} y={796} s={22} rot={-frame * 1.2} />
+      <Sparkle x={684} y={500} s={16} rot={frame} fill={PINK} />
+    </AbsoluteFill>
+  );
+};
+
+const Sparkle: React.FC<{ x: number; y: number; s: number; rot: number; fill?: string }> = ({ x, y, s, rot, fill = INK }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" style={{ position: "absolute", left: x, top: y, transform: `rotate(${rot}deg)` }}>
+    <path d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z" fill={fill} stroke={INK} strokeWidth={fill === INK ? 0 : 1.5} />
+  </svg>
+);
+
+const Sticker: React.FC<{ bg: string; rot?: number; size?: number; pop?: number; children: React.ReactNode }> = ({ bg, rot = -2, size = 15, pop = 1, children }) => (
   <div style={{
-    position: "absolute", inset: 0, opacity: o, display: "flex", flexDirection: "column", justifyContent: "center",
-    transform: `scale(${0.985 + o * 0.015})`, pointerEvents: "none",
+    display: "inline-flex", alignItems: "center", padding: `${Math.round(size * 0.42)}px ${Math.round(size * 0.9)}px`,
+    background: bg, color: INK, border: `2.5px solid ${INK}`, borderRadius: 100, boxShadow: `3px 3px 0 ${INK}`,
+    fontSize: size, fontWeight: 900, letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap",
+    transform: `rotate(${rot}deg) scale(${pop})`, transformOrigin: "left center",
   }}>{children}</div>
 );
 
-const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 14, letterSpacing: ".16em", color: "#666", fontWeight: 800 }}>{children}</div>
-);
-const H: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 34, fontWeight: 800, color: "#fff", marginTop: 10, letterSpacing: "-.02em" }}>{children}</div>
-);
-const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 17, color: "#8d8d8d", lineHeight: 1.55, marginTop: 10 }}>{children}</div>
+/** Highlighter stroke behind the lower half of the words. */
+const Mark: React.FC<{ c: string; children: React.ReactNode }> = ({ c, children }) => (
+  <span style={{
+    background: `linear-gradient(180deg, transparent 54%, ${c} 54%, ${c} 92%, transparent 92%)`,
+    padding: "0 5px", margin: "0 -2px", WebkitBoxDecorationBreak: "clone", boxDecorationBreak: "clone",
+  }}>{children}</span>
 );
 
-const Hero: React.FC<{ T: Theme; dateLabel: string; tournamentName: string; stats: [string, string][] }> = ({ T, dateLabel, tournamentName, stats }) => (
-  <>
-    <div style={{ fontSize: 15, letterSpacing: ".16em", color: T.acc, fontWeight: 800 }}>{String(dateLabel).toUpperCase()}</div>
-    <div style={{ fontSize: 40, fontWeight: 800, color: "#fff", lineHeight: 1.08, marginTop: 12, letterSpacing: "-.02em" }}>
-      {String(tournamentName).replace(/ - /g, " · ")}
-    </div>
-    <div style={{ display: "flex", gap: 12, marginTop: 26 }}>
-      {stats.map(([k, v]) => <Stat key={k} k={k} v={v} />)}
-    </div>
-  </>
+const BrowserBar: React.FC<{ url: string }> = ({ url }) => (
+  <div style={{
+    height: BAR_H, boxSizing: "border-box", borderBottom: `3px solid ${INK}`, background: PAPER,
+    display: "flex", alignItems: "center", gap: 7, padding: "0 14px",
+  }}>
+    {[PINK, LEMON, MINT].map(c => <div key={c} style={{ width: 12, height: 12, borderRadius: "50%", background: c, border: `2px solid ${INK}` }} />)}
+    <div style={{
+      marginLeft: 10, flex: 1, height: 20, boxSizing: "border-box", border: `2px solid ${INK}`, borderRadius: 100, background: CARD,
+      display: "flex", alignItems: "center", padding: "0 10px", fontSize: 12, fontWeight: 800, color: BODY,
+    }}>🔒 {url}</div>
+  </div>
 );
 
-const Stat: React.FC<{ k: string; v: string }> = ({ k, v }) => (
-  <div style={{ flex: 1, background: "#0f1113", border: "1px solid #1c1e21", borderRadius: 13, padding: "13px 15px" }}>
-    <div style={{ fontSize: 12, letterSpacing: ".1em", color: "#6a6a6a", fontWeight: 700 }}>{k}</div>
-    <div style={{ fontSize: 25, fontWeight: 800, color: "#fff", marginTop: 4 }}>{v}</div>
+/** One screen of the app card: below the browser bar, top-aligned. */
+const Screen: React.FC<{ o: number; children: React.ReactNode }> = ({ o, children }) => (
+  <div style={{
+    position: "absolute", top: BAR_H, left: 0, right: 0, bottom: 0, padding: "22px 24px",
+    opacity: o, transform: `translateY(${(1 - o) * 10}px)`, pointerEvents: "none",
+  }}>{children}</div>
+);
+
+const Text: React.FC<{ children: React.ReactNode; mt?: number; size?: number; center?: boolean }> = ({ children, mt = 0, size = 18, center }) => (
+  <div style={{ fontSize: size, color: BODY, fontWeight: 600, lineHeight: 1.5, marginTop: mt, textAlign: center ? "center" : "left" }}>{children}</div>
+);
+
+const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".16em", color: MUTED, marginBottom: 8 }}>{children}</div>
+);
+
+const Pill: React.FC<{ children: React.ReactNode; bg?: string }> = ({ children, bg = CARD }) => (
+  <div style={{ padding: "6px 14px", borderRadius: 100, border: `2px solid ${INK}`, background: bg, fontSize: 15, fontWeight: 800 }}>{children}</div>
+);
+
+const StatRow: React.FC<{ frame: number; at: number; stats: [string, string, string][] }> = ({ frame, at, stats }) => (
+  <div style={{ display: "flex", gap: 12 }}>
+    {stats.map(([k, v, bg], i) => (
+      <div key={k} style={{
+        flex: 1, background: bg, border: `2.5px solid ${INK}`, borderRadius: 16, padding: "12px 14px", boxShadow: `3px 3px 0 ${INK}`,
+        transform: `rotate(${(i - 1) * 1.5}deg) scale(${at + i * 4 <= 0 ? 1 : interpolate(frame, [at + i * 4, at + i * 4 + 12], [0.8, 1], { ...clamp, easing: BOUNCE })})`,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".1em", opacity: 0.7 }}>{k}</div>
+        <div style={{ fontSize: 27, fontWeight: 900, marginTop: 2 }}>{v}</div>
+      </div>
+    ))}
   </div>
 );
 
 const KV: React.FC<{ k: string; v: string; mt?: number }> = ({ k, v, mt = 0 }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, marginTop: mt }}>
-    <span style={{ color: "#7a7a7a" }}>{k}</span><span style={{ color: "#fff", fontWeight: 700 }}>{v}</span>
+  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, marginTop: mt }}>
+    <span style={{ color: BODY, fontWeight: 600 }}>{k}</span><span style={{ fontWeight: 900 }}>{v}</span>
   </div>
 );
 
-const Chip: React.FC<any> = ({ bg, bd, fg, grow, children }) => (
+const ChipBtn: React.FC<{ bg: string; children: React.ReactNode; grow?: boolean }> = ({ bg, children, grow = true }) => (
   <div style={{
-    padding: "11px 20px", borderRadius: 100, background: bg, border: `1px solid ${bd}`, color: fg,
-    fontWeight: 800, fontSize: 17, ...(grow ? { flex: 1, textAlign: "center" as const } : null),
+    ...(grow ? { flex: 1 } : { padding: "0 22px" }), height: 54, boxSizing: "border-box",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    border: `3px solid ${INK}`, borderRadius: 14, background: bg, boxShadow: `4px 4px 0 ${INK}`, fontSize: 17, fontWeight: 900,
   }}>{children}</div>
 );
 
 /** A text field mid-entry. `code` is the 6-character join code. */
-const Field: React.FC<{ value: string; caret: boolean; placeholder: string; T: Theme; code?: boolean }> = ({ value, caret, placeholder, T, code }) => (
+const Field: React.FC<{ value: string; caret: boolean; placeholder: string; code?: boolean; mt?: number }> = ({ value, caret, placeholder, code, mt = 0 }) => (
   <div style={{
-    marginTop: 16, padding: "15px 18px", borderRadius: 13, background: "#0f1113",
-    border: `1px solid ${value ? T.line : "#1c1e21"}`,
-    fontSize: code ? 26 : 22, fontWeight: 800, color: value ? "#fff" : "#4a4a4a",
-    letterSpacing: code ? ".3em" : ".04em", textAlign: code ? "center" : "left",
+    marginTop: mt, padding: "12px 16px", borderRadius: 14, border: `3px solid ${INK}`, background: CARD, boxShadow: `4px 4px 0 ${INK}`,
+    fontSize: code ? 30 : 24, fontWeight: 900, color: value ? INK : "#B7B1BF",
+    letterSpacing: code ? ".3em" : ".03em", textAlign: code ? "center" : "left",
     ...(code ? { textIndent: ".3em" } : null),
   }}>
     {value || placeholder}
-    <span style={{ opacity: caret ? 1 : 0, color: T.acc }}>|</span>
+    <span style={{ opacity: caret ? 1 : 0 }}>|</span>
   </div>
 );
 
-const Button: React.FC<any> = ({ T, frame, hoverAt, clickAt, label, brand, fg, glow, ghost, mt = 24 }) => {
+/**
+ * A pressable button, anchored to the bottom of the screen by default so the
+ * cursor's target y is fixed (see BTN_Y). Press = the hard shadow collapses
+ * and the button drops into where it was.
+ */
+const Button: React.FC<{
+  T: Theme; frame: number; label: React.ReactNode; hoverAt?: number; clickAt?: number;
+  bg?: string; fg?: string; bottom?: number;
+}> = ({ T, frame, label, hoverAt = -1, clickAt = -1, bg, fg = INK, bottom = 24 }) => {
   const hover = hoverAt >= 0 ? interpolate(frame, [hoverAt, hoverAt + 8], [0, 1], clamp) : 0;
-  const press = clickAt >= 0 && frame >= clickAt && frame < clickAt + 7 ? 1 : 0;
+  const press = clickAt >= 0 && frame >= clickAt && frame < clickAt + 7;
+  const sh = press ? 1 : 5 + hover * 2;
+  const shift = press ? 4 : -hover * 2;
   return (
     <div style={{
-      marginTop: mt, width: "100%", textAlign: "center", padding: "17px 22px", borderRadius: 13,
-      fontSize: 19, fontWeight: 800, color: ghost ? "#fff" : fg || T.ctaFg,
-      background: ghost ? "#141416" : brand || `linear-gradient(180deg, ${T.acc}, ${T.acc2})`,
-      border: `1px solid ${ghost ? "#26282b" : "transparent"}`,
-      transform: `translateY(${press ? 1.5 : -hover * 2.5}px) scale(${press ? 0.985 : 1 + hover * 0.012})`,
-      boxShadow: ghost ? "none" : `0 ${8 + hover * 10}px ${22 + hover * 20}px ${glow || (brand ? "rgba(88,101,242,.35)" : T.glow)}`,
+      position: "absolute", left: 24, right: 24, bottom, height: BTN_H, boxSizing: "border-box",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      borderRadius: 16, border: `3px solid ${INK}`, background: bg || T.acc, color: fg,
+      fontSize: 21, fontWeight: 900, boxShadow: `${sh}px ${sh}px 0 ${INK}`, transform: `translate(${shift}px, ${shift}px)`,
     }}>{label}</div>
   );
 };
 
+const DiscordBody: React.FC<{ frame: number; at: number }> = ({ frame, at }) => (
+  <>
+    <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+      <div style={{
+        width: 76, height: 76, flex: "none", borderRadius: "50%", background: LILAC, border: `3px solid ${INK}`, boxShadow: `4px 4px 0 ${INK}`,
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36,
+        transform: `rotate(${Math.sin(frame / 6) * 6}deg) scale(${interpolate(frame, [at + 4, at + 16], [0.6, 1], { ...clamp, easing: BOUNCE })})`,
+      }}>💬</div>
+      <Text>Brackets, match calls and your team all live there.</Text>
+    </div>
+    <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
+      <Pill bg={LEMON}>📣 Match calls</Pill><Pill bg={MINT}>🏆 Brackets</Pill><Pill bg={PINK}>🎮 Lobby codes</Pill>
+    </div>
+  </>
+);
+
+/** Captain plus the empty seats the code fills. */
+const SquadDots: React.FC<{ frame: number; at: number; T: Theme; size: number }> = ({ frame, at, T, size }) => (
+  <div style={{ display: "flex", gap: 10, marginTop: 18, alignItems: "center" }}>
+    {Array.from({ length: size }).map((_, i) => (
+      <div key={i} style={{
+        width: 46, height: 46, borderRadius: "50%", boxSizing: "border-box",
+        border: `3px ${i === 0 ? "solid" : "dashed"} ${INK}`, background: i === 0 ? T.acc : CARD,
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: i === 0 ? INK : MUTED,
+        transform: `scale(${interpolate(frame, [at + i * 3, at + i * 3 + 10], [0, 1], { ...clamp, easing: BOUNCE })})`,
+      }}>{i === 0 ? "C" : "+"}</div>
+    ))}
+    <span style={{ fontSize: 15, fontWeight: 800, color: BODY, marginLeft: 4 }}>captain + {size - 1} by code</span>
+  </div>
+);
+
 /** The hosted checkout, sliding in over whichever screen called it. */
-const PayuSheet: React.FC<{ frame: number; T: Theme; o: number; slideFrom: number; spinUntil: number; amount: number }> = ({ frame, T, o, slideFrom, spinUntil, amount }) => (
+const PayuSheet: React.FC<{ frame: number; o: number; slideFrom: number; spinUntil: number; amount: number }> = ({ frame, o, slideFrom, spinUntil, amount }) => (
   <Screen o={o}>
     <div style={{
-      position: "absolute", inset: 0, background: "#0a0b0d",
-      transform: `translateX(${interpolate(frame, [slideFrom, slideFrom + 16], [420, 0], { ...clamp, easing: EASE })}px)`,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18,
+      position: "absolute", inset: 0, background: PAPER,
+      transform: `translateX(${interpolate(frame, [slideFrom, slideFrom + 16], [620, 0], { ...clamp, easing: EASE })}px)`,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20,
     }}>
-      <div style={{ fontSize: 15, letterSpacing: ".18em", color: "#5a5a5a", fontWeight: 800 }}>PAYU · SECURE</div>
-      <Spinner frame={frame} start={slideFrom + 14} until={spinUntil} T={T} />
-      <div style={{ fontSize: 30, fontWeight: 800, color: frame > spinUntil ? "#4ade80" : "#fff" }}>
-        {frame > spinUntil ? "✓ Paid" : `₹${inr(amount)}`}
-      </div>
+      <Sticker bg={LILAC} rot={-3}>UPI · Net Banking</Sticker>
+      {frame > spinUntil ? (
+        <Pop frame={frame} at={spinUntil}>
+          <div style={{ width: 92, height: 92, borderRadius: "50%", background: MINT, border: `3px solid ${INK}`, boxShadow: `5px 5px 0 ${INK}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, fontWeight: 900 }}>✓</div>
+        </Pop>
+      ) : (
+        <div style={{ width: 56, height: 56, borderRadius: "50%", boxSizing: "border-box", border: `6px solid ${INK}22`, borderTopColor: INK, transform: `rotate(${(frame - slideFrom) * 14}deg)` }} />
+      )}
+      <div style={{ fontSize: 36, fontWeight: 900 }}>{frame > spinUntil ? "Paid" : `₹${inr(amount)}`}</div>
     </div>
   </Screen>
 );
 
-const Counter: React.FC<any> = ({ frame, from, to, value }) => (
-  <div style={{ fontSize: 68, fontWeight: 800, letterSpacing: "-.035em", color: "#fff", lineHeight: 1.05, marginTop: 8 }}>
-    ₹{Math.round(interpolate(frame, [from, to], [0, value], { ...clamp, easing: EASE })).toLocaleString("en-IN")}
+const Counter: React.FC<{ frame: number; from: number; to: number; value: number }> = ({ frame, from, to, value }) => (
+  <div style={{ fontSize: 76, fontWeight: 900, letterSpacing: "-.04em", lineHeight: 1 }}>
+    ₹{inr(Math.round(interpolate(frame, [from, to], [0, value], { ...clamp, easing: EASE })))}
   </div>
 );
 
-const Row: React.FC<any> = ({ done, label, value, T, delay, frame }) => {
+const Row: React.FC<{ done: boolean; label: string; value: string; delay: number; frame: number }> = ({ done, label, value, delay, frame }) => {
   const a = interpolate(frame, [delay - 10, delay], [0, 1], clamp);
+  const tick = done ? interpolate(frame, [delay, delay + 10], [1.5, 1], { ...clamp, easing: BOUNCE }) : 1;
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 13, padding: "13px 15px", borderRadius: 12,
-      background: "#0f1113", border: `1px solid ${done ? "rgba(74,222,128,.3)" : "#1c1e21"}`,
-      opacity: a, transform: `translateX(${(1 - a) * -10}px)`, marginTop: 10,
+      display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 14, marginTop: 12,
+      border: `2.5px solid ${INK}`, background: done ? "#EFFFF5" : CARD,
+      opacity: a, transform: `translateX(${(1 - a) * -14}px)`,
     }}>
       <div style={{
-        width: 27, height: 27, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-        background: done ? "rgba(74,222,128,.14)" : T.soft, color: done ? "#4ade80" : T.acc, fontSize: 14, fontWeight: 800,
-      }}>{done ? "✓" : "•"}</div>
-      <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", flex: 1 }}>{label}</div>
-      <div style={{ fontSize: 14, color: "#6fcf8a" }}>{done ? value : ""}</div>
+        width: 30, height: 30, borderRadius: 9, boxSizing: "border-box", border: `2.5px solid ${INK}`, background: done ? MINT : CARD,
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, transform: `scale(${tick})`,
+      }}>{done ? "✓" : ""}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: OK_TEXT }}>{done ? value : ""}</div>
     </div>
   );
 };
 
-const Progress: React.FC<any> = ({ frame, from, to, T }) => (
-  <div style={{ height: 5, borderRadius: 3, background: "#191b1e", overflow: "hidden", marginTop: 16 }}>
-    <div style={{ height: "100%", width: `${interpolate(frame, [from, to], [0, 100], { ...clamp, easing: EASE })}%`, background: T.acc, boxShadow: `0 0 12px ${T.glow}` }} />
+const Progress: React.FC<{ frame: number; from: number; to: number; T: Theme }> = ({ frame, from, to, T }) => (
+  <div style={{ height: 16, boxSizing: "border-box", borderRadius: 100, border: `2.5px solid ${INK}`, background: CARD, overflow: "hidden", marginBottom: 2 }}>
+    <div style={{ height: "100%", width: `${interpolate(frame, [from, to], [0, 100], { ...clamp, easing: EASE })}%`, background: T.acc }} />
   </div>
 );
 
-const Spinner: React.FC<any> = ({ frame, start, until, T }) => (
-  frame > until ? <div style={{ fontSize: 34 }}>✅</div> : <div style={{
-    width: 34, height: 34, borderRadius: "50%", border: "3px solid #1c1e21", borderTopColor: T.acc,
-    transform: `rotate(${(frame - start) * 12}deg)`,
-  }} />
-);
-
-const Pop: React.FC<any> = ({ frame, at, children }) => {
+const Pop: React.FC<{ frame: number; at: number; children: React.ReactNode }> = ({ frame, at, children }) => {
   const { fps } = useVideoConfig();
-  return <div style={{ transform: `scale(${spring({ frame: frame - at, fps, config: { damping: 11, mass: 0.5 } })})` }}>{children}</div>;
+  return <div style={{ transform: `scale(${spring({ frame: frame - at, fps, config: { damping: 9, mass: 0.5 } })})` }}>{children}</div>;
 };
 
 // ── match day ──────────────────────────────────────────────────────────────
 
 /**
- * The draw, rebuilt — SOLO MODE ONLY. Team registrations arrive pre-formed and
- * there is nothing to draw; playing this over a team tournament is exactly the
- * wrong claim, so the team timeline carries no `draw` beat at all.
+ * The draw — SOLO MODE ONLY. Team registrations arrive pre-formed and there is
+ * nothing to draw, so the team timeline carries no `draw` beat at all.
  *
- * The previous version crossfaded a floating pool out while team cards faded
- * in — two unrelated sets of elements, so the dots never *became* players and
- * the whole thing read as a dissolve rather than a draw. Now there is ONE set
- * of dots: each is given a pool position and a seat, and flies from one to the
- * other on a staggered arc. Identity is continuous, which is the entire point.
- *
- * Dots are dealt k % teamCount — one to each team in turn, the way a real draw
- * looks — rather than filling one team at a time.
+ * ONE set of dots: each is given a pool position and a seat, and flies from
+ * one to the other on a staggered arc, dealt k % teamCount — one to each team
+ * in turn, the way a real draw looks. Identity is continuous, which is the
+ * entire point; crossfading a pool into filled cards read as a dissolve.
  */
-const POOL_X = (k: number) => 176 + (k % 5) * 84;
-const POOL_Y = (k: number) => 392 + Math.floor(k / 5) * 62;
+const POOL_X = (k: number) => 196 + (k % 5) * 82;
+const POOL_Y = (k: number) => 376 + Math.floor(k / 5) * 54;
 
 const MatchDay: React.FC<{
   frame: number; T: Theme; teamCount: number; totalSlots: number; teamMode: boolean;
-  groupBo: number; finalBo: number;
-  finalTime: string; prizePool: string; entryFee: number; dateLabel: string;
-}> = ({ frame, T, teamCount, totalSlots, teamMode, groupBo, finalBo, finalTime, prizePool, entryFee, dateLabel }) => {
+  groupBo: number; finalBo: number; finalTime: string; entryFee: number; dateLabel: string;
+}> = ({ frame, T, teamCount, totalSlots, teamMode, groupBo, finalBo, finalTime, entryFee, dateLabel }) => {
   const B = teamMode ? B_TEAM : B_SOLO;
   const STANDINGS = STANDINGS_BY_BO[groupBo === 1 ? 1 : 2];
   const GROUP = `Bo${groupBo}`;
@@ -736,253 +867,254 @@ const MatchDay: React.FC<{
     { t: finalTime, l: "Grand Final", s: `${FINAL} · top 2 only`, gold: true },
   ];
 
-  /** "Bo1" alone means nothing to a first-timer; the spelled-out half says it. */
-  const spelled = (n: number) => `best of ${n}`;
+  const panel: React.CSSProperties = { position: "absolute", left: PAD_X, right: PAD_X, top: BODY_TOP };
 
   return (
     <>
-      {/* ── the draw (solo only) ── */}
-      {/* B_SOLO directly, not B: the draw beat exists on that timeline only,
-          and this branch is the solo one by construction. */}
+      {/* ── the draw (solo only) — B_SOLO directly: this branch is solo by construction ── */}
       {!teamMode && (() => {
         const bDraw = beat(frame, B_SOLO.draw[0], B_SOLO.draw[1], 13);
         const DRAW_AT = B_SOLO.draw[0] + 22;
-        const colW = 600 / teamCount;
-        const seatX = (k: number) => 60 + (k % teamCount) * colW + colW / 2;
-        const seatY = (k: number) => 408 + Math.floor(k / teamCount) * 42;
+        const colW = (720 - PAD_X * 2) / teamCount;
+        const seatX = (k: number) => PAD_X + (k % teamCount) * colW + colW / 2;
+        const seatY = (k: number) => 392 + Math.floor(k / teamCount) * 40;
         const youIdx = 1 + teamCount * 2;          // team B, third seat dealt
         const cardsIn = interpolate(frame, [DRAW_AT - 14, DRAW_AT + 2], [0, 1], { ...clamp, easing: EASE });
         const seated = interpolate(frame, [DRAW_AT + totalSlots * 2 + 16, DRAW_AT + totalSlots * 2 + 32], [0, 1], clamp);
         return (
           <AbsoluteFill style={bDraw}>
-            <div style={{ position: "absolute", left: 58, right: 58, top: 176 }}>
-              <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>TOURNAMENT DAY · 10:45</div>
-              <div style={{ fontSize: 42, fontWeight: 800, color: "#fff", letterSpacing: "-.02em", lineHeight: 1.1, marginTop: 10 }}>
-                Teams are drawn<br />at random
-              </div>
-            </div>
+            {Array.from({ length: teamCount }).map((_, ti) => {
+              const mine = TEAM_NAMES[ti] === YOU;
+              return (
+                <div key={ti} style={{
+                  position: "absolute", left: PAD_X + ti * colW + 6, width: colW - 12, top: BODY_TOP + 30, height: 268, boxSizing: "border-box",
+                  borderRadius: 18, border: `3px solid ${INK}`, background: mine ? LEMON : CARD, boxShadow: `5px 5px 0 ${INK}`,
+                  opacity: cardsIn, transform: `rotate(${(ti % 2 ? 1 : -1) * 1.2}deg) scale(${0.94 + cardsIn * 0.06})`,
+                  display: "flex", justifyContent: "center", paddingTop: 12,
+                }}>
+                  <div><Sticker bg={mine ? T.acc : PAPER} rot={0} size={12}>Team {TEAM_NAMES[ti]}</Sticker></div>
+                </div>
+              );
+            })}
 
-            {/* team cards — the targets the dots fly into */}
-            {Array.from({ length: teamCount }).map((_, ti) => (
-              <div key={ti} style={{
-                position: "absolute", left: 60 + ti * colW + 5, width: colW - 10, top: 366, height: 236,
-                borderRadius: 15, background: TEAM_NAMES[ti] === YOU ? T.soft : "rgba(15,17,19,.9)",
-                border: `1px solid ${TEAM_NAMES[ti] === YOU ? T.line : "#1c1e21"}`,
-                opacity: cardsIn, transform: `scale(${0.96 + cardsIn * 0.04})`,
-              }}>
-                <div style={{
-                  fontSize: 13, letterSpacing: ".1em", fontWeight: 800, textAlign: "center", marginTop: 11,
-                  color: TEAM_NAMES[ti] === YOU ? T.acc : "#6a6a6a",
-                }}>TEAM {TEAM_NAMES[ti]}</div>
-              </div>
-            ))}
-
-            {/* ONE set of dots — pool → seat, staggered, lifting through the arc */}
             {Array.from({ length: totalSlots }).map((_, k) => {
               const start = DRAW_AT + k * 2;
               const t = interpolate(frame, [start, start + 20], [0, 1], { ...clamp, easing: EASE });
               const jitter = t < 0.02 ? Math.sin((frame + k * 9) / 6) * 7 : 0;
               const x = POOL_X(k) + (seatX(k) - POOL_X(k)) * t + jitter;
-              const y = POOL_Y(k) + (seatY(k) - POOL_Y(k)) * t - Math.sin(t * Math.PI) * 26;
+              const y = POOL_Y(k) + (seatY(k) - POOL_Y(k)) * t - Math.sin(t * Math.PI) * 30;
               const you = k === youIdx;
-              const dot = you ? 30 : 25;
+              const dot = you ? 32 : 26;
               return (
                 <div key={k} style={{
-                  position: "absolute", left: x - dot / 2, top: y - dot / 2, width: dot, height: dot,
-                  borderRadius: "50%", background: you ? T.acc : "#20242a",
-                  border: you ? `2px solid ${T.acc}` : "1px solid #2a2e34",
-                  boxShadow: you ? `0 0 18px ${T.glow}` : t > 0.9 ? "0 2px 8px rgba(0,0,0,.5)" : "none",
-                  transform: `scale(${t > 0.01 && t < 0.99 ? 1.14 : 1})`,
+                  position: "absolute", left: x - dot / 2, top: y - dot / 2, width: dot, height: dot, boxSizing: "border-box",
+                  borderRadius: "50%", border: `3px solid ${INK}`, background: you ? T.acc : CARD,
+                  transform: `scale(${t > 0.01 && t < 0.99 ? 1.18 : 1})`,
                 }} />
               );
             })}
 
-            <div style={{ position: "absolute", left: 58, right: 58, top: 628, fontSize: 20, color: "#8d8d8d", opacity: seated }}>
-              {teamCount} teams of 5 — <span style={{ color: T.acc, fontWeight: 700 }}>you&apos;re in Team {YOU}</span>.
+            <div style={{ position: "absolute", left: PAD_X, right: PAD_X, top: BODY_TOP + 330, fontSize: 22, fontWeight: 800, opacity: seated }}>
+              {teamCount} teams of 5 — <Mark c={T.acc}>you&apos;re in Team {YOU}</Mark>.
             </div>
           </AbsoluteFill>
         );
       })()}
 
       {/* ── the day, hour by hour ── */}
-      <AbsoluteFill style={{ padding: "146px 54px 182px", justifyContent: "center", gap: 12, ...bDay }}>
-        <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>SUNDAY · THE WHOLE DAY</div>
-        <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", letterSpacing: "-.02em", lineHeight: 1.1 }}>
-          One day, start<br />to finish
-        </div>
-
-        {/* The whole format in one line, before any detail. Two stages and
-            nothing else — no semis, no lower bracket. */}
-        <div style={{
-          display: "flex", alignItems: "stretch", gap: 10, marginTop: 4,
-          opacity: interpolate(frame, [B.day[0] + 8, B.day[0] + 20], [0, 1], clamp),
-          transform: `translateY(${interpolate(frame, [B.day[0] + 8, B.day[0] + 20], [10, 0], { ...clamp, easing: EASE })}px)`,
-        }}>
-          <div style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: T.soft, border: `1px solid ${T.line}` }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Round robin · <span style={{ color: T.acc }}>{GROUP}</span></div>
-            <div style={{ fontSize: 13, color: "#8d8d8d", marginTop: 2 }}>{spelled(groupBo)} · everyone plays everyone</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#5a5a5a", fontSize: 22, fontWeight: 800 }}>→</div>
-          <div style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.35)" }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Grand Final · <span style={{ color: "#fbbf24" }}>{FINAL}</span></div>
-            <div style={{ fontSize: 13, color: "#9a8a5a", marginTop: 2 }}>{spelled(finalBo)} · top 2 only</div>
-          </div>
-        </div>
-
-        <div style={{ position: "relative", marginTop: 8 }}>
-          {/* the spine the day runs down */}
+      <AbsoluteFill style={bDay}>
+        <div style={panel}>
+          {/* The whole format in one line, before any detail. Two stages and
+              nothing else — no semis, no lower bracket. */}
           <div style={{
-            position: "absolute", left: 7, top: 8, bottom: 8, width: 2, background: "#1e2126",
-          }} />
-          <div style={{
-            position: "absolute", left: 7, top: 8, width: 2, background: T.acc,
-            height: `${interpolate(frame, [B.day[0] + 20, B.day[0] + 108], [0, 100], clamp)}%`,
-            boxShadow: `0 0 10px ${T.glow}`,
-          }} />
+            display: "flex", alignItems: "stretch", gap: 12,
+            opacity: interpolate(frame, [B.day[0] + 8, B.day[0] + 20], [0, 1], clamp),
+            transform: `scale(${interpolate(frame, [B.day[0] + 8, B.day[0] + 22], [0.85, 1], { ...clamp, easing: BOUNCE })})`,
+          }}>
+            <StageBox title="Round robin" badge={GROUP} badgeBg={T.acc} sub={`best of ${groupBo} · everyone plays everyone`} rot={-1.5} />
+            <div style={{ alignSelf: "center", fontSize: 30, fontWeight: 900 }}>→</div>
+            <StageBox title="Grand Final" badge={FINAL} badgeBg={GOLD} sub={`best of ${finalBo} · top 2 only`} rot={1.5} />
+          </div>
 
-          {DAY_ROWS.map((r, i) => {
-            // Team mode has one fewer row but a shorter beat, so the stagger
-            // tightens to leave the finished timeline on screen, not mid-build.
-            const at = B.day[0] + (teamMode ? 20 : 24) + i * (teamMode ? 13 : 15);
-            const a = interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: EASE });
-            return (
-              <div key={r.t} style={{
-                position: "relative", display: "flex", alignItems: "center", gap: 15, padding: "9px 0 9px 26px",
-                opacity: a, transform: `translateX(${(1 - a) * -12}px)`,
-              }}>
-                {/* node on the spine — positioned against its own row, or all
-                    of them would collapse onto the wrapper's origin */}
-                <div style={{
-                  position: "absolute", left: 0, top: "50%", marginTop: -8, width: 16, height: 16, borderRadius: "50%",
-                  background: r.gold ? "#fbbf24" : r.hi ? T.acc : "#2a2e34",
-                  border: `2px solid ${r.gold ? "#fbbf24" : r.hi ? T.acc : "#33383f"}`,
-                  boxShadow: r.gold ? "0 0 12px rgba(251,191,36,.5)" : r.hi ? `0 0 12px ${T.glow}` : "none",
-                }} />
-                <span style={{ fontSize: 19, fontWeight: 800, width: 78, color: r.gold ? "#fbbf24" : r.hi ? T.acc : "#7a7a7a" }}>{r.t}</span>
-                <span style={{ fontSize: 19, fontWeight: 700, color: "#fff", flex: 1 }}>{r.l}</span>
-                <span style={{ fontSize: 14, color: r.gold ? "#fbbf24" : "#7d7d7d" }}>{r.s}</span>
-              </div>
-            );
-          })}
+          <div style={{ position: "relative", marginTop: 26 }}>
+            {/* the spine the day runs down */}
+            <div style={{ position: "absolute", left: 9, top: 14, bottom: 14, width: 4, borderRadius: 4, background: `${INK}22` }} />
+            <div style={{
+              position: "absolute", left: 9, top: 14, width: 4, borderRadius: 4, background: INK,
+              height: `${interpolate(frame, [B.day[0] + 20, B.day[0] + 100], [0, 92], clamp)}%`,
+            }} />
+            {DAY_ROWS.map((r, i) => {
+              const at = B.day[0] + (teamMode ? 20 : 24) + i * (teamMode ? 13 : 15);
+              const a = interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: EASE });
+              return (
+                <div key={r.t} style={{
+                  position: "relative", display: "flex", alignItems: "center", gap: 14, height: 48, paddingLeft: 38,
+                  opacity: a, transform: `translateX(${(1 - a) * -14}px)`,
+                }}>
+                  {/* node positioned against its own row, or all of them would
+                      collapse onto the wrapper's origin */}
+                  <div style={{
+                    position: "absolute", left: 0, top: "50%", marginTop: -11, width: 22, height: 22, boxSizing: "border-box", borderRadius: "50%",
+                    border: `3px solid ${INK}`, background: r.gold ? GOLD : r.hi ? T.acc : CARD,
+                    transform: `scale(${interpolate(frame, [at, at + 10], [0.3, 1], { ...clamp, easing: BOUNCE })})`,
+                  }} />
+                  <span style={{ fontSize: 20, fontWeight: 900, width: 72 }}>{r.t}</span>
+                  <span style={{ fontSize: 19, fontWeight: 800, flex: 1 }}>{r.l}</span>
+                  {r.hi || r.gold ? (
+                    <span style={{ fontSize: 13, fontWeight: 900, padding: "3px 10px", borderRadius: 100, border: `2px solid ${INK}`, background: r.gold ? GOLD : CARD }}>{r.s}</span>
+                  ) : (
+                    <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{r.s}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </AbsoluteFill>
 
       {/* ── your day, from your side ── */}
-      <AbsoluteFill style={{ padding: "150px 56px 186px", justifyContent: "center", gap: 13, ...bMine }}>
-        <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>YOUR DAY</div>
-        <div style={{ fontSize: 44, fontWeight: 800, color: "#fff", letterSpacing: "-.025em", lineHeight: 1.08 }}>
-          You play 3 matches.<br /><span style={{ color: T.acc }}>Guaranteed.</span>
-        </div>
-        <div style={{ fontSize: 18, color: "#8d8d8d", lineHeight: 1.5 }}>
-          {teamMode
-            ? `${MY_TEAM} plays every other team once. A loss doesn't send you home.`
-            : "One against every other team. A loss doesn't send you home."}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 4 }}>
-          {MY_MATCHES.map((m, i) => {
-            const at = B.mine[0] + 32 + i * 18;
-            const a = interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: EASE });
-            return (
-              <div key={m.time} style={{
-                display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", borderRadius: 14,
-                background: T.soft, border: `1px solid ${T.line}`,
-                opacity: a, transform: `translateX(${(1 - a) * -14}px)`,
-              }}>
-                <span style={{ fontSize: 19, fontWeight: 800, color: T.acc, width: 74 }}>{m.time}</span>
-                <span style={{ fontSize: 19, color: "#fff", fontWeight: 700, flex: 1 }}>vs {label(m.vs)}</span>
-                <span style={{ fontSize: 15, color: "#8d8d8d" }}>{GROUP}</span>
-              </div>
-            );
-          })}
-
-          {/* the fourth, conditional on finishing top two */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", borderRadius: 14,
-            background: "rgba(251,191,36,.07)", border: "1px dashed rgba(251,191,36,.4)",
-            opacity: interpolate(frame, [B.mine[0] + 92, B.mine[0] + 106], [0, 1], { ...clamp, easing: EASE }),
-            transform: `translateY(${interpolate(frame, [B.mine[0] + 92, B.mine[0] + 106], [12, 0], { ...clamp, easing: EASE })}px)`,
-          }}>
-            <span style={{ fontSize: 19, fontWeight: 800, color: "#fbbf24", width: 74 }}>{finalTime}</span>
-            <span style={{ fontSize: 19, color: "#fff", fontWeight: 700, flex: 1 }}>Grand Final</span>
-            <span style={{ fontSize: 15, color: "#fbbf24" }}>{FINAL} · if top 2</span>
+      <AbsoluteFill style={bMine}>
+        <div style={panel}>
+          <Text size={18}>
+            {teamMode ? "Every team plays every team once." : "One match against every other team."} A loss won&apos;t send you home.
+          </Text>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
+            {MY_MATCHES.map((m, i) => {
+              const at = B.mine[0] + 24 + i * 14;
+              const a = interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: EASE });
+              return (
+                <Ticket key={m.time} time={m.time} timeBg={T.acc} name={`vs ${label(m.vs)}`} tag={GROUP}
+                  style={{ opacity: a, transform: `translateX(${(1 - a) * -20}px) rotate(${(i % 2 ? 0.6 : -0.6)}deg)` }} />
+              );
+            })}
+            {/* the fourth, conditional on finishing top two */}
+            <Ticket time={finalTime} timeBg={GOLD} name="Grand Final" tag={`${FINAL} · if top 2`} tagBg={GOLD} dashed
+              style={{
+                opacity: interpolate(frame, [B.mine[0] + 72, B.mine[0] + 86], [0, 1], { ...clamp, easing: EASE }),
+                transform: `scale(${interpolate(frame, [B.mine[0] + 72, B.mine[0] + 88], [0.85, 1], { ...clamp, easing: BOUNCE })})`,
+              }} />
           </div>
-        </div>
-
-        <div style={{ fontSize: 19, color: "#fff", marginTop: 2, opacity: interpolate(frame, [B.mine[0] + 112, B.mine[0] + 126], [0, 1], clamp) }}>
-          {/* Three group fixtures of groupBo maps each, plus up to finalBo. */}
-          <b>{3 * groupBo} maps minimum.</b> <span style={{ color: "#8d8d8d" }}>Up to {3 * groupBo + finalBo} if you reach the final.</span>
+          <div style={{ fontSize: 20, fontWeight: 900, marginTop: 20, opacity: interpolate(frame, [B.mine[0] + 92, B.mine[0] + 104], [0, 1], clamp) }}>
+            {/* Three group fixtures of groupBo maps each, plus up to finalBo. */}
+            <Mark c={T.acc}>{3 * groupBo} maps minimum.</Mark>{" "}
+            <span style={{ color: BODY, fontWeight: 700 }}>Up to {3 * groupBo + finalBo} if you reach the final.</span>
+          </div>
         </div>
       </AbsoluteFill>
 
       {/* ── standings ── */}
-      <AbsoluteFill style={{ padding: "150px 56px 186px", justifyContent: "center", gap: 15, ...bStand }}>
-        <div style={{ fontSize: 15, letterSpacing: ".18em", color: T.acc, fontWeight: 800 }}>HOW YOU QUALIFY</div>
-        <div style={{ fontSize: 34, fontWeight: 800, color: "#fff", letterSpacing: "-.02em" }}>Top two make the final</div>
-        <div style={{ background: "#0f1113", border: "1px solid #1c1e21", borderRadius: 18, padding: 18 }}>
-          <div style={{ display: "flex", fontSize: 14, color: "#6a6a6a", fontWeight: 700, letterSpacing: ".08em", paddingBottom: 8 }}>
-            <span style={{ flex: 1 }}>TEAM</span><span style={{ width: 64, textAlign: "right" }}>PTS</span><span style={{ width: 92, textAlign: "right" }}>RW−RL</span>
+      <AbsoluteFill style={bStand}>
+        <div style={panel}>
+          <div style={{ background: CARD, border: `3px solid ${INK}`, borderRadius: 20, boxShadow: `6px 6px 0 ${INK}`, overflow: "hidden" }}>
+            <div style={{ display: "flex", padding: "10px 18px", background: PAPER, borderBottom: `3px solid ${INK}`, fontSize: 13, fontWeight: 900, letterSpacing: ".1em" }}>
+              <span style={{ flex: 1 }}>TEAM</span><span style={{ width: 60, textAlign: "right" }}>PTS</span><span style={{ width: 88, textAlign: "right" }}>RW−RL</span>
+            </div>
+            {STANDINGS.map((s, i) => {
+              const at = B.stand[0] + 14 + i * 8;
+              const a = interpolate(frame, [at, at + 9], [0, 1], clamp);
+              const you = s.t === YOU;
+              return (
+                <div key={s.t} style={{
+                  display: "flex", alignItems: "center", height: 52, padding: "0 18px",
+                  // The dashed rule under second place is the qualification cut.
+                  borderTop: i === 0 ? "none" : i === 2 ? `3px dashed ${INK}` : `2px solid ${INK}1f`,
+                  background: you ? T.soft : "transparent",
+                  opacity: a, transform: `translateX(${(1 - a) * -14}px)`,
+                }}>
+                  <div style={{
+                    width: 28, height: 28, boxSizing: "border-box", borderRadius: "50%", border: `2.5px solid ${INK}`, background: i < 2 ? GOLD : CARD,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, marginRight: 12,
+                  }}>{i + 1}</div>
+                  <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, fontSize: 19, fontWeight: 900, color: i < 2 ? INK : MUTED }}>
+                    {label(s.t)}
+                    {you && <Sticker bg={T.acc} rot={-5} size={11}>you</Sticker>}
+                  </span>
+                  <span style={{ width: 60, textAlign: "right", fontSize: 22, fontWeight: 900 }}>{s.p}</span>
+                  <span style={{ width: 88, textAlign: "right", fontSize: 18, fontWeight: 800, color: s.rd >= 0 ? OK_TEXT : BAD_TEXT }}>{s.rd > 0 ? `+${s.rd}` : s.rd}</span>
+                </div>
+              );
+            })}
           </div>
-          {STANDINGS.map((s, i) => {
-            const at = B.stand[0] + 14 + i * 8;
-            const a = interpolate(frame, [at, at + 9], [0, 1], clamp);
-            return (
-              <div key={s.t} style={{
-                display: "flex", alignItems: "center", padding: "11px 0", borderTop: "1px solid #191b1e",
-                opacity: a, transform: `translateX(${(1 - a) * -12}px)`,
-              }}>
-                <span style={{ flex: 1, fontSize: teamMode ? 20 : 22, fontWeight: 800, color: s.t === YOU ? T.acc : i < 2 ? "#fff" : "#7f7f7f" }}>
-                  {i + 1}. {label(s.t)}{s.t === YOU ? "  ← you" : ""}
-                </span>
-                <span style={{ width: 64, textAlign: "right", fontSize: 21, fontWeight: 800, color: "#fff" }}>{s.p}</span>
-                <span style={{ width: 92, textAlign: "right", fontSize: 19, color: s.rd >= 0 ? "#6fcf8a" : "#c86a6a" }}>{s.rd > 0 ? `+${s.rd}` : s.rd}</span>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ fontSize: 16, color: "#8d8d8d" }}>
-          {groupBo === 1 ? "Each match won is a point." : "Each map won is a point."} Level? <b style={{ color: "#fff" }}>RW−RL</b>, then <b style={{ color: "#fff" }}>K−D</b>.
-        </div>
+          <Text size={16} mt={14}>
+            {groupBo === 1 ? "Each match won is a point." : "Each map won is a point."} Level? <b style={{ color: INK }}>RW−RL</b>, then <b style={{ color: INK }}>K−D</b>.
+          </Text>
 
-        {/* No bracket, no semis — the top two go straight to one final. Saying
-            so explicitly stops people assuming a longer play-off run. */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 13, marginTop: 4,
-          padding: "16px 18px", borderRadius: 15,
-          background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.35)",
-          opacity: interpolate(frame, [B.stand[0] + 56, B.stand[0] + 70], [0, 1], { ...clamp, easing: EASE }),
-          transform: `scale(${interpolate(frame, [B.stand[0] + 56, B.stand[0] + 70], [0.96, 1], { ...clamp, easing: EASE })})`,
-        }}>
-          <span style={{ fontSize: teamMode ? 19 : 30, fontWeight: 800, color: T.acc }}>{label(STANDINGS[0].t)}</span>
-          <span style={{ fontSize: 16, color: "#8d8d8d" }}>vs</span>
-          <span style={{ fontSize: teamMode ? 19 : 30, fontWeight: 800, color: "#fff" }}>{label(STANDINGS[1].t)}</span>
-          <div style={{ width: 1, height: 30, background: "rgba(251,191,36,.3)" }} />
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#fbbf24" }}>{finalTime} GRAND FINAL</div>
-            <div style={{ fontSize: 13, color: "#9a8a5a" }}>{FINAL} ({spelled(finalBo)}) — that&apos;s the whole play-off</div>
+          {/* No bracket, no semis — the top two go straight to one final. Saying
+              so explicitly stops people assuming a longer play-off run. */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 13, marginTop: 18,
+            padding: "14px 18px", borderRadius: 18, background: GOLD, border: `3px solid ${INK}`, boxShadow: `5px 5px 0 ${INK}`,
+            opacity: interpolate(frame, [B.stand[0] + 52, B.stand[0] + 64], [0, 1], clamp),
+            transform: `rotate(-1.2deg) scale(${interpolate(frame, [B.stand[0] + 52, B.stand[0] + 68], [0.8, 1], { ...clamp, easing: BOUNCE })})`,
+          }}>
+            <span style={{ fontSize: 20, fontWeight: 900 }}>{label(STANDINGS[0].t)}</span>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>vs</span>
+            <span style={{ fontSize: 20, fontWeight: 900 }}>{label(STANDINGS[1].t)}</span>
+            <div style={{ width: 3, height: 34, background: INK, borderRadius: 2 }} />
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>{finalTime} GRAND FINAL</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{FINAL} — the whole play-off</div>
+            </div>
           </div>
         </div>
       </AbsoluteFill>
 
       {/* ── close ── */}
-      <AbsoluteFill style={{ padding: "150px 56px 186px", justifyContent: "center", alignItems: "center", gap: 16, textAlign: "center", ...bCta }}>
-        <div style={{ fontSize: teamMode ? 46 : 52, fontWeight: 800, color: "#fff", letterSpacing: "-.025em", lineHeight: 1.06 }}>
+      <AbsoluteFill style={bCta}>
+        <div style={{ ...panel, top: BODY_TOP + 10, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Sticker bg={T.acc} rot={-3} size={17}>Round robin · {GROUP}</Sticker>
+            <span style={{ fontSize: 28, fontWeight: 900 }}>→</span>
+            <Sticker bg={GOLD} rot={3} size={17}>Grand Final · {FINAL}</Sticker>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: BODY, marginTop: 6 }}>{dateLabel}</div>
           {teamMode
-            ? <>{teamCount} team slots.<br />₹{Number(entryFee).toLocaleString("en-IN")} per team.</>
-            : <>{totalSlots} slots.<br />₹{entryFee}.</>}
+            ? <div style={{ fontSize: 19, fontWeight: 800 }}>Create a team, or join one with a code.</div>
+            : <div style={{ fontSize: 19, fontWeight: 800 }}>Register solo — ₹{inr(entryFee)} a seat.</div>}
+          <div style={{ position: "relative", marginTop: 18 }}>
+            <div style={{
+              padding: "20px 58px", borderRadius: 100, border: `3px solid ${INK}`, background: T.acc, boxShadow: `7px 7px 0 ${INK}`,
+              fontSize: 32, fontWeight: 900,
+              transform: `scale(${1 + Math.max(0, Math.sin((frame - B.cta[0]) / 5)) * 0.035})`,
+            }}>Register →</div>
+            <div style={{ position: "absolute", right: -30, top: -26 }}>
+              <Sticker bg={PINK} rot={14} size={15} pop={interpolate(frame, [B.cta[0] + 16, B.cta[0] + 28], [0, 1], { ...clamp, easing: BOUNCE })}>GO!</Sticker>
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 21, color: "#8d8d8d" }}>{dateLabel} · ₹{prizePool} prize pool</div>
-        <div style={{ fontSize: 18, color: "#fff", fontWeight: 700 }}>
-          Round robin <span style={{ color: T.acc }}>{GROUP}</span> → Grand Final <span style={{ color: "#fbbf24" }}>{FINAL}</span>
-        </div>
-        {teamMode && <div style={{ fontSize: 17, color: "#7a7a7a" }}>Create a team, or join one with a code.</div>}
-        <div style={{
-          marginTop: 6, padding: "18px 44px", borderRadius: 100, fontSize: 26, fontWeight: 800,
-          color: T.ctaFg, background: `linear-gradient(180deg, ${T.acc}, ${T.acc2})`, boxShadow: `0 12px 44px ${T.glow}`,
-        }}>Register →</div>
       </AbsoluteFill>
     </>
   );
 };
+
+const StageBox: React.FC<{ title: string; badge: string; badgeBg: string; sub: string; rot: number }> = ({ title, badge, badgeBg, sub, rot }) => (
+  <div style={{
+    flex: 1, background: CARD, border: `3px solid ${INK}`, borderRadius: 16, boxShadow: `4px 4px 0 ${INK}`, padding: "12px 14px",
+    transform: `rotate(${rot}deg)`,
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 19, fontWeight: 900 }}>{title}</span>
+      <Sticker bg={badgeBg} rot={0} size={13}>{badge}</Sticker>
+    </div>
+    <div style={{ fontSize: 13.5, fontWeight: 600, color: BODY, marginTop: 6 }}>{sub}</div>
+  </div>
+);
+
+/** A fixture as a ticket stub: time on a coloured tab, opponent, best-of tag. */
+const Ticket: React.FC<{ time: string; timeBg: string; name: string; tag: string; tagBg?: string; dashed?: boolean; style: React.CSSProperties }> = ({
+  time, timeBg, name, tag, tagBg = CARD, dashed, style,
+}) => (
+  <div style={{
+    display: "flex", alignItems: "stretch", height: 62, boxSizing: "border-box",
+    border: `3px ${dashed ? "dashed" : "solid"} ${INK}`, borderRadius: 16, background: dashed ? PAPER : CARD,
+    boxShadow: dashed ? "none" : `4px 4px 0 ${INK}`, overflow: "hidden", ...style,
+  }}>
+    <div style={{ width: 96, background: timeBg, borderRight: `3px ${dashed ? "dashed" : "solid"} ${INK}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900 }}>{time}</div>
+    <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "0 16px", fontSize: 19, fontWeight: 800 }}>{name}</div>
+    <div style={{ display: "flex", alignItems: "center", paddingRight: 14 }}>
+      <span style={{ fontSize: 13, fontWeight: 900, padding: "3px 10px", borderRadius: 100, border: `2px solid ${INK}`, background: tagBg }}>{tag}</span>
+    </div>
+  </div>
+);
 
 export default TournamentExplainer;

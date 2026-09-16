@@ -87,10 +87,12 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
     finalBestOf: Number(tournament?.grandFinalBestOf) || 3,
   };
 
-  const frame = (children: React.ReactNode) => (
+  // `ground` is what shows before the player mounts — it must match the film,
+  // or the light explainer flashes a black box on its way in.
+  const frame = (children: React.ReactNode, ground = "#070707") => (
     <div style={{
       position: "relative", borderRadius: 18, overflow: "hidden",
-      border: `1px solid ${T.line}`, background: "#070707",
+      border: `1px solid ${T.line}`, background: ground,
       boxShadow: "0 18px 60px rgba(0,0,0,.55)",
     }}>{children}</div>
   );
@@ -120,7 +122,7 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
             autoPlay loop controls={false}
             style={{ width: "100%", display: "block" }}
           />
-        ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />)}
+        ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />, "#FFF7EA")}
         <div className="tiv-cap">
           <span style={{ fontSize: 11.5, color: "#666" }}>{teamMode ? "How team entry works" : "How it works"} · 30s</span>
           <button onClick={() => setReplay(r => r + 1)} style={{
