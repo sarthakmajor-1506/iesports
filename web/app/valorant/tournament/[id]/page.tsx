@@ -834,7 +834,10 @@ function ValorantTournamentDetailInner() {
   const teamSize = Number(tournament.teamSize) || 5;
   const totalTeams = Number(tournament.totalTeams) || Math.floor((tournament.totalSlots || 0) / teamSize);
   const onTeam = teamMode && !!myTeam?.team;
-  const teamPending = teamMode && !myTeam?.team && !!myTeam?.pendingTeamPayment;  // Canonical "tournament is over" check — matches ended/completed/endDate-passed
+  const teamPending = teamMode && !myTeam?.team && !!myTeam?.pendingTeamPayment;
+  // Group stage straight into a single Grand Final (Horizon). The bracket fields
+  // on such a tournament are template leftovers and must not be displayed.
+  const finalOnly = tournament.playoffFormat === "Grand Final";  // Canonical "tournament is over" check — matches ended/completed/endDate-passed
   // used elsewhere (featured-tournaments route). Literal status==="ended" alone
   // missed tournaments marked "completed", which let Join as Substitute keep
   // showing after the tournament was fully done.
@@ -1543,8 +1546,10 @@ function ValorantTournamentDetailInner() {
               <div className="vtd-stat-tiles">
                 <div className="vtd-stat-tile red" style={{ animationDelay: "0s" }}>
                   <div className="vtd-stat-tile-icon"><Zap size={24} color="#3CCBFF" /></div>
-                  <div className="vtd-stat-tile-val">{tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>
-                  <div className="vtd-stat-tile-lbl">Format</div>
+                  {/* Team registration says so: "Standard" told nobody that you
+                      bring your own five and nobody is shuffled. */}
+                  <div className="vtd-stat-tile-val">{teamMode ? "Team entry" : tournament.format === "shuffle" ? "Shuffle" : tournament.format === "auction" ? "Auction" : "Standard"}</div>
+                  <div className="vtd-stat-tile-lbl">{teamMode ? "Create or join a team" : "Format"}</div>
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.05s" }}>
                   <div className="vtd-stat-tile-icon"><Coins size={24} color="#8A8880" /></div>
@@ -1565,23 +1570,26 @@ function ValorantTournamentDetailInner() {
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.2s" }}>
                   <div className="vtd-stat-tile-icon"><Users size={24} color="#8A8880" /></div>
-                  <div className="vtd-stat-tile-val">{tournament.slotsBooked}/{tournament.totalSlots}</div>
-                  <div className="vtd-stat-tile-lbl">Players Registered</div>
+                  <div className="vtd-stat-tile-val">{teamMode ? `${teams.length}/${totalTeams}` : `${tournament.slotsBooked}/${tournament.totalSlots}`}</div>
+                  <div className="vtd-stat-tile-lbl">{teamMode ? "Teams Registered" : "Players Registered"}</div>
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.25s" }}>
                   <div className="vtd-stat-tile-icon"><Target size={24} color="#8A8880" /></div>
                   <div className="vtd-stat-tile-val">BO{tournament.matchesPerRound || 2}</div>
-                  <div className="vtd-stat-tile-lbl">Match Format</div>
+                  <div className="vtd-stat-tile-lbl">Group Matches</div>
                 </div>
+                {/* Both read the tournament's own format fields, as the CS2 page
+                    already does. Hardcoded "Swiss" / "Double Elim" told Horizon
+                    players about a bracket that event does not have. */}
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.3s" }}>
                   <div className="vtd-stat-tile-icon"><Shield size={24} color="#8A8880" /></div>
-                  <div className="vtd-stat-tile-val">Swiss</div>
+                  <div className="vtd-stat-tile-val">{tournament.groupStageFormat || "Swiss"}</div>
                   <div className="vtd-stat-tile-lbl">Group Stage Format</div>
                 </div>
                 <div className="vtd-stat-tile" style={{ animationDelay: "0.35s" }}>
                   <div className="vtd-stat-tile-icon"><GitBranch size={24} color="#8A8880" /></div>
-                  <div className="vtd-stat-tile-val">{tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim"}</div>
-                  <div className="vtd-stat-tile-lbl">Play-Off Format</div>
+                  <div className="vtd-stat-tile-val">{finalOnly ? `Grand Final BO${tournament.grandFinalBestOf || 3}` : tournament.playoffFormat || (tournament.bracketFormat === "single_elimination" ? "Single Elim" : "Double Elim")}</div>
+                  <div className="vtd-stat-tile-lbl">{finalOnly ? "Top 2 Play-Off" : "Play-Off Format"}</div>
                 </div>
               </div>
 
@@ -1612,13 +1620,22 @@ function ValorantTournamentDetailInner() {
                   <div className="vtd-card">
                     <span className="vtd-card-label"><GitBranch size={12} style={{ display: "inline", marginRight: 6 }} />Tournament Flow</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      {[
-                        { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#3b82f6" },
-                        { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
-                        { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
-                        { label: "→", sub: `LB Final BO${tournament.lbFinalBestOf || tournament.bracketBestOf || 2}`, color: "#555550", isArrow: true },
-                        { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#3CCBFF" },
-                      ].map((s, i) => s.isArrow ? (
+                      {(finalOnly
+                        ? [
+                            // Group stage straight into one final — no bracket
+                            // stage in between, so none is drawn.
+                            { label: tournament.groupStageFormat || "Round Robin", sub: `BO${tournament.matchesPerRound || 2} · every team plays every team`, color: "#3b82f6" },
+                            { label: "→", sub: "Top 2", color: "#555550", isArrow: true },
+                            { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3} · top 2 teams`, color: "#3CCBFF" },
+                          ]
+                        : [
+                            { label: "Group Stage", sub: `${tournament.groupStageRounds || 3} rounds · BO${tournament.matchesPerRound || 2}`, color: "#3b82f6" },
+                            { label: "→", sub: `Top ${tournament.bracketTeamCount || "50%"}`, color: "#555550", isArrow: true },
+                            { label: "Play-offs", sub: `${tournament.bracketFormat === "single_elimination" ? "Single" : "Double"} Elim · BO${tournament.bracketBestOf || 2}`, color: "#f59e0b" },
+                            { label: "→", sub: `LB Final BO${tournament.lbFinalBestOf || tournament.bracketBestOf || 2}`, color: "#555550", isArrow: true },
+                            { label: "Grand Final", sub: `BO${tournament.grandFinalBestOf || 3}`, color: "#3CCBFF" },
+                          ]
+                      ).map((s, i) => s.isArrow ? (
                         <div key={i} style={{ color: "#555550", fontSize: "1.2rem", flexShrink: 0 }}>{s.label}</div>
                       ) : (
                         <div key={i} style={{ flex: 1, minWidth: 100, background: `${s.color}10`, border: `1px solid ${s.color}30`, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
@@ -1634,7 +1651,9 @@ function ValorantTournamentDetailInner() {
                       <div className="vtd-timeline">
                         {schedule.registrationOpens && <TimelineItem label="Registration Opens" date={schedule.registrationOpens} status={new Date(schedule.registrationOpens) <= new Date() ? "past" : "future"} />}
                         {schedule.registrationCloses && <TimelineItem label="Registration Closes" date={schedule.registrationCloses} status={new Date(schedule.registrationCloses) <= new Date() ? "past" : new Date(schedule.registrationOpens) <= new Date() ? "active" : "future"} />}
-                        {schedule.squadCreation && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
+                        {/* Team entries form their rosters at sign-up; a
+                            "Team Formation" slot there would read as a draw. */}
+                        {schedule.squadCreation && !teamMode && <TimelineItem label="Team Formation" date={schedule.squadCreation} status={new Date(schedule.squadCreation) <= new Date() ? "past" : "future"} />}
                         {schedule.groupStageStart && <TimelineItem label="Group Stage Starts" date={schedule.groupStageStart} status={tournament.status === "active" ? "active" : new Date(schedule.groupStageStart) <= new Date() ? "past" : "future"} badge={tournament.status === "active" ? "ACTIVE" : undefined} />}
                         {schedule.groupStageEnd && <TimelineItem label="Group Stage Ends" date={schedule.groupStageEnd} status={new Date(schedule.groupStageEnd) <= new Date() ? "past" : "future"} />}
                         {schedule.tourneyStageStart && <TimelineItem label="Play-off Stage" date={schedule.tourneyStageStart} status="future" />}

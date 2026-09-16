@@ -8,6 +8,7 @@ import {
   AbsoluteFill,
   Img,
 } from "remotion";
+import { formatFlowSteps } from "@/lib/tournamentFormat";
 
 /* ═══════════════════════════════════════════════
    TYPES
@@ -31,6 +32,12 @@ export interface ShareSlideData {
   bracketBestOf?: number;
   bracketTeamCount?: number | string;
   grandFinalBestOf?: number;
+  /** "team" = captain creates, teammates join by code (no formation step). */
+  registrationMode?: string;
+  teamSize?: number;
+  groupStageFormat?: string;
+  /** "Grand Final" = group stage straight into one final, no bracket. */
+  playoffFormat?: string;
   schedule?: {
     registrationOpens?: string;
     registrationCloses?: string;
@@ -1495,19 +1502,10 @@ function FormatFlowSlide({
   fps: number;
 }) {
   const name = t.name || "Tournament";
-  const fmtLabel =
-    t.format === "shuffle" ? "SHUFFLE" : t.format === "auction" ? "AUCTION" : "STANDARD";
-
-  const sc = t.schedule || {};
   const accentColor = C.sky;
 
-  const steps = [
-    { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: sc.registrationOpens || t.registrationDeadline, color: accentColor },
-    { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: sc.squadCreation, color: accentColor },
-    { n: "3", lbl: "Group Stage", sub: `Swiss  /  BO${t.matchesPerRound || 2}`, date: sc.groupStageStart || t.startDate, color: accentColor },
-    { n: "4", lbl: "Play-off Stage", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}`, date: sc.tourneyStageStart, color: accentColor },
-    { n: "5", lbl: "Grand Final", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
-  ];
+  // Same steps as the static format image — see lib/tournamentFormat.
+  const steps = formatFlowSteps(t).map((s, i) => ({ ...s, n: String(i + 1), color: accentColor }));
 
   return (
     <div

@@ -67,6 +67,10 @@ export type ExplainerProps = {
   registrationMode?: RegistrationMode;
   teamSize?: number;
   totalTeams?: number;
+  /** Maps per round-robin match — `matchesPerRound` on the tournament. */
+  groupBestOf?: number;
+  /** Maps in the Grand Final — `grandFinalBestOf` on the tournament. */
+  finalBestOf?: number;
 };
 
 const DUR = 900;
@@ -91,14 +95,31 @@ const MY_MATCHES = [
   { time: "15:00", vs: "C" },
 ];
 
-/** Six matches × 2 points = 12, and these sum to 12. A and D tie on 3 so the
- *  RW−RL tie-break is demonstrated rather than asserted. */
-const STANDINGS = [
-  { t: "B", p: 5, rd: +34 },
-  { t: "D", p: 3, rd: +6 },
-  { t: "A", p: 3, rd: -2 },
-  { t: "C", p: 1, rd: -38 },
-];
+/**
+ * Final group table, one per best-of, because the points only add up for the
+ * format they were written for — a point per map, six fixtures. In both, the
+ * round differences sum to zero (every round one team wins, another loses) and
+ * B vs D is the final the film shows.
+ *
+ *   Bo2  6 × 2 = 12 points. A and D tie on 3; RW−RL puts D through.
+ *   Bo1  6 × 1 =  6 points. B wins all three; D, A and C finish level on 1
+ *        and RW−RL alone picks the second finalist — the tie-break doing
+ *        real work rather than being asserted.
+ */
+const STANDINGS_BY_BO: Record<1 | 2, { t: string; p: number; rd: number }[]> = {
+  2: [
+    { t: "B", p: 5, rd: +34 },
+    { t: "D", p: 3, rd: +6 },
+    { t: "A", p: 3, rd: -2 },
+    { t: "C", p: 1, rd: -38 },
+  ],
+  1: [
+    { t: "B", p: 3, rd: +29 },
+    { t: "D", p: 1, rd: +3 },
+    { t: "A", p: 1, rd: -5 },
+    { t: "C", p: 1, rd: -27 },
+  ],
+};
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const EASE = Easing.bezier(0.33, 1, 0.68, 1);
@@ -165,6 +186,8 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
   registrationMode = "team",
   teamSize = 5,
   totalTeams = 4,
+  groupBestOf = 1,
+  finalBestOf = 3,
 }) => {
   const frame = useCurrentFrame();
   const T = GAME_THEME[game];
@@ -239,6 +262,7 @@ export const TournamentExplainer: React.FC<ExplainerProps> = ({
 
         {!productPhase && (
           <MatchDay frame={frame} T={T} teamCount={teams} totalSlots={totalSlots} teamMode={teamMode}
+            groupBo={groupBestOf} finalBo={finalBestOf}
             finalTime={finalTime} prizePool={prizePool} entryFee={entryFee} dateLabel={dateLabel} />
         )}
 
@@ -688,9 +712,13 @@ const POOL_Y = (k: number) => 392 + Math.floor(k / 5) * 62;
 
 const MatchDay: React.FC<{
   frame: number; T: Theme; teamCount: number; totalSlots: number; teamMode: boolean;
+  groupBo: number; finalBo: number;
   finalTime: string; prizePool: string; entryFee: number; dateLabel: string;
-}> = ({ frame, T, teamCount, totalSlots, teamMode, finalTime, prizePool, entryFee, dateLabel }) => {
+}> = ({ frame, T, teamCount, totalSlots, teamMode, groupBo, finalBo, finalTime, prizePool, entryFee, dateLabel }) => {
   const B = teamMode ? B_TEAM : B_SOLO;
+  const STANDINGS = STANDINGS_BY_BO[groupBo === 1 ? 1 : 2];
+  const GROUP = `Bo${groupBo}`;
+  const FINAL = `Bo${finalBo}`;
   const bDay = beat(frame, B.day[0], B.day[1], 13);
   const bMine = beat(frame, B.mine[0], B.mine[1], 13);
   const bStand = beat(frame, B.stand[0], B.stand[1], 12);
@@ -702,11 +730,14 @@ const MatchDay: React.FC<{
   const DAY_ROWS: DayRow[] = [
     { t: "10:30", l: "Check in on Discord", s: "Lobby codes go out there" },
     ...(teamMode ? [] : [{ t: "10:45", l: "Teams drawn at random", s: `${teamCount} teams of 5` }]),
-    { t: "11:00", l: "Match 1", s: "best of 2", hi: true },
-    { t: "13:00", l: "Match 2", s: "best of 2", hi: true },
-    { t: "15:00", l: "Match 3", s: "best of 2", hi: true },
-    { t: finalTime, l: "Grand Final", s: "best of 3 · top 2 only", gold: true },
+    { t: "11:00", l: "Match 1", s: `${GROUP} · round robin`, hi: true },
+    { t: "13:00", l: "Match 2", s: `${GROUP} · round robin`, hi: true },
+    { t: "15:00", l: "Match 3", s: `${GROUP} · round robin`, hi: true },
+    { t: finalTime, l: "Grand Final", s: `${FINAL} · top 2 only`, gold: true },
   ];
+
+  /** "Bo1" alone means nothing to a first-timer; the spelled-out half says it. */
+  const spelled = (n: number) => `best of ${n}`;
 
   return (
     <>
@@ -780,6 +811,24 @@ const MatchDay: React.FC<{
           One day, start<br />to finish
         </div>
 
+        {/* The whole format in one line, before any detail. Two stages and
+            nothing else — no semis, no lower bracket. */}
+        <div style={{
+          display: "flex", alignItems: "stretch", gap: 10, marginTop: 4,
+          opacity: interpolate(frame, [B.day[0] + 8, B.day[0] + 20], [0, 1], clamp),
+          transform: `translateY(${interpolate(frame, [B.day[0] + 8, B.day[0] + 20], [10, 0], { ...clamp, easing: EASE })}px)`,
+        }}>
+          <div style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: T.soft, border: `1px solid ${T.line}` }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Round robin · <span style={{ color: T.acc }}>{GROUP}</span></div>
+            <div style={{ fontSize: 13, color: "#8d8d8d", marginTop: 2 }}>{spelled(groupBo)} · everyone plays everyone</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", color: "#5a5a5a", fontSize: 22, fontWeight: 800 }}>→</div>
+          <div style={{ flex: 1, padding: "11px 14px", borderRadius: 12, background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.35)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Grand Final · <span style={{ color: "#fbbf24" }}>{FINAL}</span></div>
+            <div style={{ fontSize: 13, color: "#9a8a5a", marginTop: 2 }}>{spelled(finalBo)} · top 2 only</div>
+          </div>
+        </div>
+
         <div style={{ position: "relative", marginTop: 8 }}>
           {/* the spine the day runs down */}
           <div style={{
@@ -826,7 +875,7 @@ const MatchDay: React.FC<{
         </div>
         <div style={{ fontSize: 18, color: "#8d8d8d", lineHeight: 1.5 }}>
           {teamMode
-            ? `${MY_TEAM} plays every other team. A loss doesn't send you home.`
+            ? `${MY_TEAM} plays every other team once. A loss doesn't send you home.`
             : "One against every other team. A loss doesn't send you home."}
         </div>
 
@@ -842,7 +891,7 @@ const MatchDay: React.FC<{
               }}>
                 <span style={{ fontSize: 19, fontWeight: 800, color: T.acc, width: 74 }}>{m.time}</span>
                 <span style={{ fontSize: 19, color: "#fff", fontWeight: 700, flex: 1 }}>vs {label(m.vs)}</span>
-                <span style={{ fontSize: 15, color: "#8d8d8d" }}>best of 2</span>
+                <span style={{ fontSize: 15, color: "#8d8d8d" }}>{GROUP}</span>
               </div>
             );
           })}
@@ -856,12 +905,13 @@ const MatchDay: React.FC<{
           }}>
             <span style={{ fontSize: 19, fontWeight: 800, color: "#fbbf24", width: 74 }}>{finalTime}</span>
             <span style={{ fontSize: 19, color: "#fff", fontWeight: 700, flex: 1 }}>Grand Final</span>
-            <span style={{ fontSize: 15, color: "#fbbf24" }}>if top 2</span>
+            <span style={{ fontSize: 15, color: "#fbbf24" }}>{FINAL} · if top 2</span>
           </div>
         </div>
 
         <div style={{ fontSize: 19, color: "#fff", marginTop: 2, opacity: interpolate(frame, [B.mine[0] + 112, B.mine[0] + 126], [0, 1], clamp) }}>
-          <b>6 maps minimum.</b> <span style={{ color: "#8d8d8d" }}>9 if you reach the final.</span>
+          {/* Three group fixtures of groupBo maps each, plus up to finalBo. */}
+          <b>{3 * groupBo} maps minimum.</b> <span style={{ color: "#8d8d8d" }}>Up to {3 * groupBo + finalBo} if you reach the final.</span>
         </div>
       </AbsoluteFill>
 
@@ -891,7 +941,7 @@ const MatchDay: React.FC<{
           })}
         </div>
         <div style={{ fontSize: 16, color: "#8d8d8d" }}>
-          Each map won is a point. Level? <b style={{ color: "#fff" }}>RW−RL</b>, then <b style={{ color: "#fff" }}>K−D</b>.
+          {groupBo === 1 ? "Each match won is a point." : "Each map won is a point."} Level? <b style={{ color: "#fff" }}>RW−RL</b>, then <b style={{ color: "#fff" }}>K−D</b>.
         </div>
 
         {/* No bracket, no semis — the top two go straight to one final. Saying
@@ -909,7 +959,7 @@ const MatchDay: React.FC<{
           <div style={{ width: 1, height: 30, background: "rgba(251,191,36,.3)" }} />
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#fbbf24" }}>{finalTime} GRAND FINAL</div>
-            <div style={{ fontSize: 13, color: "#9a8a5a" }}>best of 3 — that&apos;s the whole play-off</div>
+            <div style={{ fontSize: 13, color: "#9a8a5a" }}>{FINAL} ({spelled(finalBo)}) — that&apos;s the whole play-off</div>
           </div>
         </div>
       </AbsoluteFill>
@@ -922,6 +972,9 @@ const MatchDay: React.FC<{
             : <>{totalSlots} slots.<br />₹{entryFee}.</>}
         </div>
         <div style={{ fontSize: 21, color: "#8d8d8d" }}>{dateLabel} · ₹{prizePool} prize pool</div>
+        <div style={{ fontSize: 18, color: "#fff", fontWeight: 700 }}>
+          Round robin <span style={{ color: T.acc }}>{GROUP}</span> → Grand Final <span style={{ color: "#fbbf24" }}>{FINAL}</span>
+        </div>
         {teamMode && <div style={{ fontSize: 17, color: "#7a7a7a" }}>Create a team, or join one with a code.</div>}
         <div style={{
           marginTop: 6, padding: "18px 44px", borderRadius: 100, fontSize: 26, fontWeight: 800,

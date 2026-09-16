@@ -230,7 +230,10 @@ export default function ValorantTournaments() {
                             </div>
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Format</span>
-                              <span className="vt-meta-val">{t.format === "auction" ? "Auction" : t.format === "shuffle" ? "Shuffle" : "Standard"}</span>
+                              {/* Team entry names the group stage too — "Standard" said nothing about how you enter or play. */}
+                              <span className="vt-meta-val">{(t as any).registrationMode === "team"
+                                ? `Teams · ${(t as any).groupStageFormat || "Round Robin"} BO${(t as any).matchesPerRound || 2}`
+                                : t.format === "auction" ? "Auction" : t.format === "shuffle" ? "Shuffle" : "Standard"}</span>
                             </div>
                             <div className="vt-meta-item">
                               <span className="vt-meta-key">Starts</span>

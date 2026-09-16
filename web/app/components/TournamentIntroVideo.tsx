@@ -80,6 +80,11 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
     registrationMode: teamMode ? "team" : "solo",
     teamSize,
     totalTeams,
+    // Same fields, same defaults, as the page's own format tiles and the
+    // pairing generator — so the film cannot state a different best-of from
+    // the fixtures that actually get created.
+    groupBestOf: Number(tournament?.matchesPerRound) || 2,
+    finalBestOf: Number(tournament?.grandFinalBestOf) || 3,
   };
 
   const frame = (children: React.ReactNode) => (

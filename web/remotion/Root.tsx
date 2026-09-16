@@ -34,6 +34,8 @@ export const RemotionRoot: React.FC = () => (
         registrationMode: "team" as const,
         teamSize: 5,
         totalTeams: 4,
+        groupBestOf: 1,     // Bo1 round robin
+        finalBestOf: 3,     // Bo3 Grand Final
       }}
     />
     <Composition

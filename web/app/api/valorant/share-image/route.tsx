@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { formatFlowSteps } from "@/lib/tournamentFormat";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -1395,13 +1396,8 @@ export async function GET(req: NextRequest) {
   } else if (type === "format") {
     // ── CARD 5: COMBINED FORMAT & FLOW ──
     const accentColor = CL.sky;
-    const formatSteps = [
-      { n: "1", lbl: "Register", sub: "Sign up on iesports.in  /  Connect Riot ID", date: schedule.registrationOpens || t.registrationDeadline, color: accentColor },
-      { n: "2", lbl: "Team Formation", sub: `${fmtLabel} format  /  ${t.playersPerTeam || 5}v${t.playersPerTeam || 5}`, date: schedule.squadCreation, color: accentColor },
-      { n: "3", lbl: "Group Stage", sub: `Swiss  /  BO${t.matchesPerRound || 2}`, date: schedule.groupStageStart || t.startDate, color: accentColor },
-      { n: "4", lbl: "Play-off Stage", sub: `${t.bracketFormat === "single_elimination" ? "Single" : "Double"} Elimination  /  BO${t.bracketBestOf || 2}`, date: schedule.tourneyStageStart, color: accentColor },
-      { n: "5", lbl: "Grand Final", sub: `Best of ${t.grandFinalBestOf || 3}  /  Champion crowned`, date: t.endDate, color: accentColor },
-    ];
+    // Steps come from the tournament's own format fields — see lib/tournamentFormat.
+    const formatSteps = formatFlowSteps(t).map((s, i) => ({ ...s, n: String(i + 1), color: accentColor }));
 
     content = (
       <div
