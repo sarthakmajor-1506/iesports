@@ -6,7 +6,7 @@
  *
  * The main film answers "how does this work". This answers "why here and not a
  * scrim with friends", which is the harder question. Three answers, in the
- * order they matter to someone weighing ₹500: your matches get an audience,
+ * order they matter to someone weighing the entry: your matches get an audience,
  * your best round comes back as something you can post, and you leave knowing
  * more about your own play than when you arrived.
  *
@@ -22,7 +22,8 @@
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { GAME_THEME, type GameKey } from "@/app/lib/gameTheme";
 
-export type PerksProps = { game?: GameKey; entryFee?: number };
+/** `perTeam` says the fee buys a whole roster, not one seat (team registration). */
+export type PerksProps = { game?: GameKey; entryFee?: number; perTeam?: boolean; teamSize?: number };
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const EASE = Easing.bezier(0.33, 1, 0.68, 1);
@@ -33,10 +34,12 @@ const beat = (frame: number, a: number, b: number, r = 12) => {
   return { opacity: enter * (1 - exit), transform: `translateY(${(1 - enter) * 28 - exit * 28}px)` };
 };
 
+// Kept free of team names: under team registration the rosters are named by
+// their captains, so "team B" would date the film to the shuffled-draw format.
 const CHAT = [
   { u: "riz.", t: "that clutch omg" },
   { u: "sneh", t: "1v3?? no way" },
-  { u: "kabir", t: "team B carrying fr" },
+  { u: "kabir", t: "these guys carrying fr" },
 ];
 
 /**
@@ -59,7 +62,7 @@ const INSIGHTS = [
   { k: "Opening duels · B site", v: "71%", note: "your strongest angle", good: true },
 ];
 
-export const PerksExplainer: React.FC<PerksProps> = ({ game = "valorant", entryFee = 500 }) => {
+export const PerksExplainer: React.FC<PerksProps> = ({ game = "valorant", entryFee = 500, perTeam = false, teamSize = 5 }) => {
   const frame = useCurrentFrame();
   const T = GAME_THEME[game];
   const drift = Math.sin(frame / 80) * 4;
@@ -93,7 +96,9 @@ export const PerksExplainer: React.FC<PerksProps> = ({ game = "valorant", entryF
 
       {/* ── intro ── */}
       <AbsoluteFill style={{ padding: "150px 58px 186px", justifyContent: "center", gap: 18, ...bIntro }}>
-        {eyebrow(`YOUR ₹${entryFee} BUYS MORE THAN A LOBBY`)}
+        {eyebrow(perTeam
+          ? `₹${entryFee.toLocaleString("en-IN")} FOR ${teamSize} BUYS MORE THAN A LOBBY`
+          : `YOUR ₹${entryFee} BUYS MORE THAN A LOBBY`)}
         <div style={{ fontSize: 52, fontWeight: 800, color: "#fff", letterSpacing: "-.03em", lineHeight: 1.06 }}>
           Why play with<br /><span style={{ color: T.acc }}>IEsports?</span>
         </div>

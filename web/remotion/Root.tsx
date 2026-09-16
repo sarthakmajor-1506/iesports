@@ -18,15 +18,22 @@ export const RemotionRoot: React.FC = () => (
       fps={30}
       width={720}
       height={900}
+      // Horizon as it actually runs since 14 Sep 2026: ₹2,000 per team of five,
+      // captain pays once and shares a join code. Render the solo cut (random
+      // draw, refundable slot) only for a tournament that still works that way
+      // — pass registrationMode: "solo".
       defaultProps={{
         game: "valorant" as const,
         tournamentName: "LEAGUE OF RISING STARS - HORIZON",
         dateLabel: "Sunday 27 September",
         prizePool: "8,000",
-        entryFee: 500,
+        entryFee: 2000,
         totalSlots: 20,
         deadlineLabel: "24 Sept",
         finalTime: "17:00",
+        registrationMode: "team" as const,
+        teamSize: 5,
+        totalTeams: 4,
       }}
     />
     <Composition
@@ -36,7 +43,7 @@ export const RemotionRoot: React.FC = () => (
       fps={30}
       width={720}
       height={900}
-      defaultProps={{ game: "valorant" as const, entryFee: 500 }}
+      defaultProps={{ game: "valorant" as const, entryFee: 2000, perTeam: true, teamSize: 5 }}
     />
   </>
 );

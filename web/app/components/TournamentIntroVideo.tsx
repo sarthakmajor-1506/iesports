@@ -60,6 +60,14 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
 
   const entryFee = Number(tournament?.entryFee) || 0;
 
+  // The main film has a solo cut and a team cut, and playing the wrong one is
+  // worse than playing none: the solo cut demonstrates a random draw and a
+  // refundable slot, neither of which exists under team registration. Read the
+  // mode off the tournament document, not the game — Valorant runs both.
+  const teamMode = tournament?.registrationMode === "team";
+  const teamSize = Number(tournament?.teamSize) || 5;
+  const totalTeams = Number(tournament?.totalTeams) || Math.floor((Number(tournament?.totalSlots) || 0) / teamSize);
+
   const mainProps: ExplainerProps = {
     game,
     tournamentName: tournament?.name || "Tournament",
@@ -69,6 +77,9 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
     totalSlots: Number(tournament?.totalSlots) || 20,
     deadlineLabel: shortLabel(tournament?.registrationDeadline),
     finalTime,
+    registrationMode: teamMode ? "team" : "solo",
+    teamSize,
+    totalTeams,
   };
 
   const frame = (children: React.ReactNode) => (
@@ -106,7 +117,7 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
           />
         ) : <div style={{ width: "100%", aspectRatio: "720 / 900" }} />)}
         <div className="tiv-cap">
-          <span style={{ fontSize: 11.5, color: "#666" }}>How it works · 30s</span>
+          <span style={{ fontSize: 11.5, color: "#666" }}>{teamMode ? "How team entry works" : "How it works"} · 30s</span>
           <button onClick={() => setReplay(r => r + 1)} style={{
             background: "none", border: "1px solid #222", borderRadius: 100, padding: "5px 13px",
             color: "#888", fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
@@ -120,7 +131,7 @@ export default function TournamentIntroVideo({ game = "cs2", tournament, finalTi
           <Player
             key={`p${replay}`}
             component={PerksExplainer as any}
-            inputProps={{ game, entryFee } as any}
+            inputProps={{ game, entryFee, perTeam: teamMode, teamSize } as any}
             durationInFrames={PERKS_FRAMES}
             fps={FPS} compositionWidth={720} compositionHeight={900}
             autoPlay loop controls={false}
