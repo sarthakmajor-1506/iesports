@@ -1309,7 +1309,7 @@ function ValorantTournamentDetailInner() {
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,215,0,0.2)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(255,215,0,0.25)"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,215,0,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
-                      >View Brackets</button>
+                      >{finalOnly ? "View Grand Final" : "View Brackets"}</button>
                       <button
                         onClick={() => { setActiveTab("matches"); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }}
                         style={{
@@ -1506,9 +1506,9 @@ function ValorantTournamentDetailInner() {
           <div className="vtd-tabs-wrap" ref={tabsWrapRef}>
             <div className="vtd-tabs">
               {TABS.map(t => (
-                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }} title={t.label}>
+                <button key={t.key} className={`vtd-tab${activeTab === t.key ? " active" : ""}`} onClick={() => { setActiveTab(t.key); router.replace(`?tab=${t.key}`, { scroll: false }); setTimeout(() => { const el = tabsWrapRef.current; if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top: y, behavior: "smooth" }); } }, 50); }} title={t.key === "brackets" && finalOnly ? "Grand Final" : t.label}>
                   <t.Icon size={16} strokeWidth={activeTab === t.key ? 2.5 : 2} />
-                  <span className="vtd-tab-label">{t.label}</span>
+                  <span className="vtd-tab-label">{t.key === "brackets" && finalOnly ? "Grand Final" : t.label}</span>
                   {t.key === "players" && <span className="vtd-tab-count">{players.length}</span>}
                   {t.key === "teams" && teams.length > 0 && <span className="vtd-tab-count">{teams.length}</span>}
                 </button>
@@ -1856,16 +1856,18 @@ function ValorantTournamentDetailInner() {
                 {standings.length === 0 ? (
                   <div className="vtd-empty"><Trophy size={48} strokeWidth={1} style={{ margin: "0 auto 10px", display: "block", color: "#555550" }} /><span className="vtd-empty-title">No standings yet</span><span className="vtd-empty-sub">Standings will appear once matches are played.</span></div>
                 ) : (() => {
-                  const bracketCount = tournament.bracketTeamCount || tournament.bracketSize || standings.length;
-                  const ubCount = tournament.ubTeamCount ?? Math.ceil(bracketCount / 2);
+                  // Final-only: the top two go to the Grand Final and nobody else
+                  // plays on, so there is no upper/lower split to show.
+                  const bracketCount = finalOnly ? Math.min(2, standings.length) : tournament.bracketTeamCount || tournament.bracketSize || standings.length;
+                  const ubCount = finalOnly ? bracketCount : tournament.ubTeamCount ?? Math.ceil(bracketCount / 2);
                   // Only show the bottom-two "eliminated" styling when there are
                   // actually eliminated teams (i.e. bracketCount < standings.length).
-                  const hasEliminations = bracketCount < standings.length;
+                  const hasEliminations = !finalOnly && bracketCount < standings.length;
                   const hasBrackets = tournament.bracketsComputed || bracketMatches.length > 0;
                   return (
                   <div style={{ overflowX: "auto" }}>
                     <table className="vtd-standings-table vtd-freeze-team">
-                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GW</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#fbbf24" }}>Diff</th><th style={{ color: "#3CCBFF" }}>Pts</th>{hasBrackets && <th>Bracket</th>}</tr></thead>
+                      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th style={{ color: "#6fcf8a" }}>GW</th><th style={{ color: "#d07070" }}>GL</th><th style={{ color: "#6fcf8a" }}>RW</th><th style={{ color: "#d07070" }}>RL</th><th style={{ color: "#fbbf24" }}>Diff</th><th style={{ color: "#3CCBFF" }}>Pts</th>{hasBrackets && <th>{finalOnly ? "Final" : "Bracket"}</th>}</tr></thead>
                       <tbody>
                         {standings.map((s: any, i: number) => {
                           const inUB = i < ubCount;
@@ -1902,7 +1904,7 @@ function ValorantTournamentDetailInner() {
                               {hasBrackets && (
                                 <td>
                                   {inUB ? (
-                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(60,203,255,0.12)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)", whiteSpace: "nowrap" }}>Upper</span>
+                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(60,203,255,0.12)", color: "#3CCBFF", border: "1px solid rgba(60,203,255,0.3)", whiteSpace: "nowrap" }}>{finalOnly ? "Grand Final" : "Upper"}</span>
                                   ) : inLB ? (
                                     <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", whiteSpace: "nowrap" }}>Lower</span>
                                   ) : (
@@ -1915,7 +1917,12 @@ function ValorantTournamentDetailInner() {
                         })}
                       </tbody>
                     </table>
-                    {hasBrackets && (
+                    {hasBrackets && finalOnly && (
+                      <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: "0.65rem", color: "#6b7280" }}>
+                        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(60,203,255,0.4)", marginRight: 4, verticalAlign: "middle" }} />Top 2 — Grand Final</span>
+                      </div>
+                    )}
+                    {hasBrackets && !finalOnly && (
                       <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: "0.65rem", color: "#6b7280" }}>
                         <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(60,203,255,0.4)", marginRight: 4, verticalAlign: "middle" }} />Top {ubCount} — Upper Bracket</span>
                         <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "rgba(245,158,11,0.4)", marginRight: 4, verticalAlign: "middle" }} />Next {Math.min(bracketCount - ubCount, standings.length - ubCount)} — Lower Bracket</span>
@@ -1962,7 +1969,7 @@ function ValorantTournamentDetailInner() {
                   )}
                   {bracketMatches.length > 0 && (
                     <div style={{ marginTop: groupMatches.length > 0 ? 32 : 0 }}>
-                      <div className="vtd-section-header bracket">Playoffs</div>
+                      <div className="vtd-section-header bracket">{finalOnly ? "Grand Final" : "Playoffs"}</div>
                       {(() => {
                         // Group scheduled matches by IST calendar date, sort dates ascending,
                         // sort matches within each date by scheduledTime. Unscheduled bracket
@@ -2034,8 +2041,50 @@ function ValorantTournamentDetailInner() {
             </div>
           )}
 
+          {/* ═══ GRAND FINAL (final-only tournaments, e.g. Horizon) ═══
+              No bracket: the top two of the group stage play one final. The
+              tournament's bracket fields are template leftovers, so nothing
+              here reads them. */}
+          {activeTab === "brackets" && finalOnly && (() => {
+            const gf = bracketMatches.find((m: any) => m.bracketType === "grand_final");
+            const gfBo = tournament.grandFinalBestOf || 3;
+            const gfTime = gf?.scheduledTime || tournament.schedule?.tourneyStageStart;
+            const seed = (i: number) => standings[i]?.teamName || `#${i + 1} in the group stage`;
+            return (
+              <div className="vtd-tab-pane" ref={tabContentRef} style={{ animation: "vtd-fadein 0.3s ease" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#E6E6E6" }}>Grand Final</h3>
+                    <span style={{ fontSize: "0.6rem", fontWeight: 900, letterSpacing: "0.1em", padding: "3px 10px", borderRadius: 100, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", color: "#f59e0b" }}>
+                      BO{gfBo} · TOP 2
+                    </span>
+                  </div>
+                  <TabSharePopover tabKey="brackets" id={id} tournamentName={tournament?.name || ""} tabContentRef={tabContentRef} setShowToast={setShowToast} setToastMsg={setToastMsg} />
+                </div>
+                {gf ? (
+                  <MatchCard m={gf} teamMembers={teamMembers} teamLogoMap={teamLogoMap} expandedMatch={expandedMatch} setExpandedMatch={setExpandedMatch} tournamentId={id} isBracket={true} bestOf={gf.bestOf || gfBo} />
+                ) : (
+                  <div className="vtd-card" style={{ textAlign: "center", padding: "32px 20px" }}>
+                    <Trophy size={40} strokeWidth={1.5} style={{ margin: "0 auto 14px", display: "block", color: "#f59e0b" }} />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap", fontSize: "1rem", fontWeight: 800, color: "#E6E6E6" }}>
+                      <span>{seed(0)}</span>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 900, color: "#555550" }}>VS</span>
+                      <span>{seed(1)}</span>
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: "0.8rem", color: "#8A8880" }}>
+                      Best of {gfBo}{gfTime ? ` · ${formatDate(gfTime)}, ${formatTime(gfTime)}` : ""}
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: "0.72rem", color: "#555550" }}>
+                      {standings.length >= 2 ? "Current top two of the round robin. Locked in once the group stage ends." : "The top two teams from the round robin play for the title. No other play-offs."}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ═══ BRACKETS ═══ */}
-          {activeTab === "brackets" && (
+          {activeTab === "brackets" && !finalOnly && (
             <div className="vtd-tab-pane" ref={tabContentRef} style={{ animation: "vtd-fadein 0.3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

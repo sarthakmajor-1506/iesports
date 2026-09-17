@@ -173,7 +173,7 @@ const B_TEAM = {
 
 export const TournamentExplainer: React.FC<ExplainerProps> = ({
   game = "valorant",
-  tournamentName = "LEAGUE OF RISING STARS - HORIZON",
+  tournamentName = "HORIZON - ROUND 1",
   dateLabel = "Sunday 27 September",
   prizePool = "8,000",
   entryFee = 2000,

@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Determine advancing teams ──────────────────────────────────────────────
-    const numAdvancing = topTeams || 4;
+    // A final-only tournament (playoffFormat "Grand Final", e.g. Horizon) always
+    // sends exactly two teams, whatever the admin picker was left on.
+    const numAdvancing = tDoc.data()?.playoffFormat === "Grand Final" ? 2 : topTeams || 4;
     if (numAdvancing < 2) {
       return NextResponse.json({ error: "Need at least 2 teams for brackets." }, { status: 400 });
     }

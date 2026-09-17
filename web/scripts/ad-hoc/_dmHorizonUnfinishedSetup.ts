@@ -62,7 +62,7 @@ const TID = "league-of-rising-stars-horizon";
 
   const link = `${base}/valorant/tournament/${TID}`;
   const message = [
-    `Hey ${u.fullName?.split(" ")[0] || "there"}, your slot in **${t.name || "LEAGUE OF RISING STARS - HORIZON"}** is paid for and still held for you.`,
+    `Hey ${u.fullName?.split(" ")[0] || "there"}, your slot in **${t.name || "HORIZON - ROUND 1"}** is paid for and still held for you.`,
     ``,
     `We just never got ${missing.join(" and ")}, so you are not on the roster yet. Add it here and you are in:`,
     link,

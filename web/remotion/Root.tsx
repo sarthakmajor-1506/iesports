@@ -24,7 +24,7 @@ export const RemotionRoot: React.FC = () => (
       // — pass registrationMode: "solo".
       defaultProps={{
         game: "valorant" as const,
-        tournamentName: "LEAGUE OF RISING STARS - HORIZON",
+        tournamentName: "HORIZON - ROUND 1",
         dateLabel: "Sunday 27 September",
         prizePool: "8,000",
         entryFee: 2000,
