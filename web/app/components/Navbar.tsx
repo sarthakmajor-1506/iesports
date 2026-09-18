@@ -87,7 +87,9 @@ export default function Navbar() {
     g.id === "dota2"
       ? pathname === "/dota2" || pathname === "/dashboard" || pathname.startsWith("/tournament")
       : pathname.startsWith(g.path)
-  ) || games.find((g) => g.id === "valorant")!;
+  ) || (pathname === "/" ? null : games.find((g) => g.id === "valorant")!);
+  // The landing page is game-neutral — the three tabs are an invitation there,
+  // not a "you are here", so nothing is highlighted and the accent bar stays brand blue.
 
   const discordLinked   = !!steamData?.discordId;
   const discordUsername = steamData?.discordUsername || "";
@@ -311,7 +313,8 @@ export default function Navbar() {
         <div className="ie-nav-row">
 
           <div className="ie-nav-logo" onClick={() => router.push("/")}>
-            <Image className="ie-logo-img" src="/ielogo.png" alt="Indian Esports" width={42} height={42} style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
+            {/* Above the fold on every page, and the LCP element on the landing page. */}
+            <Image className="ie-logo-img" src="/ielogo.png" alt="Indian Esports" width={42} height={42} priority style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(59,130,246,0.25)" }} />
             <div>
               <div className="ie-nav-logo-name">Indian <span>Esports</span></div>
               <div className="ie-nav-logo-sub">Competitive Gaming</div>
@@ -321,6 +324,9 @@ export default function Navbar() {
           <div className="ie-nav-tabs">
             {games.map((g) => {
               const isActive = activeGame?.id === g.id;
+              // With no active game (the landing page) every tab is an offer, so
+              // none is dimmed — greying all three made the front door look shut.
+              const lit = isActive || !activeGame;
               return (
                 <button key={g.id} className={`ie-nav-tab${isActive ? " active" : ""}${!g.active ? " ie-nav-tab-inactive" : ""}`} onClick={() => router.push(g.path)}
                   style={isActive ? {
@@ -328,8 +334,8 @@ export default function Navbar() {
                     border: `1.5px solid ${g.color}40`,
                     color: g.color,
                     boxShadow: `0 2px 16px ${g.glow}, inset 0 0 0 1px ${g.color}10`,
-                  } : {}}>
-                  <img src={g.icon} alt={g.name} style={{ filter: isActive ? "none" : "grayscale(100%) brightness(45%) opacity(60%)" }} />
+                  } : !activeGame ? { color: "#D8D6D0" } : {}}>
+                  <img src={g.icon} alt={g.name} style={{ filter: lit ? "none" : "grayscale(100%) brightness(45%) opacity(60%)" }} />
                   <span>{g.name}</span>
                   {!g.active && <span className="ie-soon-badge">Soon</span>}
                 </button>

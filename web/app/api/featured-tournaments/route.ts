@@ -11,8 +11,13 @@ export async function GET() {
       adminDb.collection("cs2Tournaments").get(),
     ]);
     const dotaAll = dotaSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // `status` alone is not enough: a tournament that finished months ago can
+    // still read "ongoing" because nothing closes it out, and it then leads the
+    // landing page ahead of the event that is actually next. Gate on endDate
+    // the same way Valorant and CS2 do below.
+    const dotaIsPast = (t: any) => t.status === "ended" || t.status === "completed" || (t.endDate && now > new Date(t.endDate));
     const dotaFeatured = dotaAll
-      .filter((t: any) => !t.isTestTournament && (t.status === "upcoming" || t.status === "active" || t.status === "ongoing"))
+      .filter((t: any) => !t.isTestTournament && !dotaIsPast(t) && (t.status === "upcoming" || t.status === "active" || t.status === "ongoing"))
       .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     const valAll = valSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -26,6 +31,19 @@ export async function GET() {
     // "Recent Results" only, never both (previously fell back to the most
     // recent ended tournament here, which duplicated it into Recent Results too).
     const valResult = valFeatured.length > 0 ? valFeatured[0] : null;
+
+    // Under team registration `slotsBooked` keeps counting PLAYERS, and capacity
+    // is counted from the teams collection against `totalTeams` (lib/valorantTeams.ts).
+    // The landing card says "N of M teams", so it needs the real number rather
+    // than slotsBooked ÷ teamSize, which is wrong for any part-filled roster.
+    const withTeamCount = async (t: any) => {
+      if (!t || t.registrationMode !== "team") return t;
+      try {
+        const agg = await adminDb.collection("valorantTournaments").doc(t.id).collection("teams").count().get();
+        return { ...t, teamsBooked: agg.data().count };
+      } catch { return t; }
+    };
+    const valFeaturedResult = await withTeamCount(valResult);
 
     // ── CS2: featured ──
     const cs2All = cs2Snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -114,7 +132,7 @@ export async function GET() {
 
     return NextResponse.json({
       dota: dotaFeatured.length > 0 ? dotaFeatured[0] : null,
-      valorant: valResult,
+      valorant: valFeaturedResult,
       cs2: cs2Result,
       completedValorant: completedVal,
       completedDota: completedDota2,
