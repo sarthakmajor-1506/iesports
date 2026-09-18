@@ -92,7 +92,6 @@ const toDate = (s?: string | null): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 const fmtDay = (d: Date) => d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: IST });
-const fmtDayLong = (d: Date) => d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: IST });
 const fmtTime = (d: Date) => d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: IST });
 const inr = (n: number) => n.toLocaleString("en-IN");
 
@@ -284,21 +283,37 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         .ie-sp3 { right: 12%; bottom: 8%;  animation-duration: 20s; }
         @keyframes ie-spin { to { transform: rotate(360deg); } }
 
-        /* ── hero ──────────────────────────────────────────────────────── */
-        .ie-hero { position: relative; z-index: 2; min-height: calc(100svh - 68px); display: flex; align-items: center; padding: 34px 24px 48px; }
-        .ie-hero-grid {
+        /* ── hero ──────────────────────────────────────────────────────────
+           Brand first and centred: the wordmark and what iesports IS, then the
+           next tournament as a wide banner under it. The previous split layout
+           led with a tagline and read like a Valorant page rather than a
+           platform. A column ordered with flex order lets the phone put the
+           banner directly under the wordmark and push the supporting copy and
+           buttons below it, so the tournament stays in the first fold. */
+        .ie-hero { position: relative; z-index: 2; min-height: calc(100svh - 68px); display: flex; align-items: center; padding: 30px 24px 44px; }
+        /* Desktop: brand column beside the tournament card, both vertically
+           centred. Stacking them ran the card off the bottom of a short laptop
+           window. The brand still reads as centred — it is centred inside its
+           own half. A phone collapses this to one column (see the 860 block). */
+        .ie-hero-inner {
           width: 100%; max-width: 1160px; margin: 0 auto;
-          display: grid; grid-template-columns: 1.02fr .98fr; gap: 16px 52px;
-          grid-template-areas: "copy card" "sub card" "cta card"; align-items: start;
+          display: grid; grid-template-columns: 1.02fr .98fr; gap: 18px 52px;
+          grid-template-areas: "brand card" "sub card" "cta card";
+          align-items: center; text-align: center;
         }
-        .ie-copy { grid-area: copy; }
-        .ie-copy h1 {
-          font-size: clamp(2.3rem, 5.4vw, 4.05rem); font-weight: 900; line-height: 1.02;
-          letter-spacing: -.035em; margin: 18px 0 0;
+        .ie-brand { grid-area: brand; display: flex; flex-direction: column; align-items: center; }
+        .ie-brand-logo { border: 3.5px solid var(--ink); border-radius: 20px; box-shadow: 6px 6px 0 var(--ink); display: block; }
+        /* Capped so IESPORTS never outgrows its column on a narrow laptop. */
+        .ie-wordmark {
+          font-size: clamp(2.8rem, 6.4vw, 4.7rem); font-weight: 900; line-height: .95;
+          letter-spacing: .04em; margin: 16px 0 0; color: var(--ink);
+          text-shadow: 6px 6px 0 var(--lilac);
         }
-        .ie-sub { grid-area: sub; font-size: clamp(.95rem, 1.35vw, 1.06rem); font-weight: 500; color: var(--body); line-height: 1.6; max-width: 470px; }
-        .ie-actions { grid-area: cta; display: flex; flex-direction: column; gap: 20px; }
-        .ie-btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .ie-tagline { font-size: clamp(1.05rem, 2.1vw, 1.5rem); font-weight: 900; letter-spacing: -.02em; margin-top: 15px; }
+        .ie-sub { grid-area: sub; font-size: clamp(.92rem, 1.3vw, 1.02rem); font-weight: 500; color: var(--body); line-height: 1.6; max-width: 520px; margin: 4px auto 0; }
+        .ie-nx-slot { grid-area: card; width: 100%; }
+        .ie-actions { grid-area: cta; margin-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+        .ie-btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
         .ie-btn {
           display: inline-flex; align-items: center; justify-content: center; gap: 9px;
@@ -311,38 +326,44 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         .ie-btn:active { transform: translate(2px, 2px);   box-shadow: 1px 1px 0 var(--ink); }
         .ie-btn.wide { width: 100%; }
 
-        .ie-stats { display: flex; gap: 26px; flex-wrap: wrap; }
+        .ie-stats { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; }
         .ie-stat-n { font-size: 1.5rem; font-weight: 900; letter-spacing: -.03em; display: block; }
         .ie-stat-l { font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 
-        /* ── the next-up card: the whole point of the first fold ───────── */
+        /* ── the next-up card: still the whole point of the first fold ──
+           Tall, because it sits in a half-width column beside the brand.
+           ie-nx-main is what the tournament is; ie-nx-side is whether you
+           can still get into it. */
         .ie-nx {
-          grid-area: card; position: relative;
+          position: relative; text-align: left;
           background: var(--card); border: 3.5px solid var(--ink); border-radius: 26px;
           box-shadow: 9px 9px 0 var(--ink); padding: 22px 22px 24px;
           transform: rotate(-1.1deg); transition: transform .18s, box-shadow .18s;
         }
         .ie-nx:hover { transform: rotate(-1.1deg) translate(-3px, -3px); box-shadow: 12px 12px 0 var(--ink); }
-        .ie-nx-rail { position: absolute; left: -3.5px; right: -3.5px; top: -3.5px; height: 14px; border: 3.5px solid var(--ink); border-radius: 26px 26px 0 0; }
-        .ie-nx-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 15px; flex-wrap: wrap; }
-        .ie-nx-name { font-size: clamp(1.45rem, 2.7vw, 2rem); font-weight: 900; line-height: 1.05; letter-spacing: -.035em; }
-        .ie-nx-when { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: .92rem; font-weight: 700; color: var(--body); }
+        .ie-nx-side { margin-top: 18px; }
+        .ie-nx-rail { position: absolute; left: -3.5px; right: -3.5px; top: -3.5px; height: 13px; border: 3.5px solid var(--ink); border-radius: 26px 26px 0 0; }
+        .ie-nx-head { display: flex; align-items: center; gap: 10px; margin: 10px 0 13px; flex-wrap: wrap; }
+        .ie-nx-name { font-size: clamp(1.45rem, 2.9vw, 2.15rem); font-weight: 900; line-height: 1.04; letter-spacing: -.035em; }
+        .ie-nx-when { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: .92rem; font-weight: 700; color: var(--body); }
         .ie-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
         .ie-chip {
           display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
           border: 2.5px solid var(--ink); border-radius: 100px; background: var(--paper);
           font-size: .79rem; font-weight: 800; white-space: nowrap;
         }
-        .ie-meter { margin-top: 18px; }
-        .ie-meter-row { display: flex; justify-content: space-between; align-items: baseline; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--body); margin-bottom: 7px; }
-        .ie-meter-bar { height: 17px; border: 3px solid var(--ink); border-radius: 100px; background: var(--paper); overflow: hidden; }
+        .ie-meter { margin-top: 0; }
+        .ie-meter-row { display: flex; justify-content: space-between; align-items: baseline; font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--body); margin-bottom: 7px; }
+        .ie-meter-bar { height: 16px; border: 3px solid var(--ink); border-radius: 100px; background: var(--paper); overflow: hidden; }
         .ie-meter-fill { height: 100%; border-right: 3px solid var(--ink); transition: width .6s cubic-bezier(.33,1,.68,1); }
-        .ie-nx-foot { margin-top: 11px; text-align: center; font-size: .78rem; font-weight: 800; color: var(--body); }
-        .ie-nx-link { display: block; margin-top: 9px; text-align: center; font-size: .8rem; font-weight: 800; color: var(--body); text-decoration: underline; text-underline-offset: 3px; }
+        .ie-nx-foot { margin-top: 10px; text-align: center; font-size: .78rem; font-weight: 800; color: var(--body); }
+        .ie-nx-link { display: block; width: 100%; margin-top: 7px; padding: 4px 0; text-align: center; font-size: .78rem; font-weight: 800; color: var(--body); background: none; border: none; font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+        .ie-nx-link:hover { color: var(--ink); }
+        .ie-nx:focus-visible { outline: 4px solid var(--lilac); outline-offset: 3px; }
 
         /* No loading state for the card any more — it is server-rendered, so it
            is either there in the first paint or there is genuinely nothing on. */
-        .ie-none { grid-area: card; border: 3.5px dashed rgba(22,19,31,.3); border-radius: 26px; padding: 40px 26px; text-align: center; font-weight: 800; color: var(--body); line-height: 1.6; }
+        .ie-none { border: 3.5px dashed rgba(22,19,31,.3); border-radius: 26px; padding: 36px 26px; text-align: center; font-weight: 800; color: var(--body); line-height: 1.6; }
 
         /* ── ticker ────────────────────────────────────────────────────── */
         .ie-ticker { position: relative; z-index: 2; background: var(--ink); border-top: 3.5px solid var(--ink); border-bottom: 3.5px solid var(--ink); padding: 12px 0; overflow: hidden; }
@@ -420,22 +441,44 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         .ie-riot { margin: 18px auto 0; max-width: 880px; padding: 13px 17px; border: 2px solid rgba(255,247,234,.16); border-radius: 12px; font-size: 11px; line-height: 1.55; color: rgba(255,247,234,.5); text-align: center; }
 
         /* ── responsive ────────────────────────────────────────────────── */
-        @media (max-width: 960px) {
-          .ie-hero-grid { grid-template-columns: 1fr; grid-template-areas: "copy" "card" "sub" "cta"; gap: 20px; }
-          .ie-sub { max-width: none; }
-          .ie-nx { transform: rotate(-.7deg); }
+        @media (max-width: 860px) {
+          /* One column, and the card moves up directly under the wordmark with
+             the prose below it — the tournament stays inside the first fold. */
+          .ie-hero-inner { display: flex; flex-direction: column; align-items: center; }
+          .ie-brand { order: 1; }
+          .ie-nx-slot { order: 2; margin-top: 24px; }
+          .ie-sub { order: 3; margin-top: 22px; }
+          .ie-actions { order: 4; margin-top: 20px; }
           .ie-games { grid-template-columns: 1fr; }
           .ie-steps { grid-template-columns: repeat(2, 1fr); }
           .ie-row { flex-direction: column; align-items: stretch; gap: 16px; }
           .ie-row-side { width: 100%; }
         }
         @media (max-width: 620px) {
-          .ie-hero { min-height: 0; padding: 22px 16px 34px; }
+          /* Everything here exists to keep the brand AND the whole tournament
+             banner — down to its Register button — inside one phone screen.
+             Measured against 330x663, the smallest viewport worth supporting;
+             at the desktop sizes the card's foot landed ~280px below the fold. */
+          .ie-hero { min-height: 0; padding: 16px 14px 28px; }
           .ie-sec { padding: 54px 16px; }
-          .ie-copy h1 { font-size: clamp(2rem, 9vw, 2.6rem); margin: 13px 0 11px; }
-          .ie-sub { font-size: .9rem; }
-          .ie-nx { padding: 18px 16px 20px; border-radius: 22px; box-shadow: 7px 7px 0 var(--ink); }
-          .ie-nx-name { font-size: 1.42rem; }
+          .ie-brand-logo { width: 56px !important; height: 56px !important; border-width: 3px; border-radius: 15px; box-shadow: 4px 4px 0 var(--ink); }
+          .ie-wordmark { font-size: 2.55rem; text-shadow: 4px 4px 0 var(--lilac); margin-top: 11px; }
+          .ie-tagline { font-size: .95rem; margin-top: 10px; }
+          .ie-brand-games { margin-top: 12px !important; gap: 6px !important; }
+          .ie-brand-games .ie-stk { font-size: .57rem; padding: 4px 9px; border-width: 2px; box-shadow: 2px 2px 0 var(--ink); gap: 5px; }
+          .ie-brand-games .ie-stk img { width: 13px; height: 13px; }
+          .ie-nx-slot { margin-top: 18px; }
+          .ie-nx { padding: 14px 13px 16px; border-radius: 20px; box-shadow: 6px 6px 0 var(--ink); }
+          .ie-nx-head { margin: 7px 0 9px; gap: 7px; }
+          .ie-nx-name { font-size: 1.3rem; }
+          .ie-nx-when { font-size: .81rem; margin-top: 6px; }
+          .ie-chips { gap: 6px; margin-top: 10px; }
+          .ie-chip { font-size: .71rem; padding: 5px 9px; border-width: 2px; }
+          .ie-meter-row { font-size: .67rem; }
+          .ie-nx-side .ie-btn { font-size: .92rem !important; padding: 12px 16px !important; margin-top: 10px !important; }
+          .ie-nx-foot { margin-top: 8px; font-size: .75rem; }
+          .ie-nx-link { margin-top: 5px; font-size: .75rem; }
+          .ie-sub { font-size: .9rem; margin-top: 20px; }
           .ie-btn { width: 100%; }
           .ie-steps { grid-template-columns: 1fr; }
           .ie-stats { gap: 18px; }
@@ -460,34 +503,50 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         <Sparkle className="ie-sp ie-sp2" size={26} fill="#FF9EC4" />
 
         <section className="ie-hero">
-          <div className="ie-hero-grid">
+          <div className="ie-hero-inner">
 
-            <div className="ie-copy">
-              <span className="ie-stk" style={{ background: "var(--lemon)" }}>🎮 India&apos;s community esports ladder</span>
-              <h1>Turn your rank<br />into a <span className="ie-mark" style={{ ["--hl" as string]: "var(--lilac)" }}>trophy</span>.</h1>
+            {/* The brand block, centred and first. Everything here answers
+                "who is this and what do they do" before anything else. */}
+            <div className="ie-brand">
+              <Image className="ie-brand-logo" src="/ielogo.png" alt="" width={84} height={84} priority />
+              <h1 className="ie-wordmark">IESPORTS</h1>
+              <p className="ie-tagline">
+                India&apos;s <span className="ie-mark" style={{ ["--hl" as string]: "var(--lemon)" }}>tournament hosting platform</span>
+              </p>
+              <div className="ie-brand-games" style={{ display: "flex", gap: 8, marginTop: 18, flexWrap: "wrap", justifyContent: "center" }}>
+                {GAME_ORDER.map((k, i) => (
+                  <span className={`ie-stk${i % 2 ? " r" : ""}`} key={k} style={{ background: GAME[k].acc }}>
+                    <img src={GAME[k].logo} alt="" /> {GAME[k].label}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            {/* Its own grid item so a phone can drop it BELOW the card — four lines
-                of prose between the headline and the register button is exactly
-                what pushes the thing we want seen out of the first fold. */}
+            {/* Ordered below the banner on a phone — prose between the wordmark
+                and the register button is what pushes the tournament out of the
+                first fold. */}
             <p className="ie-sub">
-              Dota 2, Valorant and CS2 tournaments run properly — rank-verified brackets,
-              every match streamed, and prize money over UPI. Sign in once with Discord and you&apos;re in.
+              We run the whole thing: rank-verified brackets, fixtures and standings,
+              every match streamed, and prize money paid over UPI. Sign in once with Discord and you&apos;re in.
             </p>
 
-            {nextUp ? (
-              <NextUpCard card={nextUp} now={now} onGo={() => router.push(nextUp.href)} />
-            ) : (
-              <div className="ie-none">
-                <div style={{ fontSize: "2rem", marginBottom: 10 }}>🗓️</div>
-                Nothing scheduled this second.<br />The next bracket goes up on Discord first.
-              </div>
-            )}
+            <div className="ie-nx-slot">
+              {nextUp ? (
+                <NextUpCard card={nextUp} now={now} onGo={() => router.push(nextUp.href)} />
+              ) : (
+                <div className="ie-none">
+                  <div style={{ fontSize: "2rem", marginBottom: 10 }}>🗓️</div>
+                  Nothing scheduled this second.<br />The next bracket goes up on Discord first.
+                </div>
+              )}
+            </div>
 
             <div className="ie-actions">
               <div className="ie-btn-row">
-                <button className="ie-btn" style={{ background: "var(--mint)" }} onClick={() => router.push("/valorant")}>
-                  ⚡ Browse all tournaments
+                {/* Goes to the calendar on this page, not to Valorant — the
+                    landing page should not pick a game for you. */}
+                <button className="ie-btn" style={{ background: "var(--mint)" }} onClick={() => document.getElementById("whats-on")?.scrollIntoView({ behavior: "smooth" })}>
+                  ⚡ See everything that&apos;s on
                 </button>
                 <button className="ie-btn" style={{ background: "#5865F2", color: "#fff" }} onClick={signIn}>
                   <DiscordIcon size={17} /> Sign in with Discord
@@ -564,7 +623,7 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
       {/* ═══ ALSO ON + RESULTS ═══ */}
       <div className="ie-wrap" style={{ background: "var(--card)", borderTop: "3.5px solid var(--ink)", borderBottom: "3.5px solid var(--ink)" }}>
         <div className="ie-blob ie-b2" style={{ opacity: .3 }} />
-        <section className="ie-sec">
+        <section className="ie-sec" id="whats-on" style={{ scrollMarginTop: 92 }}>
           <div className="ie-inner">
             <div className="ie-head">
               <span className="ie-stk r" style={{ background: "var(--lilac)" }}>The calendar</span>
@@ -709,54 +768,78 @@ function NextUpCard({ card, now, onGo }: { card: Card; now: number; onGo: () => 
   const t = card.t;
   const closing = card.deadline ? countdown(card.deadline, now) : null;
 
+  // The whole banner is the link — the button, the rules line and any dead
+  // space between them all land on the same tournament page. `role`/`tabIndex`
+  // and the Enter handler keep it reachable without a mouse, since a div with
+  // an onClick is invisible to the keyboard.
   return (
-    <article className="ie-nx">
+    <article
+      className="ie-nx"
+      role="link"
+      tabIndex={0}
+      aria-label={`${t.name} — view tournament`}
+      onClick={onGo}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGo(); } }}
+      style={{ cursor: "pointer" }}
+    >
       <div className="ie-nx-rail" style={{ background: g.acc }} />
-      <div className="ie-nx-head">
-        <span className="ie-stk" style={{ background: g.acc }}><img src={g.logo} alt="" /> {g.label}</span>
-        {card.start && <span className="ie-stk r" style={{ background: "var(--lemon)" }}>⏱ {whenSticker(card.start, now)}</span>}
-      </div>
 
-      <div className="ie-nx-name">{t.name}</div>
-
-      <div className="ie-nx-when">
-        {card.regOpen && <span className="ie-dot" />}
-        {card.start ? <>📅 {fmtDayLong(card.start)} · {fmtTime(card.start)} IST</> : card.status}
-      </div>
-
-      <div className="ie-chips">
-        {card.prize && <span className="ie-chip" style={{ background: "var(--gold)" }}>🏆 {card.prize} prize pool</span>}
-        <span className="ie-chip">🎟️ {card.entry}</span>
-        <span className="ie-chip">👥 {card.squad}</span>
-        {t.playoffFormat && <span className="ie-chip">🥇 {t.playoffFormat}</span>}
-      </div>
-
-      {card.total > 0 && (
-        <div className="ie-meter">
-          <div className="ie-meter-row">
-            <span>{card.booked} of {card.total} {card.unit} in</span>
-            <strong>{card.full ? "Full" : `${card.left} left`}</strong>
-          </div>
-          <div className="ie-meter-bar">
-            <div className="ie-meter-fill" style={{ width: `${Math.max(card.pct, card.booked > 0 ? 6 : 0)}%`, background: g.acc }} />
-          </div>
+      <div className="ie-nx-main">
+        <div className="ie-nx-head">
+          <span className="ie-stk" style={{ background: g.acc }}><img src={g.logo} alt="" /> {g.label}</span>
+          {card.start && <span className="ie-stk r" style={{ background: "var(--lemon)" }}>⏱ {whenSticker(card.start, now)}</span>}
         </div>
-      )}
 
-      <button
-        className="ie-btn wide"
-        style={{ background: card.regOpen ? g.acc : "var(--card)", marginTop: 18, fontSize: "1.02rem", padding: "15px 24px" }}
-        onClick={onGo}
-      >
-        {card.regOpen
-          ? (t.registrationMode === "team" ? "Register your team →" : "Grab a slot →")
-          : "View tournament →"}
-      </button>
+        <div className="ie-nx-name">{t.name}</div>
 
-      <div className="ie-nx-foot">
-        {closing ? `Registration closes in ${closing}` : card.status}
+        <div className="ie-nx-when">
+          {card.regOpen && <span className="ie-dot" />}
+          {/* Short form, not "Sunday, 27 September": the long one wraps on a
+              phone and orphans "IST" onto a line of its own. */}
+          {card.start ? <>📅 {fmtDay(card.start)} · {fmtTime(card.start)} IST</> : card.status}
+        </div>
+
+        <div className="ie-chips">
+          {card.prize && <span className="ie-chip" style={{ background: "var(--gold)" }}>🏆 {card.prize} prize pool</span>}
+          <span className="ie-chip">🎟️ {card.entry}</span>
+          <span className="ie-chip">👥 {card.squad}</span>
+          {t.playoffFormat && <span className="ie-chip">🥇 {t.playoffFormat}</span>}
+        </div>
       </div>
-      <span className="ie-nx-link">Rules, format and schedule</span>
+
+      <div className="ie-nx-side">
+        {card.total > 0 && (
+          <div className="ie-meter">
+            <div className="ie-meter-row">
+              <span>{card.booked} of {card.total} {card.unit} in</span>
+              <strong>{card.full ? "Full" : `${card.left} left`}</strong>
+            </div>
+            <div className="ie-meter-bar">
+              <div className="ie-meter-fill" style={{ width: `${Math.max(card.pct, card.booked > 0 ? 6 : 0)}%`, background: g.acc }} />
+            </div>
+          </div>
+        )}
+
+        <button
+          className="ie-btn wide"
+          style={{ background: card.regOpen ? g.acc : "var(--card)", marginTop: 16, fontSize: "1rem", padding: "14px 20px" }}
+          onClick={(e) => { e.stopPropagation(); onGo(); }}
+        >
+          {card.regOpen
+            ? (t.registrationMode === "team" ? "Register your team →" : "Grab a slot →")
+            : "View tournament →"}
+        </button>
+
+        <div className="ie-nx-foot">
+          {closing ? `Registration closes in ${closing}` : card.status}
+        </div>
+        <button
+          className="ie-nx-link"
+          onClick={(e) => { e.stopPropagation(); onGo(); }}
+        >
+          Rules, format and schedule
+        </button>
+      </div>
     </article>
   );
 }

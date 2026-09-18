@@ -210,8 +210,9 @@ export default function Navbar() {
       <style>{`
         * { box-sizing: border-box; }
         .ie-navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,12,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid #2A2A30; font-family: var(--font-geist-sans), system-ui, sans-serif; }
+        /* 68px clears the desktop row (62 + 3px accent + 1px border) and the
+           taller 60px mobile row below, so one value serves both. */
         .ie-navbar-spacer { height: 68px; }
-        @media (max-width: 900px) { .ie-navbar-spacer { height: 56px; } }
         .ie-nav-accent { height: 3px; transition: background 0.3s; }
         .ie-nav-row { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 62px; gap: 12px; }
         .ie-nav-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
@@ -257,10 +258,10 @@ export default function Navbar() {
           .ie-nav-tab-inactive { display: none !important; }
           .ie-signin-btn { display: none !important; }
           .ie-mobile-signin-cta { display: flex !important; }
-          .ie-nav-logo .ie-logo-img { width: 26px !important; height: 26px !important; }
+          .ie-nav-logo .ie-logo-img { width: 32px !important; height: 32px !important; }
           .ie-nav-logo-name { display: none !important; }
           .ie-nav-logo-sub { display: none !important; }
-          .ie-nav-row { padding: 0 10px !important; height: 48px !important; gap: 8px !important; }
+          .ie-nav-row { padding: 0 10px !important; height: 60px !important; gap: 8px !important; }
           .ie-profile-name-text { display: none !important; }
           .ie-profile-chevron { display: none !important; }
           .ie-profile-btn { padding: 2px !important; border-radius: 50% !important; }
