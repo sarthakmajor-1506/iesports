@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import DiscordAccountsPrompt from "./DiscordAccountsPrompt";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
@@ -34,11 +34,31 @@ const DiscordIcon = ({ size = 16, color = "currentColor" }: { size?: number; col
 
 type PhoneStep = "phone" | "otp";
 
+/**
+ * Strips ?discord=linked|error out of the URL after a link round-trip.
+ *
+ * It lives in its own component, behind its own Suspense, because
+ * `useSearchParams()` opts its entire Suspense boundary out of static
+ * rendering. Navbar called it directly, and app/layout.tsx wraps the whole app
+ * in a single boundary — so NO page rendered any server-side markup at all.
+ * The landing page shipped an empty shell and painted only after hydration.
+ * Isolated here, the bail-out costs nothing: this component renders null.
+ */
+function DiscordParamCleanup() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    const discord = searchParams.get("discord");
+    if (discord === "linked" || discord === "error") router.replace(pathname);
+  }, [searchParams, router, pathname]);
+  return null;
+}
+
 export default function Navbar() {
   const { user, logout, riotData, steamLinked, discordConnections, userProfile, dotaProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const steamData = userProfile;
   const [dropdownOpen,   setDropdownOpen]   = useState(false);
@@ -60,11 +80,6 @@ export default function Navbar() {
   const recaptchaRef = useRef<any>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-
-  useEffect(() => {
-    const discord = searchParams.get("discord");
-    if (discord === "linked" || discord === "error") router.replace(pathname);
-  }, [searchParams]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -190,6 +205,7 @@ export default function Navbar() {
 
   return (
     <>
+      <Suspense fallback={null}><DiscordParamCleanup /></Suspense>
       {user && <DiscordAccountsPrompt />}
       <style>{`
         * { box-sizing: border-box; }
