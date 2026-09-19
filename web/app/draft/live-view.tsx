@@ -7,7 +7,7 @@ import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar, CoinChip,
+  Shell, Band, Btn, Panel, Label, Field, VersusBar, CoinChip, SoundToggle,
   CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, BW_2,
 } from "./ui";
@@ -215,7 +215,7 @@ export function LiveView({
     return (
       <Shell
         tab={null}
-        head={<Band title="Live room" compact accent={LEMON} onBack={onLeave} sub="Share the code — the draft starts the moment they join" />}
+        head={<Band title="Live room" compact accent={LEMON} onBack={onLeave} sub="Share the code — the draft starts the moment they join" right={<SoundToggle />} />}
         foot={
           <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `${BW_2}px solid ${LINE}`, background: PAPER }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={() => navigator.clipboard?.writeText(code)}>COPY CODE</Btn></div>
@@ -257,7 +257,7 @@ export function LiveView({
   /* --------------------------------------------------------------- recap */
   if (done && knowledge && !quiz && !recapDone) {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={onLeave} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={onLeave} sub="Both sides are locked in" right={<SoundToggle />} />}>
           <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
@@ -303,7 +303,7 @@ export function LiveView({
         ? { ready: !!room.quizReadyHost, opponentReady: !!room.quizReadyGuest }
         : { ready: !!room.quizReadyGuest, opponentReady: !!room.quizReadyHost };
       return (
-        <Shell tab={null} head={<Band title="Draft closed" compact accent={LEMON} onBack={onLeave} sub="Now the questions" />}>
+        <Shell tab={null} head={<Band title="Draft closed" compact accent={LEMON} onBack={onLeave} sub="Now the questions" right={<SoundToggle />} />}>
               <div style={{ paddingTop: 10 }}>
             {/* Both players derive the same questions from the room code, so
                 nothing about the paper has to cross the network and neither
@@ -477,7 +477,7 @@ export function LiveView({
           compact accent={banning ? PINK : myTurn ? LEMON : "transparent"}
           title={turnLabel}
           sub={`Round ${turnIdx + 1} of ${seq.length}${turnHint} · room ${code}`}
-          right={<TurnClock seconds={seconds} yours={myTurn} size={40} />}
+          right={<><SoundToggle /><TurnClock seconds={seconds} yours={myTurn} size={34} /></>}
         />
       }
     >

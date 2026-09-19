@@ -463,7 +463,7 @@ function Duel() {
   /* -------------------------------------------------------------- recap */
   if (stage === "recap") {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={toMenu} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={toMenu} sub="Both sides are locked in" right={<SoundToggle />} />}>
         <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
@@ -480,7 +480,7 @@ function Duel() {
   /* -------------------------------------------------------------- quiz */
   if (stage === "quiz") {
     return (
-      <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} onBack={toMenu} sub="Now the questions" />}>
+      <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} onBack={toMenu} sub="Now the questions" right={<SoundToggle />} />}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
           <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 19vw, 92px)" />
           {knowledge ? (
@@ -546,7 +546,12 @@ function Duel() {
             accent={banning ? PINK : yourTurn ? LEMON : "transparent"}
             title={turnLabel}
             sub={`Round ${turnIndex + 1} of ${SEQ.length}${turnHint}${bans.length ? ` · ${bans.length} banned` : ""}`}
-            right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? LEMON : MINT} />}
+            right={<>
+              {/* Reachable mid-draft, not only from the menu — the whole point
+                  of a mute is that you hit it when the noise starts. */}
+              <SoundToggle />
+              <Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? LEMON : MINT} />
+            </>}
           />
         }
       >
@@ -700,7 +705,7 @@ function LadderTile({
       ) : waiting ? (
         <Btn full tone="dark" onClick={onCancel}>CANCEL</Btn>
       ) : (
-        <Btn full tone="dark" onClick={onQueue}>FIND AN OPPONENT</Btn>
+        <Btn full tone="dark" onClick={onQueue}>FIND AN OPPONENT ONLINE</Btn>
       )}
 
       {error && <div style={{ fontSize: 11, fontWeight: 700, marginTop: 8 }}>{error}</div>}

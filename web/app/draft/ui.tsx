@@ -311,7 +311,7 @@ export function Band({
     <div style={{
       flex: "0 0 auto", position: "relative", zIndex: 20,
       background: PAPER, borderBottom: `${BW_3}px solid ${LINE}`,
-      padding: `calc(14px + env(safe-area-inset-top)) 12px ${children ? 13 : 14}px`,
+      padding: `calc(4px + env(safe-area-inset-top)) 12px ${children ? 5 : 6}px`,
     }}>
       {/*
        * A flex row, not a centred block with floating overlays.
@@ -329,12 +329,12 @@ export function Band({
        * The spacer opposite a lone back button keeps it optically centred, which
        * is the one thing the overlay version did buy.
        */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: compact ? 40 : 46 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, minHeight: compact ? 22 : 26 }}>
         {onBack && (
           <button onClick={onBack} aria-label="Back" className="dl-btn" style={{
-            flexShrink: 0, width: 36, height: 36, borderRadius: R_BTN,
+            flexShrink: 0, width: 28, height: 28, borderRadius: R_BTN,
             background: PANEL, border: `${BW}px solid ${LINE}`, color: CREAM,
-            fontSize: 19, fontWeight: 900, cursor: "pointer", display: "grid", placeItems: "center",
+            fontSize: 16, fontWeight: 900, cursor: "pointer", display: "grid", placeItems: "center",
             padding: 0, lineHeight: 1, ...lift(2),
           }}>‹</button>
         )}
@@ -345,8 +345,8 @@ export function Band({
               bar, scaling with the viewport so the same title survives a 360px
               phone and a 520px sheet. */}
           <div style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 0,
-            fontSize: compact ? "clamp(18px, 5.4vw, 22px)" : "clamp(22px, 6.8vw, 28px)",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minWidth: 0,
+            fontSize: compact ? "clamp(14.5px, 4.3vw, 17px)" : "clamp(17px, 5.2vw, 21px)",
             fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.16, color: CREAM,
           }}>
             {icon}
@@ -355,15 +355,15 @@ export function Band({
             </span>
           </div>
           {sub && (
-            <div style={{ fontSize: 11, color: DIM, marginTop: 5, letterSpacing: .3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
+            <div style={{ fontSize: 9.5, color: DIM, marginTop: 2, letterSpacing: .3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
           )}
         </div>
 
         {right && (
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>{right}</div>
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}>{right}</div>
         )}
         {/* Balances a lone back button, so the title stays centred. */}
-        {onBack && !right && <span style={{ flexShrink: 0, width: 36 }} />}
+        {onBack && !right && <span style={{ flexShrink: 0, width: 28 }} />}
       </div>
       {children}
     </div>
@@ -380,7 +380,7 @@ export function Band({
  * literal hex is deliberate: this chip stays white in the night sheet too, the
  * way the hero name bars stay ink.
  */
-export function DotaMark({ size = 30 }: { size?: number }) {
+export function DotaMark({ size = 24 }: { size?: number }) {
   return (
     <span style={{
       flexShrink: 0, width: size, height: size, borderRadius: 9, overflow: "hidden",
@@ -403,7 +403,7 @@ export function DotaMark({ size = 30 }: { size?: number }) {
  * — in a fraction of the width, and their name is on the boards below anyway.
  */
 export function AvatarChip({
-  src, name, size = 30, onClick,
+  src, name, size = 25, onClick,
 }: { src: string | null; name: string; size?: number; onClick?: () => void }) {
   const initial = (name || "?").trim().slice(0, 1).toUpperCase();
   const El = onClick ? "button" : "span";
@@ -436,19 +436,19 @@ export type Tab = "duel" | "picker" | "guide";
 
 const ICONS: Record<Tab, React.ReactNode> = {
   duel: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="m13 19 6-6" /><path d="m16 16 4 4" />
       <path d="M19 3h2v2l-9 9" />
     </svg>
   ),
   picker: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.4" />
       <path d="M12 1.8v4M12 18.2v4M1.8 12h4M18.2 12h4" />
     </svg>
   ),
   guide: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2H11v18H4.5A2.5 2.5 0 0 0 2 22z" />
       <path d="M22 4.5A2.5 2.5 0 0 0 19.5 2H13v18h6.5a2.5 2.5 0 0 1 2.5 2z" />
     </svg>
@@ -465,23 +465,23 @@ const TABS: { id: Tab; href: string; label: string; fill: string }[] = [
 export function TabBar({ active }: { active: Tab }) {
   return (
     <nav style={{
-      flex: "0 0 auto", display: "flex", gap: 7, zIndex: 30,
+      flex: "0 0 auto", display: "flex", gap: 6, zIndex: 30,
       borderTop: `${BW_2}px solid ${LINE}`, background: PAPER,
-      padding: "9px 10px calc(9px + env(safe-area-inset-bottom))",
+      padding: "6px 10px calc(6px + env(safe-area-inset-bottom))",
     }}>
       {TABS.map((t) => {
         const on = t.id === active;
         return (
           <a key={t.id} href={t.href} className="dl-btn" style={{
-            flex: "1 1 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-            textDecoration: "none", padding: "8px 2px 6px", borderRadius: R_CHIP, minHeight: 52,
+            flex: "1 1 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+            textDecoration: "none", padding: "5px 2px 4px", borderRadius: R_CHIP, minHeight: 36,
             color: on ? ON_FILL : CREAM,
             background: on ? t.fill : PANEL,
             border: `${BW}px solid ${LINE}`,
             ...lift(on ? 3 : 2),
           }}>
             {ICONS[t.id]}
-            <span style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: .8 }}>{t.label.toUpperCase()}</span>
+            <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: .7 }}>{t.label.toUpperCase()}</span>
           </a>
         );
       })}
@@ -636,7 +636,7 @@ function IconBtn({
 }: { onClick: () => void; label: string; title?: string; on?: boolean; fill?: string; children: React.ReactNode }) {
   return (
     <button onClick={onClick} className="dl-btn" aria-label={label} title={title} style={{
-      width: 32, height: 32, borderRadius: R_BTN, background: on ? fill : PANEL,
+      width: 26, height: 26, borderRadius: R_BTN, background: on ? fill : PANEL,
       border: `${BW}px solid ${LINE}`, color: on ? ON_FILL : DIM,
       cursor: "pointer", display: "grid", placeItems: "center", padding: 0, ...lift(2),
     }}>{children}</button>
@@ -649,7 +649,7 @@ export function SoundToggle() {
   return (
     <IconBtn onClick={() => setMuted(!muted)} on={!muted} fill={MINT}
       label={muted ? "Turn sound on" : "Turn sound off"} title={muted ? "Sound off" : "Sound on"}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M11 5 6 9H2v6h4l5 4z" />
         {muted ? <><path d="m23 9-6 6" /><path d="m17 9 6 6" /></> : <path d="M15.5 8.5a5 5 0 0 1 0 7" />}
       </svg>
@@ -669,7 +669,7 @@ export function ThemeToggle() {
   return (
     <IconBtn onClick={() => setNight(!night)} on={night} fill={LILAC}
       label={night ? "Switch to paper" : "Switch to night"} title={night ? "Night" : "Paper"}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
         {night ? (
           <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.6 6.6 0 0 0 10.5 10.5z" />
         ) : (
