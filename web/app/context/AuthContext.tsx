@@ -54,7 +54,7 @@ type AuthContextType = {
   registeredCS2Tournaments: Set<string>;
   registeredSoloTournaments: Set<string>;
   refreshUser: () => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (redirectTo?: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -234,13 +234,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [user, loading, steamLinked, dotaProfile?.dotaRankTier, syncUserData]);
 
-  const logout = useCallback(async () => {
+  // `redirectTo` defaults to the front page, which is right for the main site:
+  // the navbar's logout sits on pages that assume an account. Somewhere like
+  // Draft Lab, which is playable signed out, passes its own path instead so
+  // logging out drops the account and leaves you on the page you were on.
+  const logout = useCallback(async (redirectTo: string = "/") => {
     if (user) {
       try { sessionStorage.removeItem(`discord_prompt_dismissed_${user.uid}`); } catch {}
     }
     const { auth, mod } = await getFirebaseAuth();
     await mod.signOut(auth);
-    router.push("/");
+    router.push(redirectTo);
   }, [user, router]);
 
   return (

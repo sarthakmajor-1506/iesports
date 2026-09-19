@@ -346,7 +346,7 @@ function Duel() {
                     picture; what you are called is on the board below. Tapping
                     it is also the only way to sign out of Draft Lab — there was
                     none before, anywhere in the game. */}
-                {user && <ProfileMenu src={avatarUrl} name={displayName} onLogout={logout} />}
+                {user && <ProfileMenu src={avatarUrl} name={displayName} onLogout={() => logout("/draft")} />}
               </>
             } />
         }
