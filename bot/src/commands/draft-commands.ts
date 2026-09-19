@@ -124,13 +124,28 @@ export async function draftExecute(interaction: ChatInputCommandInteraction): Pr
 
 export const draftboardData = new SlashCommandBuilder()
   .setName("draftboard")
-  .setDescription("Today's Draft Lab ladder")
+  .setDescription("This week's Draft Lab board")
   .addBooleanOption((opt) =>
-    opt.setName("alltime").setDescription("Show the all-time ladder instead of today").setRequired(false)
+    opt.setName("alltime").setDescription("Show all-time ranked rating instead of this week's coins").setRequired(false)
   );
 
-/** IST, because the daily board rolls over on the players' midnight, not the server's. */
-const dayKey = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+/**
+ * The Monday (IST) this week's coin board is keyed on.
+ *
+ * Mirrors lib/draftLadder.ts's `weekKey` on the web side — the bot is a
+ * separately built and deployed package with its own node_modules and cannot
+ * import from `web/`, so this stays a second, small copy rather than a shared
+ * import. A Monday date string, not an ISO week number: nobody has to
+ * remember what "2026-W01" means when the Firestore console just shows a date.
+ */
+function weekKey(): string {
+  const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const sinceMonday = (ist.getDay() + 6) % 7;
+  const monday = new Date(ist);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(ist.getDate() - sinceMonday);
+  return monday.toLocaleDateString("en-CA");
+}
 
 export async function draftboardExecute(interaction: ChatInputCommandInteraction): Promise<void> {
   const allTime = interaction.options.getBoolean("alltime") ?? false;
@@ -142,17 +157,18 @@ export async function draftboardExecute(interaction: ChatInputCommandInteraction
       ? (await db.collection("draftlabLadder").orderBy("elo", "desc").limit(10).get()).docs
           .map((d) => d.data())
           .filter((d) => (d.games ?? 0) >= 3)
-      // Per-day subcollection, so "today, best first" is a single-field order
-      // rather than a filter-plus-sort needing a composite index.
-      : (await db.collection("draftlabLadderDaily").doc(dayKey()).collection("players")
-          .orderBy("delta", "desc").limit(10).get()).docs
+      // Per-week subcollection, so "this week, most coins first" is a
+      // single-field order rather than a filter-plus-sort needing a
+      // composite index nobody has deployed.
+      : (await db.collection("draftlabLadderWeekly").doc(weekKey()).collection("players")
+          .orderBy("coins", "desc").limit(10).get()).docs
           .map((d) => d.data());
 
     if (!rows.length) {
       await interaction.editReply(
         allTime
-          ? "Nobody is on the ladder yet. `/draft` opens a seat."
-          : `Nobody has played today. \`/draft\` opens a seat — ${appUrl()}/draft`
+          ? "Nobody is ranked yet. `/draft` opens a seat."
+          : `Nobody has coins yet this week. \`/draft\` opens a seat — ${appUrl()}/draft`
       );
       return;
     }
@@ -163,22 +179,22 @@ export async function draftboardExecute(interaction: ChatInputCommandInteraction
       const name = String(d.name ?? "Anonymous").slice(0, 24);
       return allTime
         ? `${place} **${name}** — ${d.elo} (${d.wins ?? 0}W ${d.losses ?? 0}L)`
-        : `${place} **${name}** — ${(d.delta ?? 0) > 0 ? "+" : ""}${d.delta ?? 0} (${d.games ?? 0} played)`;
+        : `${place} **${name}** — 🪙 ${d.coins ?? 0} (${d.games ?? 0} played, ${d.wins ?? 0}W)`;
     });
 
     const embed = new EmbedBuilder()
       .setColor(0xffd24a)
-      .setTitle(allTime ? "Draft Lab — all-time ladder" : "Draft Lab — today")
+      .setTitle(allTime ? "Draft Lab — all-time rating" : "Draft Lab — this week")
       .setDescription(lines.join("\n"))
       .setFooter({
         text: allTime
-          ? "Rating from head-to-head drafts. 3 games to be ranked."
-          : "Rating gained today. Resets at midnight IST.",
+          ? "Rating from head-to-head ranked drafts. 3 games to be ranked."
+          : "Coins from every win, solo or ranked. Resets Monday IST.",
       });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
     console.error("[draftboard] failed:", err);
-    await interaction.editReply("Could not read the ladder just now.");
+    await interaction.editReply("Could not read the board just now.");
   }
 }

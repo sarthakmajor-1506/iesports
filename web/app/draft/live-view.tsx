@@ -13,7 +13,7 @@ import {
 } from "./ui";
 import { Skeleton } from "./theme";
 import { TeamRow, BanStrip, AttributePool } from "./hero-art";
-import { Col } from "./result";
+import { Col, CoinPanel } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
   type Seat,
@@ -28,12 +28,29 @@ import {
  * from the same `draftSequence()` solo uses (role 0 = host, role 1 = guest), so
  * the two modes cannot silently drift apart the way two hand-written sequences
  * eventually would.
+ *
+ * SETTLEMENT HAPPENS SERVER-SIDE, AUTOMATICALLY. The room route calls
+ * `settleRoom` the instant the last pick lands (see api/draftlab/room), which
+ * pays Elo and coins before this component ever asks. There used to be a
+ * second, client-driven report here too — the same `submitScore` solo uses,
+ * re-evaluating the same two fives through the avg-points board — which is
+ * gone now that board is gone. Nothing in this file writes a result; it only
+ * ever reads `room.result`.
  */
 export function LiveView({
-  model, knowledge, code, onLeave, motion, submitScore,
+  model, knowledge, code, onLeave, motion, displayName, avatarUrl,
 }: {
   model: DraftModel; knowledge: Knowledge | null; code: string; onLeave: () => void; motion: boolean;
-  submitScore?: (mine: number[], theirs: number[], quiz: QuizResult | null) => void;
+  /**
+   * Passed down rather than read from localStorage inside the auto-join
+   * effect below, which is exactly the bug that used to seat a signed-in
+   * player as "Guest": that local key is only ever populated by the
+   * signed-OUT "PLAYING AS" box, so a signed-in player auto-joining a matched
+   * room read an empty string and fell through to the hard-coded default. The
+   * account's real name is resolved once, in page.tsx, and handed to every
+   * screen that can seat a player — this is the one that was missing it.
+   */
+  displayName: string; avatarUrl: string | null;
 }) {
   const { room, err } = useLiveRoom(code);
   const { call, error, setError } = useRoomActions();
@@ -74,9 +91,10 @@ export function LiveView({
   /**
    * Take the open seat automatically.
    *
-   * Someone arriving on a shared /draft?live=CODE link has not joined anything
-   * yet — without this they would sit and watch an empty room while the host
-   * waits for a guest who never registers.
+   * Someone arriving on a shared /draft?live=CODE link — or matched via the
+   * ladder queue, which seats only the host up front — has not joined
+   * anything yet. Without this they would sit and watch an empty room while
+   * the other side waits for a guest who never registers.
    */
   const joinedRef = useRef(false);
   useEffect(() => {
@@ -84,10 +102,8 @@ export function LiveView({
     const seated = room.host?.id === me || room.guest?.id === me;
     if (seated || room.guest) return;
     joinedRef.current = true;
-    let stored = "";
-    try { stored = localStorage.getItem("draftlab_name") || ""; } catch {}
-    void call({ action: "join", code, name: stored || "Guest" });
-  }, [room, me, call, code]);
+    void call({ action: "join", code, name: displayName, avatar: avatarUrl });
+  }, [room, me, call, code, displayName, avatarUrl]);
 
   const submit = useCallback((heroId: number) => {
     if (!myTurn) return;
@@ -100,14 +116,6 @@ export function LiveView({
   useTurnTimeout(room, onExpire, seat != null);
 
   const done = room?.status === "done";
-  const reported = useRef(false);
-  useEffect(() => {
-    if (!done || reported.current || !submitScore) return;
-    if (mine.length !== 5 || theirs.length !== 5) return;
-    if (knowledge && !quiz) return; // wait for the questions to be answered
-    reported.current = true;
-    submitScore(mine, theirs, quiz);
-  }, [done, mine, theirs, quiz, knowledge, submitScore]);
 
   if (err) {
     return (
@@ -179,7 +187,7 @@ export function LiveView({
   /* --------------------------------------------------------------- recap */
   if (done && knowledge && !quiz && !recapDone) {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={onLeave} sub="Both sides are locked in" />}>
           <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
@@ -201,10 +209,11 @@ export function LiveView({
      * The server's verdict wins when it has one.
      *
      * The model also runs here, and it agrees — but the browser's copy is a
-     * number the winner's own machine produced, and the rating was moved from
-     * `result`. Showing a locally computed outcome beside a server-paid rating
-     * is how the two quietly disagree in front of the player. The local value
-     * is the fallback for a room that has not settled yet.
+     * number the winner's own machine produced, and the rating and coins were
+     * both paid from `result`. Showing a locally computed outcome beside a
+     * server-paid rating is how the two quietly disagree in front of the
+     * player. The local value is the fallback for a room that has not settled
+     * yet (a brief window right after the last pick).
      */
     const settled = room.result ?? null;
     const finalP = playerWinProb(engine, mine, theirs, true);
@@ -213,19 +222,32 @@ export function LiveView({
       : finalP > 0.5;
     const drew = settled?.outcome === "draw";
     const eloDelta = settled ? (seat === "host" ? settled.deltaHost : settled.deltaGuest) : 0;
+    const coinsMine = settled ? (seat === "host" ? settled.coinsHost : settled.coinsGuest) : 0;
     const oppQuiz = seat ? (seat === "host" ? room.quizGuest : room.quizHost) ?? null : null;
     const { yoursWin, theirsWin } = counterMap(engine, mine, theirs);
     const style = draftingStyle(engine, mine, tempos);
     const autos = picks.filter((p) => p.auto && p.by === seat).length;
 
     if (knowledge && !quiz) {
+      const mySync = seat === "host"
+        ? { ready: !!room.quizReadyHost, opponentReady: !!room.quizReadyGuest }
+        : { ready: !!room.quizReadyGuest, opponentReady: !!room.quizReadyHost };
       return (
-        <Shell tab={null} head={<Band title="Draft closed" compact accent={LEMON} sub="Now the questions" />}>
+        <Shell tab={null} head={<Band title="Draft closed" compact accent={LEMON} onBack={onLeave} sub="Now the questions" />}>
               <div style={{ paddingTop: 10 }}>
             {/* Both players derive the same questions from the room code, so
-                nothing about the paper has to cross the network and neither can peek. */}
+                nothing about the paper has to cross the network and neither
+                can peek. The clock they answer against, though, is NOT local
+                any more — see QuizSync — because two ten-second clocks that
+                started a few seconds apart were never the same round. */}
             <QuizRound knowledge={knowledge} seed={`room-${code}`}
-              onDone={(r) => { setQuiz(r); void call({ action: "quiz", code, points: r.points, correct: r.correct }); }} />
+              onDone={(r) => { setQuiz(r); void call({ action: "quiz", code, points: r.points, correct: r.correct }); }}
+              sync={seat ? {
+                ready: mySync.ready, opponentReady: mySync.opponentReady, opponentName: themName ?? "them",
+                startAt: room.quizStartAt ?? null,
+                onReady: () => { void call({ action: "quizReady", code }); },
+              } : undefined}
+            />
           </div>
         </Shell>
       );
@@ -266,6 +288,8 @@ export function LiveView({
             <VersusBar p={settled ? (seat === "host" ? settled.hostWinProb : 1 - settled.hostWinProb) : finalP}
               left={meName.toUpperCase()} right={themName.toUpperCase()} />
           </Panel>
+
+          {!!coinsMine && <CoinPanel coins={coinsMine} weeklyTotal={null} />}
 
           {quiz && (
             <Panel>
@@ -343,9 +367,16 @@ export function LiveView({
          * One line, with the clock in the header slot rather than a band of its
          * own. Live is the mode with the least room to spare — the seconds and
          * the heroes are what matter, and chrome between them is a cost.
+         *
+         * NO BACK BUTTON HERE. A draft in progress against a real, live
+         * opponent is the one screen where "back" is a live-fire action — it
+         * does not pause anything, the clock keeps running, and a stray tap
+         * costs a pick to the timeout. Every other live screen (waiting for an
+         * opponent, the recap, the questions, the result) keeps its back
+         * button; only the turn-taking itself does not.
          */
         <Band
-          compact accent={banning ? PINK : myTurn ? LEMON : "transparent"} onBack={onLeave}
+          compact accent={banning ? PINK : myTurn ? LEMON : "transparent"}
           title={turnLabel}
           sub={`Round ${turnIdx + 1} of ${seq.length}${turnHint} · room ${code}`}
           right={<TurnClock seconds={seconds} yours={myTurn} size={40} />}
@@ -355,9 +386,11 @@ export function LiveView({
       <div style={{ display: "grid", gap: 8, paddingTop: 9 }}>
         <TeamRow side="them" label={(themName ?? "DIRE").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
           heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
-          status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }} />
+          status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }}
+          turnActive={!myTurn && !banning} />
         <TeamRow side="you" label={(meName ?? "YOU").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
-          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null} />
+          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null}
+          turnActive={myTurn && !banning} />
       </div>
 
       <Field

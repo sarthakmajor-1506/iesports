@@ -11,12 +11,11 @@ import { QUIZ_COUNT, type Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, Segment, SoundToggle, ThemeToggle,
+  Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
   DiscordIcon, signInWithDiscord, DotaMark, AvatarChip,
   CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
   LEMON, MINT, PINK, LILAC, CORAL, GOLD_FILL, ON_FILL, R_CARD, BW_2, BW_3, lift,
 } from "./ui";
-import { Ladder } from "./ladder";
 import { Skeleton } from "./theme";
 import { play, startMusic, stopMusic } from "./sound";
 import { TeamRow, BanStrip, AttributePool, setRenderConcurrency } from "./hero-art";
@@ -48,7 +47,7 @@ export default function DraftDuelPage() {
 }
 
 function Duel() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, logout } = useAuth();
   const [model, setModel] = useState<DraftModel | null>(null);
   const [knowledge, setKnowledge] = useState<Knowledge | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +61,6 @@ function Duel() {
   const [busy, setBusy] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [motion, setMotion] = useState(true);
-  const [board, setBoard] = useState<"ladder" | "solo">("ladder");
   const { call: roomCall } = useRoomActions();
   /*
    * Matching drops you straight into the room. The queue hands back a code the
@@ -78,7 +76,9 @@ function Duel() {
   const [botThinking, setBotThinking] = useState(false);
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [scored, setScored] = useState<{ points: number; draftPoints: number; quizPoints: number } | null>(null);
-  const [personalBest, setPersonalBest] = useState(false);
+  const [coinsAwarded, setCoinsAwarded] = useState(0);
+  const [weeklyTotal, setWeeklyTotal] = useState<number | null>(null);
+  const [coinsPersonalBest, setCoinsPersonalBest] = useState(false);
   const [boardVersion, setBoardVersion] = useState(0);
 
   /**
@@ -225,11 +225,17 @@ function Duel() {
   };
 
   /**
-   * Send the finished game up for scoring.
+   * Send the finished solo game up for scoring.
    *
-   * The picks and the answer sheet go, not the score: the server re-evaluates the
-   * model on those ten heroes and re-marks the quiz from its seed, so a leaderboard
-   * place cannot be typed into a console. An anonymous player skips this entirely.
+   * The picks and the answer sheet go, not the score: the server re-evaluates
+   * the model on those ten heroes and re-marks the quiz from its seed, so a
+   * leaderboard place cannot be typed into a console. An anonymous player
+   * skips this entirely.
+   *
+   * Solo only. A live ranked match is settled automatically, server-side, the
+   * instant the draft finishes — see the note at the top of live-view.tsx —
+   * so this route only ever hears from the mode that has nobody else to
+   * settle it for.
    */
   const submitScore = useCallback(async (mineIds: number[], theirIds: number[], q: QuizResult | null) => {
     if (!user) return;
@@ -250,7 +256,9 @@ function Duel() {
       });
       const d = await r.json();
       if (d?.scored) setScored(d.scored);
-      if (d?.personalBest) setPersonalBest(true);
+      setCoinsAwarded(d?.coinsAwarded ?? 0);
+      setWeeklyTotal(typeof d?.weeklyTotal === "number" ? d.weeklyTotal : null);
+      setCoinsPersonalBest(!!d?.coinsPersonalBest);
       setBoardVersion((v) => v + 1);
     } catch { /* the leaderboard is never allowed to break the game loop */ }
   }, [user, displayName, avatarUrl]);
@@ -286,13 +294,14 @@ function Duel() {
    */
   const restart = () => {
     setEvents([]); setSearch(""); setLogged(false); setQuiz(null); setScored(null);
-    setPersonalBest(false);
+    setCoinsAwarded(0); setWeeklyTotal(null); setCoinsPersonalBest(false);
     setStartedAt(Date.now()); rngState.current = Math.floor(Math.random() * 0xffffffff);
     startMusic("draft");
     setStage("drafting");
   };
   const toMenu = () => {
-    setEvents([]); setQuiz(null); setScored(null); setPersonalBest(false); setLogged(false);
+    setEvents([]); setQuiz(null); setScored(null);
+    setCoinsAwarded(0); setWeeklyTotal(null); setCoinsPersonalBest(false); setLogged(false);
     startMusic("menu");
     setStage("menu");
   };
@@ -316,7 +325,8 @@ function Duel() {
   const poolHero = (id: number) => { const h = heroById(id); return h ? { img: h.img, name: h.name, attr: h.attr } : undefined; };
 
   if (liveCode) {
-    return <LiveView model={model} knowledge={knowledge} code={liveCode} motion={motion} submitScore={submitScore}
+    return <LiveView model={model} knowledge={knowledge} code={liveCode} motion={motion}
+      displayName={displayName} avatarUrl={avatarUrl}
       onLeave={() => { setLiveCode(null); window.history.replaceState({}, "", "/draft"); }} />;
   }
 
@@ -333,8 +343,10 @@ function Duel() {
                 <ThemeToggle />
                 <SoundToggle />
                 {/* One icon, not a name pill. Who you are signed in as is a
-                    picture; what you are called is on the boards below. */}
-                {user && <AvatarChip src={avatarUrl} name={displayName} />}
+                    picture; what you are called is on the board below. Tapping
+                    it is also the only way to sign out of Draft Lab — there was
+                    none before, anywhere in the game. */}
+                {user && <ProfileMenu src={avatarUrl} name={displayName} onLogout={logout} />}
               </>
             } />
         }
@@ -409,14 +421,7 @@ function Duel() {
           )}
 
           <div style={{ height: 4 }} />
-          {/* Two boards, and the ladder is first: one ranks who beats people,
-              the other ranks what the model thought of your five heroes. */}
-          <Segment value={board} onChange={setBoard}
-            options={[{ v: "ladder", label: "LADDER", accent: GOLD_FILL }, { v: "solo", label: "SOLO SCORES", accent: PINK }]} />
-          <div style={{ height: 2 }} />
-          {board === "ladder"
-            ? <Ladder uid={user?.uid ?? null} refreshKey={boardVersion} />
-            : <Leaderboard uid={user?.uid ?? null} refreshKey={boardVersion} />}
+          <Leaderboard uid={user?.uid ?? null} refreshKey={boardVersion} />
         </div>
       </Shell>
     );
@@ -425,7 +430,7 @@ function Duel() {
   /* -------------------------------------------------------------- recap */
   if (stage === "recap") {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={toMenu} sub="Both sides are locked in" />}>
         <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
@@ -442,7 +447,7 @@ function Duel() {
   /* -------------------------------------------------------------- quiz */
   if (stage === "quiz") {
     return (
-      <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} sub="Now the questions" />}>
+      <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} onBack={toMenu} sub="Now the questions" />}>
         <div style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
           <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 19vw, 92px)" />
           {knowledge ? (
@@ -497,8 +502,14 @@ function Duel() {
            * while the other side is thinking. It replaced a coloured title,
            * which on paper made the words themselves harder to read the more
            * urgent they were.
+           *
+           * NO onBack HERE. Every other screen in the game keeps its back
+           * button; a draft actually in progress does not. Restarting takes a
+           * full ten rounds either way, so there is nothing to lose by simply
+           * not offering an exit mid-turn — and it removes the one misclick
+           * that used to be able to throw a run away.
            */
-          <Band compact onBack={toMenu}
+          <Band compact
             accent={banning ? PINK : yourTurn ? LEMON : "transparent"}
             title={turnLabel}
             sub={`Round ${turnIndex + 1} of ${SEQ.length}${turnHint}${bans.length ? ` · ${bans.length} banned` : ""}`}
@@ -510,13 +521,15 @@ function Duel() {
           <TeamRow side="them" label="DIRE" motion={motion} height="clamp(96px, 29vw, 148px)"
             heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
             status={{ text: botTurn ? (banning ? "banning…" : "picking…") : "idle", active: botTurn }}
+            turnActive={botTurn && !banning}
             note={lastBotPick?.answering != null ? (
               <span style={{ fontSize: 9, color: ENEMY, textAlign: "right", lineHeight: 1.2 }}>
                 answers your {heroName(lastBotPick.answering)}
               </span>
             ) : undefined} />
           <TeamRow side="you" label="RADIANT" motion={motion} height="clamp(96px, 29vw, 148px)"
-            heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null} />
+            heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null}
+            turnActive={yourTurn && !banning} />
         </div>
 
         <Field value={search} onChange={(e) => setSearch(e.target.value)}
@@ -556,8 +569,49 @@ function Duel() {
       foot={<ResultActions onAgain={restart} onMenu={toMenu} />}
     >
       <Result engine={engine} events={events} yours={yours} theirs={theirs} finalP={finalP}
-        quiz={quiz} tempos={tempos} motion={motion} scored={scored} personalBest={personalBest} />
+        quiz={quiz} tempos={tempos} motion={motion} scored={scored}
+        coinsAwarded={coinsAwarded} weeklyTotal={weeklyTotal} coinsPersonalBest={coinsPersonalBest} />
     </Shell>
+  );
+}
+
+/**
+ * The signed-in avatar, with a logout tucked behind it.
+ *
+ * There used to be no way to sign out of Draft Lab short of clearing cookies
+ * or finding the main site's own navbar — this game has no navbar of its own,
+ * and the avatar in its header was purely decorative. It is the one thing in
+ * the header that names an account, so it is where a menu belongs.
+ */
+function ProfileMenu({ src, name, onLogout }: { src: string | null; name: string; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <AvatarChip src={src} name={name} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <div className="dl-in dl-card" style={{
+          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 60,
+          minWidth: 168, padding: 10, boxSizing: "border-box",
+        }}>
+          <div style={{
+            fontSize: 11.5, fontWeight: 900, color: CREAM, marginBottom: 9, paddingLeft: 2,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>{name}</div>
+          <Btn full size="s" tone="red" onClick={() => { setOpen(false); onLogout(); }}>LOG OUT</Btn>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -604,7 +658,7 @@ function LadderTile({
           ? "Beat a human and it counts. Needs an account — there has to be somewhere to put the result."
           : state === "hosting"
             ? "Nobody was queueing, so your room is open and posted in Discord. Sit tight, or share the code."
-            : "Win and take their rating. The board wipes at midnight."}
+            : "Win and take their rating, plus coins toward this week's board."}
       </div>
 
       {!signedIn ? (

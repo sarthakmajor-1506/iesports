@@ -68,9 +68,24 @@ type Room = {
   hostSignedIn?: boolean;
   /** Set once the ladder has been paid out, so a replayed request cannot pay twice. */
   settled?: boolean;
-  result?: { outcome: "host" | "guest" | "draw"; hostWinProb: number; deltaHost: number; deltaGuest: number } | null;
+  result?: {
+    outcome: "host" | "guest" | "draw"; hostWinProb: number;
+    deltaHost: number; deltaGuest: number; coinsHost: number; coinsGuest: number;
+  } | null;
   quizHost?: { points: number; correct: number } | null;
   quizGuest?: { points: number; correct: number } | null;
+  /**
+   * The quiz starts for both players at once, or not at all.
+   *
+   * Each side marks itself ready as soon as it reaches the question screen;
+   * once both flags are true the server picks one shared instant a few seconds
+   * out and writes it here, and both clients — already watching this document
+   * for the pick clock — count down to that same instant rather than to
+   * whenever their own "I'm ready" tap happened to land.
+   */
+  quizReadyHost?: boolean;
+  quizReadyGuest?: boolean;
+  quizStartAt?: number | null;
 };
 
 const seatOf = (room: Room, id: string): "host" | "guest" | null =>
@@ -263,6 +278,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(out);
     }
 
+    /* --------------------------------------------- quiz start, synchronised */
+    if (action === "quizReady") {
+      /*
+       * A fixed lead from the moment BOTH sides are ready, not from whenever
+       * this request happened to land. Both clients read `quizStartAt` off the
+       * same document they already poll for the pick clock, so a couple of
+       * seconds of lead is what covers the slower client's poll interval
+       * (1.2s, in the onSnapshot-blocked fallback) with room to spare — not a
+       * countdown either player has to watch tick down uselessly.
+       */
+      const START_LEAD_MS = 2200;
+
+      const out = await adminDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return { error: "No room with that code", status: 404 };
+        const room = snap.data() as Room;
+        const seat = seatOf(room, playerId);
+        if (!seat) return { error: "You are not in this room", status: 403 };
+
+        const field = seat === "host" ? "quizReadyHost" : "quizReadyGuest";
+        if ((room as unknown as Record<string, unknown>)[field]) {
+          return { ok: true, alreadyReady: true, startAt: room.quizStartAt ?? null };
+        }
+
+        const otherReady = seat === "host" ? room.quizReadyGuest : room.quizReadyHost;
+        const update: Record<string, unknown> = { [field]: true };
+        let startAt = room.quizStartAt ?? null;
+        if (otherReady && startAt == null) {
+          startAt = Date.now() + START_LEAD_MS;
+          update.quizStartAt = startAt;
+        }
+        tx.update(ref, update);
+        return { ok: true, startAt };
+      });
+      if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
+      return NextResponse.json(out);
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (e) {
     console.error("[draftlab] room action failed:", e);
@@ -283,6 +336,7 @@ export async function GET(req: NextRequest) {
       picks: d.picks, turnIndex: d.turnIndex, deadline: d.deadline,
       ranked: !!d.ranked, hostSignedIn: !!d.hostSignedIn, result: d.result ?? null,
       quizHost: d.quizHost ?? null, quizGuest: d.quizGuest ?? null,
+      quizReadyHost: !!d.quizReadyHost, quizReadyGuest: !!d.quizReadyGuest, quizStartAt: d.quizStartAt ?? null,
       turns: seq.length, turnMs: TURN_MS,
     });
   } catch (e) {

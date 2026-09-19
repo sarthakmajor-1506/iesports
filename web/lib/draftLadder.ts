@@ -1,18 +1,26 @@
 /**
- * Draft Lab — the head-to-head ladder.
+ * Draft Lab — the head-to-head ladder, and the weekly coin board.
  *
- * WHY THIS IS SEPARATE FROM THE SOLO BOARD. The solo leaderboard ranks players
- * on what the win-probability model thinks of their five heroes. That model is
- * 58% accurate and well calibrated but has no authority: when it disagrees with
- * a player, neither of them can tell who is right, and a ranking built on it
- * inherits exactly that problem. A ladder does not have it. You beat a person,
- * and nobody argues about whether you beat a person.
+ * WHY A LADDER, NOT JUST THE SOLO BOARD. Ranking players on what a
+ * 58%-accurate model thinks of their five heroes has no authority: when it
+ * disagrees with a player, neither of them can tell who is right, and a
+ * ranking built on it inherits exactly that problem. A ladder does not have
+ * it. You beat a person, and nobody argues about whether you beat a person.
  *
  * WHY THIS IS SEPARATE FROM lib/elo.ts. That file is Valorant tournament
  * seeding, and it is bound by a Riot policy line: its numbers must never be
  * surfaced as a parallel rank. This one is a public Dota ladder whose whole
- * point is to be surfaced. Sharing code between them would blur a boundary that
- * needs to stay obvious, so the twelve lines of Elo are written again here.
+ * point is to be surfaced. Sharing code between them would blur a boundary
+ * that needs to stay obvious, so the twelve lines of Elo are written again
+ * here.
+ *
+ * ONE VISIBLE BOARD. Elo/medal used to run alongside a separate avg-points
+ * "Solo Scores" board and a daily Elo-delta board — three numbers for one
+ * game. They are now one: Elo still moves on every ranked live result (it is
+ * what the medal badge is drawn from), but the thing players are actually
+ * ranked against each other on is coins earned this week, in
+ * `draftlabLadderWeekly/{weekKey}/players/{uid}` — see draftLadderServer.ts
+ * for who gets paid and when.
  */
 
 /** Everyone starts at Archon — the middle of the medal range, not the bottom. */
@@ -21,7 +29,7 @@ export const START_ELO = 1200;
 /**
  * K is high on purpose. A small pool playing a handful of games each needs to
  * reach its level in ten games, not two hundred; the cost is a noisier board,
- * which the daily reset already absorbs.
+ * which the weekly reset already absorbs.
  */
 export const K_FACTOR = 32;
 
@@ -87,25 +95,36 @@ export function medal(elo: number): { name: string; fill: string } {
   return { name: hit.name, fill: hit.fill };
 }
 
-/* ------------------------------------------------------------- the day */
+/* ----------------------------------------------------------- the week */
 
 /**
- * Which day a game belongs to, in IST.
+ * Which week a game belongs to, keyed by that week's Monday in IST.
  *
- * The daily board has to roll over at a moment the players share, and they are
- * in India. Deriving it from the server's own timezone would roll the board at
- * whatever hour the host region happens to be in — on Vercel, a different one
- * from the audience.
+ * A Monday date string rather than an ISO week number: week numbers need a
+ * library to get year-boundary edge cases right, and nobody has to debug what
+ * "2026-W01" means when the Firestore console just shows a date. The board's
+ * players are in India, so the boundary is IST — deriving it from the server's
+ * own timezone would roll the board at whatever hour the host region happens
+ * to be in, a different one from the audience on Vercel.
  */
-export function dayKey(at: Date = new Date()): string {
-  return at.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
+export function weekKey(at: Date = new Date()): string {
+  const ist = new Date(at.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const day = ist.getDay(); // 0 = Sunday
+  const sinceMonday = (day + 6) % 7;
+  const monday = new Date(ist);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(ist.getDate() - sinceMonday);
+  return monday.toLocaleDateString("en-CA"); // YYYY-MM-DD, already IST-local
 }
 
-/** Milliseconds until the daily board resets, for the countdown on it. */
-export function msUntilReset(now: Date = new Date()): number {
+/** Milliseconds until the weekly board resets, for the countdown on it. */
+export function msUntilWeekReset(now: Date = new Date()): number {
   const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const day = ist.getDay();
+  const untilMonday = (8 - day) % 7 || 7; // days remaining, 7 if today IS Monday
   const next = new Date(ist);
-  next.setHours(24, 0, 0, 0);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(ist.getDate() + untilMonday);
   return Math.max(0, next.getTime() - ist.getTime());
 }
 
@@ -120,13 +139,17 @@ export type LadderRow = {
   losses: number;
   draws: number;
   streak: number;
+  best: number;
 };
 
-export type DailyRow = {
+/** One row on the visible weekly board. */
+export type WeeklyRow = {
   uid: string;
   name: string;
   avatar: string | null;
-  delta: number;
+  coins: number;
   games: number;
   wins: number;
+  /** Mirrored from the permanent ladder doc at write time, purely for the medal badge. */
+  elo: number;
 };

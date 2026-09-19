@@ -182,133 +182,6 @@ export type LineupHero = { id: number; img: string; name: string };
 const SETTLE_MS = 4200;
 
 /**
- * A drafted hero, standing free on the page.
- *
- * Valve's renders are VP9-with-alpha — they are already cut out. The black box
- * behind every drafted hero was never theirs; it was our `--tile` bed, put there
- * for the still image underneath, which is an opaque JPEG. So once the render is
- * actually playing there is nothing to hide, and the frame comes off: the hero
- * stands on the paper with a hard ink drop-shadow, which is the same die-cut
- * sticker every other object on this page is.
- *
- * `drop-shadow` follows the alpha channel rather than the box, so the shadow is
- * hero-shaped. That is the whole trick, and it is why this cannot be done with
- * `box-shadow`.
- *
- * Until the render arrives — and permanently in any browser that will not decode
- * VP9 with alpha, which notably includes Safari — the framed still is shown
- * instead. That fallback is a deliberate design, not a broken state: a portrait
- * that fades to black at its edges needs a dark bed, or it haloes on cream.
- */
-function HeroStanding({
-  hero, fill, latest, phase, motion, h,
-}: { hero: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; h: string }) {
-  // `cut` needs to start false again for a new hero. The parent keys this
-  // component on the hero id so React remounts it, which resets the state
-  // without an effect that writes state during mount.
-  const [cut, setCut] = useState(false);
-
-  return (
-    <div style={{ position: "relative", height: h, borderRadius: R_CHIP, boxSizing: "border-box" }}>
-      <div
-        className="dl-drop"
-        style={{
-          position: "absolute", inset: 0, borderRadius: R_CHIP, boxSizing: "border-box",
-          overflow: cut ? "visible" : "hidden",
-          background: cut ? "transparent" : "var(--tile)",
-          border: cut ? "none" : `${BW}px solid ${LINE}`,
-          boxShadow: cut ? "none" : `3px 3px 0 ${LINE}`,
-          transition: "background .35s ease, border-color .35s ease",
-        }}
-      >
-        {/*
-         * Freed from the frame, the art gets its own box, and it is bigger than
-         * the slot. Valve's renders are square; `contain` inside a slot that is
-         * twice as tall as it is wide therefore scales the hero down to the
-         * slot's WIDTH and centres it in all that leftover height, which is why
-         * the first version looked like a row of postage stamps. Growing the box
-         * past the slot on three sides and anchoring the image to its bottom
-         * edge puts the hero at a readable size with its feet on the line.
-         */}
-        {/*
-         * ONE drop-shadow, and the render settles.
-         *
-         * The first version of this stacked THREE drop-shadows to fake an ink
-         * outline, and put them on a playing video. A filter on an animating
-         * element is recomputed every frame, so that was three full-frame
-         * filter passes per hero per frame, times ten heroes — which is exactly
-         * why the board went from smooth to laggy the moment the tiles came
-         * off. One offset pass costs a third of that.
-         *
-         * The rest is `settleMs`: each hero plays its idle for a few seconds as
-         * it lands, which is the moment the animation is actually worth
-         * anything, and then pauses on a frame. A paused video still paints
-         * with its alpha intact, so the board ends up as ten static cut-outs
-         * that cost nothing, instead of ten videos decoding forever behind a
-         * filter.
-         */}
-        <div style={cut
-          ? {
-            position: "absolute", left: "-14%", right: "-14%", top: "-24%", bottom: "8%",
-            // Hero-shaped, because `drop-shadow` follows the alpha channel
-            // rather than the box. That is the whole trick.
-            filter: `drop-shadow(2px 3px 0 ${LINE})`,
-          }
-          : { position: "absolute", inset: 0 }}>
-          <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion}
-            onReady={setCut} position={cut ? "50% 100%" : "50% 12%"} fit={cut ? "contain" : "cover"}
-            settleMs={SETTLE_MS} />
-        </div>
-
-        {!cut && (
-          <div style={{
-            position: "absolute", left: 0, right: 0, bottom: 0, padding: "3px 4px",
-            background: "#16131F", textAlign: "center",
-          }}>
-            <span style={{
-              fontSize: "clamp(7px, 2.3vw, 10px)", color: "#FFF7EA", textTransform: "uppercase", fontWeight: 900,
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", letterSpacing: .4,
-            }}>{hero.name}</span>
-          </div>
-        )}
-
-        {latest && (
-          <>
-            <span key={`f${hero.id}`} className="dl-flash" style={{
-              position: "absolute", inset: 0, pointerEvents: "none", background: fill,
-              borderRadius: R_CHIP, mixBlendMode: cut ? "multiply" : "normal",
-            }} />
-            <span key={`r${hero.id}`} style={{
-              position: "absolute", inset: -3, pointerEvents: "none", borderRadius: R_CHIP,
-              border: `3px solid ${fill}`, animation: "dl-ring .6s var(--ease) both",
-            }} />
-          </>
-        )}
-      </div>
-
-      {/* Standing on the page, the name needs its own object — there is no card
-          edge left to hang a bar off. */}
-      {/*
-       * Pinned to the slot's own edges rather than centred on it. A pill centred
-       * with translateX and allowed to be wider than its slot runs straight into
-       * the neighbouring hero's pill — at five slots across a 390px phone there
-       * is no spare width, so "Witch Doctor" and "Night Stalker" printed over
-       * each other. Inside the slot it can only ever ellipsise.
-       */}
-      {cut && (
-        <span className="dl-stk flat" style={{
-          position: "absolute", left: 0, right: 0, bottom: -7, justifyContent: "center",
-          background: fill, fontSize: 7.5, padding: "2px 5px", borderWidth: 2,
-          boxShadow: `2px 2px 0 ${LINE}`,
-        }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hero.name}</span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-/**
  * A hero in a slot, as a card off the sticker sheet.
  *
  * Ink outline, hard offset shadow, rounded corner — the same object the landing
@@ -316,46 +189,94 @@ function HeroStanding({
  * sheets because every Valve portrait fades to black at the edges and a cream
  * bed shows as a halo around each one.
  *
+ * ON THE BLACK BED, NOT CUT OUT. A version of this stood the hero free on the
+ * page with a drop-shadow doing the work of an outline. It never looked right:
+ * Valve's renders carry their own soft glows and particle trails baked into the
+ * alpha, which read as ragged fuzz against a hard die-cut edge instead of a
+ * clean sticker silhouette — and there is no better source to switch to,
+ * Valve's own CDN renders already being the best cut-out hero animation that
+ * exists for this cast. Framed, that same fuzz is just how the art is supposed
+ * to look, sitting on the dark bed it was rendered for.
+ *
  * The name sits on a solid ink bar rather than the gradient scrim it used to
  * wear. A scrim fading into cream is a smudge; a bar is the same object the
  * landing page's ticker is, and it works over a dark portrait and a paper page
  * alike. The two hexes in here are deliberately literal: that bar is ink with
  * paper on it in BOTH sheets, so it must not follow `--stroke` when night
  * inverts it.
+ *
+ * `active` is the turn highlight: an EMPTY slot on the side whose turn it is
+ * gets a pulsing outline in that side's colour, so the next card to fill is
+ * obvious without reading the band above the board.
  */
 function Card({
-  hero, fill, latest, phase, motion, hidden, h, slot,
-}: { hero?: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string; slot: number }) {
-  // A drafted hero stands free; an empty slot and a hidden one stay framed,
-  // because both of those ARE the frame — there is nothing cut out to show.
-  if (hero && !hidden) {
-    return (
-      <div style={{ flex: "1 1 0", minWidth: 0 }}>
-        <HeroStanding key={hero.id} hero={hero} fill={fill} latest={latest} phase={phase} motion={motion} h={h} />
-      </div>
-    );
-  }
-
-  // Empty, or hidden during a blind pick. Both are the frame itself: a dashed
-  // slot numbered the way the client numbers them, and a hatched card.
+  hero, fill, latest, phase, motion, hidden, h, slot, active,
+}: {
+  hero?: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean;
+  hidden?: boolean; h: string; slot: number;
+  /** This is the next slot to be filled, and it is this side's turn. */
+  active?: boolean;
+}) {
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
-      <div style={{
-        position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
-        background: hero ? "var(--tile)" : PANEL_2,
-        border: `${BW}px ${hero ? "solid" : "dashed"} ${LINE}`,
-        boxShadow: hero ? `3px 3px 0 ${LINE}` : "none",
-      }}>
-        {hero ? (
+      <div
+        // Keyed on the hero so the drop-in replays when a slot fills, not on
+        // every re-render of a slot that was already occupied.
+        key={hero?.id ?? "empty"}
+        className={hero && !hidden ? "dl-drop" : active ? "dl-turn" : undefined}
+        style={{
+          position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
+          background: hero ? "var(--tile)" : PANEL_2,
+          border: `${active ? BW + 0.5 : BW}px ${hero ? "solid" : "dashed"} ${active ? fill : LINE}`,
+          boxShadow: hero ? `3px 3px 0 ${LINE}` : active ? `0 0 0 2px ${LINE}, 0 0 14px -3px ${fill}` : "none",
+        }}
+      >
+        {hero && !hidden && (
+          <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion} settleMs={SETTLE_MS} />
+        )}
+
+        {hero && hidden && (
           <div style={{
             position: "absolute", inset: 0, display: "grid", placeItems: "center",
             background: `repeating-linear-gradient(135deg, ${alpha(LINE, 14)} 0 7px, transparent 7px 14px)`,
             color: CREAM, fontSize: 22, fontWeight: 900,
           }}>?</div>
-        ) : (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: DIM, fontSize: 15, fontWeight: 900 }}>
-            {slot}
-          </div>
+        )}
+
+        {!hero && (
+          <div style={{
+            position: "absolute", inset: 0, display: "grid", placeItems: "center",
+            color: active ? fill : DIM, fontSize: 15, fontWeight: 900,
+          }}>{slot}</div>
+        )}
+
+        {hero && !hidden && (
+          <>
+            <div style={{
+              position: "absolute", left: 0, right: 0, bottom: 0, padding: "3px 4px",
+              background: "#16131F", textAlign: "center",
+            }}>
+              <span style={{
+                fontSize: "clamp(7px, 2.3vw, 10px)", color: "#FFF7EA", textTransform: "uppercase", fontWeight: 900,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", letterSpacing: .4,
+              }}>{hero.name}</span>
+            </div>
+            {/* The lock-in. This replaced a toast pinned to the top of the
+                viewport, which floated over the header and read as a browser
+                notification rather than something the game did. Confirmation
+                belongs on the card that just filled. */}
+            {latest && (
+              <>
+                <span key={`f${hero.id}`} className="dl-flash" style={{
+                  position: "absolute", inset: 0, pointerEvents: "none", background: fill,
+                }} />
+                <span key={`r${hero.id}`} style={{
+                  position: "absolute", inset: -3, pointerEvents: "none", borderRadius: "inherit",
+                  border: `3px solid ${fill}`, animation: "dl-ring .6s var(--ease) both",
+                }} />
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -383,6 +304,7 @@ export function Presence({ text, fill, active }: { text: string; fill: string; a
 /** One side of the board: a labelled row of five cards under a side sticker. */
 export function TeamRow({
   side, heroes, latest, label, note, status, hidden, motion = true, height = "clamp(84px, 24vw, 124px)",
+  turnActive,
 }: {
   side: "them" | "you";
   heroes: LineupHero[];
@@ -393,8 +315,15 @@ export function TeamRow({
   hidden?: boolean;
   motion?: boolean;
   height?: string;
+  /**
+   * It is this side's turn to PICK (never during a ban — a ban does not fill
+   * a slot, so there is no specific card to point at). The next empty slot —
+   * heroes.length, since they fill left to right — gets the highlight.
+   */
+  turnActive?: boolean;
 }) {
   const fill = side === "them" ? ENEMY_FILL : ALLY_FILL;
+  const nextSlot = heroes.length;
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
@@ -415,6 +344,7 @@ export function TeamRow({
         {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i} hero={heroes[i]} fill={fill} h={height} slot={i + 1}
             latest={heroes[i] != null && heroes[i].id === latest}
+            active={!!turnActive && i === nextSlot}
             phase={i} motion={motion} hidden={hidden} />
         ))}
       </div>

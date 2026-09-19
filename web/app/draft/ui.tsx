@@ -104,11 +104,46 @@ export const lift = (d = 3) => ({
  * navbar and the landing page use: stash where we are, hand off to Discord, and
  * `/auth/discord-success` brings the player back to exactly this screen.
  */
+/**
+ * On Android, hand the OAuth link straight to the Discord app rather than the
+ * browser.
+ *
+ * iOS needs nothing extra: Discord registers discord.com as a Universal Link,
+ * so Safari already hands this exact URL to the installed app on its own —
+ * there is no better hook to pull on there, and a fake `discord://` scheme
+ * would risk dropping the player on an unrelated screen inside the app
+ * instead of the login it does not know how to handle.
+ *
+ * Android's browsers do not reliably make that same handoff from every
+ * context (some in-app webviews never offer it), but Android DOES resolve an
+ * explicit `intent://` URI naming the package — Google's own documented way
+ * to prefer an installed app over the browser. That needs the real
+ * discord.com URL, not our own redirecting route, so it is fetched with
+ * `redirect=false` first; a `browser_fallback_url` means a phone without
+ * Discord installed still lands in the browser exactly as before.
+ */
+async function openDiscordAuth() {
+  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+  if (!isAndroid) {
+    window.location.href = "/api/auth/discord-login";
+    return;
+  }
+  try {
+    const r = await fetch("/api/auth/discord-login?redirect=false");
+    const { url } = await r.json();
+    if (!url) throw new Error("no url");
+    const bare = String(url).replace(/^https?:\/\//, "");
+    window.location.href = `intent://${bare}#Intent;scheme=https;package=com.discord;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+  } catch {
+    window.location.href = "/api/auth/discord-login";
+  }
+}
+
 export function signInWithDiscord() {
   try {
     sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search);
   } catch { /* private mode: they land on the front page instead, still signed in */ }
-  window.location.href = "/api/auth/discord-login";
+  void openDiscordAuth();
 }
 
 /** Discord's mark, for the button that carries it. */
@@ -346,20 +381,31 @@ export function DotaMark({ size = 30 }: { size?: number }) {
  * answers the only question the header was being asked — which account am I on
  * — in a fraction of the width, and their name is on the boards below anyway.
  */
-export function AvatarChip({ src, name, size = 30 }: { src: string | null; name: string; size?: number }) {
+export function AvatarChip({
+  src, name, size = 30, onClick,
+}: { src: string | null; name: string; size?: number; onClick?: () => void }) {
   const initial = (name || "?").trim().slice(0, 1).toUpperCase();
+  const El = onClick ? "button" : "span";
   return (
-    <span title={name} style={{
-      flexShrink: 0, width: size, height: size, borderRadius: R_BTN, overflow: "hidden",
-      background: MINT, border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
-      display: "grid", placeItems: "center", boxSizing: "border-box",
-      color: ON_FILL, fontSize: size * 0.42, fontWeight: 900,
-    }}>
+    <El
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      aria-label={onClick ? `${name} — account menu` : undefined}
+      title={name}
+      className={onClick ? "dl-btn" : undefined}
+      style={{
+        flexShrink: 0, width: size, height: size, borderRadius: R_BTN, overflow: "hidden",
+        background: MINT, border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
+        display: "grid", placeItems: "center", boxSizing: "border-box", padding: 0,
+        color: ON_FILL, fontSize: size * 0.42, fontWeight: 900,
+        cursor: onClick ? "pointer" : undefined, fontFamily: "inherit",
+      }}
+    >
       {src
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         : initial}
-    </span>
+    </El>
   );
 }
 

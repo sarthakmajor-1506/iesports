@@ -21,9 +21,16 @@ export type LiveRoom = {
   /** Whether the host has an account, so the waiting room can say what ranked depends on. */
   hostSignedIn?: boolean;
   /** Written by the server once the draft finishes; the source of the scoreboard. */
-  result?: { outcome: "host" | "guest" | "draw"; hostWinProb: number; deltaHost: number; deltaGuest: number } | null;
+  result?: {
+    outcome: "host" | "guest" | "draw"; hostWinProb: number;
+    deltaHost: number; deltaGuest: number; coinsHost: number; coinsGuest: number;
+  } | null;
   quizHost?: { points: number; correct: number } | null;
   quizGuest?: { points: number; correct: number } | null;
+  /** Both sides ready → one shared instant to start the question clock from. */
+  quizReadyHost?: boolean;
+  quizReadyGuest?: boolean;
+  quizStartAt?: number | null;
 };
 
 export const TURN_MS = 30_000;

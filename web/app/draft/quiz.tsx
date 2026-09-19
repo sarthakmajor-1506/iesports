@@ -24,21 +24,46 @@ export type QuizResult = {
 };
 
 /**
+ * A live opponent's copy of this same round, kept in step.
+ *
+ * Without this, each side's "I'M READY" click starts their OWN local 3-2-1 and
+ * their own ten-second clock — whoever taps first is already reading question
+ * one while the other is still looking at the stamp. `startAt` is one instant
+ * both clients agree on (the room document they already poll for the pick
+ * clock carries it), so the countdown — and the question — begin for both at
+ * the same moment regardless of who clicked ready first.
+ */
+export type QuizSync = {
+  /** Have I told the server I'm ready. */
+  ready: boolean;
+  opponentReady: boolean;
+  opponentName: string;
+  /** Set once both sides are ready; null means still waiting on one of us. */
+  startAt: number | null;
+  onReady: () => void;
+};
+
+/**
  * Five questions, ten seconds each, points equal to the seconds left.
  *
  * The clock is the whole game here, so it counts only time the page was actually
  * visible — see the note on the clock refs below.
  */
 export function QuizRound({
-  knowledge, seed, onDone, title = "ABILITY & ITEM ROUND",
+  knowledge, seed, onDone, title = "ABILITY & ITEM ROUND", sync,
 }: {
   knowledge: Knowledge; seed: string; onDone: (r: QuizResult) => void; title?: string;
+  /** Live mode only — omit for solo, where there is nobody to wait for. */
+  sync?: QuizSync;
 }) {
   const questions = useMemo(() => buildQuiz(knowledge, seed, QUIZ_COUNT), [knowledge, seed]);
 
   const [phase, setPhase] = useState<"ready" | "count" | "asking" | "feedback" | "done">("ready");
   const [idx, setIdx] = useState(0);
   const [countdown, setCountdown] = useState(3);
+  /** Local optimism: the tap should feel instant, not wait a poll round trip. */
+  const [clickedReady, setClickedReady] = useState(false);
+  const [syncMsLeft, setSyncMsLeft] = useState(0);
   const [msLeft, setMsLeft] = useState(QUIZ_SECONDS * 1000);
   const [chosen, setChosen] = useState<number | null>(null);
   const [gained, setGained] = useState(0);
@@ -92,6 +117,33 @@ export function QuizRound({
     const t = setTimeout(() => setCountdown((c) => c - 1), 700);
     return () => clearTimeout(t);
   }, [phase, countdown]);
+
+  /*
+   * The synced countdown is a DISPLAY, not a stored phase.
+   *
+   * Whether to show the countdown stamp is computed at render time from
+   * `phase === "ready" && sync.startAt != null` — see the render branch below
+   * — rather than by transitioning into a dedicated "syncCount" phase from an
+   * effect. The only state transition this drives is the real one, into
+   * "asking", once the shared instant has actually arrived; everything before
+   * that is a pure function of props and is never worth its own state.
+   */
+  useEffect(() => {
+    if (phase !== "ready" || !sync?.startAt) return;
+    const startAt = sync.startAt;
+    const tick = () => {
+      const left = startAt - Date.now();
+      setSyncMsLeft(left);
+      if (left <= 0) {
+        restartClock();
+        setMsLeft(QUIZ_SECONDS * 1000);
+        setPhase("asking");
+      }
+    };
+    tick();
+    const t = setInterval(tick, 120);
+    return () => clearInterval(t);
+  }, [phase, sync?.startAt]);
 
   const finish = useCallback((r: QuizResult) => { setResult(r); setPhase("done"); onDone(r); }, [onDone]);
 
@@ -154,6 +206,15 @@ export function QuizRound({
   /* ------------------------------------------------------------- screens */
 
   if (phase === "ready") {
+    // Both sides ready and the server has picked the shared instant: show the
+    // countdown stamp instead of the ready screen, no separate phase needed —
+    // this is a pure function of `sync`, and the only STATE transition it
+    // drives (into "asking") lives in the effect above.
+    if (sync?.startAt != null) {
+      return <CountdownStamp display={Math.max(0, Math.ceil(syncMsLeft / 1000))} />;
+    }
+
+    const iAmReady = !sync || clickedReady || sync.ready;
     return (
       <div className="dl-in" style={panel()}>
         <span className="dl-stk" style={{ background: LEMON, marginBottom: 12 }}>{title}</span>
@@ -164,27 +225,39 @@ export function QuizRound({
           Abilities and items. Your points are the seconds you have left — an instant answer is worth {MAX_POINTS},
           wrong or too slow is nothing.
         </p>
-        <Btn full tone="gold" size="l" onClick={() => { setCountdown(3); setPhase("count"); }}>I&apos;M READY</Btn>
+
+        {!sync ? (
+          <Btn full tone="gold" size="l" onClick={() => { setCountdown(3); setPhase("count"); }}>I&apos;M READY</Btn>
+        ) : iAmReady ? (
+          /*
+           * Waiting on the other side. This is the whole point of `sync`: two
+           * ten-second clocks that started seconds apart are not the same
+           * round, and a player who starts reading question one while their
+           * opponent is still on the recap screen has already won the timing
+           * before either answer is scored.
+           */
+          <div style={{ textAlign: "center" }}>
+            <span className="dl-stk r" style={{ background: MINT, fontSize: 10 }}>
+              <span className="dl-turn" style={{ width: 6, height: 6, borderRadius: 3, background: ON_FILL, flex: "none" }} />
+              WAITING FOR {sync.opponentName.toUpperCase()}
+            </span>
+          </div>
+        ) : (
+          <>
+            <Btn full tone="gold" size="l" onClick={() => { setClickedReady(true); sync.onReady(); }}>I&apos;M READY</Btn>
+            {sync.opponentReady && (
+              <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, textAlign: "center", marginTop: 9 }}>
+                {sync.opponentName} is ready — the clock starts the moment you are too.
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }
 
   if (phase === "count") {
-    return (
-      <div style={{ ...panel(), textAlign: "center", padding: "40px 16px" }}>
-        {/* The number lands as a stamp: it arrives oversized and rotated and
-            settles square. `dl-slam` was referenced here long before it was
-            written, so until now the count simply appeared. */}
-        <div key={countdown} style={{
-          width: 108, height: 108, margin: "0 auto", borderRadius: "50%",
-          display: "grid", placeItems: "center", boxSizing: "border-box",
-          background: countdown === 0 ? MINT : LEMON, color: ON_FILL,
-          border: `4px solid ${LINE}`, boxShadow: `6px 6px 0 ${LINE}`,
-          fontSize: countdown === 0 ? 40 : 58, fontWeight: 900, lineHeight: 1, letterSpacing: "-.03em",
-          animation: "dl-slam .5s cubic-bezier(.2,.9,.3,1.3) both",
-        }}>{countdown === 0 ? "GO" : countdown}</div>
-      </div>
-    );
+    return <CountdownStamp display={countdown} />;
   }
 
   if (phase === "done") {
@@ -313,6 +386,29 @@ export function QuizRound({
           <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 700, marginTop: 7, lineHeight: 1.45 }}>{q.explain}</div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The 3-2-1 stamp, shared by the plain local countdown and the synced one.
+ * The only difference between them is what feeds `display` — a 700ms local
+ * tick for solo, the shared `startAt` instant for a live opponent.
+ */
+function CountdownStamp({ display }: { display: number }) {
+  return (
+    <div style={{ ...panel(), textAlign: "center", padding: "40px 16px" }}>
+      {/* The number lands as a stamp: it arrives oversized and rotated and
+          settles square. `dl-slam` was referenced here long before it was
+          written, so until now the count simply appeared. */}
+      <div key={display} style={{
+        width: 108, height: 108, margin: "0 auto", borderRadius: "50%",
+        display: "grid", placeItems: "center", boxSizing: "border-box",
+        background: display === 0 ? MINT : LEMON, color: ON_FILL,
+        border: `4px solid ${LINE}`, boxShadow: `6px 6px 0 ${LINE}`,
+        fontSize: display === 0 ? 40 : 58, fontWeight: 900, lineHeight: 1, letterSpacing: "-.03em",
+        animation: "dl-slam .5s cubic-bezier(.2,.9,.3,1.3) both",
+      }}>{display === 0 ? "GO" : display}</div>
     </div>
   );
 }

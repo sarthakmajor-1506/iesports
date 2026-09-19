@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
 import { buildQuiz, QUIZ_COUNT, MAX_POINTS, type Knowledge } from "@/lib/quiz";
+import { START_ELO, weekKey, msUntilWeekReset, medal } from "@/lib/draftLadder";
+import { resolvePlayerIdentity } from "@/lib/draftIdentity";
 
 /**
- * Draft Lab — leaderboard.
+ * Draft Lab — the one leaderboard.
  *
- * Signed-in players are ranked; everyone else can still play, they just are not
- * on the board. That asymmetry is the whole reason to sign in, so the game never
- * blocks on it.
- *
- * THE SCORE IS RECOMPUTED HERE, NOT ACCEPTED.
- *
- * The win-probability model runs in the browser, so a submitted score is a number
- * the player's own machine produced and could trivially edit. This route takes
- * the picks and the quiz answer sheet instead, and derives the score from them:
+ * THE SCORE IS RECOMPUTED HERE, NOT ACCEPTED. The win-probability model runs in
+ * the browser, so a submitted score is a number the player's own machine
+ * produced and could trivially edit. This route takes the picks and the quiz
+ * answer sheet instead, and derives the score from them:
  *
  *   draft  — the model is re-evaluated server-side on the ten heroes submitted
  *   quiz   — the paper is regenerated from its seed and the answers re-marked
@@ -23,10 +21,25 @@ import { buildQuiz, QUIZ_COUNT, MAX_POINTS, type Knowledge } from "@/lib/quiz";
  * capped at ten per answer that was actually correct. That is a real bound, not
  * a rubber stamp: it makes the only forgeable component "claimed to be fast",
  * and makes a wrong answer worth nothing no matter what is sent.
+ *
+ * ONE BOARD, NOT THREE. This used to feed its own avg-points collection,
+ * separate from the ranked ladder's Elo board and its own separate daily
+ * variant. A player's name could be right on one and wrong on another because
+ * they were three different write paths trusting three different strings. Now
+ * there is one permanent record per player (`draftlabLadder`, shared with
+ * ranked live results — see draftLadderServer.ts) and one visible board
+ * (`draftlabLadderWeekly`, coins earned this week, resetting Monday IST), and
+ * the identity on every write is looked up from the account, never taken from
+ * the request body — see draftIdentity.ts.
+ *
+ * COINS. A solo win pays draft points plus quiz points, in one award, because
+ * both are known by the time this fires (the quiz always runs before "done").
+ * A loss pays nothing — coins are a reward for winning, not a score for
+ * playing.
  */
 
-const COLL = "draftlabLeaderboard";
-const MIN_GAMES = 3;
+const LADDER = "draftlabLadder";
+const WEEKLY = "draftlabLadderWeekly";
 const clean = (v: unknown, max = 24) =>
   typeof v === "string" ? v.trim().slice(0, max).replace(/[<>]/g, "") : "";
 
@@ -65,19 +78,6 @@ async function callerUid(req: NextRequest, claimed: string): Promise<string | nu
 
 const heroIds = (v: unknown): number[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is number => typeof x === "number" && Number.isInteger(x)))].slice(0, 5) : [];
-
-export type LeaderRow = {
-  uid: string;
-  name: string;
-  avatar: string | null;
-  games: number;
-  points: number;
-  avg: number;
-  best: number;
-  wins: number;
-  quiz: number;
-  ranked: boolean;
-};
 
 export async function POST(req: NextRequest) {
   try {
@@ -130,39 +130,70 @@ export async function POST(req: NextRequest) {
 
     const points = draftPoints + quizPoints;
     const won = p > 0.5;
+    // Coins are the reward for winning; a lost draft still shows its score
+    // above (points), but nothing is added to the board for it.
+    const coins = won ? points : 0;
+
+    /*
+     * The account's real name and picture, not whatever this request claims.
+     * See draftIdentity.ts — this is the fix for a name that was right on one
+     * board and wrong on another because two write paths trusted two strings.
+     */
+    const identity = await resolvePlayerIdentity(uid, clean(body.name), clean(body.avatar, 300));
 
     /* ----------------------------------------------------------- record */
-    const ref = adminDb.collection(COLL).doc(uid);
-    const row = await adminDb.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
+    const ref = adminDb.collection(LADDER).doc(uid);
+    const week = weekKey();
+    const weeklyRef = adminDb.collection(WEEKLY).doc(week).collection("players").doc(uid);
+
+    const out = await adminDb.runTransaction(async (tx) => {
+      const [snap, weeklySnap] = await Promise.all([tx.get(ref), tx.get(weeklyRef)]);
       const prev = snap.exists ? snap.data()! : {};
-      // Whether this beat their own record has to be decided against the row as it
-      // stood BEFORE this game is folded in, or every game is a personal best.
-      const wasBest = points > (prev.best ?? 0) && (prev.games ?? 0) > 0;
+      const elo = typeof prev.elo === "number" ? prev.elo : START_ELO;
+
+      // A coin haul beating your own record — decided against the row as it
+      // stood BEFORE this game, or every game would be a personal best.
+      const wasBest = coins > (prev.best ?? 0) && (prev.games ?? 0) > 0;
       const first = (prev.games ?? 0) === 0;
-      const games = (prev.games ?? 0) + 1;
-      const total = (prev.points ?? 0) + points;
+
+      /*
+       * Solo never touches elo/peak/losses/draws/streak — those are a ranked
+       * live concept — so they are simply left out of this write. A Firestore
+       * merge leaves whatever was there alone; a player with no ranked history
+       * reads back the defaults (START_ELO, no medal beyond Herald) exactly as
+       * before this game.
+       */
       const next = {
         uid,
-        name: clean(body.name) || prev.name || "Anonymous",
-        avatar: clean(body.avatar, 300) || prev.avatar || null,
-        games,
-        points: total,
-        avg: +(total / games).toFixed(2),
-        best: Math.max(prev.best ?? 0, points),
+        name: identity.name,
+        avatar: identity.avatar,
+        games: (prev.games ?? 0) + 1,
         wins: (prev.wins ?? 0) + (won ? 1 : 0),
-        quiz: (prev.quiz ?? 0) + quizPoints,
-        lastAt: new Date(),
+        best: Math.max(prev.best ?? 0, coins),
+        lastAt: FieldValue.serverTimestamp(),
       };
       tx.set(ref, next, { merge: true });
-      return { ...next, wasBest, first };
+
+      const wPrev = weeklySnap.exists ? weeklySnap.data()! : {};
+      const weeklyCoins = (wPrev.coins ?? 0) + coins;
+      tx.set(weeklyRef, {
+        uid, name: identity.name, avatar: identity.avatar, elo,
+        coins: weeklyCoins,
+        games: (wPrev.games ?? 0) + 1,
+        wins: (wPrev.wins ?? 0) + (won ? 1 : 0),
+        lastAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return { ...next, wasBest, first, weeklyCoins };
     });
 
     return NextResponse.json({
       ok: true,
       scored: { draftPoints, quizPoints, quizCorrect, points, winProb: +(p * 100).toFixed(1) },
-      you: { ...row, ranked: row.games >= MIN_GAMES },
-      personalBest: row.wasBest, firstGame: row.first,
+      coinsAwarded: coins,
+      weeklyTotal: out.weeklyCoins,
+      coinsPersonalBest: out.wasBest,
+      firstGame: out.first,
     });
   } catch (e) {
     console.error("[draftlab] leaderboard submit failed:", e);
@@ -173,56 +204,48 @@ export async function POST(req: NextRequest) {
 /**
  * Top of the board, plus the caller's own row whether or not it made the cut.
  *
- * Ordered on the stored average so the query needs only the automatic
- * single-field index; the minimum-games filter is applied here rather than in the
- * query, which would otherwise require a composite index to deploy.
+ * No games-played floor here, unlike the old avg board — a single big win
+ * this week is a real result worth showing, not noise that needs a sample
+ * size to trust, because the board resets before it can be gamed by attrition.
  */
 export async function GET(req: NextRequest) {
+  const week = weekKey();
   try {
     const uid = (req.nextUrl.searchParams.get("uid") || "").slice(0, 64);
     const limit = Math.min(50, Math.max(5, Number(req.nextUrl.searchParams.get("limit")) || 25));
 
-    const snap = await adminDb.collection(COLL).orderBy("avg", "desc").limit(200).get();
-    const all: LeaderRow[] = snap.docs.map((d) => {
+    const snap = await adminDb.collection(WEEKLY).doc(week).collection("players")
+      .orderBy("coins", "desc").limit(limit).get();
+
+    const rows = snap.docs.map((d) => {
       const x = d.data();
+      const elo = typeof x.elo === "number" ? x.elo : START_ELO;
+      const m = medal(elo);
       return {
-        uid: d.id,
-        name: x.name || "Anonymous",
-        avatar: x.avatar ?? null,
-        games: x.games ?? 0,
-        points: x.points ?? 0,
-        avg: x.avg ?? 0,
-        best: x.best ?? 0,
-        wins: x.wins ?? 0,
-        quiz: x.quiz ?? 0,
-        ranked: (x.games ?? 0) >= MIN_GAMES,
+        uid: x.uid, name: x.name ?? "Anonymous", avatar: x.avatar ?? null,
+        coins: x.coins ?? 0, games: x.games ?? 0, wins: x.wins ?? 0,
+        medal: m.name, medalFill: m.fill,
       };
     });
 
-    const ranked = all.filter((r) => r.ranked).slice(0, limit);
-    let you: (LeaderRow & { rank: number | null }) | null = null;
-    if (uid) {
-      const mine = all.find((r) => r.uid === uid);
-      if (mine) {
-        const rank = mine.ranked ? all.filter((r) => r.ranked).findIndex((r) => r.uid === uid) + 1 : null;
-        you = { ...mine, rank };
-      } else {
-        const doc = await adminDb.collection(COLL).doc(uid).get();
-        if (doc.exists) {
-          const x = doc.data()!;
-          you = {
-            uid, name: x.name || "Anonymous", avatar: x.avatar ?? null,
-            games: x.games ?? 0, points: x.points ?? 0, avg: x.avg ?? 0,
-            best: x.best ?? 0, wins: x.wins ?? 0, quiz: x.quiz ?? 0,
-            ranked: (x.games ?? 0) >= MIN_GAMES, rank: null,
-          };
-        }
+    let you: (typeof rows[number] & { rank: number | null }) | null = null;
+    if (uid && !rows.some((r) => r.uid === uid)) {
+      const mine = await adminDb.collection(WEEKLY).doc(week).collection("players").doc(uid).get();
+      if (mine.exists) {
+        const x = mine.data()!;
+        const elo = typeof x.elo === "number" ? x.elo : START_ELO;
+        const m = medal(elo);
+        you = {
+          uid, name: x.name ?? "Anonymous", avatar: x.avatar ?? null,
+          coins: x.coins ?? 0, games: x.games ?? 0, wins: x.wins ?? 0,
+          medal: m.name, medalFill: m.fill, rank: null,
+        };
       }
     }
 
-    return NextResponse.json({ rows: ranked, you, minGames: MIN_GAMES });
+    return NextResponse.json({ week, rows, you, resetsInMs: msUntilWeekReset() });
   } catch (e) {
     console.error("[draftlab] leaderboard read failed:", e);
-    return NextResponse.json({ rows: [], you: null, minGames: MIN_GAMES });
+    return NextResponse.json({ week, rows: [], you: null, resetsInMs: msUntilWeekReset() });
   }
 }

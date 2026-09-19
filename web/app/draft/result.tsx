@@ -44,14 +44,18 @@ export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu
 }
 
 export function Result({
-  engine, events, yours, theirs, finalP, quiz, tempos, motion, scored, personalBest,
+  engine, events, yours, theirs, finalP, quiz, tempos, motion, scored,
+  coinsAwarded, weeklyTotal, coinsPersonalBest,
 }: {
   engine: Engine; events: ResultEv[]; yours: number[]; theirs: number[]; finalP: number | null;
   quiz: { points: number; correct: number; rounds: { correct: boolean; points: number }[] } | null;
   tempos: Map<number, TempoRow>; motion: boolean;
   scored: { points: number; draftPoints: number; quizPoints: number } | null;
+  /** What this game paid into the weekly board — 0 on a loss. See CoinPanel. */
+  coinsAwarded?: number;
+  weeklyTotal?: number | null;
   /** Server-decided, against the row as it stood before this game. */
-  personalBest?: boolean;
+  coinsPersonalBest?: boolean;
 }) {
   const heroName = (id: number) => engine.heroById.get(id)?.name ?? `#${id}`;
   const heroOf = (id: number) => { const h = engine.heroById.get(id)!; return { id, img: h.img, name: h.name }; };
@@ -95,7 +99,10 @@ export function Result({
         <VersusBar p={p} left="YOU" right={them.toUpperCase()} />
       </div>
 
-      {(quiz || scored) && <ScoreReveal scored={scored} quiz={quiz} personalBest={personalBest} />}
+      {(quiz || scored) && <ScoreReveal scored={scored} quiz={quiz} />}
+      {!!coinsAwarded && (
+        <CoinPanel coins={coinsAwarded} weeklyTotal={weeklyTotal ?? null} personalBest={coinsPersonalBest} />
+      )}
 
       <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
       <TeamRow side="them" label={them.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
@@ -189,45 +196,27 @@ export function Col({ title, rows, color, engine }: { title: string; rows: Count
 }
 
 /**
- * The payoff.
+ * The score for this game, on its own — no personal-best flourish here.
  *
- * A score that simply appears reads as data; a score that climbs reads as an
- * outcome. The count-up drives the whole beat — the breakdown fades in behind it
- * and the fanfare fires when it lands, so the moment has an ending rather than
- * just a final value.
- *
- * The confetti is gated on a real personal best, decided by the server against
- * the row as it stood before this game. Celebrating every result would make the
- * celebration mean nothing, which is the same reason the win estimate is honest.
+ * That concept moved to CoinPanel below, where it is decided against a coin
+ * haul rather than a raw point total. Keeping both would have meant two
+ * "personal best" claims on one screen, sometimes disagreeing, because they
+ * would have been reading two different counters.
  */
 function ScoreReveal({
-  scored, quiz, personalBest,
+  scored, quiz,
 }: {
   scored: { points: number; draftPoints: number; quizPoints: number } | null;
   quiz: { points: number; correct: number; rounds: { correct: boolean; points: number }[] } | null;
-  personalBest?: boolean;
 }) {
   const total = scored ? scored.points : quiz?.points ?? 0;
-  const [landed, setLanded] = useState(false);
-
-  useEffect(() => {
-    if (!landed) return;
-    if (personalBest) play("win");
-  }, [landed, personalBest]);
 
   return (
     <div style={{
       position: "relative", borderRadius: R_CARD, padding: "18px 15px 16px", boxSizing: "border-box",
       background: GOLD_SHEET, color: ON_FILL, textAlign: "center",
-      border: `${BW_2}px solid ${LINE}`,
-      // The sheet lifts when the number lands on a personal best. It is the one
-      // celebration in the game, so it has to be the only thing that moves.
-      boxShadow: personalBest && landed ? `9px 9px 0 ${LINE}` : `5px 5px 0 ${LINE}`,
-      transform: personalBest && landed ? "translate(-2px, -2px)" : "none",
-      transition: "box-shadow .2s var(--ease), transform .2s var(--ease)",
+      border: `${BW_2}px solid ${LINE}`, boxShadow: `5px 5px 0 ${LINE}`,
     }}>
-      {landed && personalBest && <Burst color={PINK} n={26} spread={120} />}
-
       <span className="dl-stk r" style={{ background: PANEL, color: CREAM, marginBottom: 9 }}>
         {scored ? "SCORE THIS GAME" : "QUIZ ROUND"}
       </span>
@@ -235,14 +224,8 @@ function ScoreReveal({
       <div style={{
         fontSize: "clamp(46px, 15vw, 68px)", fontWeight: 900, lineHeight: 1, letterSpacing: "-.05em",
       }}>
-        <CountUp to={total} dur={1200} onDone={() => setLanded(true)} />
+        <CountUp to={total} dur={1200} />
       </div>
-
-      {landed && personalBest && (
-        <div className="dl-in" style={{ marginTop: 9 }}>
-          <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 10 }}>★ PERSONAL BEST</span>
-        </div>
-      )}
 
       {scored && (
         <div className="dl-in" style={{ display: "flex", gap: 9, marginTop: 15 }}>
@@ -260,6 +243,65 @@ function ScoreReveal({
               color: ON_FILL, fontSize: 12, fontWeight: 900,
             }}>{r.correct ? `+${r.points}` : "0"}</span>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What this win paid, and the running total for the week.
+ *
+ * Shown only when coins were actually earned — a loss has nothing to animate
+ * here, and a zero that counts up to zero is not a reward, it is a reminder.
+ * The count-up is the same primitive ScoreReveal uses above it; a coin haul
+ * that simply appeared would read as a label, not a payout.
+ *
+ * The confetti is gated on a genuine personal best — the biggest single-game
+ * coin haul this account has ever earned, decided server-side against the row
+ * as it stood before this game (see draftLadderServer.ts / the leaderboard
+ * route). Celebrating every win the same way would make the celebration mean
+ * nothing.
+ */
+export function CoinPanel({
+  coins, weeklyTotal, personalBest,
+}: { coins: number; weeklyTotal: number | null; personalBest?: boolean }) {
+  const [landed, setLanded] = useState(false);
+
+  useEffect(() => {
+    if (landed && personalBest) play("win");
+  }, [landed, personalBest]);
+
+  if (coins <= 0) return null;
+
+  return (
+    <div style={{
+      position: "relative", borderRadius: R_CARD, padding: "16px 15px 15px", boxSizing: "border-box",
+      background: GOLD_SHEET, color: ON_FILL, textAlign: "center", overflow: "hidden",
+      border: `${BW_2}px solid ${LINE}`,
+      boxShadow: personalBest && landed ? `9px 9px 0 ${LINE}` : `5px 5px 0 ${LINE}`,
+      transform: personalBest && landed ? "translate(-2px, -2px)" : "none",
+      transition: "box-shadow .2s var(--ease), transform .2s var(--ease)",
+    }}>
+      {landed && personalBest && <Burst color={PINK} n={26} spread={120} />}
+
+      <span className="dl-stk r" style={{ background: PANEL, color: CREAM, marginBottom: 9 }}>COINS EARNED</span>
+
+      <div style={{ fontSize: "clamp(40px, 13vw, 58px)", fontWeight: 900, lineHeight: 1, letterSpacing: "-.04em" }}>
+        🪙 <CountUp to={coins} dur={1100} onDone={() => setLanded(true)} />
+      </div>
+
+      {landed && personalBest && (
+        <div className="dl-in" style={{ marginTop: 9 }}>
+          <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 10 }}>★ BEST WIN YET</span>
+        </div>
+      )}
+
+      {weeklyTotal != null && (
+        <div className="dl-in" style={{ marginTop: 11 }}>
+          <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 9.5 }}>
+            WEEKLY TOTAL · 🪙 {weeklyTotal}
+          </span>
         </div>
       )}
     </div>
