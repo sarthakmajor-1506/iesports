@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { Skull, X } from "lucide-react";
+import { discordLoginUrl } from "@/lib/discordLogin";
 
 type Kind = "tomato" | "bail";
 type ShameType = "wanted" | "warning";
@@ -573,7 +574,7 @@ export default function WallOfShame({ tournamentId, user, onRequireLogin, forceO
                   <button
                     onClick={() => {
                       try { localStorage.setItem("pendingRegistration", window.location.pathname); } catch {}
-                      window.location.href = "/api/auth/discord-login";
+                      window.location.href = discordLoginUrl();
                     }}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 10,

@@ -24,14 +24,17 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get("state") || "";
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
 
-  // `state` is "discord_login:<encoded return path>" — see discord-login/route.ts.
+  // `state` is "discord_login" or "discord_login:<encoded return path>" — see
+  // discord-login/route.ts. No path means the caller did not specify one, and
+  // `dest` is then left off the success URL entirely so the client falls back
+  // to sessionStorage rather than being sent somewhere arbitrary.
   const sepIdx = state.indexOf(":");
   const stateTag = sepIdx === -1 ? state : state.slice(0, sepIdx);
-  let next = "/valorant";
+  let dest: string | null = null;
   if (sepIdx !== -1) {
     try {
       const decoded = decodeURIComponent(state.slice(sepIdx + 1));
-      if (decoded.startsWith("/") && !decoded.startsWith("//")) next = decoded;
+      if (decoded.startsWith("/") && !decoded.startsWith("//")) dest = decoded;
     } catch {}
   }
 
@@ -159,7 +162,9 @@ export async function GET(req: NextRequest) {
     // ── 5. Create custom token and redirect ──────────────────────────────
     const customToken = await adminAuth.createCustomToken(firebaseUid);
 
-    return NextResponse.redirect(`${realm}/auth/discord-success?token=${customToken}&dest=${encodeURIComponent(next)}`);
+    const successUrl = `${realm}/auth/discord-success?token=${customToken}`
+      + (dest ? `&dest=${encodeURIComponent(dest)}` : "");
+    return NextResponse.redirect(successUrl);
   } catch (e: any) {
     console.error("Discord login callback error:", e.message);
     return NextResponse.redirect(`${realm}/?error=discord_failed`);
