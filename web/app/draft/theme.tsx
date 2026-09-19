@@ -253,11 +253,36 @@ export function DraftTheme() {
       @keyframes dl-drift { from { transform: translate(0, 0) } to { transform: translate(18px, -16px) } }
       @keyframes dl-spin  { to { transform: rotate(360deg) } }
 
+      /* A tile taking the tap: squashes under the finger, then settles. This is
+         the whole point of the live pool's optimistic lock — the server has not
+         answered yet, so the press itself has to be the acknowledgement. */
+      @keyframes dl-lock {
+        0%   { transform: scale(1) }
+        35%  { transform: scale(.88) }
+        70%  { transform: scale(1.04) }
+        100% { transform: scale(1) }
+      }
+      /* Coins landing in the header: rises out of the chip and fades. */
+      @keyframes dl-coin {
+        0%   { opacity:0; transform: translateY(5px) scale(.7) }
+        22%  { opacity:1; transform: translateY(-3px) scale(1.12) }
+        70%  { opacity:1; transform: translateY(-13px) scale(1) }
+        100% { opacity:0; transform: translateY(-22px) scale(.95) }
+      }
+      /* Sonar: rings leaving the centre while the queue looks for someone. */
+      @keyframes dl-sonar {
+        0%   { opacity:.6;  transform: scale(.28) }
+        70%  { opacity:.14; transform: scale(1) }
+        100% { opacity:0;   transform: scale(1.15) }
+      }
+
       .dl-in     { animation: dl-in .32s var(--ease) both; }
       .dl-turn   { animation: dl-pulse 1.3s ease-in-out infinite; }
       .dl-drop   { animation: dl-drop .5s var(--ease) both; }
       .dl-flash  { animation: dl-flash .6s ease-out both; }
       .dl-urgent { animation: dl-urgent .55s ease-in-out infinite; }
+      .dl-lock   { animation: dl-lock .32s var(--ease) both; }
+      .dl-coin   { animation: dl-coin 1.5s var(--ease) both; }
 
       .dl-sheen {
         background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--stroke) 9%, transparent) 50%, transparent 62%);

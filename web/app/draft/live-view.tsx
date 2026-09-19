@@ -7,13 +7,15 @@ import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar,
+  Shell, Band, Btn, Panel, Label, Field, VersusBar, CoinChip,
   CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, BW_2,
 } from "./ui";
 import { Skeleton } from "./theme";
+import { play, startMusic, stopMusic } from "./sound";
 import { TeamRow, BanStrip, AttributePool } from "./hero-art";
-import { Col, CoinPanel } from "./result";
+import { Col, CoinPanel, CounterNote } from "./result";
+import { useMyCoins } from "./leaderboard";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
   type Seat,
@@ -38,9 +40,13 @@ import {
  * ever reads `room.result`.
  */
 export function LiveView({
-  model, knowledge, code, onLeave, motion, displayName, avatarUrl,
+  model, knowledge, code, onLeave, onRematch, motion, displayName, avatarUrl, uid,
 }: {
   model: DraftModel; knowledge: Knowledge | null; code: string; onLeave: () => void; motion: boolean;
+  /** Hands the caller the new room's code so the whole view swaps to it. */
+  onRematch: (code: string) => void;
+  /** Signed-in account, for the header's coin total. Null when playing as a guest. */
+  uid: string | null;
   /**
    * Passed down rather than read from localStorage inside the auto-join
    * effect below, which is exactly the bug that used to seat a signed-in
@@ -57,6 +63,7 @@ export function LiveView({
   const [search, setSearch] = useState("");
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [recapDone, setRecapDone] = useState(false);
+  const [rematching, setRematching] = useState(false);
 
   const engine: Engine = useMemo(() => buildEngine(model), [model]);
   const tempos = useMemo(() => tempoMap(model as { tempo?: TempoRow[] }), [model]);
@@ -64,6 +71,8 @@ export function LiveView({
   const me = playerId();
   const seat: Seat | null = room ? (room.host?.id === me ? "host" : room.guest?.id === me ? "guest" : null) : null;
   const seconds = useCountdown(room?.status === "drafting" ? room.deadline : null);
+  // Refetched once the room has settled, so the total already includes this game.
+  const myCoins = useMyCoins(uid, room?.result ? 1 : 0);
 
   const picks = useMemo(() => room?.picks ?? [], [room]);
   const seq = useMemo(() => draftSequence(!!room?.bans), [room?.bans]);
@@ -105,17 +114,78 @@ export function LiveView({
     void call({ action: "join", code, name: displayName, avatar: avatarUrl });
   }, [room, me, call, code, displayName, avatarUrl]);
 
-  const submit = useCallback((heroId: number) => {
-    if (!myTurn) return;
+  /**
+   * The tap, acknowledged before the server has answered.
+   *
+   * A live pick is a round trip, and reads of the room fall back to a 1.2s poll
+   * whenever onSnapshot is blocked — so the board could sit unchanged for well
+   * over a second after a tap. That is indistinguishable from a tap that
+   * missed, and players tapped again. This records what was tapped and on which
+   * turn, which is enough for the pool to lock the tile and for the hero to
+   * appear in the team row immediately.
+   *
+   * It clears ITSELF: `at` is the number of picks when the tap happened, so the
+   * moment the room advances — confirmed, substituted, or timed out — the
+   * derived value below stops matching and the optimism is gone. No effect, no
+   * timer, and nothing to leak if the answer never comes.
+   */
+  const [pending, setPending] = useState<{ heroId: number; at: number } | null>(null);
+  const pendingHero = pending && pending.at === picks.length ? pending.heroId : null;
+
+  const submit = useCallback(async (heroId: number) => {
+    if (!myTurn || pendingHero != null) return;
     setSearch("");
-    void call({ action: "pick", code, heroId, fallback });
-  }, [call, code, fallback, myTurn]);
+    setPending({ heroId, at: picks.length });
+    play(banning ? "ban" : "pick");
+    const ok = await call({ action: "pick", code, heroId, fallback });
+    // Rejected outright — the room never advances, so nothing else would clear this.
+    if (!ok) setPending(null);
+  }, [call, code, fallback, myTurn, pendingHero, picks.length, banning]);
 
   // Either side may fire this; the server accepts only the first.
   const onExpire = useCallback(() => { void call({ action: "timeout", code, fallback }); }, [call, code, fallback]);
   useTurnTimeout(room, onExpire, seat != null);
 
   const done = room?.status === "done";
+
+  /*
+   * Live rooms had no sound at all — not a cue, not a bed.
+   *
+   * Solo starts the music from the button that starts the game, but a room
+   * entered by code, by link or by the queue never passed through it, so the
+   * entire head-to-head mode played in silence. The gesture that opened the
+   * room is enough to have unlocked audio, so keying this off the room's own
+   * status is safe: nobody reaches `drafting` without having tapped something.
+   */
+  const status = room?.status;
+  useEffect(() => {
+    if (status === "drafting") startMusic("draft");
+    else if (status === "done") startMusic("menu");
+  }, [status]);
+  useEffect(() => () => stopMusic(), []);
+
+  /*
+   * The opponent's pick, out loud.
+   *
+   * Their turn is the half of a live draft you are not driving, and without a
+   * cue the board just quietly changes while you are reading the pool. Only
+   * THEIR moves ring here; your own already rang on the tap, and replaying it
+   * on confirmation would double every pick you make.
+   *
+   * The ref starts unsynced so that arriving in a room mid-draft — or a
+   * reconnect that replays the whole document — does not fire a cue for a pick
+   * that happened before you were watching.
+   */
+  const heardUpTo = useRef<number | null>(null);
+  useEffect(() => {
+    const n = picks.length;
+    if (heardUpTo.current == null) { heardUpTo.current = n; return; }
+    if (n > heardUpTo.current) {
+      const last = picks[n - 1];
+      if (last && last.by !== seat) play(last.kind === "ban" ? "ban" : "pick");
+      heardUpTo.current = n;
+    }
+  }, [picks, seat]);
 
   if (err) {
     return (
@@ -188,7 +258,7 @@ export function LiveView({
   if (done && knowledge && !quiz && !recapDone) {
     return (
       <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={onLeave} sub="Both sides are locked in" />}>
-          <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
+          <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
             <span className="dl-stk" style={{ background: LILAC, fontSize: 10 }}>VS</span>
@@ -265,15 +335,39 @@ export function LiveView({
                 ? "Too close for the model to call — no rating moved"
                 : `Ladder · ${eloDelta > 0 ? "+" : ""}${eloDelta} rating`)
               : "Unranked — both players need to be signed in"}
+            /* Coins are paid server-side before this screen renders, so the
+               total fetched here already includes them — the chip climbs the
+               last `coinsMine` of the way so they are seen landing. */
+            right={<CoinChip coins={myCoins} added={coinsMine} />}
           />
         }
         foot={
+          /*
+           * Two ways out, not one.
+           *
+           * This screen used to offer only BACK TO DUEL, so the single most
+           * likely thing either player wanted next — another game against the
+           * person they had just played — meant going back to the menu and
+           * re-sharing a code. REMATCH opens a new room and stamps it on this
+           * one; the other player, still watching this document, sees the
+           * button turn into JOIN REMATCH and follows them in.
+           */
           <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `${BW_2}px solid ${LINE}`, background: PAPER }}>
-            <div style={{ flex: 1 }}><Btn full tone="gold" onClick={onLeave}>BACK TO DUEL</Btn></div>
+            <div style={{ flex: 2 }}>
+              <Btn full tone="gold" disabled={rematching} onClick={async () => {
+                if (rematching) return;
+                setRematching(true);
+                const d = await call({ action: "rematch", code });
+                if (d?.code) onRematch(d.code); else setRematching(false);
+              }}>
+                {rematching ? "OPENING…" : room.rematchCode ? "JOIN REMATCH" : "REMATCH"}
+              </Btn>
+            </div>
+            <div style={{ flex: 1 }}><Btn full tone="ghost" onClick={onLeave}>MENU</Btn></div>
           </div>
         }
       >
-          <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
+          <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
           <Panel>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               <span className="dl-stk" style={{ background: drew ? LILAC : won ? MINT : PINK }}>
@@ -333,6 +427,7 @@ export function LiveView({
                 {yoursWin.length} — {theirsWin.length}
               </span>
             </div>
+            <CounterNote />
             <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
             <div style={{ height: 8 }} />
             <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
@@ -351,13 +446,16 @@ export function LiveView({
   /* ----------------------------------------------------------- the draft */
   const q = search.trim().toLowerCase();
   const filtered = available.filter((id) => heroName(id).toLowerCase().includes(q));
+  const optimisticMine = pendingHero != null && !banning ? [...mine, pendingHero] : mine;
   const lastPick = picks[picks.length - 1];
   // Short enough to survive the band's centre column beside the clock — see the
   // note on the same label in the solo board.
-  const turnLabel = myTurn
-    ? (banning ? "YOUR BAN" : "YOUR PICK")
-    : `${themName ?? "THEY"} ${banning ? "IS BANNING…" : "IS PICKING…"}`.toUpperCase();
-  const turnHint = myTurn ? (banning ? " · take one away" : " · lock one in") : "";
+  const turnLabel = pendingHero != null
+    ? "LOCKING IN…"
+    : myTurn
+      ? (banning ? "YOUR BAN" : "YOUR PICK")
+      : `${themName ?? "THEY"} ${banning ? "IS BANNING…" : "IS PICKING…"}`.toUpperCase();
+  const turnHint = myTurn && pendingHero == null ? (banning ? " · take one away" : " · lock one in") : "";
 
   return (
     <Shell
@@ -383,14 +481,17 @@ export function LiveView({
         />
       }
     >
-      <div style={{ display: "grid", gap: 8, paddingTop: 9 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, paddingTop: 9 }}>
         <TeamRow side="them" label={(themName ?? "DIRE").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
           heroes={theirs.map(heroOf)} latest={theirs[theirs.length - 1] ?? null}
           status={{ text: !myTurn ? (banning ? "banning…" : "picking…") : "idle", active: !myTurn }}
           turnActive={!myTurn && !banning} />
+        {/* A pick you have made but the room has not confirmed lands here now
+            rather than after the round trip. A ban is not shown this way — it
+            never joins a team — and the pool's locked tile covers that case. */}
         <TeamRow side="you" label={(meName ?? "YOU").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
-          heroes={mine.map(heroOf)} latest={mine[mine.length - 1] ?? null}
-          turnActive={myTurn && !banning} />
+          heroes={optimisticMine.map(heroOf)} latest={optimisticMine[optimisticMine.length - 1] ?? null}
+          turnActive={myTurn && !banning && pendingHero == null} />
       </div>
 
       <Field
@@ -407,8 +508,14 @@ export function LiveView({
       )}
       {error && <div style={{ color: ENEMY, fontSize: 11, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
 
-      <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .34, pointerEvents: myTurn ? "auto" : "none" }}>
-        <AttributePool ids={filtered} byId={poolHero} onPick={submit} dim={banning} min="clamp(52px, 16vw, 70px)" />
+      {/* Taps are refused while one is in flight — a second tap cannot become a
+          second pick, and the pool says so rather than silently swallowing it. */}
+      <div style={{
+        padding: "9px 0 16px", opacity: myTurn ? 1 : .34,
+        pointerEvents: myTurn && pendingHero == null ? "auto" : "none",
+      }}>
+        <AttributePool ids={filtered} byId={poolHero} onPick={submit} dim={banning}
+          min="clamp(52px, 16vw, 70px)" pending={pendingHero} />
       </div>
     </Shell>
   );

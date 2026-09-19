@@ -31,6 +31,8 @@ export type LiveRoom = {
   quizReadyHost?: boolean;
   quizReadyGuest?: boolean;
   quizStartAt?: number | null;
+  /** Set when either player asks for another game; both sides follow it into the new room. */
+  rematchCode?: string | null;
 };
 
 export const TURN_MS = 30_000;

@@ -86,6 +86,14 @@ type Room = {
   quizReadyHost?: boolean;
   quizReadyGuest?: boolean;
   quizStartAt?: number | null;
+  /**
+   * The room these two moved on to, once either of them asked for another game.
+   *
+   * It lives on the OLD room because that is the one document both clients are
+   * already watching — so the second player is told where to go without
+   * needing to be notified, polled for, or messaged.
+   */
+  rematchCode?: string | null;
 };
 
 const seatOf = (room: Room, id: string): "host" | "guest" | null =>
@@ -316,6 +324,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(out);
     }
 
+    /* ----------------------------------------------------------- rematch */
+    if (action === "rematch") {
+      /*
+       * Another game, same two people.
+       *
+       * The first of them to ask opens a fresh room and the code is stamped
+       * onto the finished one; the second gets handed that same code rather
+       * than opening a second room, which is the whole reason this is a
+       * transaction — two players tapping REMATCH within the same second is
+       * the normal case, not the edge case, and two rooms would leave them
+       * each waiting in one.
+       *
+       * The asker becomes the new host regardless of which seat they held, so
+       * the sequence starts from them. Everything else is a plain new room:
+       * the other side joins through the ordinary join path, and `ranked` is
+       * decided there, from both accounts, exactly as it was the first time.
+       */
+      const first = newCode();
+      const second = newCode();
+      const firstRef = adminDb.collection("draftlabRooms").doc(first);
+      const secondRef = adminDb.collection("draftlabRooms").doc(second);
+
+      const out = await adminDb.runTransaction(async (tx) => {
+        // Every read first — a Firestore transaction refuses a read after a write.
+        const [snap, firstSnap, secondSnap] = await Promise.all([
+          tx.get(ref), tx.get(firstRef), tx.get(secondRef),
+        ]);
+        if (!snap.exists) return { error: "No room with that code", status: 404 };
+        const room = snap.data() as Room;
+        const seat = seatOf(room, playerId);
+        if (!seat) return { error: "You are not in this room", status: 403 };
+        if (room.status !== "done") return { error: "That draft is still going", status: 409 };
+
+        // Somebody already asked: send them to the same place.
+        if (room.rematchCode) return { ok: true, code: room.rematchCode, followed: true };
+
+        const code2 = !firstSnap.exists ? first : !secondSnap.exists ? second : null;
+        if (!code2) return { error: "Could not open a room", status: 503 };
+
+        const me = seat === "host" ? room.host : room.guest!;
+        const next: Room = {
+          code: code2,
+          status: "waiting",
+          host: { id: playerId, name: me?.name || "Host", avatar: me?.avatar ?? null },
+          guest: null,
+          bans: !!room.bans,
+          picks: [],
+          turnIndex: 0,
+          deadline: null,
+          ranked: false,
+          hostSignedIn: !!uid,
+          settled: false,
+        };
+        tx.set(adminDb.collection("draftlabRooms").doc(code2), { ...next, createdAt: FieldValue.serverTimestamp() });
+        tx.set(adminDb.collection(SEATS).doc(code2), { hostUid: uid, guestUid: null } satisfies SeatUids);
+        tx.update(ref, { rematchCode: code2 });
+        return { ok: true, code: code2, followed: false };
+      });
+
+      if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
+      return NextResponse.json(out);
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (e) {
     console.error("[draftlab] room action failed:", e);
@@ -337,6 +408,7 @@ export async function GET(req: NextRequest) {
       ranked: !!d.ranked, hostSignedIn: !!d.hostSignedIn, result: d.result ?? null,
       quizHost: d.quizHost ?? null, quizGuest: d.quizGuest ?? null,
       quizReadyHost: !!d.quizReadyHost, quizReadyGuest: !!d.quizReadyGuest, quizStartAt: d.quizStartAt ?? null,
+      rematchCode: d.rematchCode ?? null,
       turns: seq.length, turnMs: TURN_MS,
     });
   } catch (e) {

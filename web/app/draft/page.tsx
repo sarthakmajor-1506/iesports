@@ -12,7 +12,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
   Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
-  DiscordIcon, signInWithDiscord, DotaMark, AvatarChip,
+  DiscordIcon, signInWithDiscord, DotaMark, AvatarChip, CoinChip,
   CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
   LEMON, MINT, PINK, LILAC, CORAL, GOLD_FILL, ON_FILL, R_CARD, BW_2, BW_3, lift,
 } from "./ui";
@@ -22,7 +22,7 @@ import { TeamRow, BanStrip, AttributePool, setRenderConcurrency } from "./hero-a
 import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
-import { Leaderboard } from "./leaderboard";
+import { Leaderboard, useMyCoins } from "./leaderboard";
 import { useRoomActions, useQueue } from "./live";
 
 /** Role 0 is the bot, role 1 is you — bot always opens, matching live's host. */
@@ -80,6 +80,8 @@ function Duel() {
   const [weeklyTotal, setWeeklyTotal] = useState<number | null>(null);
   const [coinsPersonalBest, setCoinsPersonalBest] = useState(false);
   const [boardVersion, setBoardVersion] = useState(0);
+  /** Your own coin total for the week — the header chip, and what the result climbs into. */
+  const myCoins = useMyCoins(user?.uid ?? null, boardVersion);
 
   /**
    * Signed in? Then that is your name.
@@ -306,6 +308,28 @@ function Duel() {
     setStage("menu");
   };
   useEffect(() => () => stopMusic(), []);
+
+  /*
+   * The menu had no sound at all, ever.
+   *
+   * Music only started from `restart()` and `toMenu()` — both of which are
+   * reached by finishing or leaving a game — so the screen everybody actually
+   * lands on was silent until they had played once. It cannot simply be
+   * started on mount either: a browser refuses to let an AudioContext or an
+   * <audio> element run before a user gesture, and a page that makes noise the
+   * instant it opens is the one everybody mutes and never unmutes.
+   *
+   * So it waits for the first tap anywhere and starts then. A tap that happens
+   * to be PLAY starts the draft bed a moment later and this one is torn down
+   * before it is audible — the fallback bed ramps its gain in over two seconds,
+   * so the overlap cannot be heard.
+   */
+  useEffect(() => {
+    if (stage !== "menu" || liveCode) return;
+    const kick = () => startMusic("menu");
+    window.addEventListener("pointerdown", kick, { once: true });
+    return () => window.removeEventListener("pointerdown", kick);
+  }, [stage, liveCode]);
   const saveName = (n: string) => { setName(n); try { localStorage.setItem("draftlab_name", n); } catch {} };
 
   if (error) {
@@ -325,9 +349,15 @@ function Duel() {
   const poolHero = (id: number) => { const h = heroById(id); return h ? { img: h.img, name: h.name, attr: h.attr } : undefined; };
 
   if (liveCode) {
-    return <LiveView model={model} knowledge={knowledge} code={liveCode} motion={motion}
-      displayName={displayName} avatarUrl={avatarUrl}
-      onLeave={() => { setLiveCode(null); window.history.replaceState({}, "", "/draft"); }} />;
+    /* Keyed on the code: a rematch is a different room, and every bit of
+       per-room state in there (the quiz, whether the recap was dismissed, a
+       pick in flight) has to start clean rather than carry over. */
+    return <LiveView key={liveCode} model={model} knowledge={knowledge} code={liveCode} motion={motion}
+      displayName={displayName} avatarUrl={avatarUrl} uid={user?.uid ?? null}
+      onLeave={() => { setLiveCode(null); window.history.replaceState({}, "", "/draft"); }}
+      /* A rematch is a different room, so the link has to follow it — otherwise
+         a refresh drops the player back into the game they just finished. */
+      onRematch={(next) => { setLiveCode(next); window.history.replaceState({}, "", `/draft?live=${next}`); }} />;
   }
 
   /* -------------------------------------------------------------- menu */
@@ -340,6 +370,9 @@ function Duel() {
             icon={<DotaMark size={30} />}
             right={
               <>
+                {/* Where you are on the week's board, without scrolling to find
+                    your own row. Signed out there is no total, so nothing renders. */}
+                <CoinChip coins={myCoins} />
                 <ThemeToggle />
                 <SoundToggle />
                 {/* One icon, not a name pill. Who you are signed in as is a
@@ -351,7 +384,7 @@ function Duel() {
             } />
         }
       >
-        <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 13, position: "relative", zIndex: 1 }}>
+        <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, paddingTop: 13, position: "relative", zIndex: 1 }}>
           {/* Two ways in, one switch. The previous menu was two paragraph-heavy
               cards each carrying its own bans control, which made bans look like
               a property of a mode rather than a property of the draft. */}
@@ -431,7 +464,7 @@ function Duel() {
   if (stage === "recap") {
     return (
       <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} onBack={toMenu} sub="Both sides are locked in" />}>
-        <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
+        <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <div style={{ textAlign: "center" }}>
             <span className="dl-stk" style={{ background: LILAC, fontSize: 10 }}>VS</span>
@@ -448,7 +481,7 @@ function Duel() {
   if (stage === "quiz") {
     return (
       <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} onBack={toMenu} sub="Now the questions" />}>
-        <div style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
           <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 19vw, 92px)" />
           {knowledge ? (
             <QuizRound knowledge={knowledge} seed={`solo-${yours.join("-")}-${startedAt}`}
@@ -517,7 +550,7 @@ function Duel() {
           />
         }
       >
-        <div style={{ display: "grid", gap: 8, paddingTop: 9 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, paddingTop: 9 }}>
           <TeamRow side="them" label="DIRE" motion={motion} height="clamp(96px, 29vw, 148px)"
             heroes={theirs.map(heroOf)} latest={lastBotPick?.heroId ?? null}
             status={{ text: botTurn ? (banning ? "banning…" : "picking…") : "idle", active: botTurn }}
@@ -565,7 +598,7 @@ function Duel() {
   return (
     <Shell
       tab={null}
-      head={<ResultBand won={won} onMenu={toMenu} />}
+      head={<ResultBand won={won} onMenu={toMenu} coins={weeklyTotal ?? myCoins} coinsAdded={coinsAwarded} />}
       foot={<ResultActions onAgain={restart} onMenu={toMenu} />}
     >
       <Result engine={engine} events={events} yours={yours} theirs={theirs} finalP={finalP}
@@ -643,23 +676,24 @@ function LadderTile({
         <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 8.5, padding: "3px 9px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}` }}>
           RANKED · 30s
         </span>
-        {waiting && (
-          <span className="dl-turn" style={{ fontSize: 10, fontWeight: 900, letterSpacing: .4 }}>
-            {state === "hosting" ? "POSTED TO DISCORD" : `SEARCHING · ${Math.floor(waitedMs / 1000)}s`}
-          </span>
-        )}
+        {/* The sonar below says what is happening and for how long, so this no
+            longer repeats it — the two captions sat one above the other. */}
       </div>
 
-      <div style={{ fontSize: "clamp(19px, 5.6vw, 24px)", fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.1, marginBottom: 5 }}>
-        Draft a real person
-      </div>
-      <div style={{ fontSize: 11.5, fontWeight: 700, opacity: .8, lineHeight: 1.4, marginBottom: 13 }}>
-        {!signedIn
-          ? "Beat a human and it counts. Needs an account — there has to be somewhere to put the result."
-          : state === "hosting"
-            ? "Nobody was queueing, so your room is open and posted in Discord. Sit tight, or share the code."
-            : "Win and take their rating, plus coins toward this week's board."}
-      </div>
+      {waiting ? (
+        <Sonar waitedMs={waitedMs} hosting={state === "hosting"} />
+      ) : (
+        <>
+          <div style={{ fontSize: "clamp(19px, 5.6vw, 24px)", fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.1, marginBottom: 5 }}>
+            Draft a real person
+          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, opacity: .8, lineHeight: 1.4, marginBottom: 13 }}>
+            {!signedIn
+              ? "Beat a human and it counts. Needs an account — there has to be somewhere to put the result."
+              : "Win and take their rating, plus coins toward this week's board."}
+          </div>
+        </>
+      )}
 
       {!signedIn ? (
         <Btn full tone="dark" onClick={signInWithDiscord}><DiscordIcon size={15} /> SIGN IN TO PLAY RANKED</Btn>
@@ -670,6 +704,66 @@ function LadderTile({
       )}
 
       {error && <div style={{ fontSize: 11, fontWeight: 700, marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
+/**
+ * Looking for someone.
+ *
+ * A queue with no feedback reads as broken inside about eight seconds, and the
+ * old one offered a single line of text that ticked a counter — which says a
+ * number is going up, not that anything is being searched. This is a sonar:
+ * rings leaving the centre on a stagger, a hand sweeping round, and the count
+ * underneath.
+ *
+ * It is drawn in ink on the tile's own gold rather than in a pastel, because it
+ * sits INSIDE the ladder card — a second fill on top of a fill is how this
+ * layout stops reading as paper.
+ */
+function Sonar({ waitedMs, hosting }: { waitedMs: number; hosting: boolean }) {
+  const secs = Math.floor(waitedMs / 1000);
+  return (
+    <div style={{ padding: "4px 0 13px" }}>
+      <div style={{
+        position: "relative", height: 104, display: "grid", placeItems: "center",
+        overflow: "hidden", marginBottom: 9,
+      }}>
+        {/* Three rings on a stagger. Each leaves the middle and fades, so there
+            is always one mid-flight — a single ring reads as a pulse, three
+            read as something being swept. */}
+        {[0, 0.8, 1.6].map((delay) => (
+          <span key={delay} style={{
+            position: "absolute", width: 104, height: 104, borderRadius: "50%",
+            border: `2px solid ${ON_FILL}`, boxSizing: "border-box", opacity: 0,
+            animation: `dl-sonar 2.4s ease-out ${delay}s infinite`,
+          }} />
+        ))}
+        {/* The hand. A plain bar pinned at the centre and turned, which is the
+            cheapest honest radar there is — no gradient, nothing to composite. */}
+        <span style={{
+          position: "absolute", width: 2, height: 44, background: ON_FILL, opacity: .5,
+          transformOrigin: "50% 100%", top: "calc(50% - 44px)",
+          animation: "dl-spin 2.4s linear infinite",
+        }} />
+        <span style={{
+          position: "relative", width: 42, height: 42, borderRadius: "50%", display: "grid", placeItems: "center",
+          background: PANEL, border: `2.5px solid ${ON_FILL}`, boxSizing: "border-box",
+        }}>
+          <DotaMark size={22} />
+        </span>
+      </div>
+
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "-.02em" }}>
+          {hosting ? "Your room is open" : "Looking for an opponent"}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, opacity: .75, marginTop: 3, lineHeight: 1.4 }}>
+          {hosting
+            ? "Nobody was queueing, so it was posted in Discord. Sit tight, or share the code."
+            : `Searching the queue · ${secs}s`}
+        </div>
+      </div>
     </div>
   );
 }

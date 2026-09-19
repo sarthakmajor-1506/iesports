@@ -522,13 +522,25 @@ export function DraftColumn({
  * colour down its left edge, which is how the client marks them too.
  */
 export function AttributePool({
-  ids, byId, onPick, dim, min = "clamp(42px, 12vw, 54px)",
+  ids, byId, onPick, dim, min = "clamp(42px, 12vw, 54px)", pending = null,
 }: {
   ids: number[];
   byId: (id: number) => { img: string; name: string; attr: string } | undefined;
   onPick: (id: number) => void;
   dim?: boolean;
   min?: string;
+  /**
+   * A hero this client has tapped but the server has not confirmed yet.
+   *
+   * Live rooms are the only mode where a tap and its result are separated by a
+   * network round trip — solo mutates local state and repaints on the same
+   * frame. Without a mark here the tile looked exactly as it did before the
+   * tap for up to a second and a half, which reads as a tap that missed, so
+   * players tapped again. The tile takes the press immediately and the rest of
+   * the pool goes quiet behind it; the room document is still what actually
+   * decides, and when it arrives this simply stops being set.
+   */
+  pending?: number | null;
 }) {
   const order: string[] = ["str", "agi", "int", "all"];
   const groups = order
@@ -536,7 +548,7 @@ export function AttributePool({
     .filter((g) => g.list.length > 0);
 
   return (
-    <div style={{ display: "grid", gap: 11 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 11 }}>
       {groups.map((g) => {
         const c = attrColor(g.attr);
         const f = attrFill(g.attr);
@@ -552,15 +564,32 @@ export function AttributePool({
             <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 6 }}>
               {g.list.map((id) => {
                 const h = byId(id)!;
+                const locking = pending === id;
+                const hushed = pending != null && !locking;
                 return (
-                  <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
+                  <button key={id} className={`dl-pick${locking ? " dl-lock" : ""}`} onClick={() => onPick(id)} title={h.name} style={{
                     padding: 0, position: "relative", aspectRatio: "1 / 1", cursor: "pointer", overflow: "hidden",
-                    background: "var(--tile)", border: `2px solid ${LINE}`, borderLeftWidth: 4,
+                    background: "var(--tile)", border: `2px solid ${locking ? (dim ? DANGER_FILL : c) : LINE}`, borderLeftWidth: 4,
                     borderLeftColor: dim ? DANGER_FILL : c, borderRadius: 9, boxSizing: "border-box",
-                    filter: dim ? "saturate(.4) brightness(.85)" : undefined, ...lift(2),
+                    filter: dim ? "saturate(.4) brightness(.85)" : hushed ? "saturate(.5) brightness(.8)" : undefined,
+                    opacity: hushed ? .55 : 1,
+                    transition: "opacity .15s var(--ease), filter .15s var(--ease)",
+                    ...lift(2),
                   }}>
                     <HeroImg base={heroBase(h.img)} name={h.name} />
                     {dim && <span style={{ position: "absolute", inset: 0, background: alpha(DANGER_FILL, 34), pointerEvents: "none" }} />}
+                    {locking && (
+                      <span style={{
+                        position: "absolute", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none",
+                        background: alpha(dim ? DANGER_FILL : c, 46),
+                      }}>
+                        <span style={{
+                          width: 15, height: 15, borderRadius: "50%", boxSizing: "border-box",
+                          border: `2.5px solid ${LINE}`, borderTopColor: "transparent",
+                          animation: "dl-spin .7s linear infinite",
+                        }} />
+                      </span>
+                    )}
                     <span style={{
                       position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: "#FFF7EA", fontWeight: 900,
                       background: "#16131F", padding: "1px 2px",

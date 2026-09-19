@@ -814,6 +814,62 @@ export function Delta({ v, size = 13, forThem }: { v: number; size?: number; for
 }
 
 /**
+ * Your coin total, in the header.
+ *
+ * The board below the menu says who is winning the week; this says where YOU
+ * are without scrolling to find your own row, which is the number a player
+ * actually came back to check.
+ *
+ * IT COUNTS UP FROM WHAT IT WAS, NOT FROM ZERO. `added` is what the game just
+ * paid, and the chip starts at `coins - added` and climbs — so the result
+ * screen shows the coins arriving in the header rather than a total that was
+ * simply different the next time you looked at it. Deriving the starting point
+ * from the two props rather than from whatever the previous instance held
+ * matters because the menu and the result screen render their own headers:
+ * there is no single chip that survives the trip, so it cannot rely on
+ * remembering.
+ */
+export function CoinChip({ coins, added = 0 }: { coins: number | null; added?: number }) {
+  const [shown, setShown] = useState(Math.max(0, (coins ?? 0) - added));
+
+  useEffect(() => {
+    if (coins == null) return;
+    const from = Math.max(0, coins - added);
+    const to = coins;
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = from === to ? 0 : 1100;
+    const tick = (now: number) => {
+      const k = dur === 0 ? 1 : Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - k, 3);
+      setShown(from + (to - from) * eased);
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [coins, added]);
+
+  if (coins == null) return null;
+
+  return (
+    <span style={{ position: "relative", flexShrink: 0, display: "inline-flex" }}>
+      <span className="dl-stk" style={{
+        background: GOLD_FILL, fontSize: 10, padding: "3px 8px", borderWidth: 2,
+        boxShadow: `2px 2px 0 ${LINE}`, whiteSpace: "nowrap",
+      }}>
+        🪙 <span style={{ fontVariantNumeric: "tabular-nums" }}>{Math.round(shown)}</span>
+      </span>
+      {added > 0 && (
+        <span className="dl-coin" style={{
+          position: "absolute", left: "50%", top: -2, transform: "translateX(-50%)",
+          fontSize: 11, fontWeight: 900, color: GREEN, pointerEvents: "none", whiteSpace: "nowrap",
+        }}>+{added}</span>
+      )}
+    </span>
+  );
+}
+
+/**
  * A number that counts up to its target.
  *
  * Results are the payoff screen, and a score that simply appears reads as data

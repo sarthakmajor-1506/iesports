@@ -4,7 +4,7 @@ import { type Engine } from "@/lib/draftlab";
 import { counterMap, teamTempo, draftingStyle, type TempoRow, type CounterEdge } from "@/lib/draftbot";
 import { useEffect, useState } from "react";
 import {
-  Band, Btn, Panel, Label, VersusBar, CountUp, Mark,
+  Band, Btn, Panel, Label, VersusBar, CountUp, CoinChip, Mark,
   CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, R_CARD, R_CHIP, BW_2,
 } from "./ui";
@@ -26,9 +26,16 @@ export type ResultEv = {
  * of the analysis, which is where it used to be — four screens down, past every
  * breakdown, so playing again meant reading the post-mortem first.
  */
-export function ResultBand({ won, onMenu }: { won: boolean; onMenu: () => void }) {
+export function ResultBand({ won, onMenu, coins, coinsAdded }: {
+  won: boolean; onMenu: () => void;
+  /** Weekly total after this game, for the header chip. Null when signed out. */
+  coins?: number | null;
+  /** What this game paid, so the chip climbs into the total instead of just showing it. */
+  coinsAdded?: number;
+}) {
   return <Band compact accent={won ? MINT : PINK} onBack={onMenu}
-    title={won ? "You won the draft" : "You lost the draft"} />;
+    title={won ? "You won the draft" : "You lost the draft"}
+    right={coins != null ? <CoinChip coins={coins} added={coinsAdded} /> : undefined} />;
 }
 
 export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu: () => void }) {
@@ -77,7 +84,7 @@ export function Result({
   const them = "The Counterpicker";
 
   return (
-    <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
+    <div className="dl-in" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
       {/* The verdict. A sentence in ink with the outcome highlightered under it,
           which is how the films deliver a headline — the old version coloured
           the whole sentence, and a green sentence on paper is harder to read the
@@ -137,6 +144,7 @@ export function Result({
             {yoursWin.length} — {theirsWin.length}
           </span>
         </div>
+        <CounterNote />
         <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
         <div style={{ height: 8 }} />
         <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
@@ -170,27 +178,70 @@ function Beat({ fill, label, children }: { fill: string; label: string; children
   );
 }
 
+/**
+ * What the two numbers in a counter row mean.
+ *
+ * They are one matchup split in two, so they add to 100 — but a hero can hold
+ * a counter edge and still be the underdog outright, which is how a pair like
+ * "46%–54%" ends up under YOU COUNTERED. Without a word of explanation that
+ * looks like an error rather than the point, and the old fix for it (printing
+ * the expected rate beside the real one) was the thing making these rows too
+ * wide to fit a phone.
+ */
+export function CounterNote() {
+  return (
+    <div style={{ fontSize: 9.5, color: MUTED, fontWeight: 700, lineHeight: 1.4, marginBottom: 8 }}>
+      Win rate in each matchup, split between the two heroes. A hero can counter
+      and still be the underdog.
+    </div>
+  );
+}
+
+/**
+ * One side of the counter war.
+ *
+ * TWO NUMBERS THAT ADD UP. This used to print the attacker's head-to-head rate
+ * beside what their base strengths predicted — "54% vs 49%" — which is a real
+ * distinction but reads as two heroes' shares of one matchup, and those plainly
+ * did not sum to 100. It is now the matchup split itself: the attacker's rate
+ * and its complement, one under each hero, which is what the numbers next to
+ * two names are always taken to mean. The edge the row is claiming is already
+ * carried by which column it is in.
+ *
+ * NOTHING RUNS OFF THE RIGHT. Both names are flex items with `minWidth: 0` so
+ * they can actually ellipsise. Without it a flex item's automatic minimum is
+ * its content width, and `whiteSpace: nowrap` made that the full hero name —
+ * so two long names and a percentage simply pushed the row wider than the
+ * phone, which is what was cut off on the right of this screen.
+ */
 export function Col({ title, rows, color, engine }: { title: string; rows: CounterEdge[]; color: string; engine: Engine }) {
   const heroName = (id: number) => engine.heroById.get(id)?.name ?? `#${id}`;
   return (
     <div>
       <div style={{ fontSize: 9, letterSpacing: 1.2, color, marginBottom: 5, fontWeight: 900 }}>{title}</div>
       {rows.length === 0 && <div style={{ fontSize: 11.5, color: MUTED }}>Nothing decisive.</div>}
-      {rows.map((r, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
-          <span style={{ width: 26, height: 17, flexShrink: 0, borderRadius: 4, overflow: "hidden", border: `1.5px solid ${LINE}`, boxSizing: "border-box", background: "var(--tile)" }}>
-            <HeroImg base={heroBase(engine.heroById.get(r.attacker)!.img)} shape="crop" position="50% 20%" />
-          </span>
-          <span style={{ fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heroName(r.attacker)}</span>
-          <span style={{ fontSize: 9.5, color: DIM, flexShrink: 0 }}>vs</span>
-          <span style={{ fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heroName(r.defender)}</span>
-          {r.winRate != null && (
-            <span style={{ fontSize: 10.5, color: DIM, marginLeft: "auto", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-              {(r.winRate * 100).toFixed(0)}%{r.expected != null && ` vs ${(r.expected * 100).toFixed(0)}%`}
+      {rows.map((r, i) => {
+        // Round one and take the complement, rather than rounding both: 51.4 and
+        // 48.6 would otherwise print as 51 and 49.
+        const a = r.winRate == null ? null : Math.round(r.winRate * 100);
+        const b = a == null ? null : 100 - a;
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+            <span style={{ width: 26, height: 17, flexShrink: 0, borderRadius: 4, overflow: "hidden", border: `1.5px solid ${LINE}`, boxSizing: "border-box", background: "var(--tile)" }}>
+              <HeroImg base={heroBase(engine.heroById.get(r.attacker)!.img)} shape="crop" position="50% 20%" />
             </span>
-          )}
-        </div>
-      ))}
+            <span style={{ flex: "1 1 0", minWidth: 0, fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {heroName(r.attacker)}
+            </span>
+            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 900, color: DIM, fontVariantNumeric: "tabular-nums" }}>
+              {a == null ? "vs" : <><span style={{ color }}>{a}%</span>–{b}%</>}
+            </span>
+            <span style={{ flex: "1 1 0", minWidth: 0, fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>
+              {heroName(r.defender)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

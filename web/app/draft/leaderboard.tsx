@@ -40,6 +40,38 @@ const hhmm = (ms: number) => {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
+/**
+ * Just your own coin total for the week, for the header chip.
+ *
+ * Reads the same endpoint the board does. A signed-out player has no row and
+ * no total, and gets null rather than a zero — there is a difference between
+ * "you have won nothing yet" and "there is nobody to have won anything", and
+ * the chip renders nothing for the second.
+ *
+ * The caller's own row comes back inside `rows` when they are in the top 25
+ * and in `you` when they are not, so both are checked; a signed-in player who
+ * has never scored is in neither, which is a real zero.
+ */
+export function useMyCoins(uid: string | null, refreshKey?: number): number | null {
+  const [coins, setCoins] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!uid) return;
+    let dead = false;
+    fetch(`/api/draftlab/leaderboard?limit=25&uid=${encodeURIComponent(uid)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (dead) return;
+        const mine = (d.rows ?? []).find((r: WeeklyRow) => r.uid === uid) ?? d.you ?? null;
+        setCoins(mine?.coins ?? 0);
+      })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [uid, refreshKey]);
+
+  return uid ? coins : null;
+}
+
 export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKey?: number }) {
   const [rows, setRows] = useState<WeeklyRow[] | null>(null);
   const [you, setYou] = useState<(WeeklyRow & { rank: number | null }) | null>(null);
@@ -81,7 +113,7 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
       )}
 
       {rows != null && rows.length > 0 && (
-        <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 6 }}>
           {rows.map((r, i) => <Row key={r.uid} r={r} rank={i + 1} me={r.uid === uid} />)}
         </div>
       )}
