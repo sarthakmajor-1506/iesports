@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ALLY, ENEMY, DANGER, GREEN, CREAM, LINE, MUTED, DIM, R_CHIP, attrColor, attrName, alpha,
+import {
+  ALLY_FILL, ENEMY_FILL, DANGER_FILL, CREAM, LINE, DIM, PANEL, PANEL_2, ON_FILL,
+  R_CHIP, BW, lift, attrColor, attrFill, attrName, alpha,
 } from "./ui";
 
 /**
@@ -133,9 +135,24 @@ export function HeroArt({
 
 export type LineupHero = { id: number; img: string; name: string };
 
+/**
+ * A hero in a slot, as a card off the sticker sheet.
+ *
+ * Ink outline, hard offset shadow, rounded corner — the same object the landing
+ * page builds its game cards from. The art keeps its dark bed (`--tile`) in both
+ * sheets because every Valve portrait fades to black at the edges and a cream
+ * bed shows as a halo around each one.
+ *
+ * The name sits on a solid ink bar rather than the gradient scrim it used to
+ * wear. A scrim fading into cream is a smudge; a bar is the same object the
+ * landing page's ticker is, and it works over a dark portrait and a paper page
+ * alike. The two hexes in here are deliberately literal: that bar is ink with
+ * paper on it in BOTH sheets, so it must not follow `--stroke` when night
+ * inverts it.
+ */
 function Card({
-  hero, accent, latest, phase, motion, hidden, h,
-}: { hero?: LineupHero; accent: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string }) {
+  hero, fill, latest, phase, motion, hidden, h,
+}: { hero?: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string }) {
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
       <div
@@ -144,10 +161,10 @@ function Card({
         key={hero?.id ?? "empty"}
         className={hero && !hidden ? "dl-drop" : undefined}
         style={{
-          position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden",
-          background: hero ? "var(--tile)" : "rgba(255,255,255,.018)",
-          border: `1px solid ${latest ? accent : hero ? "rgba(255,255,255,.10)" : "rgba(255,255,255,.05)"}`,
-          boxShadow: latest ? `0 0 0 1px ${accent}, 0 10px 30px -10px ${accent}, 0 0 22px -8px ${accent}` : "none",
+          position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
+          background: hero ? "var(--tile)" : PANEL_2,
+          border: `${BW}px ${hero ? "solid" : "dashed"} ${LINE}`,
+          boxShadow: hero ? `3px 3px 0 ${LINE}` : "none",
         }}
       >
         {hero && !hidden && <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion} />}
@@ -155,26 +172,24 @@ function Card({
         {hero && hidden && (
           <div style={{
             position: "absolute", inset: 0, display: "grid", placeItems: "center",
-            background: "repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 7px, transparent 7px 14px)",
-            color: MUTED, fontSize: 22, fontWeight: 800,
+            background: `repeating-linear-gradient(135deg, ${alpha(LINE, 14)} 0 7px, transparent 7px 14px)`,
+            color: CREAM, fontSize: 22, fontWeight: 900,
           }}>?</div>
         )}
 
         {!hero && (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,.09)", fontSize: 15 }}>◆</div>
+          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: DIM, fontSize: 15, fontWeight: 900 }}>◆</div>
         )}
 
         {hero && !hidden && (
           <>
             <div style={{
-              position: "absolute", left: 0, right: 0, bottom: 0, height: "48%",
-              background: "linear-gradient(transparent, rgba(6,9,15,.95))", pointerEvents: "none",
-            }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "0 4px 5px", textAlign: "center" }}>
+              position: "absolute", left: 0, right: 0, bottom: 0, padding: "3px 4px",
+              background: "#16131F", textAlign: "center",
+            }}>
               <span style={{
-                fontSize: "clamp(7px, 2.3vw, 10px)", color: CREAM, textTransform: "uppercase", fontWeight: 800,
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block",
-                textShadow: "0 1px 5px #000", letterSpacing: .3,
+                fontSize: "clamp(7px, 2.3vw, 10px)", color: "#FFF7EA", textTransform: "uppercase", fontWeight: 900,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", letterSpacing: .4,
               }}>{hero.name}</span>
             </div>
             {/* The lock-in. This replaced a toast pinned to the top of the
@@ -184,12 +199,11 @@ function Card({
             {latest && (
               <>
                 <span key={`f${hero.id}`} className="dl-flash" style={{
-                  position: "absolute", inset: 0, pointerEvents: "none",
-                  background: `linear-gradient(180deg, ${alpha(accent, 0)}, ${alpha(accent, 44)})`,
+                  position: "absolute", inset: 0, pointerEvents: "none", background: fill,
                 }} />
                 <span key={`r${hero.id}`} style={{
-                  position: "absolute", inset: -2, pointerEvents: "none", borderRadius: "inherit",
-                  border: `2px solid ${accent}`, animation: "dl-ring .6s var(--ease) both",
+                  position: "absolute", inset: -3, pointerEvents: "none", borderRadius: "inherit",
+                  border: `3px solid ${fill}`, animation: "dl-ring .6s var(--ease) both",
                 }} />
               </>
             )}
@@ -201,21 +215,24 @@ function Card({
 }
 
 /**
- * A status pill — "PICKING…", "BANNING…", "READY" — with a pulsing dot when
+ * A status sticker — PICKING…, BANNING…, READY — with a blinking dot when
  * `active`. This is what turns an opponent from a label into a presence: the
- * point isn't the text, it's that something on their side of the board is
- * visibly alive while you're deciding.
+ * point is not the text, it is that something on their side of the board is
+ * visibly alive while you are deciding.
  */
-export function Presence({ text, color, active }: { text: string; color: string; active?: boolean }) {
+export function Presence({ text, fill, active }: { text: string; fill: string; active?: boolean }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 8.5, fontWeight: 900, letterSpacing: .5, color, flexShrink: 0 }}>
-      <span className={active ? "dl-turn" : undefined} style={{ width: 5, height: 5, borderRadius: 3, background: color, boxShadow: `0 0 6px ${color}` }} />
+    <span className="dl-stk flat" style={{
+      background: fill, fontSize: 8, padding: "2px 7px", gap: 4, boxShadow: `2px 2px 0 ${LINE}`,
+      borderWidth: 2, flexShrink: 0,
+    }}>
+      <span className={active ? "dl-turn" : undefined} style={{ width: 5, height: 5, borderRadius: 3, background: ON_FILL }} />
       {text.toUpperCase()}
     </span>
   );
 }
 
-/** One side of the board: a labelled row of five cards. */
+/** One side of the board: a labelled row of five cards under a side sticker. */
 export function TeamRow({
   side, heroes, latest, label, note, status, hidden, motion = true, height = "clamp(84px, 24vw, 124px)",
 }: {
@@ -229,21 +246,23 @@ export function TeamRow({
   motion?: boolean;
   height?: string;
 }) {
-  const accent = side === "them" ? ENEMY : ALLY;
+  const fill = side === "them" ? ENEMY_FILL : ALLY_FILL;
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-        <span style={{ fontSize: 9, letterSpacing: 1.3, fontWeight: 900, color: accent, display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          <span style={{ width: 5, height: 5, borderRadius: 3, background: accent, boxShadow: `0 0 8px ${accent}`, flexShrink: 0 }} />
-          {label}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+        <span className="dl-stk" style={{
+          background: fill, fontSize: 9, padding: "3px 9px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}`,
+          minWidth: 0, maxWidth: "56%",
+        }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
         </span>
-        {status && <Presence text={status.text} color={accent} active={status.active} />}
-        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(accent, 27)}, transparent)` }} />
+        {status && <Presence text={status.text} fill={fill} active={status.active} />}
+        <span className="dl-rule" style={{ flex: "1 1 auto" }} />
         {note}
       </div>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div style={{ display: "flex", gap: 6 }}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} hero={heroes[i]} accent={accent} h={height}
+          <Card key={i} hero={heroes[i]} fill={fill} h={height}
             latest={heroes[i] != null && heroes[i].id === latest}
             phase={i} motion={motion} hidden={hidden} />
         ))}
@@ -255,7 +274,7 @@ export function TeamRow({
 /**
  * Square hero tiles. The one grid used by every screen that picks heroes.
  *
- * `dim` is the ban phase: the whole pool goes desaturated under a red wash, so
+ * `dim` is the ban phase: the whole pool goes desaturated under a pink wash, so
  * the mode you are in is legible from the grid itself rather than only from the
  * banner above it — you are about to remove a hero, not take one.
  */
@@ -270,22 +289,24 @@ export function HeroGrid({
   labelSize?: number;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 5 }}>
+    // The gap is wider than it was: every tile now throws a 2px hard shadow, and
+    // at the old 5px they landed on top of each other.
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 7 }}>
       {ids.map((id) => {
         const h = byId(id);
         if (!h) return null;
         return (
           <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
-            padding: 0, border: `1px solid ${dim ? DANGER + "3d" : LINE}`, borderRadius: R_CHIP, overflow: "hidden",
+            padding: 0, border: `${BW}px solid ${LINE}`, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
             background: "var(--tile)", cursor: "pointer", position: "relative", aspectRatio: "1 / 1",
-            filter: dim ? "saturate(.45) brightness(.9)" : undefined,
+            filter: dim ? "saturate(.4) brightness(.85)" : undefined, ...lift(2),
           }}>
             <HeroImg base={heroBase(h.img)} name={h.name} />
-            {dim && <span style={{ position: "absolute", inset: 0, background: `${alpha(DANGER, 12)}`, pointerEvents: "none" }} />}
+            {dim && <span style={{ position: "absolute", inset: 0, background: alpha(DANGER_FILL, 34), pointerEvents: "none" }} />}
             <span style={{
-              position: "absolute", left: 0, right: 0, bottom: 0, fontSize: labelSize ?? 7.5, color: CREAM,
-              background: "linear-gradient(transparent, rgba(6,9,15,.96))", padding: "10px 3px 3px",
-              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 800,
+              position: "absolute", left: 0, right: 0, bottom: 0, fontSize: labelSize ?? 7.5,
+              color: "#FFF7EA", background: "#16131F", padding: "2px 3px",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 900, letterSpacing: .2,
             }}>{h.name}</span>
           </button>
         );
@@ -294,19 +315,23 @@ export function HeroGrid({
   );
 }
 
+/** The heroes taken off the board, stamped out. */
 export function BanStrip({ bans, byId }: { bans: { by: "bot" | "you"; heroId: number }[]; byId: (id: number) => { img: string; name: string } | undefined }) {
   if (!bans.length) return null;
   return (
-    <div style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center" }}>
-      <span style={{ fontSize: 8.5, letterSpacing: 1.3, color: MUTED, fontWeight: 800, marginRight: 2 }}>BANNED</span>
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+      <span className="dl-stk" style={{ background: DANGER_FILL, fontSize: 8, padding: "2px 8px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}`, marginRight: 2 }}>BANNED</span>
       {bans.map((b, i) => {
         const h = byId(b.heroId);
         if (!h) return null;
         return (
           <div key={i} title={`${h.name} — banned by ${b.by === "you" ? "you" : "them"}`}
-            style={{ position: "relative", width: 26, height: 16, borderRadius: 3, overflow: "hidden" }}>
-            <HeroImg base={heroBase(h.img)} shape="crop" position="50% 22%" style={{ filter: "grayscale(1) brightness(.38)" }} />
-            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: b.by === "you" ? ALLY : ENEMY, fontSize: 12, fontWeight: 800 }}>×</div>
+            style={{
+              position: "relative", width: 30, height: 20, borderRadius: 5, overflow: "hidden",
+              border: `2px solid ${LINE}`, boxSizing: "border-box", background: "var(--tile)",
+            }}>
+            <HeroImg base={heroBase(h.img)} shape="crop" position="50% 22%" style={{ filter: "grayscale(1) brightness(.5)" }} />
+            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: b.by === "you" ? ALLY_FILL : ENEMY_FILL, fontSize: 14, fontWeight: 900 }}>×</div>
           </div>
         );
       })}
@@ -342,25 +367,23 @@ export function DraftColumn({
   motion?: boolean;
   width?: number;
 }) {
-  const accent = side === "radiant" ? ALLY : ENEMY;
+  const fill = side === "radiant" ? ALLY_FILL : ENEMY_FILL;
   return (
     // Sticky, because a team column that scrolls away defeats the point of
     // flanking the pool with it — in the client both sides are always on screen.
     <div style={{
-      width, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3,
+      width, flexShrink: 0, display: "flex", flexDirection: "column", gap: 5,
       position: "sticky", top: 0, alignSelf: "flex-start", zIndex: 2,
     }}>
-      <div className="dl-cut-s" style={{
-        textAlign: "center", padding: "3px 2px 4px",
-        background: active ? `${alpha(accent, 18)}` : `${alpha(accent, 7)}`,
-        borderBottom: `2px solid ${accent}`,
-        boxShadow: active ? `0 0 16px -4px ${accent}` : "none",
+      <div className={active ? "dl-turn" : undefined} style={{
+        textAlign: "center", padding: "4px 3px 5px", borderRadius: 9, boxSizing: "border-box",
+        background: active ? fill : PANEL, border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
       }}>
-        <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: .6, color: accent, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: .6, color: active ? ON_FILL : CREAM, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {label}
         </div>
         {status && (
-          <div className={active ? "dl-turn" : undefined} style={{ fontSize: 7, color: active ? accent : DIM, fontWeight: 700, letterSpacing: .3 }}>
+          <div style={{ fontSize: 7, color: active ? ON_FILL : DIM, fontWeight: 800, letterSpacing: .3 }}>
             {status}
           </div>
         )}
@@ -372,34 +395,34 @@ export function DraftColumn({
         return (
           <div
             key={hero?.id ?? `e${i}`}
-            className={hero ? "dl-drop dl-cut-s" : "dl-cut-s"}
+            className={hero ? "dl-drop" : undefined}
             style={{
               position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
-              background: hero ? "var(--tile)" : "rgba(200,166,93,.035)",
-              border: `1px solid ${isLatest ? accent : hero ? `${alpha(accent, 33)}` : "rgba(200,166,93,.16)"}`,
-              boxShadow: isLatest ? `0 0 0 1px ${accent}, 0 0 18px -4px ${accent}` : "none",
+              borderRadius: 9, boxSizing: "border-box",
+              background: hero ? "var(--tile)" : PANEL_2,
+              border: `2px ${hero ? "solid" : "dashed"} ${LINE}`,
+              boxShadow: hero ? `2px 2px 0 ${LINE}` : "none",
             }}
           >
             {hero ? (
               <>
                 <HeroArt base={heroBase(hero.img)} name={hero.name} phase={i} animate={motion} />
                 <span style={{
-                  position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: CREAM,
-                  fontWeight: 800, letterSpacing: .2, textAlign: "center",
-                  background: "linear-gradient(transparent, rgba(8,11,15,.96))", padding: "8px 1px 2px",
+                  position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: "#FFF7EA",
+                  fontWeight: 900, letterSpacing: .2, textAlign: "center", background: "#16131F", padding: "1px",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>{hero.name}</span>
                 {isLatest && (
                   <>
-                    <span className="dl-flash" style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${alpha(accent, 0)}, ${alpha(accent, 44)})` }} />
-                    <span style={{ position: "absolute", inset: -2, border: `2px solid ${accent}`, animation: "dl-ring .6s var(--ease) both" }} />
+                    <span className="dl-flash" style={{ position: "absolute", inset: 0, background: fill }} />
+                    <span style={{ position: "absolute", inset: -2, border: `2.5px solid ${fill}`, borderRadius: "inherit", animation: "dl-ring .6s var(--ease) both" }} />
                   </>
                 )}
               </>
             ) : (
               <span style={{
                 position: "absolute", inset: 0, display: "grid", placeItems: "center",
-                color: `${alpha(accent, 20)}`, fontSize: 13, fontWeight: 800,
+                color: DIM, fontSize: 13, fontWeight: 900,
               }}>{i + 1}</span>
             )}
           </div>
@@ -413,8 +436,9 @@ export function DraftColumn({
  * The hero pool, grouped by primary attribute.
  *
  * Dota's grid is organised by attribute and players navigate it that way — "I
- * need a strength offlaner" is a section, not a search. Every tile carries its
- * attribute colour on the left edge, which is how the client marks them too.
+ * need a strength offlaner" is a section, not a search. Every group is headed by
+ * a sticker in that attribute's pastel, and every tile carries the attribute
+ * colour down its left edge, which is how the client marks them too.
  */
 export function AttributePool({
   ids, byId, onPick, dim, min = "clamp(42px, 12vw, 54px)",
@@ -431,32 +455,34 @@ export function AttributePool({
     .filter((g) => g.list.length > 0);
 
   return (
-    <div style={{ display: "grid", gap: 9 }}>
+    <div style={{ display: "grid", gap: 11 }}>
       {groups.map((g) => {
         const c = attrColor(g.attr);
+        const f = attrFill(g.attr);
         return (
           <div key={g.attr}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <span style={{ width: 7, height: 7, background: c, boxShadow: `0 0 7px ${c}`, flexShrink: 0 }} />
-              <span style={{ fontSize: 7.5, fontWeight: 800, letterSpacing: 1.1, color: c }}>{attrName(g.attr)}</span>
-              <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(c, 24)}, transparent)` }} />
-              <span style={{ fontSize: 7.5, color: DIM, fontWeight: 700 }}>{g.list.length}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+              <span className="dl-stk" style={{ background: f, fontSize: 8, padding: "2px 8px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}` }}>
+                {attrName(g.attr)}
+              </span>
+              <span className="dl-rule" style={{ flex: "1 1 auto" }} />
+              <span style={{ fontSize: 8.5, color: DIM, fontWeight: 900 }}>{g.list.length}</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 3 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${min}, 1fr))`, gap: 6 }}>
               {g.list.map((id) => {
                 const h = byId(id)!;
                 return (
                   <button key={id} className="dl-pick" onClick={() => onPick(id)} title={h.name} style={{
                     padding: 0, position: "relative", aspectRatio: "1 / 1", cursor: "pointer", overflow: "hidden",
-                    background: "var(--tile)", border: `1px solid ${dim ? `${alpha(DANGER, 27)}` : "rgba(200,166,93,.13)"}`,
-                    borderLeft: `2px solid ${dim ? DANGER : c}`,
-                    filter: dim ? "saturate(.4) brightness(.85)" : undefined,
+                    background: "var(--tile)", border: `2px solid ${LINE}`, borderLeftWidth: 4,
+                    borderLeftColor: dim ? DANGER_FILL : c, borderRadius: 9, boxSizing: "border-box",
+                    filter: dim ? "saturate(.4) brightness(.85)" : undefined, ...lift(2),
                   }}>
                     <HeroImg base={heroBase(h.img)} name={h.name} />
-                    {dim && <span style={{ position: "absolute", inset: 0, background: `${alpha(DANGER, 15)}`, pointerEvents: "none" }} />}
+                    {dim && <span style={{ position: "absolute", inset: 0, background: alpha(DANGER_FILL, 34), pointerEvents: "none" }} />}
                     <span style={{
-                      position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: CREAM, fontWeight: 800,
-                      background: "linear-gradient(transparent, rgba(8,11,15,.97))", padding: "8px 1px 2px",
+                      position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 6.5, color: "#FFF7EA", fontWeight: 900,
+                      background: "#16131F", padding: "1px 2px",
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     }}>{h.name}</span>
                   </button>

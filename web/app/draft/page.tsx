@@ -11,8 +11,9 @@ import type { Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Toggle, TurnBanner, DraftTimeline, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
-  RED, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, DANGER, ALLY, R_CARD, R_BTN, R_CHIP, alpha,
+  Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
+  CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
+  LEMON, MINT, PINK, LILAC, ON_FILL, R_CARD, BW_2, lift,
 } from "./ui";
 import { Skeleton } from "./theme";
 import { play } from "./sound";
@@ -290,17 +291,26 @@ function Duel() {
       <Shell
         tab="duel"
         head={
-          <Band title="Draft Duel" compact sub="Draft, then three questions"
+          <Band title="Draft Duel" compact sub="Draft, then three questions" accent={LEMON}
             right={
               <>
                 <ThemeToggle />
                 <SoundToggle />
-                <span style={{
-                  maxWidth: 108, fontSize: 10.5, fontWeight: 800, color: user ? GREEN : DIM,
-                  border: `1px solid ${user ? GREEN + "44" : LINE}`, borderRadius: R_CHIP, padding: "5px 9px",
-                  background: user ? `${alpha(GREEN, 7)}` : PANEL_2,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>{user ? (steamName || name || "Signed in") : "Guest"}</span>
+                {/* Only when signed in. The chip's job is to say WHICH account
+                    you are on, and a "GUEST" pill said nothing the PLAYING AS
+                    field below does not — while being the third thing in a slot
+                    that only fits two on a 390px phone, where it crowded the
+                    subtitle out of the band. */}
+                {user && (
+                  <span className="dl-stk" style={{
+                    maxWidth: 88, fontSize: 8.5, padding: "3px 9px", borderWidth: 2,
+                    boxShadow: `2px 2px 0 ${LINE}`, background: MINT, color: ON_FILL,
+                  }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {steamName || name || "Signed in"}
+                    </span>
+                  </span>
+                )}
               </>
             } />
         }
@@ -309,10 +319,10 @@ function Duel() {
           {/* Two ways in, one switch. The previous menu was two paragraph-heavy
               cards each carrying its own bans control, which made bans look like
               a property of a mode rather than a property of the draft. */}
-          <div style={{ display: "flex", gap: 9 }}>
-            <ModeTile accent={RED} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
+          <div style={{ display: "flex", gap: 11 }}>
+            <ModeTile fill={PINK} rot={-1.4} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
               cta="PLAY" onClick={restart} />
-            <ModeTile accent={GOLD} kicker="LIVE · 30s" title="Play a friend" sub="Head to head, on a clock"
+            <ModeTile fill={LEMON} rot={1.2} kicker="LIVE · 30s" title="Play a friend" sub="Head to head, on a clock"
               cta="CREATE ROOM"
               onClick={async () => {
                 const d = await roomCall({ action: "create", name: steamName || name || "Host", bans: bansOn });
@@ -324,10 +334,10 @@ function Duel() {
 
           <div className="dl-card" style={{
             display: "flex", justifyContent: "center", alignItems: "center", gap: 10,
-            padding: "8px 12px", borderRadius: R_CARD, background: PANEL, border: `1px solid ${LINE}`,
+            padding: "7px 12px", borderRadius: R_CARD,
           }}>
-            <Toggle checked={bansOn} onChange={setBansOn} label="BANS" />
-            <span style={{ fontSize: 10, color: DIM, letterSpacing: .3 }}>
+            <Toggle checked={bansOn} onChange={setBansOn} label="BANS" color={PINK} />
+            <span style={{ fontSize: 10, color: DIM, fontWeight: 700, letterSpacing: .3 }}>
               {bansOn ? "3 bans each, both modes" : "straight picks, both modes"}
             </span>
           </div>
@@ -336,8 +346,8 @@ function Duel() {
             <Field value={codeInput}
               onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
               placeholder="ROOM CODE" autoCapitalize="characters"
-              style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 3, fontWeight: 800, textAlign: "center", minHeight: 44 }} />
-            <Btn tone="dark" disabled={busy || codeInput.length < 4} onClick={async () => {
+              style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 3, fontWeight: 900, textAlign: "center", minHeight: 44 }} />
+            <Btn tone="lilac" disabled={busy || codeInput.length < 4} onClick={async () => {
               setBusy(true); setJoinError(null);
               const j = await roomCall({ action: "join", code: codeInput, name: steamName || name || "Guest" });
               setBusy(false);
@@ -367,10 +377,12 @@ function Duel() {
   /* -------------------------------------------------------------- recap */
   if (stage === "recap") {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} sub="Both sides are locked in" />}>
         <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label="THE COUNTERPICKER" heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
-          <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
+          <div style={{ textAlign: "center" }}>
+            <span className="dl-stk" style={{ background: LILAC, fontSize: 10 }}>VS</span>
+          </div>
           <TeamRow side="you" label="YOU" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           {bans.length > 0 && <BanStrip bans={bans} byId={heroById} />}
           <Btn full tone="gold" size="l" onClick={() => setStage("quiz")}>SEE THE QUESTIONS</Btn>
@@ -382,7 +394,7 @@ function Duel() {
   /* -------------------------------------------------------------- quiz */
   if (stage === "quiz") {
     return (
-      <Shell tab={null} head={<Band title="Draft locked" compact accent={GOLD} sub="Now the questions" />}>
+      <Shell tab={null} head={<Band title="Draft locked" compact accent={LEMON} sub="Now the questions" />}>
         <div style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 16 }}>
           <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(64px, 19vw, 92px)" />
           {knowledge ? (
@@ -407,9 +419,19 @@ function Duel() {
     const lastBotBan = [...events].reverse().find((e) => e.by === "bot" && e.kind === "ban");
     const botTurn = slot?.by === "bot";
 
+    /*
+     * Two words, not a sentence.
+     *
+     * The band centres the title between the back arrow and the right slot, so
+     * on a 390px phone it has about 220px — "YOUR PICK — LOCK ONE IN" was
+     * ellipsised to "YOUR PICK — LOCK ONE …", which is the instruction cut off
+     * at exactly the word that carried it. The state goes in the title and the
+     * instruction goes in the subtitle, which has the width for it.
+     */
     const turnLabel = yourTurn
-      ? (banning ? "YOUR BAN — CHOOSE ONE TO REMOVE" : "YOUR PICK — LOCK ONE IN")
+      ? (banning ? "YOUR BAN" : "YOUR PICK")
       : (botThinking ? "DIRE IS DECIDING…" : "DIRE'S TURN");
+    const turnHint = yourTurn ? (banning ? " · take one away" : " · lock one in") : "";
 
     return (
       <Shell
@@ -421,13 +443,18 @@ function Duel() {
            * screen before a single hero was visible. The turn now lives in the
            * title, where it is read anyway, and the accent carries the state.
            */
+          /*
+           * The highlighter under the title carries the state, the way it does
+           * in the films: pink while banning, lemon on your turn, nothing at all
+           * while the other side is thinking. It replaced a coloured title,
+           * which on paper made the words themselves harder to read the more
+           * urgent they were.
+           */
           <Band compact onBack={toMenu}
-            accent={banning ? DANGER : yourTurn ? GOLD : MUTED}
-            title={
-              <span style={{ color: banning ? DANGER : yourTurn ? GOLD : MUTED }}>{turnLabel}</span>
-            }
-            sub={`Round ${turnIndex + 1} of ${SEQ.length}${bans.length ? ` · ${bans.length} banned` : ""}`}
-            right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? GOLD : DIM} />}
+            accent={banning ? PINK : yourTurn ? LEMON : "transparent"}
+            title={turnLabel}
+            sub={`Round ${turnIndex + 1} of ${SEQ.length}${turnHint}${bans.length ? ` · ${bans.length} banned` : ""}`}
+            right={<Pips total={SEQ.filter((s) => s.kind === "pick" && s.role === YOU).length} filled={yours.length} color={yourTurn ? LEMON : MINT} />}
           />
         }
       >
@@ -448,12 +475,12 @@ function Duel() {
           placeholder={yourTurn ? (banning ? "Search — banning" : "Search heroes") : "Waiting for Dire…"}
           disabled={!yourTurn}
           style={{
-            marginTop: 9, padding: "8px 11px", minHeight: 36,
-            opacity: yourTurn ? 1 : .4, borderColor: banning && yourTurn ? DANGER : LINE,
+            marginTop: 10, padding: "8px 14px", minHeight: 38,
+            opacity: yourTurn ? 1 : .45, background: banning && yourTurn ? PINK : "var(--field)",
           }} />
 
         {lastBotBan && lastBotBan.deniedRank != null && lastBotBan.deniedRank <= 5 && (
-          <div style={{ fontSize: 11, color: DANGER, padding: "8px 2px 0", lineHeight: 1.35 }}>
+          <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 700, padding: "9px 2px 0", lineHeight: 1.4 }}>
             Dire banned <strong style={{ color: CREAM }}>{heroName(lastBotBan.heroId)}</strong> — your
             {lastBotBan.deniedRank === 1 ? " best" : ` #${lastBotBan.deniedRank}`} option.
           </div>
@@ -483,31 +510,37 @@ function Duel() {
 /**
  * One of the two ways into a game.
  *
- * Terse on purpose: a kicker, a name, one line, and the verb. The accent bar and
- * its glow are the whole identity of the mode — red for solo, gold for live —
- * so the two are distinguishable at a glance before any text is read.
+ * Terse on purpose: a kicker sticker, a name, one line, and the verb. The two
+ * cards sit at opposite tilts with different pastels — pink for solo, lemon for
+ * live — so which is which is settled before a word is read, the way the
+ * landing page separates its three games.
+ *
+ * The rotation has to survive `.dl-btn`, whose hover and press are a
+ * `transform: translate(...)` that would overwrite it. So the tilt lives on the
+ * outer wrapper and the button inside it stays square.
  */
 function ModeTile({
-  accent, kicker, title, sub, cta, onClick,
-}: { accent: string; kicker: string; title: string; sub: string; cta: string; onClick: () => void }) {
+  fill, rot, kicker, title, sub, cta, onClick,
+}: { fill: string; rot: number; kicker: string; title: string; sub: string; cta: string; onClick: () => void }) {
   return (
-    <button className="dl-btn dl-card" onClick={() => { play("pick"); onClick(); }} style={{
-      flex: "1 1 0", minWidth: 0, textAlign: "left", cursor: "pointer",
-      position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "14px 12px 13px",
-      background: `linear-gradient(158deg, ${PANEL} 34%, ${alpha(accent, 15)})`,
-      border: `1px solid ${alpha(accent, 24)}`, color: CREAM,
-      boxShadow: `0 10px 34px -18px ${accent}, 0 0 0 1px rgba(255,255,255,.02) inset`,
-    }}>
-      <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent, boxShadow: `0 0 18px ${accent}` }} />
-      <div style={{ fontSize: 8.5, letterSpacing: 1.6, color: accent, fontWeight: 800, marginBottom: 6 }}>{kicker}</div>
-      <div style={{ fontSize: "clamp(15px, 4.4vw, 18px)", fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.1, marginBottom: 5 }}>{title}</div>
-      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.35, marginBottom: 11, minHeight: 27 }}>{sub}</div>
-      <span style={{
-        display: "block", textAlign: "center", padding: "9px 6px", borderRadius: R_BTN,
-        background: `linear-gradient(180deg, ${accent}, ${alpha(accent, 80)})`, color: accent === GOLD ? "#1A1103" : "#FFF",
-        fontSize: 11.5, fontWeight: 800, letterSpacing: .5, boxShadow: `0 0 22px -6px ${accent}`,
-      }}>{cta}</span>
-    </button>
+    <div style={{ flex: "1 1 0", minWidth: 0, transform: `rotate(${rot}deg)` }}>
+      <button className="dl-btn" onClick={() => { play("pick"); onClick(); }} style={{
+        width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+        position: "relative", borderRadius: R_CARD, padding: "14px 13px 13px", boxSizing: "border-box",
+        background: PANEL, border: `${BW_2}px solid ${LINE}`, color: CREAM, ...lift(5),
+      }}>
+        <span className="dl-stk" style={{ background: fill, fontSize: 8, padding: "3px 9px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}`, marginBottom: 9 }}>
+          {kicker}
+        </span>
+        <div style={{ fontSize: "clamp(15px, 4.4vw, 18px)", fontWeight: 900, letterSpacing: "-.03em", lineHeight: 1.1, margin: "2px 0 5px" }}>{title}</div>
+        <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, lineHeight: 1.35, marginBottom: 12, minHeight: 28 }}>{sub}</div>
+        <span style={{
+          display: "block", textAlign: "center", padding: "8px 6px", borderRadius: 999,
+          background: fill, color: ON_FILL, border: `2px solid ${LINE}`,
+          fontSize: 11, fontWeight: 900, letterSpacing: .6,
+        }}>{cta}</span>
+      </button>
+    </div>
   );
 }
 
@@ -533,19 +566,17 @@ function Pulse() {
   if (!live && !today) return null;
 
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-      fontSize: 10.5, color: MUTED, letterSpacing: .3,
-    }}>
-      <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7 }}>
-        <span className="dl-turn" style={{
-          position: "absolute", inset: 0, borderRadius: 4,
-          background: live ? GREEN : DIM, boxShadow: live ? `0 0 10px ${GREEN}` : "none",
-        }} />
+    <div style={{ display: "flex", justifyContent: "center" }}>
+      {/* Idle, the sticker is an empty outline on the page surface, so its text
+          has to follow `--text` rather than the near-black that sits on a fill. */}
+      <span className="dl-stk r" style={{
+        background: live ? MINT : PANEL, color: live ? ON_FILL : CREAM, fontSize: 9, gap: 7,
+      }}>
+        <span className="dl-turn" style={{ width: 7, height: 7, borderRadius: 4, background: live ? ON_FILL : DIM, flex: "none" }} />
+        {live > 0 && <span>{live} {live === 1 ? "draft" : "drafts"} live now</span>}
+        {live > 0 && today > 0 && <span>·</span>}
+        {today > 0 && <span>{today} played today</span>}
       </span>
-      {live > 0 && <span><b style={{ color: CREAM, fontWeight: 800 }}>{live}</b> {live === 1 ? "draft" : "drafts"} live now</span>}
-      {live > 0 && today > 0 && <span style={{ color: DIM }}>·</span>}
-      {today > 0 && <span><b style={{ color: CREAM, fontWeight: 800 }}>{today}</b> played today</span>}
     </div>
   );
 }

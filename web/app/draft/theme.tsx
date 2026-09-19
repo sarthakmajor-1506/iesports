@@ -3,16 +3,39 @@
 /**
  * Draft — the design system.
  *
- * Dota's own client is the reference: desaturated slate rather than black, warm
- * gold ornament, Radiant green against Dire red, and corners that are chamfered
- * rather than rounded. Every value lives here once as a CSS custom property,
- * scoped to `.dl-app` rather than `:root` — this is one route inside a larger
- * site, and a global override would leak a game's palette into the tournament
- * pages.
+ * This is the sticker style the rest of iesports now wears: the landing page
+ * (app/HomeClient.tsx) and the two Horizon films (app/components/remotion/kit.tsx)
+ * share a cream page, ink outlines, hard offset shadows, pill stickers,
+ * highlighter marks and drifting pastel blobs. Draft Lab used to be the one
+ * route still painted in Dota's slate-and-gold, which made it read as a
+ * different product bolted onto the site.
  *
- * The JS constants in `ui.tsx` mirror these values, because a lot of the app
- * builds translucent variants by string concatenation (`${alpha(DIRE, 33)}`), which a
- * `var()` cannot do. The hex values in the two files must stay in step.
+ * Dota is still in here, but as CONTENT rather than chrome: Radiant green and
+ * Dire red are the two sides, the ornament gold is the score colour, the
+ * attribute colours are the ones the client uses, and the hero art keeps its own
+ * dark bed because a cream bed shows as a halo around every portrait. What
+ * changed is everything around the art — cut corners became rounded, glows
+ * became hard ink shadows, and the near-black surfaces became paper.
+ *
+ * THREE TEXT TOKENS, NOT ONE. The films can get away with `color: INK`
+ * everywhere because they only ever run on cream. This route has a night mode,
+ * and there the outline colour has to invert while text on a pastel fill must
+ * NOT — a lemon sticker still needs near-black on it at 2am. So:
+ *
+ *   --stroke   outlines and the hard offset shadows
+ *   --text     body copy on the page surface
+ *   --on-fill  text sitting on a pastel fill — near-black in both modes
+ *
+ * PAIRS, NOT SINGLE ACCENTS. Every accent exists twice: a readable version for
+ * text and borders, and a pastel `-fill` for the sticker it sits inside. Mint on
+ * cream is roughly 1.4:1, so the fill can never be the text colour, and the
+ * readable green can never be the sticker.
+ *
+ * Every value lives here once as a CSS custom property, scoped to `.dl-app`
+ * rather than `:root` — this is one route inside a larger site, and a global
+ * override would leak the game's palette into the tournament pages. The JS
+ * constants in `ui.tsx` mirror these names, because a lot of the app builds
+ * translucent variants with `color-mix()` at the call site.
  */
 
 export const FONT = "var(--font-geist-sans), Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -21,157 +44,184 @@ export function DraftTheme() {
   return (
     <style>{`
       .dl-app {
-        /* surfaces — Dota's slate, never pure black */
-        --bg:        #101318;
-        --surface:   #191E25;
-        --surface-2: #222831;
-        --overlay:   rgba(10, 13, 17, 0.93);
-        --chrome:    rgba(10, 13, 17, 0.92);
-        --tile:      #0A0D14;
-        --field:     rgba(0,0,0,0.32);
-        --disabled:  #1B2130;
-        --hairline:  rgba(200,166,93,.34);
+        /* ── surfaces: paper, not slate ─────────────────────────────────── */
+        --paper:     #FFF7EA;
+        --card:      #FFFFFF;
+        --card-2:    #FFF1DC;
+        --field:     #FFFFFF;
+        --disabled:  #EFE7D8;
+        --chrome:    rgba(255, 247, 234, 0.94);
+        --overlay:   rgba(255, 247, 234, 0.95);
 
-        /* the two sides */
-        --radiant:   #A2B93B;
-        --radiant-h: #BCD452;
-        --dire:      #C8402C;
-        --dire-h:    #E05138;
+        /*
+         * The hero bed stays dark in BOTH modes. Valve's portraits are dark art
+         * with dark edges; on cream every one of them gets a visible halo.
+         */
+        --tile:      #14121C;
 
-        /* Dota's ornament gold */
-        --gold:      #C8A65D;
-        --gold-h:    #E3BF74;
+        /* ── the three text tokens ──────────────────────────────────────── */
+        --stroke:    #16131F;
+        --text:      #16131F;
+        --body:      #4E4858;
+        --muted:     #8A8394;
+        --on-fill:   #16131F;
 
-        /* attributes, as the client colours them */
-        --str:       #E04A3F;
-        --agi:       #9BC44E;
-        --int:       #4BA9E8;
-        --uni:       #C77DDA;
+        /* ── the pastels, straight from the films' kit ──────────────────── */
+        --lilac:     #C9B6FF;
+        --lemon:     #FFE066;
+        --pink:      #FF9EC4;
+        --mint:      #A6F0C6;
+        --gold-fill: #FFD24A;
+        --sky:       #A9DCFF;
+        --coral:     #FFB3A0;
 
-        --success:   #7FD44C;
-        --danger:    #D6412B;
+        /* ── the two sides ──────────────────────────────────────────────── */
+        --radiant:      #0E7A43;
+        --radiant-fill: #A6F0C6;
+        --dire:         #C2412D;
+        --dire-fill:    #FF9EC4;
 
-        /* text */
-        --text:      #DDE1E4;
-        --muted:     #8C949E;
-        --dim:       #5D656F;
+        /* Dota's ornament gold, in a shade that survives being read. */
+        --gold:      #8A6320;
 
-        /* lines */
-        --line:      rgba(200,166,93,0.14);
-        --line-hi:   rgba(200,166,93,0.30);
+        --ok:        #0E7A43;
+        --danger:    #C2412D;
 
-        /* glows */
-        --glow-radiant: 0 0 24px rgba(162, 185, 59, 0.40);
-        --glow-dire:    0 0 24px rgba(200, 64, 44, 0.42);
-        --glow-gold:    0 0 22px rgba(200, 166, 93, 0.38);
+        /* ── attributes, as the client colours them ─────────────────────── */
+        --str:       #B93529;  --str-fill: #FFB3A0;
+        --agi:       #3E7D18;  --agi-fill: #BCEFA0;
+        --int:       #1E6FA8;  --int-fill: #A9DCFF;
+        --uni:       #7A3FA0;  --uni-fill: #D9C2FF;
 
-        --r-card: 4px;
-        --r-btn:  3px;
-        --r-chip: 3px;
+        /* ── geometry ───────────────────────────────────────────────────── */
+        --bw:        2.5px;
+        --bw-2:      3px;
+        --bw-3:      3.5px;
+        --r-card:    18px;
+        --r-btn:     999px;
+        --r-chip:    12px;
 
-        --ease: cubic-bezier(.22, .9, .3, 1);
-        --t:    170ms;
+        --ease:      cubic-bezier(.33, 1, .68, 1);
+        --t:         140ms;
+
+        color-scheme: light;
+      }
+
+      /*
+       * Night. Not a different design — the same stickers on a dark sheet. The
+       * outline colour inverts to cream, the pastels stay exactly as they are
+       * (they are fills, and --on-fill keeps near-black text on them), and the
+       * readable accents lift because #0E7A43 on #151220 is unreadable.
+       */
+      html[data-draft-theme="night"] .dl-app {
+        --paper:     #151220;
+        --card:      #211C2E;
+        --card-2:    #2B2539;
+        --field:     #2B2539;
+        --disabled:  #2A2536;
+        --chrome:    rgba(21, 18, 32, 0.94);
+        --overlay:   rgba(21, 18, 32, 0.95);
+
+        --stroke:    #F2E8D6;
+        --text:      #F6F1E6;
+        --body:      #C3BCCE;
+        --muted:     #8E8799;
+
+        --radiant:      #7FD9A6;
+        --dire:         #FF8A73;
+        --gold:         #FFD24A;
+        --ok:           #7FD9A6;
+        --danger:       #FF8A73;
+
+        --str:       #FF8A73;
+        --agi:       #A6E06A;
+        --int:       #6FC0FF;
+        --uni:       #C9A6FF;
 
         color-scheme: dark;
       }
 
-      /*
-       * Light mode — warm stone and parchment rather than white, so it still
-       * reads as Dota rather than as a document. The accents darken, because
-       * #A2B93B on parchment is roughly 2:1 against the text it sits beside;
-       * keeping the dark values here would have shipped a theme nobody could
-       * read. The surfaces beneath hero art stay dark in both, since the art
-       * itself is dark and a light bed shows as a halo around every portrait.
-       */
-      html[data-draft-theme="light"] .dl-app {
-        --bg:        #E7E3D9;
-        --surface:   #F4F1EA;
-        --surface-2: #DED8CA;
-        --overlay:   rgba(244, 241, 234, 0.93);
-
-        --radiant:   #5E7317;
-        --radiant-h: #71891F;
-        --dire:      #B33320;
-        --dire-h:    #CA3D27;
-
-        --gold:      #8A6A20;
-        --gold-h:    #A5812C;
-
-        --str:       #B93529;
-        --agi:       #5E7317;
-        --int:       #1E6FA8;
-        --uni:       #8A44A0;
-
-        --success:   #3E7D18;
-        --danger:    #B62A17;
-
-        --text:      #1A1D22;
-        --muted:     #565D66;
-        --dim:       #7C848E;
-
-        --line:      rgba(70, 55, 22, 0.18);
-        --line-hi:   rgba(70, 55, 22, 0.34);
-
-        --chrome:    rgba(244, 241, 234, 0.92);
-        --tile:      #CFC9BB;
-
-        --glow-radiant: 0 0 18px rgba(94, 115, 23, 0.28);
-        --glow-dire:    0 0 18px rgba(179, 51, 32, 0.30);
-        --glow-gold:    0 0 16px rgba(138, 106, 32, 0.28);
-      }
-
       html, body { overscroll-behavior: none; }
 
-      /* ---------------------------------------------------------- surfaces */
+      /* ------------------------------------------------------- vocabulary */
 
       /*
-       * Chamfered corners. Dota's panels are cut, not rounded, and this single
-       * detail does more to place the interface in that world than any colour
-       * choice — a 16px radius reads as a web app no matter what is painted on it.
+       * The sticker. A pill with a 2.5px ink outline, a hard offset shadow and a
+       * couple of degrees of rotation — the single piece of the film kit that
+       * places a screen in this world faster than any colour choice does.
        */
-      .dl-cut  { clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
-      .dl-cut-s { clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+      .dl-stk {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 11px; border: var(--bw) solid var(--stroke); border-radius: var(--r-btn);
+        box-shadow: 3px 3px 0 var(--stroke); color: var(--on-fill);
+        font-size: .68rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase;
+        white-space: nowrap; transform: rotate(-2deg);
+      }
+      .dl-stk.r { transform: rotate(2.5deg); }
+      .dl-stk.flat { transform: none; }
 
-      /* The hairline of gold along the top edge that keeps a dark panel from reading as a hole. */
-      .dl-card { position: relative; }
-      .dl-card::before {
-        content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
-        background: linear-gradient(90deg, transparent, var(--hairline) 22%, var(--hairline) 78%, transparent);
-        pointer-events: none;
+      /* Highlighter stroke behind the lower half of the words. */
+      .dl-mark {
+        --mark: var(--hl);
+        background: linear-gradient(180deg, transparent 54%, var(--mark) 54%, var(--mark) 92%, transparent 92%);
+        padding: 0 5px; margin: 0 -3px;
+        -webkit-box-decoration-break: clone; box-decoration-break: clone;
+      }
+      /*
+       * On the night sheet the words above the stroke are cream, not ink, so a
+       * full-strength pastel puts cream on lemon for the bottom half of every
+       * glyph. Thinning the stroke keeps the hue — which is what carries the
+       * state in a header — while leaving the text on something dark.
+       */
+      html[data-draft-theme="night"] .dl-mark {
+        --mark: color-mix(in srgb, var(--hl) 40%, transparent);
       }
 
-      /* An ornamental divider — a gold rule that fades out from a centre diamond. */
-      .dl-rule {
-        height: 1px; background: linear-gradient(90deg, transparent, rgba(200,166,93,.32), transparent);
+      /* The card. Ink outline plus a hard shadow — never a border and a glow. */
+      .dl-card {
+        background: var(--card); border: var(--bw-2) solid var(--stroke);
+        border-radius: var(--r-card); box-shadow: 5px 5px 0 var(--stroke);
       }
+
+      /* An ornamental divider: a dashed ink rule rather than a fading gradient. */
+      .dl-rule { height: 0; border-top: 2px dashed var(--stroke); opacity: .28; }
+
+      /*
+       * The chamfers this design replaced. Kept as no-ops so a .dl-cut left on
+       * an element somewhere cannot clip a hard shadow off at the corner.
+       */
+      .dl-cut, .dl-cut-s { clip-path: none; }
 
       /* ------------------------------------------------------ interactions */
 
-      .dl-btn {
+      /*
+       * Press and lift, never scale.
+       *
+       * The depth is a per-element --sh, so a button can be shallow (3px) or a
+       * headline card can be deep (9px) with one inline variable. NOTHING with
+       * .dl-btn or .dl-pick on it may set box-shadow inline — an inline
+       * value beats the class and the element stops moving on press.
+       */
+      .dl-btn, .dl-pick {
+        box-shadow: var(--sh, 3px 3px 0 var(--stroke));
         transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease),
-                    filter var(--t) var(--ease), background var(--t) var(--ease),
-                    border-color var(--t) var(--ease);
+                    background var(--t) var(--ease), border-color var(--t) var(--ease),
+                    color var(--t) var(--ease);
         -webkit-tap-highlight-color: transparent;
       }
-      .dl-btn:active:not(:disabled) { transform: scale(.965); }
-      @media (hover: hover) {
-        .dl-btn:hover:not(:disabled) { transform: scale(1.02); filter: brightness(1.1); }
+      .dl-btn:active:not(:disabled), .dl-pick:active:not(:disabled) {
+        transform: translate(2px, 2px); box-shadow: var(--sh-a, 1px 1px 0 var(--stroke));
       }
-
-      .dl-pick {
-        transition: transform var(--t) var(--ease), border-color var(--t) var(--ease),
-                    box-shadow var(--t) var(--ease), filter var(--t) var(--ease);
-        -webkit-tap-highlight-color: transparent;
-      }
-      .dl-pick:active { transform: scale(.9); }
       @media (hover: hover) {
-        .dl-pick:hover {
-          transform: scale(1.06);
-          filter: brightness(1.15);
-          box-shadow: 0 6px 22px -8px #000, 0 0 16px -3px rgba(200,166,93,.65);
-          z-index: 3;
+        .dl-btn:hover:not(:disabled), .dl-pick:hover:not(:disabled) {
+          transform: translate(-2px, -2px); box-shadow: var(--sh-h, 5px 5px 0 var(--stroke)); z-index: 3;
         }
       }
+      .dl-btn:disabled { box-shadow: 2px 2px 0 var(--stroke); opacity: .55; }
+
+      /* Flat things — tab bar entries, chips inside a scroller — lift without
+         carrying a shadow of their own. */
+      .dl-flat { --sh: none; --sh-h: none; --sh-a: none; }
 
       /* ---------------------------------------------------------- keyframes */
 
@@ -188,26 +238,20 @@ export function DraftTheme() {
         100% { transform: none }
       }
       @keyframes dl-flash  { 0% { opacity:.9 } 100% { opacity:0 } }
-      @keyframes dl-ring   { 0% { opacity:.7; transform: scale(.84) } 100% { opacity:0; transform: scale(1.45) } }
+      @keyframes dl-ring   { 0% { opacity:.8; transform: scale(.84) } 100% { opacity:0; transform: scale(1.4) } }
       @keyframes dl-urgent { 0%,100% { transform: scale(1) } 50% { transform: scale(1.07) } }
       @keyframes dl-burst  { 0% { opacity:1; transform: translate(0,0) scale(1) } 100% { opacity:0; transform: translate(var(--dx), var(--dy)) scale(.35) } }
+      /* The quiz countdown. This was referenced before it existed, so "3 · 2 · 1"
+         appeared with no animation at all. */
+      @keyframes dl-slam {
+        0%   { opacity:0; transform: scale(2.1) rotate(-8deg) }
+        60%  { opacity:1; transform: scale(.92) rotate(2deg) }
+        100% { opacity:1; transform: scale(1) rotate(0deg) }
+      }
 
-      /*
-       * The ambient drift. Two enormous soft lights, Radiant from one corner and
-       * Dire from the other, breathing past each other on a slow cycle. Cheap
-       * because it is two elements moving on the compositor, not a particle loop.
-       */
-      @keyframes dl-drift-a {
-        0%,100% { transform: translate3d(-8%, -6%, 0) scale(1) }
-        50%     { transform: translate3d(6%, 8%, 0) scale(1.14) }
-      }
-      @keyframes dl-drift-b {
-        0%,100% { transform: translate3d(7%, 9%, 0) scale(1.1) }
-        50%     { transform: translate3d(-6%, -7%, 0) scale(1) }
-      }
-      /* A faint diagonal weave panning behind everything, like the client's stonework. */
-      @keyframes dl-weave { from { background-position: 0 0 } to { background-position: 120px 120px } }
-      html[data-draft-theme="light"] .dl-atmos { opacity: .55; }
+      /* The backdrop's drifting blobs and spinning sparkles. */
+      @keyframes dl-drift { from { transform: translate(0, 0) } to { transform: translate(18px, -16px) } }
+      @keyframes dl-spin  { to { transform: rotate(360deg) } }
 
       .dl-in     { animation: dl-in .32s var(--ease) both; }
       .dl-turn   { animation: dl-pulse 1.3s ease-in-out infinite; }
@@ -216,20 +260,20 @@ export function DraftTheme() {
       .dl-urgent { animation: dl-urgent .55s ease-in-out infinite; }
 
       .dl-sheen {
-        background: linear-gradient(100deg, transparent 38%, rgba(200,166,93,.10) 50%, transparent 62%);
+        background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--stroke) 9%, transparent) 50%, transparent 62%);
         background-size: 220% 100%;
         animation: dl-sheen 1.7s linear infinite;
       }
 
-      ::-webkit-scrollbar { width: 0; height: 0; }
+      .dl-app ::-webkit-scrollbar { width: 0; height: 0; }
 
       /*
        * Low-end phones and anyone who asked for less motion get the layout with
-       * none of the movement. The atmosphere is removed outright rather than
+       * none of the movement. The backdrop is removed outright rather than
        * frozen — a static wash is just a muddier background.
        */
       @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
+        .dl-app *, .dl-app *::before, .dl-app *::after { animation: none !important; transition-duration: 1ms !important; }
         .dl-atmos { display: none !important; }
       }
     `}</style>
@@ -237,50 +281,69 @@ export function DraftTheme() {
 }
 
 /**
- * The background.
+ * The backdrop.
  *
- * Radiant light bleeding in from one corner and Dire from the other, drifting
- * slowly past each other, over a faint diagonal weave. It is doing the job a
- * looping video of the Dota map would do, for none of the bytes and none of the
- * battery: three composited layers, no script, no per-frame work.
+ * The landing page's exactly: a dot grid, three pastel blobs drifting on slow
+ * offset cycles, and a few sparkles turning at the edges. It is doing the job
+ * the old drifting Radiant/Dire lights did — give the page depth without
+ * competing with what is on it — for the same three composited layers and no
+ * per-frame script.
  *
- * `weight` lets a screen dial it down — the draft board wants atmosphere, not
- * competition with the heroes on it.
+ * `weight` lets a screen dial it down. The draft board wants a hint of paper
+ * texture, not a pastel cloud behind 120 hero portraits.
  */
-export function DotaAtmosphere({ weight = 1 }: { weight?: number }) {
+export function Backdrop({ weight = 1 }: { weight?: number }) {
   return (
     <div className="dl-atmos" aria-hidden style={{
       position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0,
     }}>
       <div style={{
-        position: "absolute", inset: "-30%",
-        background: `radial-gradient(closest-side, rgba(162,185,59,${0.16 * weight}), transparent 72%)`,
-        animation: "dl-drift-a 34s ease-in-out infinite",
-        willChange: "transform",
+        position: "absolute", inset: 0,
+        backgroundImage: "radial-gradient(color-mix(in srgb, var(--stroke) 14%, transparent) 1.6px, transparent 1.8px)",
+        backgroundSize: "26px 26px",
+        opacity: 0.55 + 0.45 * weight,
       }} />
       <div style={{
-        position: "absolute", inset: "-30%",
-        background: `radial-gradient(closest-side, rgba(200,64,44,${0.17 * weight}), transparent 72%)`,
-        animation: "dl-drift-b 41s ease-in-out infinite",
-        willChange: "transform",
+        position: "absolute", width: 420, height: 420, borderRadius: "50%", background: "var(--lilac)",
+        opacity: 0.46 * weight, right: -190, top: -200,
+        animation: "dl-drift 15s ease-in-out infinite alternate",
       }} />
       <div style={{
-        position: "absolute", inset: 0, opacity: 0.5 * weight,
-        backgroundImage:
-          "repeating-linear-gradient(45deg, rgba(200,166,93,.030) 0 1px, transparent 1px 14px)," +
-          "repeating-linear-gradient(-45deg, rgba(255,255,255,.016) 0 1px, transparent 1px 22px)",
-        animation: "dl-weave 90s linear infinite",
+        position: "absolute", width: 360, height: 360, borderRadius: "50%", background: "var(--lemon)",
+        opacity: 0.5 * weight, left: -180, bottom: -160,
+        animation: "dl-drift 19s ease-in-out infinite alternate-reverse",
       }} />
+      <div style={{
+        position: "absolute", width: 140, height: 140, borderRadius: "50%", background: "var(--mint)",
+        opacity: 0.4 * weight, right: "4%", bottom: "16%",
+        animation: "dl-drift 13s ease-in-out infinite alternate",
+      }} />
+      <Sparkle style={{ right: "6%", top: "15%", animationDuration: "14s" }} size={20} />
+      <Sparkle style={{ left: "4%", bottom: "13%", animationDirection: "reverse", animationDuration: "17s" }} size={22} />
+      <Sparkle style={{ right: "13%", bottom: "7%", animationDuration: "21s" }} size={15} fill="var(--pink)" />
     </div>
   );
 }
 
+/** The four-point star the films and the landing page scatter at the edges. */
+export function Sparkle({
+  size = 18, fill, style,
+}: { size?: number; fill?: string; style?: React.CSSProperties }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden
+      style={{ position: "absolute", zIndex: 1, pointerEvents: "none", animation: "dl-spin 16s linear infinite", ...style }}>
+      <path d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z"
+        fill={fill ?? "var(--stroke)"} stroke="var(--stroke)" strokeWidth={fill ? 1.5 : 0} />
+    </svg>
+  );
+}
+
 /**
- * A one-shot particle burst — twenty spans thrown outward on fixed angles.
- * Enough to register as a celebration, cheap enough to fire mid-animation on a
- * phone without dropping the frame the score is counting on.
+ * A one-shot particle burst — pastel confetti squares thrown outward on fixed
+ * angles, each with its own ink outline so it reads as cut paper rather than as
+ * the glowing sparks this used to throw.
  */
-export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string; n?: number; spread?: number; size?: number }) {
+export function Burst({ color, n = 20, spread = 90, size = 7 }: { color: string; n?: number; spread?: number; size?: number }) {
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", display: "grid", placeItems: "center", zIndex: 5 }}>
       {Array.from({ length: n }).map((_, i) => {
@@ -289,7 +352,7 @@ export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string;
         return (
           <span key={i} style={{
             position: "absolute", width: size, height: size, background: color,
-            boxShadow: `0 0 10px ${color}`,
+            border: "1.5px solid var(--stroke)", borderRadius: i % 3 === 0 ? "50%" : 2,
             ["--dx" as string]: `${Math.cos(a) * d}px`,
             ["--dy" as string]: `${Math.sin(a) * d}px`,
             animation: `dl-burst ${520 + (i % 5) * 90}ms var(--ease) both`,
@@ -300,11 +363,9 @@ export function Burst({ color, n = 20, spread = 90, size = 6 }: { color: string;
   );
 }
 
-/** Skeleton block matching the panel surface rather than a grey bar. */
+/** Skeleton block matching the card surface rather than a grey bar. */
 export function Skeleton({ h = 120, style }: { h?: number | string; style?: React.CSSProperties }) {
   return (
-    <div className="dl-sheen dl-cut" style={{
-      height: h, background: "var(--surface)", border: "1px solid var(--line)", ...style,
-    }} />
+    <div className="dl-sheen dl-card" style={{ height: h, ...style }} />
   );
 }

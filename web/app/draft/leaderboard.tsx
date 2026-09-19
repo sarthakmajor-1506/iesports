@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Label, Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ENEMY, ALLY, R_CARD, R_CHIP, alpha,
+import {
+  Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, ENEMY,
+  LEMON, GOLD_FILL, ON_FILL, R_CHIP,
 } from "./ui";
 import { Skeleton } from "./theme";
 
@@ -35,19 +37,19 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
 
   return (
     <div style={{ paddingBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 7 }}>
-        <Label color={GOLD} style={{ marginBottom: 0 }}>LEADERBOARD</Label>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+        <span className="dl-stk" style={{ background: GOLD_FILL, fontSize: 9.5 }}>LEADERBOARD</span>
         <span style={{ flex: "1 1 auto" }} />
-        <span style={{ fontSize: 9.5, color: DIM, letterSpacing: .4 }}>AVG PER GAME · {minGames}+ GAMES</span>
+        <span style={{ fontSize: 9, color: DIM, fontWeight: 900, letterSpacing: .6 }}>AVG PER GAME · {minGames}+ GAMES</span>
       </div>
 
       {rows == null && <Skeleton h={130} />}
 
       {rows != null && rows.length === 0 && (
-        <Panel style={{ padding: "20px 16px", textAlign: "center", background: `linear-gradient(160deg, ${PANEL}, rgba(245,166,35,.07))`, border: `1px solid ${alpha(GOLD, 18)}` }}>
-          <div style={{ fontSize: 30, marginBottom: 8, filter: `drop-shadow(0 0 14px ${alpha(GOLD, 53)})` }}>👑</div>
-          <div style={{ fontSize: 15, color: CREAM, fontWeight: 800, marginBottom: 5 }}>First place is empty.</div>
-          <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 14px" }}>
+        <Panel style={{ padding: "20px 16px", textAlign: "center" }}>
+          <div style={{ fontSize: 30, marginBottom: 8 }}>👑</div>
+          <div style={{ fontSize: 15, color: CREAM, fontWeight: 900, marginBottom: 6, letterSpacing: "-.02em" }}>First place is empty.</div>
+          <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 14px" }}>
             Play {minGames} drafts signed in and it is yours. Your score is the model&apos;s verdict on your five heroes
             plus what you scored on the questions.
           </div>
@@ -58,7 +60,7 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
       )}
 
       {rows != null && rows.length > 0 && (
-        <div style={{ display: "grid", gap: 3 }}>
+        <div style={{ display: "grid", gap: 6 }}>
           {rows.map((r, i) => <Row key={r.uid} r={r} rank={i + 1} me={r.uid === uid} />)}
         </div>
       )}
@@ -69,7 +71,7 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
           <div style={{ height: 8 }} />
           <Row r={you} rank={you.rank ?? null} me />
           {!you.ranked && (
-            <div style={{ fontSize: 11, color: MUTED, marginTop: 6, paddingLeft: 2 }}>
+            <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, marginTop: 7, paddingLeft: 2 }}>
               {minGames - you.games} more {minGames - you.games === 1 ? "game" : "games"} to be ranked.
             </div>
           )}
@@ -79,37 +81,51 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
   );
 }
 
+/**
+ * One place on the board.
+ *
+ * The medal is the rank badge's fill — gold, silver, bronze — and your own row
+ * is a filled lemon card rather than a tinted one, so finding yourself in a list
+ * of twenty-five is a glance rather than a read. Everything on a filled row has
+ * to use `--on-fill`, which is why the numbers here do not follow `--text`.
+ */
 function Row({ r, rank, me }: { r: LeaderRow; rank: number | null; me?: boolean }) {
-  const medal = rank === 1 ? GOLD : rank === 2 ? "#c9cdd6" : rank === 3 ? "#c58a4d" : null;
+  const medal = rank === 1 ? GOLD_FILL : rank === 2 ? "#DCE1E8" : rank === 3 ? "#E6B389" : null;
+  const fg = me ? ON_FILL : CREAM;
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 9, padding: "6px 9px 6px 6px", borderRadius: R_CHIP,
-      background: me ? `${alpha(GOLD, 8)}` : PANEL, border: `1px solid ${me ? GOLD + "55" : LINE}`, boxShadow: me ? `0 0 20px -10px ${GOLD}` : "none",
+      display: "flex", alignItems: "center", gap: 9, padding: "7px 10px 7px 7px", borderRadius: R_CHIP,
+      background: me ? LEMON : PANEL, border: `2px solid ${LINE}`, boxShadow: `3px 3px 0 ${LINE}`,
+      boxSizing: "border-box",
     }}>
       <span style={{
-        width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center",
-        background: medal ?? PANEL_2, color: medal ? "#140f06" : MUTED, fontSize: 10.5, fontWeight: 900,
+        width: 24, height: 24, borderRadius: 8, flexShrink: 0, display: "grid", placeItems: "center",
+        background: medal ?? PANEL_2, color: ON_FILL, fontSize: 10.5, fontWeight: 900,
+        border: `2px solid ${LINE}`, boxSizing: "border-box",
       }}>{rank ?? "—"}</span>
 
       {r.avatar
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={r.avatar} alt="" style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, objectFit: "cover" }} />
-        : <span style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, background: PANEL_2, display: "grid", placeItems: "center", color: DIM, fontSize: 11, fontWeight: 900 }}>{r.name.slice(0, 1).toUpperCase()}</span>}
+        ? <img src={r.avatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, objectFit: "cover", border: `2px solid ${LINE}`, boxSizing: "border-box" }} />
+        : <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, background: PANEL_2, display: "grid", placeItems: "center", color: DIM, fontSize: 11, fontWeight: 900, border: `2px solid ${LINE}`, boxSizing: "border-box" }}>{r.name.slice(0, 1).toUpperCase()}</span>}
 
       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: CREAM, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {r.name}{me && <span style={{ color: GOLD, fontSize: 9.5, marginLeft: 5, letterSpacing: .6 }}>YOU</span>}
+        <div style={{ fontSize: 12.5, fontWeight: 900, color: fg, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {r.name}{me && <span style={{ fontSize: 9, marginLeft: 6, letterSpacing: .8, opacity: .65 }}>YOU</span>}
         </div>
-        <div style={{ fontSize: 9.5, color: DIM, letterSpacing: .3 }}>
+        <div style={{ fontSize: 9.5, color: me ? ON_FILL : DIM, opacity: me ? .7 : 1, fontWeight: 700, letterSpacing: .3 }}>
           {r.games} games · {r.wins}W · quiz {r.quiz}
         </div>
       </div>
 
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: r.avg >= 60 ? GREEN : r.avg >= 45 ? CREAM : ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+        <div style={{
+          fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.02em",
+          color: me ? ON_FILL : r.avg >= 60 ? GREEN : r.avg >= 45 ? CREAM : ENEMY,
+        }}>
           {r.avg.toFixed(1)}
         </div>
-        <div style={{ fontSize: 8.5, color: DIM, letterSpacing: .5, fontWeight: 800 }}>BEST {r.best}</div>
+        <div style={{ fontSize: 8.5, color: me ? ON_FILL : DIM, opacity: me ? .7 : 1, letterSpacing: .5, fontWeight: 900 }}>BEST {r.best}</div>
       </div>
     </div>
   );

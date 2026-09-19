@@ -1,62 +1,99 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { DraftTheme, DotaAtmosphere, FONT } from "./theme";
-import { useMuted, useLight } from "./sound";
+import { DraftTheme, Backdrop, FONT } from "./theme";
+import { useMuted, useNight } from "./sound";
 
 /* ------------------------------------------------------------------ tokens
  *
- * Every colour is a CSS variable defined in `theme.tsx`, so swapping the palette
- * is one class on the frame — no context, no re-render, no prop drilling. Sizes
- * stay plain numbers, because they do not change between themes.
+ * Every colour is a CSS variable defined in `theme.tsx`, so swapping paper for
+ * night is one attribute on <html> — no context, no re-render, no prop drilling.
+ * Sizes stay plain numbers, because they do not change between the two.
+ *
+ * READABLE vs FILL. Each accent comes in two halves and they are not
+ * interchangeable. `ALLY` is a green you can set as `color`; `ALLY_FILL` is the
+ * mint you put behind ink. Using the fill as text is how you get a label nobody
+ * can read, and using the readable one as a sticker background is how you get a
+ * page that stops looking like the rest of the site.
  */
 
-export const BG = "var(--bg)";
-export const PANEL = "var(--surface)";      // elevated surface
-export const PANEL_2 = "var(--surface-2)";  // secondary surface
-export const LINE = "var(--line)";
-export const LINE_HI = "var(--line-hi)";
-export const CREAM = "var(--text)";
-export const MUTED = "var(--muted)";
-export const DIM = "var(--dim)";
+export const BG = "var(--paper)";
+export const PAPER = "var(--paper)";
+export const PANEL = "var(--card)";        // elevated surface
+export const PANEL_2 = "var(--card-2)";    // secondary surface
+export const LINE = "var(--stroke)";       // the ink outline — 2.5-3.5px, never a hairline
+export const LINE_HI = "var(--stroke)";
+export const STROKE = "var(--stroke)";
+export const CREAM = "var(--text)";        // primary text
+export const MUTED = "var(--body)";
+export const DIM = "var(--muted)";
+/** Text that sits ON a pastel fill. Near-black in both sheets, never `--text`. */
+export const ON_FILL = "var(--on-fill)";
 
-/** The two sides, as Dota colours them. */
+/** The pastel fills, straight from the films' kit. */
+export const LILAC = "var(--lilac)";
+export const LEMON = "var(--lemon)";
+export const PINK = "var(--pink)";
+export const MINT = "var(--mint)";
+export const SKY = "var(--sky)";
+export const CORAL = "var(--coral)";
+export const GOLD_FILL = "var(--gold-fill)";
+
+/** The two sides, as Dota colours them — readable half and sticker half. */
 export const RADIANT = "var(--radiant)";
+export const RADIANT_FILL = "var(--radiant-fill)";
 export const DIRE = "var(--dire)";
-/** Dota's ornament gold — every frame, rule and highlight in the client. */
+export const DIRE_FILL = "var(--dire-fill)";
+
+/** Dota's ornament gold, in the shade that survives being read on cream. */
 export const GOLD = "var(--gold)";
 
-export const GREEN = "var(--success)";     // success, correct, positive delta
+export const GREEN = "var(--ok)";          // success, correct, positive delta
+export const GREEN_FILL = MINT;
 export const DANGER = "var(--danger)";     // ban, wrong
-export const ALLY = RADIANT;         // your side is always Radiant
-export const ENEMY = DIRE;           // theirs is always Dire
+export const DANGER_FILL = PINK;
+export const ALLY = RADIANT;               // your side is always Radiant
+export const ALLY_FILL = RADIANT_FILL;
+export const ENEMY = DIRE;                 // theirs is always Dire
+export const ENEMY_FILL = DIRE_FILL;
 export const RED = DIRE;
 export const BLUE = "var(--int)";
 
-export const GLOW_PRIMARY = "0 0 24px rgba(200, 64, 44, 0.42)";
-export const GLOW_GOLD = "0 0 22px rgba(200, 166, 93, 0.38)";
-export const GLOW_SUCCESS = "0 0 22px rgba(162, 185, 59, 0.40)";
+/** Rounded, not chamfered — the whole page is cut paper now. */
+export const R_CARD = 18, R_BTN = 999, R_CHIP = 12;
 
-/** Chamfered, not rounded — the single strongest Dota tell in the whole UI. */
-export const R_CARD = 4, R_BTN = 3, R_CHIP = 3;
+/** Ink outline weights. */
+export const BW = 2.5, BW_2 = 3, BW_3 = 3.5;
 
-/** Attribute colours, as the client paints them. */
+/** Attribute colours, as the client paints them, in both halves. */
 export const ATTR = { str: "var(--str)", agi: "var(--agi)", int: "var(--int)", all: "var(--uni)" } as const;
+export const ATTR_FILL = { str: "var(--str-fill)", agi: "var(--agi-fill)", int: "var(--int-fill)", all: "var(--uni-fill)" } as const;
 
 /**
  * A translucent variant of any colour, including a CSS variable.
  *
  * The app used to build these by appending two hex digits to a constant, which
  * only works while the constant is a hex literal — and that is precisely what
- * made a second theme impossible, since `var(--gold)44` is not a colour at all.
- * `color-mix()` takes a variable happily, so the palette can now be swapped by a
- * class without touching a single call site.
+ * made a second sheet impossible, since `var(--gold)44` is not a colour at all.
+ * `color-mix()` takes a variable happily, so the palette can now be swapped by an
+ * attribute without touching a single call site.
  */
 export const alpha = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
+/** A pastel fill, softened toward paper — for a tint that is not a full sticker. */
+export const wash = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, var(--card))`;
+
 export const attrColor = (a: string) => ATTR[a as keyof typeof ATTR] ?? ATTR.all;
+export const attrFill = (a: string) => ATTR_FILL[a as keyof typeof ATTR_FILL] ?? ATTR_FILL.all;
 export const attrName = (a: string) => (a === "str" ? "STRENGTH" : a === "agi" ? "AGILITY" : a === "int" ? "INTELLIGENCE" : "UNIVERSAL");
+
+/** Hard offset shadow, as a `--sh` triple for anything wearing `.dl-btn`/`.dl-pick`. */
+export const lift = (d = 3) => ({
+  ["--sh" as string]: `${d}px ${d}px 0 var(--stroke)`,
+  ["--sh-h" as string]: `${d + 2}px ${d + 2}px 0 var(--stroke)`,
+  ["--sh-a" as string]: `1px 1px 0 var(--stroke)`,
+}) as React.CSSProperties;
 
 export function anonId() {
   if (typeof window === "undefined") return "server";
@@ -72,6 +109,31 @@ export function anonId() {
   }
 }
 
+/* ----------------------------------------------------------- the vocabulary */
+
+/**
+ * The sticker — a rotated pill with an ink outline and a hard shadow.
+ *
+ * This is the unit the whole site labels things with: the films' eyebrows, the
+ * landing page's game chips, and now every kicker in the game. `bg` is always a
+ * FILL and the text on it is always `--on-fill`.
+ */
+export function Sticker({
+  children, bg = LEMON, rot = -2, size = 11, style,
+}: { children: React.ReactNode; bg?: string; rot?: number; size?: number; style?: React.CSSProperties }) {
+  return (
+    <span className="dl-stk" style={{
+      background: bg, fontSize: size, transform: `rotate(${rot}deg)`,
+      padding: `${Math.round(size * 0.38)}px ${Math.round(size * 0.85)}px`, ...style,
+    }}>{children}</span>
+  );
+}
+
+/** Highlighter stroke behind the lower half of the words. */
+export function Mark({ c = LEMON, children }: { c?: string; children: React.ReactNode }) {
+  return <span className="dl-mark" style={{ ["--hl" as string]: c }}>{children}</span>;
+}
+
 /* ------------------------------------------------------------------- frame */
 
 /**
@@ -81,6 +143,11 @@ export function anonId() {
  * does, between a pinned `head` and a pinned `foot`. Every control that gets used
  * repeatedly therefore stays under the thumb no matter how long the list below
  * it grows.
+ *
+ * On a desktop the column gets an ink outline and a hard shadow, so it reads as
+ * a sheet of paper laid on the backdrop rather than as a phone-shaped hole. On a
+ * phone the outline is dropped: a 3px border down both edges of a 390px screen
+ * is 6px of nothing.
  *
  * It also carries `.dl-app`, which is where the whole token system is scoped, and
  * renders the theme itself so no page has to remember to.
@@ -93,27 +160,39 @@ export function Shell({
   foot?: React.ReactNode;
   tab?: Tab | null;
   pad?: boolean;
-  /** Ambient colour wash behind the stage, e.g. the winner's colour on a result. */
+  /** A pastel wash behind the stage, e.g. the winner's colour on a result. */
   glow?: string;
-  /** Dial the drifting Radiant/Dire lights down on busy screens. */
+  /** Dial the backdrop down on busy screens. */
   atmos?: number;
 }) {
-  useLight();
+  useNight();
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 620px)");
+    const on = () => setWide(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
   return (
     <div className="dl-app" style={{
       height: "100dvh", background: BG, color: CREAM, fontFamily: FONT,
-      display: "flex", justifyContent: "center", overflow: "hidden", overscrollBehavior: "none",
+      display: "flex", justifyContent: "center", alignItems: "center",
+      overflow: "hidden", overscrollBehavior: "none", position: "relative",
     }}>
       <DraftTheme />
+      <Backdrop weight={atmos} />
       <div style={{
-        width: "100%", maxWidth: 520, height: "100dvh", position: "relative",
+        width: "100%", maxWidth: 520,
+        height: wide ? "calc(100dvh - 34px)" : "100dvh",
+        position: "relative", zIndex: 2,
         display: "flex", flexDirection: "column", overflow: "hidden",
-        background: glow
-          ? `radial-gradient(120% 55% at 50% 0%, ${glow}22, ${BG} 62%)`
-          : `radial-gradient(120% 50% at 50% 0%, rgba(255,255,255,.028), ${BG} 60%)`,
-        boxShadow: "0 0 90px rgba(0,0,0,.85)",
+        background: glow ? wash(glow, 16) : PAPER,
+        border: wide ? `${BW_3}px solid ${LINE}` : "none",
+        borderRadius: wide ? 26 : 0,
+        boxShadow: wide ? `9px 9px 0 ${LINE}` : "none",
       }}>
-        <DotaAtmosphere weight={atmos} />
         {head}
         <div style={{
           flex: "1 1 auto", minHeight: 0, overflowY: "auto", overscrollBehavior: "contain",
@@ -133,9 +212,13 @@ export function Shell({
  *
  * The title is centred and the back arrow and right slot float over it, so every
  * screen names itself in the same place whether or not it has a back button.
+ *
+ * `accent` is a FILL: it becomes the highlighter stroke under the title, which is
+ * how the films carry state in a header. Passing a readable colour here paints a
+ * solid block over the words, so the call sites hand it `LEMON`, `PINK`, `MINT`.
  */
 export function Band({
-  title, sub, right, onBack, accent = GOLD, children, compact,
+  title, sub, right, onBack, accent = LEMON, children, compact,
 }: {
   title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode;
   onBack?: () => void; accent?: string; children?: React.ReactNode; compact?: boolean;
@@ -143,32 +226,39 @@ export function Band({
   return (
     <div style={{
       flex: "0 0 auto", position: "relative", zIndex: 20,
-      background: `linear-gradient(180deg, ${alpha(accent, 15)} 0%, ${alpha(accent, 5)} 46%, rgba(11,14,20,0) 100%)`,
-      borderBottom: `1px solid ${LINE}`,
-      backdropFilter: "blur(10px)",
+      background: PAPER, borderBottom: `${BW_2}px solid ${LINE}`,
       padding: `calc(10px + env(safe-area-inset-top)) 12px ${children ? 11 : 10}px`,
     }}>
-      <div style={{ position: "relative", minHeight: compact ? 30 : 34, display: "grid", placeItems: "center" }}>
-        <div style={{ maxWidth: "66%", textAlign: "center" }}>
+      <div style={{ position: "relative", minHeight: compact ? 32 : 36, display: "grid", placeItems: "center" }}>
+        {/* The back arrow and the right slot float OVER this row so the title
+            sits in the same place on every screen. That only works if the title
+            is narrow enough to clear whichever of them is present — at a flat
+            64% a two-icon right slot printed straight through the subtitle on a
+            390px phone. */}
+        <div style={{ maxWidth: right ? "58%" : onBack ? "72%" : "84%", textAlign: "center" }}>
           <div style={{
-            fontSize: compact ? 15.5 : 18, fontWeight: 800, letterSpacing: -0.2,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15,
-          }}>{title}</div>
+            fontSize: compact ? 16 : 19, fontWeight: 900, letterSpacing: "-.025em",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2,
+            color: CREAM,
+          }}>
+            <Mark c={accent}>{title}</Mark>
+          </div>
           {sub && (
-            <div style={{ fontSize: 10, color: MUTED, marginTop: 2, letterSpacing: .3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 3, letterSpacing: .3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
           )}
         </div>
 
         {onBack && (
           <button onClick={onBack} aria-label="Back" className="dl-btn" style={{
-            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
-            width: 32, height: 32, borderRadius: R_CHIP,
-            background: PANEL_2, border: `1px solid ${LINE}`, color: CREAM,
-            fontSize: 17, cursor: "pointer", display: "grid", placeItems: "center", padding: 0, lineHeight: 1,
+            position: "absolute", left: 0, top: "50%", marginTop: -16,
+            width: 32, height: 32, borderRadius: R_BTN,
+            background: PANEL, border: `${BW}px solid ${LINE}`, color: CREAM,
+            fontSize: 17, fontWeight: 900, cursor: "pointer", display: "grid", placeItems: "center",
+            padding: 0, lineHeight: 1, ...lift(2),
           }}>‹</button>
         )}
         {right && (
-          <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ position: "absolute", right: 0, top: "50%", marginTop: -16, minHeight: 32, display: "flex", alignItems: "center", gap: 6 }}>
             {right}
           </div>
         )}
@@ -184,51 +274,52 @@ export type Tab = "duel" | "picker" | "guide";
 
 const ICONS: Record<Tab, React.ReactNode> = {
   duel: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="m13 19 6-6" /><path d="m16 16 4 4" />
       <path d="M19 3h2v2l-9 9" />
     </svg>
   ),
   picker: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.4" />
       <path d="M12 1.8v4M12 18.2v4M1.8 12h4M18.2 12h4" />
     </svg>
   ),
   guide: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2H11v18H4.5A2.5 2.5 0 0 0 2 22z" />
       <path d="M22 4.5A2.5 2.5 0 0 0 19.5 2H13v18h6.5a2.5 2.5 0 0 1 2.5 2z" />
     </svg>
   ),
 };
 
-const TABS: { id: Tab; href: string; label: string }[] = [
-  { id: "duel", href: "/draft", label: "Duel" },
-  { id: "picker", href: "/draft/picker", label: "Picker" },
-  { id: "guide", href: "/draft/guide", label: "Guide" },
+const TABS: { id: Tab; href: string; label: string; fill: string }[] = [
+  { id: "duel", href: "/draft", label: "Duel", fill: PINK },
+  { id: "picker", href: "/draft/picker", label: "Picker", fill: MINT },
+  { id: "guide", href: "/draft/guide", label: "Guide", fill: LILAC },
 ];
 
+/** Three stickers on a paper strip. The live one is filled; the rest are outline. */
 export function TabBar({ active }: { active: Tab }) {
   return (
     <nav style={{
-      flex: "0 0 auto", display: "flex", gap: 4, zIndex: 30,
-      borderTop: `1px solid ${LINE}`, background: "var(--chrome)", backdropFilter: "blur(14px)",
-      padding: "7px 8px calc(7px + env(safe-area-inset-bottom))",
+      flex: "0 0 auto", display: "flex", gap: 7, zIndex: 30,
+      borderTop: `${BW_2}px solid ${LINE}`, background: PAPER,
+      padding: "9px 10px calc(9px + env(safe-area-inset-bottom))",
     }}>
       {TABS.map((t) => {
         const on = t.id === active;
         return (
           <a key={t.id} href={t.href} className="dl-btn" style={{
             flex: "1 1 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-            textDecoration: "none", padding: "8px 2px 6px", borderRadius: R_BTN, minHeight: 52,
-            color: on ? RED : DIM,
-            background: on ? "rgba(255,59,59,.12)" : "transparent",
-            border: `1px solid ${on ? "rgba(255,59,59,.32)" : "transparent"}`,
-            boxShadow: on ? "0 0 20px -6px rgba(255,59,59,.6)" : "none",
+            textDecoration: "none", padding: "8px 2px 6px", borderRadius: R_CHIP, minHeight: 52,
+            color: on ? ON_FILL : CREAM,
+            background: on ? t.fill : PANEL,
+            border: `${BW}px solid ${LINE}`,
+            ...lift(on ? 3 : 2),
           }}>
             {ICONS[t.id]}
-            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .6 }}>{t.label.toUpperCase()}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: .8 }}>{t.label.toUpperCase()}</span>
           </a>
         );
       })}
@@ -246,9 +337,14 @@ export function useTab(): Tab {
 
 /* ------------------------------------------------------------- controls */
 
-/** Segmented control — the default for any two-or-three-way choice. */
+/**
+ * Segmented control — the default for any two-or-three-way choice.
+ *
+ * The track is an ink-outlined pill and the live segment is a pastel fill inside
+ * it, so the control is one sticker rather than two competing ones.
+ */
 export function Segment<T extends string>({
-  value, onChange, options, accent = GOLD, dense,
+  value, onChange, options, accent = LEMON, dense,
 }: {
   value: T; onChange: (v: T) => void;
   options: { v: T; label: string; accent?: string; dot?: string }[];
@@ -257,20 +353,20 @@ export function Segment<T extends string>({
   return (
     <div style={{
       display: "flex", gap: 3, padding: 3, borderRadius: R_BTN,
-      background: "var(--field)", border: `1px solid ${LINE}`,
+      background: PANEL, border: `${BW}px solid ${LINE}`, boxShadow: `3px 3px 0 ${LINE}`,
     }}>
       {options.map((o) => {
         const on = o.v === value;
         const c = o.accent ?? accent;
         return (
-          <button key={o.v} onClick={() => onChange(o.v)} className="dl-btn" style={{
-            flex: "1 1 0", padding: dense ? "7px 4px" : "9px 6px", borderRadius: R_CHIP, border: "none",
+          <button key={o.v} onClick={() => onChange(o.v)} className="dl-btn dl-flat" style={{
+            flex: "1 1 0", padding: dense ? "6px 4px" : "8px 6px", borderRadius: R_BTN, border: "none",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-            background: on ? c : "transparent", color: on ? "#08111A" : MUTED,
-            fontSize: dense ? 11 : 12, fontWeight: 800, letterSpacing: .3, cursor: "pointer",
-            boxShadow: on ? `0 0 18px -6px ${c}` : "none", minHeight: dense ? 30 : 34,
+            background: on ? c : "transparent", color: on ? ON_FILL : DIM,
+            fontSize: dense ? 11 : 12, fontWeight: 900, letterSpacing: .4, cursor: "pointer",
+            minHeight: dense ? 28 : 32, fontFamily: "inherit",
           }}>
-            {o.dot && <span style={{ width: 6, height: 6, borderRadius: 4, background: on ? "#08111A" : o.dot, flexShrink: 0 }} />}
+            {o.dot && <span style={{ width: 7, height: 7, borderRadius: 4, background: on ? ON_FILL : o.dot, flexShrink: 0 }} />}
             {o.label}
           </button>
         );
@@ -279,51 +375,56 @@ export function Segment<T extends string>({
   );
 }
 
-/** Action button. Glow scales with prominence; the label is a verb. */
+/**
+ * Action button.
+ *
+ * A pill with an ink outline and a hard shadow that presses into the page. The
+ * tone is the FILL, never the readable accent: on cream, a saturated red button
+ * with white text is the one thing in this palette that reads as another site.
+ */
 export function Btn({
-  children, onClick, tone = "gold", disabled, full, size = "m", href, glow,
+  children, onClick, tone = "gold", disabled, full, size = "m", href,
 }: {
   children: React.ReactNode; onClick?: () => void; href?: string;
-  tone?: "gold" | "red" | "green" | "ghost" | "dark"; disabled?: boolean; full?: boolean;
-  size?: "s" | "m" | "l"; glow?: boolean;
+  tone?: "gold" | "red" | "green" | "ghost" | "dark" | "lilac"; disabled?: boolean; full?: boolean;
+  size?: "s" | "m" | "l";
+  /** @deprecated glows are gone — the shadow is the affordance now. */
+  glow?: boolean;
 }) {
-  const tones: Record<string, { bg: string; fg: string; shadow: string; border: string }> = {
-    red: { bg: `linear-gradient(180deg, ${RED}, #D92B2B)`, fg: "#FFF", shadow: GLOW_PRIMARY, border: "none" },
-    gold: { bg: `linear-gradient(180deg, ${GOLD}, #D68A12)`, fg: "#1A1103", shadow: GLOW_GOLD, border: "none" },
-    green: { bg: `linear-gradient(180deg, ${GREEN}, #00B85E)`, fg: "#04160B", shadow: GLOW_SUCCESS, border: "none" },
-    ghost: { bg: "transparent", fg: CREAM, shadow: "none", border: `1px solid ${LINE_HI}` },
-    dark: { bg: PANEL_2, fg: CREAM, shadow: "none", border: `1px solid ${LINE}` },
+  const fills: Record<string, string> = {
+    red: PINK, gold: GOLD_FILL, green: MINT, lilac: LILAC, ghost: "transparent", dark: PANEL,
   };
-  const t = tones[tone];
-  const pad = size === "s" ? "8px 13px" : size === "l" ? "15px 22px" : "11px 17px";
+  const bg = fills[tone] ?? GOLD_FILL;
+  const fg = tone === "ghost" || tone === "dark" ? CREAM : ON_FILL;
+  const pad = size === "s" ? "7px 14px" : size === "l" ? "14px 22px" : "10px 18px";
   const fs = size === "s" ? 11.5 : size === "l" ? 15 : 13;
-  const mh = size === "s" ? 34 : size === "l" ? 52 : 42;
-  const flat = tone === "ghost" || tone === "dark";
+  const mh = size === "s" ? 34 : size === "l" ? 50 : 42;
+  const depth = size === "l" ? 4 : 3;
+
   const style: React.CSSProperties = {
-    width: full ? "100%" : undefined, padding: pad, borderRadius: R_BTN, border: t.border,
-    background: disabled ? "var(--disabled)" : t.bg, color: disabled ? DIM : t.fg,
-    fontSize: fs, fontWeight: 800, letterSpacing: .3, textAlign: "center",
-    cursor: disabled ? "not-allowed" : "pointer", textDecoration: "none",
+    width: full ? "100%" : undefined, padding: pad, borderRadius: R_BTN,
+    border: `${size === "l" ? BW_2 : BW}px solid ${LINE}`,
+    background: disabled ? "var(--disabled)" : bg, color: disabled ? DIM : fg,
+    fontSize: fs, fontWeight: 900, letterSpacing: .6, textAlign: "center", textTransform: "uppercase",
+    // Labels are verbs of one or two words and must never wrap: a narrow slot
+    // should clip or shrink the button, not turn SIGN IN into two lines.
+    whiteSpace: "nowrap",
+    cursor: disabled ? "not-allowed" : "pointer", textDecoration: "none", fontFamily: "inherit",
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
-    boxShadow: disabled || flat ? "none" : glow === false ? `0 6px 18px -10px ${t.shadow}` : t.shadow,
-    minHeight: mh,
+    minHeight: mh, ...lift(depth),
   };
-  const cut = flat ? "dl-btn dl-cut-s" : "dl-btn dl-cut-s";
-  if (href) return <a className={cut} href={href} style={style}>{children}</a>;
-  return <button className={cut} onClick={onClick} disabled={disabled} style={style}>{children}</button>;
+  if (href) return <a className="dl-btn" href={href} style={style}>{children}</a>;
+  return <button className="dl-btn" onClick={onClick} disabled={disabled} style={style}>{children}</button>;
 }
 
 export function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className="dl-card dl-cut" style={{
-      background: PANEL, border: `1px solid ${LINE}`, borderRadius: R_CARD,
-      padding: "13px 14px", ...style,
-    }}>{children}</div>
+    <div className="dl-card" style={{ padding: "13px 15px", ...style }}>{children}</div>
   );
 }
 
-export function Label({ children, color = MUTED, style }: { children: React.ReactNode; color?: string; style?: React.CSSProperties }) {
-  return <div style={{ fontSize: 9.5, letterSpacing: 1.5, color, fontWeight: 800, marginBottom: 7, ...style }}>{children}</div>;
+export function Label({ children, color = DIM, style }: { children: React.ReactNode; color?: string; style?: React.CSSProperties }) {
+  return <div style={{ fontSize: 9.5, letterSpacing: 1.5, color, fontWeight: 900, marginBottom: 7, textTransform: "uppercase", ...style }}>{children}</div>;
 }
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -331,9 +432,9 @@ export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       style={{
-        width: "100%", background: "var(--field)", border: `1px solid ${LINE}`, color: CREAM,
-        padding: "11px 13px", borderRadius: R_BTN, fontSize: 16, outline: "none", boxSizing: "border-box",
-        fontFamily: "inherit",
+        width: "100%", background: "var(--field)", border: `${BW}px solid ${LINE}`, color: CREAM,
+        padding: "10px 14px", borderRadius: R_BTN, fontSize: 16, outline: "none", boxSizing: "border-box",
+        fontFamily: "inherit", fontWeight: 700, boxShadow: `3px 3px 0 ${LINE}`,
         ...props.style,
       }}
     />
@@ -342,30 +443,41 @@ export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 /** A small switch. One of these controls bans for both solo and live. */
 export function Toggle({
-  checked, onChange, label, color = GOLD,
+  checked, onChange, label, color = LEMON,
 }: { checked: boolean; onChange: (v: boolean) => void; label: string; color?: string }) {
   return (
     <button
-      onClick={() => onChange(!checked)} className="dl-btn" role="switch" aria-checked={checked}
+      onClick={() => onChange(!checked)} className="dl-btn dl-flat" role="switch" aria-checked={checked}
       style={{
         display: "inline-flex", alignItems: "center", gap: 9, background: "none", border: "none",
-        padding: "4px 2px", cursor: "pointer", color: checked ? color : MUTED, minHeight: 34,
+        padding: "4px 2px", cursor: "pointer", color: CREAM, minHeight: 34, fontFamily: "inherit",
       }}
     >
-      <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: .6 }}>{label}</span>
+      <span style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: .8 }}>{label}</span>
       <span style={{
-        width: 38, height: 21, borderRadius: 11, flexShrink: 0, position: "relative",
-        background: checked ? color : "rgba(255,255,255,.13)",
-        boxShadow: checked ? `0 0 16px -4px ${color}` : "none",
-        transition: "background var(--t) var(--ease), box-shadow var(--t) var(--ease)",
+        width: 42, height: 24, borderRadius: R_BTN, flexShrink: 0, position: "relative",
+        background: checked ? color : PANEL, border: `${BW}px solid ${LINE}`, boxSizing: "border-box",
+        transition: "background var(--t) var(--ease)",
       }}>
         <span style={{
-          position: "absolute", top: 3, left: checked ? 20 : 3, width: 15, height: 15, borderRadius: 8,
-          background: checked ? "#0B0E14" : "#C6CDDA",
-          transition: "left var(--t) var(--ease)",
+          position: "absolute", top: 2, left: checked ? 20 : 2, width: 15, height: 15, borderRadius: 8,
+          background: ON_FILL, transition: "left var(--t) var(--ease)",
         }} />
       </span>
     </button>
+  );
+}
+
+/** A round icon button — the shape both the speaker and the sheet switch take. */
+function IconBtn({
+  onClick, label, title, on, fill = LEMON, children,
+}: { onClick: () => void; label: string; title?: string; on?: boolean; fill?: string; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="dl-btn" aria-label={label} title={title} style={{
+      width: 32, height: 32, borderRadius: R_BTN, background: on ? fill : PANEL,
+      border: `${BW}px solid ${LINE}`, color: on ? ON_FILL : DIM,
+      cursor: "pointer", display: "grid", placeItems: "center", padding: 0, ...lift(2),
+    }}>{children}</button>
   );
 }
 
@@ -373,43 +485,36 @@ export function Toggle({
 export function SoundToggle() {
   const [muted, setMuted] = useMuted();
   return (
-    <button
-      onClick={() => setMuted(!muted)} className="dl-btn"
-      aria-label={muted ? "Turn sound on" : "Turn sound off"} title={muted ? "Sound off" : "Sound on"}
-      style={{
-        width: 32, height: 32, borderRadius: R_CHIP, background: PANEL_2, border: `1px solid ${LINE}`,
-        color: muted ? DIM : CREAM, cursor: "pointer", display: "grid", placeItems: "center", padding: 0,
-      }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <IconBtn onClick={() => setMuted(!muted)} on={!muted} fill={MINT}
+      label={muted ? "Turn sound on" : "Turn sound off"} title={muted ? "Sound off" : "Sound on"}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M11 5 6 9H2v6h4l5 4z" />
         {muted ? <><path d="m23 9-6 6" /><path d="m17 9 6 6" /></> : <path d="M15.5 8.5a5 5 0 0 1 0 7" />}
       </svg>
-    </button>
+    </IconBtn>
   );
 }
 
-/** Sun/moon switch, sitting next to the speaker. One tap, and it persists. */
+/**
+ * Paper or night, sitting next to the speaker.
+ *
+ * Both sheets are the same design — ink outlines, hard shadows, the same
+ * pastels. Night only inverts the paper and the stroke, so this is a lamp
+ * switch rather than a second theme.
+ */
 export function ThemeToggle() {
-  const [light, setLight] = useLight();
+  const [night, setNight] = useNight();
   return (
-    <button
-      onClick={() => setLight(!light)} className="dl-btn"
-      aria-label={light ? "Switch to dark theme" : "Switch to light theme"}
-      title={light ? "Light theme" : "Dark theme"}
-      style={{
-        width: 32, height: 32, borderRadius: R_CHIP, background: PANEL_2, border: `1px solid ${LINE}`,
-        color: light ? GOLD : MUTED, cursor: "pointer", display: "grid", placeItems: "center", padding: 0,
-      }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {light ? (
-          <><circle cx="12" cy="12" r="4.2" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" /></>
-        ) : (
+    <IconBtn onClick={() => setNight(!night)} on={night} fill={LILAC}
+      label={night ? "Switch to paper" : "Switch to night"} title={night ? "Night" : "Paper"}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+        {night ? (
           <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.6 6.6 0 0 0 10.5 10.5z" />
+        ) : (
+          <><circle cx="12" cy="12" r="4.2" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" /></>
         )}
       </svg>
-    </button>
+    </IconBtn>
   );
 }
 
@@ -417,17 +522,16 @@ export function ThemeToggle() {
  * The single most important thing on a drafting screen: is it my turn?
  * It sits first, largest, and is the only thing that pulses.
  */
-export function TurnBanner({ active, label, accent = GOLD }: { active: boolean; label: string; accent?: string }) {
+export function TurnBanner({ active, label, accent = LEMON }: { active: boolean; label: string; accent?: string }) {
   return (
     <div className={active ? "dl-turn" : undefined} style={{
-      textAlign: "center", padding: "11px 10px", borderRadius: R_BTN, marginTop: 9,
-      background: active ? `${alpha(accent, 12)}` : "rgba(255,255,255,.025)",
-      border: `1px solid ${active ? accent + "59" : LINE}`,
-      boxShadow: active ? `0 0 26px -10px ${accent}` : "none",
+      textAlign: "center", padding: "11px 12px", borderRadius: R_BTN, marginTop: 9,
+      background: active ? accent : PANEL,
+      border: `${BW}px solid ${LINE}`, boxShadow: `3px 3px 0 ${LINE}`,
     }}>
       <span style={{
-        fontSize: "clamp(13px, 4vw, 16px)", fontWeight: 800, letterSpacing: .7,
-        color: active ? accent : MUTED,
+        fontSize: "clamp(13px, 4vw, 16px)", fontWeight: 900, letterSpacing: .7,
+        color: active ? ON_FILL : DIM,
       }}>{label}</span>
     </div>
   );
@@ -454,20 +558,21 @@ export function DraftTimeline({
     }}>
       {seq.map((s, i) => {
         const mine = s.role === mineRole;
-        const c = s.kind === "ban" ? DANGER : mine ? ALLY : ENEMY;
+        const fill = s.kind === "ban" ? DANGER_FILL : mine ? ALLY_FILL : ENEMY_FILL;
         const done = i < current, active = i === current;
         return (
           <div key={i} style={{
             flexShrink: 0, width: active ? 22 : 14, height: active ? 22 : 14,
-            borderRadius: s.kind === "ban" ? 4 : 999,
-            background: active ? c : done ? `${alpha(c, 30)}` : "rgba(255,255,255,.06)",
-            border: `1px solid ${active ? c : done ? `${alpha(c, 50)}` : LINE}`,
+            borderRadius: s.kind === "ban" ? 5 : 999,
+            background: active || done ? fill : "transparent",
+            opacity: done && !active ? .5 : 1,
+            border: `2px solid ${LINE}`, boxSizing: "border-box",
             display: "grid", placeItems: "center", scrollSnapAlign: "center",
-            boxShadow: active ? `0 0 12px -2px ${c}` : undefined,
+            boxShadow: active ? `2px 2px 0 ${LINE}` : "none",
             transition: "width var(--t) var(--ease), height var(--t) var(--ease)",
           }}>
             {s.kind === "ban" && (active || done) && (
-              <span style={{ fontSize: active ? 11 : 8, color: "#0B0E14", fontWeight: 900, lineHeight: 1 }}>×</span>
+              <span style={{ fontSize: active ? 11 : 8, color: ON_FILL, fontWeight: 900, lineHeight: 1 }}>×</span>
             )}
           </div>
         );
@@ -476,14 +581,13 @@ export function DraftTimeline({
   );
 }
 
-export function Pips({ total, filled, color = GOLD }: { total: number; filled: number; color?: string }) {
+export function Pips({ total, filled, color = LEMON }: { total: number; filled: number; color?: string }) {
   return (
     <div style={{ display: "flex", gap: 3 }}>
       {Array.from({ length: total }).map((_, i) => (
         <span key={i} style={{
-          width: i < filled ? 13 : 6, height: 5, borderRadius: 3,
-          background: i < filled ? color : "rgba(255,255,255,.11)",
-          boxShadow: i < filled ? `0 0 8px -2px ${color}` : "none",
+          width: i < filled ? 14 : 7, height: 7, borderRadius: 4, boxSizing: "border-box",
+          background: i < filled ? color : "transparent", border: `2px solid ${LINE}`,
           transition: "width var(--t) var(--ease), background var(--t) var(--ease)",
         }} />
       ))}
@@ -491,25 +595,38 @@ export function Pips({ total, filled, color = GOLD }: { total: number; filled: n
   );
 }
 
-/** Head-to-head strength bar. Compact enough to sit inside a pinned band. */
+/**
+ * Head-to-head strength bar — a meter in an ink capsule, the same one the
+ * landing page fills for tournament slots.
+ */
 export function VersusBar({ p, left, right, small }: { p: number; left: string; right: string; small?: boolean }) {
   const pct = Math.max(0, Math.min(100, p * 100));
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${alpha(ALLY, 33)}` }}>
+      {/* The two names sit between the two numbers and must never touch them:
+          at 27px tabular digits there is no optical gap, so "26.8%YOU · THE
+          COUNTERPICKER73.2%" ran together as one string. The label is the part
+          that gives way — it shrinks and ellipsises, the numbers never do. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 9, marginBottom: 7 }}>
+        <span style={{ flexShrink: 0, fontSize: small ? 19 : 27, fontWeight: 900, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.02em" }}>
           {pct.toFixed(1)}%
         </span>
-        <span style={{ fontSize: 9, letterSpacing: 1.2, color: MUTED, fontWeight: 800 }}>{left} · {right}</span>
-        <span style={{ fontSize: small ? 19 : 26, fontWeight: 800, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1, textShadow: `0 0 20px ${alpha(ENEMY, 33)}` }}>
+        <span style={{
+          minWidth: 0, fontSize: 9, letterSpacing: 1.1, color: DIM, fontWeight: 900,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center",
+        }}>{left} · {right}</span>
+        <span style={{ flexShrink: 0, fontSize: small ? 19 : 27, fontWeight: 900, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.02em" }}>
           {(100 - pct).toFixed(1)}%
         </span>
       </div>
-      <div style={{ height: small ? 8 : 11, background: `linear-gradient(90deg, #6E2226, ${ENEMY})`, borderRadius: 6, overflow: "hidden", border: `1px solid ${LINE}` }}>
+      <div style={{
+        height: small ? 13 : 17, background: ENEMY_FILL, borderRadius: R_BTN, overflow: "hidden",
+        border: `${BW}px solid ${LINE}`, boxSizing: "border-box",
+      }}>
         <div style={{
-          width: `${pct}%`, height: "100%",
-          background: `linear-gradient(90deg, ${ALLY}, #0087C7)`, boxShadow: `0 0 16px ${ALLY}`,
-          transition: "width .8s var(--ease)",
+          width: `${pct}%`, height: "100%", background: ALLY_FILL,
+          borderRight: pct > 2 && pct < 98 ? `${BW}px solid ${LINE}` : "none",
+          boxSizing: "border-box", transition: "width .8s var(--ease)",
         }} />
       </div>
     </div>
@@ -527,8 +644,9 @@ export function Delta({ v, size = 13, forThem }: { v: number; size?: number; for
   const good = forThem ? v < 0 : v >= 0;
   return (
     <span style={{
-      fontSize: size, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-      color: good ? GREEN : ENEMY, flexShrink: 0,
+      fontSize: size, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+      color: ON_FILL, background: good ? MINT : PINK, border: `1.5px solid ${LINE}`,
+      borderRadius: R_BTN, padding: "1px 5px", flexShrink: 0, lineHeight: 1.35,
     }}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>
   );
 }

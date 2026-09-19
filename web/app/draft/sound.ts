@@ -115,11 +115,11 @@ export function useMuted(): [boolean, (m: boolean) => void] {
   return [m, set];
 }
 
-/* ------------------------------------------------------------------ theme */
+/* ------------------------------------------------------------------ sheet */
 
-const THEME_KEY = "draft_theme";
-let light = false;
-const themeListeners = new Set<(l: boolean) => void>();
+const THEME_KEY = "draft_sheet";
+let night = false;
+const themeListeners = new Set<(n: boolean) => void>();
 
 /**
  * The theme is applied as an attribute on <html>, and the CSS keys off that.
@@ -130,37 +130,41 @@ const themeListeners = new Set<(l: boolean) => void>();
  * they hydrated with different values and disagreed about which way the switch
  * pointed. One attribute on the document has no such split: whoever sets it,
  * every rule in the sheet sees the same value on the next paint.
+ *
+ * Paper is the default now, and the preference moved to a new key. The old one
+ * stored "light"/"dark" against the opposite meaning, so reusing it would have
+ * opened everyone who had ever touched the switch in the wrong mode.
  */
-function apply(l: boolean) {
+function apply(n: boolean) {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.draftTheme = l ? "light" : "dark";
+  document.documentElement.dataset.draftTheme = n ? "night" : "paper";
 }
 
-export function isLight() { return light; }
+export function isNight() { return night; }
 
-export function setLight(l: boolean) {
-  light = l;
-  apply(l);
-  try { localStorage.setItem(THEME_KEY, l ? "light" : "dark"); } catch {}
-  themeListeners.forEach((fn) => fn(l));
+export function setNight(n: boolean) {
+  night = n;
+  apply(n);
+  try { localStorage.setItem(THEME_KEY, n ? "night" : "paper"); } catch {}
+  themeListeners.forEach((fn) => fn(n));
 }
 
 /**
  * Reads the stored preference on mount rather than during render, so the server
- * and the first client paint always agree. The cost is one frame in the default
- * theme before a light-mode player's choice lands, which is cheaper than the
- * hydration mismatch the alternative produced.
+ * and the first client paint always agree. The cost is one frame on paper before
+ * a night player's choice lands, which is cheaper than the hydration mismatch
+ * the alternative produced.
  */
-export function useLight(): [boolean, (l: boolean) => void] {
-  const [l, setL] = useState(light);
+export function useNight(): [boolean, (n: boolean) => void] {
+  const [n, setN] = useState(night);
   useEffect(() => {
     let stored = false;
-    try { stored = localStorage.getItem(THEME_KEY) === "light"; } catch { stored = false; }
-    if (stored !== light) { light = stored; }
-    apply(light);
-    setL(light);
-    themeListeners.add(setL);
-    return () => { themeListeners.delete(setL); };
+    try { stored = localStorage.getItem(THEME_KEY) === "night"; } catch { stored = false; }
+    if (stored !== night) { night = stored; }
+    apply(night);
+    setN(night);
+    themeListeners.add(setN);
+    return () => { themeListeners.delete(setN); };
   }, []);
-  return [l, useCallback((v: boolean) => setLight(v), [])];
+  return [n, useCallback((v: boolean) => setNight(v), [])];
 }

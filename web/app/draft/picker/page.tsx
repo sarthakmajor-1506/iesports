@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { buildEngine, evaluate, rankCandidates, type DraftModel, type Engine } from "@/lib/draftlab";
 import { counterMap, tempoMap, teamTempo, type TempoRow } from "@/lib/draftbot";
 import {
-  Shell, Band, Segment, Field, Panel, Label, Delta,
-  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
+  Shell, Band, Segment, Field, Panel, Delta,
+  CREAM, PANEL, LINE, MUTED, DIM, ALLY, ENEMY,
+  ALLY_FILL, ENEMY_FILL, LEMON, ON_FILL, R_CHIP, BW, lift,
 } from "../ui";
+import { Skeleton } from "../theme";
 import { HeroImg, heroBase } from "../hero-art";
 
 const ROLE_ORDER = ["Carry", "Support", "Nuker", "Disabler", "Durable", "Escape", "Initiator", "Pusher", "Jungler"];
@@ -76,7 +78,7 @@ export default function PickerPage() {
   if (!model || !engine) {
     return (
       <Shell tab="picker" head={<Band title="Draft Picker" />}>
-          <div className="dl-sheen" style={{ height: 120, borderRadius: 10, background: PANEL, marginTop: 12 }} />
+          <Skeleton h={120} style={{ marginTop: 12 }} />
       </Shell>
     );
   }
@@ -101,6 +103,7 @@ export default function PickerPage() {
   // A one-hero-a-side board says nothing about pace; wait for a real shape.
   const dTempo = mine.length >= 3 && theirs.length >= 3 ? teamTempo(mine, tempos) - teamTempo(theirs, tempos) : 0;
   const accent = side === "mine" ? ALLY : ENEMY;
+  const accentFill = side === "mine" ? ALLY_FILL : ENEMY_FILL;
   const best = list.length ? Math.max(...list.map((c) => c.delta)) : 0;
 
   return (
@@ -108,25 +111,29 @@ export default function PickerPage() {
       tab="picker"
       head={
         <Band
-          title="Draft Picker" compact accent={accent}
+          title="Draft Picker" compact accent={accentFill}
           sub="Fill in the board — it ranks what is left"
           right={
             (mine.length || theirs.length) ? (
               <button className="dl-btn" onClick={() => { setMine([]); setTheirs([]); }} style={{
-                background: "rgba(255,255,255,.07)", border: `1px solid ${LINE}`, color: MUTED,
-                borderRadius: 6, padding: "5px 10px", fontSize: 10.5, fontWeight: 900, cursor: "pointer", letterSpacing: .6,
+                background: PANEL, border: `2px solid ${LINE}`, color: CREAM, fontFamily: "inherit",
+                borderRadius: 999, padding: "5px 11px", fontSize: 10, fontWeight: 900, cursor: "pointer",
+                letterSpacing: .8, ...lift(2),
               }}>RESET</button>
             ) : undefined
           }
         >
           {/* Always occupies its space, so adding the first hero does not shove
               the whole list down under the thumb that just tapped it. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "9px 0 8px", visibility: p == null ? "hidden" : "visible" }}>
-            <span style={{ fontSize: 19, fontWeight: 900, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((p ?? 0.5) * 100).toFixed(1)}%</span>
-            <div style={{ flex: "1 1 auto", height: 7, background: `linear-gradient(90deg, #7a231d, ${ENEMY})`, borderRadius: 5, overflow: "hidden", border: `1px solid ${LINE}` }}>
-              <div style={{ width: `${(p ?? 0.5) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${ALLY}, #0087C7)`, boxShadow: `0 0 14px ${ALLY}`, transition: "width .5s ease" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0 8px", visibility: p == null ? "hidden" : "visible" }}>
+            <span style={{ fontSize: 19, fontWeight: 900, color: ALLY, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.02em" }}>{((p ?? 0.5) * 100).toFixed(1)}%</span>
+            <div style={{ flex: "1 1 auto", height: 13, background: ENEMY_FILL, borderRadius: 999, overflow: "hidden", border: `${BW}px solid ${LINE}`, boxSizing: "border-box" }}>
+              <div style={{
+                width: `${(p ?? 0.5) * 100}%`, height: "100%", background: ALLY_FILL, boxSizing: "border-box",
+                borderRight: `${BW}px solid ${LINE}`, transition: "width .5s var(--ease)",
+              }} />
             </div>
-            <span style={{ fontSize: 19, fontWeight: 900, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{((1 - (p ?? 0.5)) * 100).toFixed(1)}%</span>
+            <span style={{ fontSize: 19, fontWeight: 900, color: ENEMY, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.02em" }}>{((1 - (p ?? 0.5)) * 100).toFixed(1)}%</span>
           </div>
 
           {/* The board: one row a side, so a chosen hero is a picture you can
@@ -134,9 +141,9 @@ export default function PickerPage() {
               the heroes you have committed to should be the biggest thing here,
               not the pool you are still browsing. */}
           <div style={{ display: "grid", gap: 6, margin: "9px 0 8px" }}>
-            <Slots label="YOUR TEAM" ids={mine} accent={ALLY} onRemove={(id) => remove(id, "mine")} heroById={heroById}
+            <Slots label="YOUR TEAM" fill={ALLY_FILL} ids={mine} onRemove={(id) => remove(id, "mine")} heroById={heroById}
               onEmpty={() => setSide("mine")} />
-            <Slots label="ENEMY" ids={theirs} accent={ENEMY} onRemove={(id) => remove(id, "theirs")} heroById={heroById}
+            <Slots label="ENEMY" fill={ENEMY_FILL} ids={theirs} onRemove={(id) => remove(id, "theirs")} heroById={heroById}
               onEmpty={() => setSide("theirs")} />
           </div>
 
@@ -145,8 +152,8 @@ export default function PickerPage() {
               <Segment
                 dense value={side} onChange={setSide}
                 options={[
-                  { v: "mine", label: "ALLY", accent: ALLY, dot: ALLY },
-                  { v: "theirs", label: "ENEMY", accent: ENEMY, dot: ENEMY },
+                  { v: "mine", label: "ALLY", accent: ALLY_FILL, dot: ALLY },
+                  { v: "theirs", label: "ENEMY", accent: ENEMY_FILL, dot: ENEMY },
                 ]}
               />
             </div>
@@ -159,10 +166,10 @@ export default function PickerPage() {
               {["all", ...roles].map((r) => {
                 const on = role === r;
                 return (
-                  <button key={r} className="dl-btn" onClick={() => setRole(r)} style={{
-                    flexShrink: 0, padding: "4px 9px", borderRadius: 6, cursor: "pointer",
-                    background: on ? accent : "transparent", color: on ? "var(--tile)" : MUTED,
-                    border: `1px solid ${on ? accent : LINE}`, fontSize: 9.5, fontWeight: 900, letterSpacing: .4,
+                  <button key={r} className="dl-btn dl-flat" onClick={() => setRole(r)} style={{
+                    flexShrink: 0, padding: "4px 10px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit",
+                    background: on ? accentFill : PANEL, color: on ? ON_FILL : DIM,
+                    border: `2px solid ${LINE}`, fontSize: 9.5, fontWeight: 900, letterSpacing: .5,
                   }}>{r === "all" ? "ALL" : r.toUpperCase()}</button>
                 );
               })}
@@ -173,27 +180,31 @@ export default function PickerPage() {
     >
 
       {(theirsWin.length > 0 || Math.abs(dTempo) > 0.12) && (
-        <Panel style={{ margin: "10px 0 8px", padding: "9px 11px" }}>
+        <Panel style={{ margin: "11px 0 9px", padding: "10px 12px" }}>
           {theirsWin.slice(0, 2).map((r, i) => (
-            <div key={i} style={{ fontSize: 11.5, color: MUTED, padding: "1px 0" }}>
+            <div key={i} style={{ fontSize: 11.5, color: MUTED, fontWeight: 600, padding: "2px 0" }}>
               <b style={{ color: ENEMY }}>{heroName(r.attacker)}</b> is beating your <b style={{ color: CREAM }}>{heroName(r.defender)}</b>
               {r.winRate != null && ` · ${(r.winRate * 100).toFixed(0)}%`}
             </div>
           ))}
           {Math.abs(dTempo) > 0.12 && (
-            <div style={{ fontSize: 11.5, color: GOLD, marginTop: theirsWin.length ? 5 : 0 }}>
-              {dTempo > 0 ? "You want this game to end early." : "You scale better — survive the early game."}
+            <div style={{ marginTop: theirsWin.length ? 7 : 0 }}>
+              <span className="dl-stk" style={{ background: LEMON, fontSize: 8.5, whiteSpace: "normal" }}>
+                {dTempo > 0 ? "You want this game to end early" : "You scale — survive the early game"}
+              </span>
             </div>
           )}
         </Panel>
       )}
 
-      <Label color={accent} style={{ marginTop: 10 }}>
-        {side === "mine" ? "BEST PICKS LEFT FOR YOU" : "WHAT THEY WANT NEXT"}
-      </Label>
+      <div style={{ margin: "13px 0 9px" }}>
+        <span className="dl-stk" style={{ background: accentFill, fontSize: 9 }}>
+          {side === "mine" ? "BEST PICKS LEFT FOR YOU" : "WHAT THEY WANT NEXT"}
+        </span>
+      </div>
 
       {list.length === 0 && (
-        <div style={{ fontSize: 12.5, color: MUTED, padding: "10px 2px 20px" }}>
+        <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 600, padding: "10px 2px 20px" }}>
           {(side === "mine" ? mine : theirs).length >= 5
             ? "That side is full. Switch sides or reset."
             : "Nothing matches that search."}
@@ -203,37 +214,33 @@ export default function PickerPage() {
       {/* The pool is deliberately dense. It is a list you scan, not a list you
           admire — the heroes worth looking at are the ones already on the board
           above, and every row of tiles saved here is a row of options seen. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(50px, 15vw, 64px), 1fr))", gap: 4, paddingBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(clamp(50px, 15vw, 64px), 1fr))", gap: 7, paddingBottom: 16 }}>
         {list.map((c, i) => {
           const h = heroById(c.heroId)!;
           const top = i === 0 && !q && role === "all";
           // Normalised against the best delta on screen, so the scale is relative
           // to this board rather than an absolute that is meaningless at 5 picks.
           const strength = best > 0 ? Math.max(0, c.delta) / best : 0;
+          // Depth tracks the size of the swing. A glow did this before, which on
+          // paper is a smudge; a taller shadow lifts the strong options off the
+          // page instead, and the best one on the board gets an accent outline.
+          const depth = strength > .12 ? 2 + Math.round(strength * 3) : 2;
           return (
             <button
               key={c.heroId} className="dl-pick" onClick={() => add(c.heroId)} title={`${h.name} · ${c.delta >= 0 ? "+" : ""}${c.delta.toFixed(1)}%`}
               style={{
                 position: "relative", borderRadius: R_CHIP, overflow: "hidden", cursor: "pointer", padding: 0,
-                background: "var(--tile)", aspectRatio: "1 / 1",
-                // Glow intensity tracks the size of the swing, so the strongest
-                // options are findable without reading a single number.
-                border: `1px solid ${strength > .12 ? accent : LINE}`,
-                boxShadow: strength > .12
-                  ? `0 0 ${(8 + strength * 20).toFixed(0)}px -4px ${accent}${top ? ", 0 0 0 1px " + accent : ""}`
-                  : undefined,
+                background: "var(--tile)", aspectRatio: "1 / 1", boxSizing: "border-box",
+                border: `${top ? 3.5 : BW}px solid ${top ? accent : LINE}`, ...lift(depth),
               }}
             >
               <HeroImg base={heroBase(h.img)} name={h.name} />
-              <span style={{
-                position: "absolute", top: 0, left: 0, right: 0, padding: "2px 3px",
-                background: "linear-gradient(rgba(4,3,7,.88), transparent)", textAlign: "left",
-              }}>
-                <Delta v={c.delta} forThem={side === "theirs"} size={9} />
+              <span style={{ position: "absolute", top: 2, left: 2 }}>
+                <Delta v={c.delta} forThem={side === "theirs"} size={8.5} />
               </span>
               <span style={{
-                position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, color: CREAM, fontWeight: 800,
-                background: "linear-gradient(transparent, rgba(4,3,7,.96))", padding: "9px 2px 2px",
+                position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, color: "#FFF7EA", fontWeight: 900,
+                background: "#16131F", padding: "2px", letterSpacing: .2,
                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               }}>{h.name}</span>
             </button>
@@ -241,7 +248,7 @@ export default function PickerPage() {
         })}
       </div>
 
-      <div style={{ fontSize: 10.5, color: DIM, lineHeight: 1.5, padding: "0 2px 14px" }}>
+      <div style={{ fontSize: 10.5, color: DIM, fontWeight: 600, lineHeight: 1.5, padding: "0 2px 14px" }}>
         Trained on 2.57M ranked matches, patch {model.patch}. It knows hero matchups and pairings — not lanes, roles,
         items or your teammates. Treat a close call as a close call.
       </div>
@@ -251,23 +258,22 @@ export default function PickerPage() {
 
 /** One team's five slots. Tap a filled one to take it back off the board. */
 function Slots({
-  label, ids, accent, onRemove, onEmpty, heroById,
+  label, ids, fill, onRemove, onEmpty, heroById,
 }: {
-  label: string; ids: number[]; accent: string;
+  label: string; ids: number[]; fill: string;
   onRemove: (id: number) => void; onEmpty: () => void;
   heroById: (id: number) => { img: string; name: string } | undefined;
 }) {
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-        <span style={{ fontSize: 8.5, letterSpacing: 1.3, fontWeight: 900, color: accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 4, height: 4, borderRadius: 2, background: accent, boxShadow: `0 0 6px ${accent}` }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+        <span className="dl-stk" style={{ background: fill, fontSize: 8, padding: "2px 8px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}` }}>
           {label}
         </span>
-        <span style={{ flex: "1 1 auto", height: 1, background: `linear-gradient(90deg, ${alpha(accent, 25)}, transparent)` }} />
-        <span style={{ fontSize: 8.5, color: DIM, fontWeight: 800 }}>{ids.length}/5</span>
+        <span className="dl-rule" style={{ flex: "1 1 auto" }} />
+        <span style={{ fontSize: 8.5, color: DIM, fontWeight: 900 }}>{ids.length}/5</span>
       </div>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div style={{ display: "flex", gap: 6 }}>
         {Array.from({ length: 5 }).map((_, i) => {
           const id = ids[i];
           const h = id != null ? heroById(id) : null;
@@ -275,22 +281,22 @@ function Slots({
             <div key={i} style={{ flex: "1 1 0", minWidth: 0 }}>
               {h ? (
                 <button onClick={() => onRemove(id)} className="dl-pick" title={`Remove ${h.name}`} style={{
-                  width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 6, overflow: "hidden",
-                  border: `1px solid ${alpha(accent, 60)}`, background: "var(--tile)", cursor: "pointer", display: "block",
-                  position: "relative", boxShadow: `0 0 0 1px ${alpha(accent, 13)}`,
+                  width: "100%", aspectRatio: "1 / 1", padding: 0, borderRadius: 9, overflow: "hidden",
+                  border: `2px solid ${LINE}`, background: "var(--tile)", cursor: "pointer", display: "block",
+                  position: "relative", boxSizing: "border-box", ...lift(2),
                 }}>
                   <HeroImg base={heroBase(h.img)} name={h.name} />
                   <span style={{
-                    position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7.5, color: CREAM, fontWeight: 800,
-                    background: "linear-gradient(transparent, rgba(4,3,7,.95))", padding: "10px 2px 2px",
+                    position: "absolute", left: 0, right: 0, bottom: 0, fontSize: 7, color: "#FFF7EA", fontWeight: 900,
+                    background: "#16131F", padding: "1px 2px",
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>{h.name}</span>
                 </button>
               ) : (
-                <button onClick={onEmpty} className="dl-pick" aria-label={`Add to ${label}`} style={{
-                  width: "100%", aspectRatio: "1 / 1", borderRadius: 6, border: `1px dashed ${alpha(accent, 27)}`,
-                  display: "grid", placeItems: "center", color: `${alpha(accent, 33)}`, fontSize: 13,
-                  background: "transparent", cursor: "pointer",
+                <button onClick={onEmpty} className="dl-pick dl-flat" aria-label={`Add to ${label}`} style={{
+                  width: "100%", aspectRatio: "1 / 1", borderRadius: 9, border: `2px dashed ${LINE}`,
+                  display: "grid", placeItems: "center", color: DIM, fontSize: 15, fontWeight: 900,
+                  background: "transparent", cursor: "pointer", boxSizing: "border-box",
                 }}>+</button>
               )}
             </div>

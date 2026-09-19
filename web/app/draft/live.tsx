@@ -180,26 +180,38 @@ export function TurnClock({ seconds, yours, size = 44 }: { seconds: number | nul
   if (seconds == null) return null;
   const urgent = seconds <= 5;
   const warn = seconds <= 10;
-  const r = size / 2 - 3;
   const pct = Math.max(0, Math.min(1, seconds / (TURN_MS / 1000)));
-  // green while there is time, amber at ten, red at five — the colour is the
-  // warning, so it lands before the number is read.
-  const color = urgent ? "#FF1744" : warn ? "#F5A623" : yours ? "#00E676" : "#5C6577";
+  // Mint while there is time, lemon at ten, pink at five — the colour is the
+  // warning, so it lands before the number is read. These are the same three
+  // fills the rest of the game uses for good / careful / bad.
+  // Always a pastel, never a surface: the digits on top are `--on-fill`, so a
+  // `--card` disc would print near-black on near-black in the night sheet.
+  const fill = urgent ? "var(--pink)" : warn ? "var(--lemon)" : yours ? "var(--mint)" : "var(--lilac)";
+  const r = size / 2 - 3;
   return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" />
+    // A solid pastel disc with an INK arc drawn on top of it, rather than the
+    // floating coloured ring this used to be. Two reasons: a 4px stroke on cream
+    // with nothing behind it reads as a loading spinner, and the number needs a
+    // surface that does not change under it — the fill is always a pastel, so
+    // `--on-fill` is always the right colour for the digits, in both sheets.
+    <div style={{
+      position: "relative", width: size, height: size, flexShrink: 0, borderRadius: "50%",
+      background: fill, border: "2.5px solid var(--stroke)", boxSizing: "border-box",
+      boxShadow: "3px 3px 0 var(--stroke)",
+      animation: urgent ? "dl-urgent .55s ease-in-out infinite" : undefined,
+    }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+        style={{ position: "absolute", top: -2.5, left: -2.5, transform: "rotate(-90deg)" }}>
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--stroke)" strokeWidth="3" strokeLinecap="round"
           strokeDasharray={`${2 * Math.PI * r}`}
           strokeDashoffset={`${2 * Math.PI * r * (1 - pct)}`}
-          style={{ transition: "stroke-dashoffset .22s linear, stroke .3s", filter: urgent ? `drop-shadow(0 0 6px ${color})` : undefined }}
+          style={{ transition: "stroke-dashoffset .22s linear" }}
         />
       </svg>
       <div style={{
         position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: size * 0.36, fontWeight: 900, color, fontVariantNumeric: "tabular-nums",
-        animation: urgent ? "dl-urgent .55s ease-in-out infinite" : undefined,
+        fontSize: size * 0.36, fontWeight: 900, color: "var(--on-fill)", fontVariantNumeric: "tabular-nums",
       }}>{Math.ceil(seconds)}</div>
     </div>
   );

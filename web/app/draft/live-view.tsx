@@ -7,10 +7,12 @@ import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar, TurnBanner, DraftTimeline,
-  CREAM, PANEL, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
+  Shell, Band, Btn, Panel, Label, Field, VersusBar,
+  CREAM, LINE, MUTED, DIM, GREEN, ENEMY,
+  LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, BW_2,
 } from "./ui";
-import { TeamRow, BanStrip, HeroGrid } from "./hero-art";
+import { Skeleton } from "./theme";
+import { TeamRow, HeroGrid } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -118,7 +120,7 @@ export function LiveView({
   if (!room) {
     return (
       <Shell tab={null} head={<Band title={`Room ${code}`} compact onBack={onLeave} />}>
-          <div className="dl-sheen" style={{ height: 120, borderRadius: 16, background: PANEL, marginTop: 12 }} />
+          <Skeleton h={120} style={{ marginTop: 12 }} />
       </Shell>
     );
   }
@@ -136,19 +138,32 @@ export function LiveView({
     return (
       <Shell
         tab={null}
-        head={<Band title="Live room" compact accent={GOLD} onBack={onLeave} sub="Share the code — the draft starts the moment they join" />}
+        head={<Band title="Live room" compact accent={LEMON} onBack={onLeave} sub="Share the code — the draft starts the moment they join" />}
         foot={
-          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "var(--chrome)" }}>
+          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `${BW_2}px solid ${LINE}`, background: PAPER }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={() => navigator.clipboard?.writeText(code)}>COPY CODE</Btn></div>
             <div style={{ flex: 1 }}><Btn full tone="dark" onClick={() => navigator.clipboard?.writeText(link)}>COPY LINK</Btn></div>
           </div>
         }
       >
-          <div className="dl-in" style={{ textAlign: "center", padding: "34px 0 0" }}>
-          <div style={{ fontSize: 10, letterSpacing: 1.6, color: GOLD, fontWeight: 900 }}>ROOM CODE{room.bans ? " · BANS ON" : ""}</div>
-          <div style={{ fontSize: "clamp(38px, 14vw, 62px)", fontWeight: 900, letterSpacing: 10, color: GOLD, margin: "8px 0 2px", lineHeight: 1, textShadow: `0 0 40px ${alpha(GOLD, 27)}` }}>{code}</div>
-          <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: MUTED, fontSize: 12.5 }}>
-            <span className="dl-turn" style={{ color: GREEN }}>●</span> {room.host?.name} is ready
+          <div className="dl-in" style={{ textAlign: "center", padding: "30px 0 0" }}>
+          <span className="dl-stk" style={{ background: LEMON, fontSize: 10 }}>ROOM CODE{room.bans ? " · BANS ON" : ""}</span>
+          {/* The code is the whole screen, so it gets the one piece of paper on
+              it: a tilted card the other person is being asked to type from. */}
+          <div className="dl-card" style={{
+            margin: "16px 6px 0", padding: "18px 10px", transform: "rotate(-1.2deg)",
+            boxShadow: `9px 9px 0 ${LINE}`,
+          }}>
+            <div style={{
+              fontSize: "clamp(36px, 13vw, 58px)", fontWeight: 900, letterSpacing: ".18em",
+              color: CREAM, lineHeight: 1, paddingLeft: ".18em",
+            }}>{code}</div>
+          </div>
+          <div style={{ marginTop: 22 }}>
+            <span className="dl-stk r" style={{ background: MINT, fontSize: 9.5 }}>
+              <span className="dl-turn" style={{ width: 7, height: 7, borderRadius: 4, background: ON_FILL, flex: "none" }} />
+              {room.host?.name} is ready
+            </span>
           </div>
         </div>
       </Shell>
@@ -158,10 +173,12 @@ export function LiveView({
   /* --------------------------------------------------------------- recap */
   if (done && knowledge && !quiz && !recapDone) {
     return (
-      <Shell tab={null} head={<Band title="Draft complete" compact accent={GOLD} sub="Both sides are locked in" />}>
+      <Shell tab={null} head={<Band title="Draft complete" compact accent={MINT} sub="Both sides are locked in" />}>
           <div className="dl-in" style={{ display: "grid", gap: 12, paddingTop: 12, paddingBottom: 18 }}>
           <TeamRow side="them" label={(themName ?? "THEM").toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
-          <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 900, color: DIM, letterSpacing: 1.6 }}>VS</div>
+          <div style={{ textAlign: "center" }}>
+            <span className="dl-stk" style={{ background: LILAC, fontSize: 10 }}>VS</span>
+          </div>
           <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
           <Btn full tone="gold" size="l" onClick={() => setRecapDone(true)}>SEE THE QUESTIONS</Btn>
         </div>
@@ -180,7 +197,7 @@ export function LiveView({
 
     if (knowledge && !quiz) {
       return (
-        <Shell tab={null} head={<Band title="Draft closed" compact accent={GOLD} sub="Now the questions" />}>
+        <Shell tab={null} head={<Band title="Draft closed" compact accent={LEMON} sub="Now the questions" />}>
               <div style={{ paddingTop: 10 }}>
             {/* Both players derive the same three questions from the room code, so
                 nothing about the paper has to cross the network and neither can peek. */}
@@ -194,33 +211,36 @@ export function LiveView({
     return (
       <Shell
         tab={null}
-        head={<Band compact accent={won ? GREEN : ENEMY} title={won ? `You beat ${themName}` : `${themName} beat you`} />}
+        head={<Band compact accent={won ? MINT : PINK} title={won ? `You beat ${themName}` : `${themName} beat you`} />}
         foot={
-          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `1px solid ${LINE}`, background: "var(--chrome)" }}>
+          <div style={{ flex: "0 0 auto", display: "flex", gap: 7, padding: "9px 12px calc(9px + env(safe-area-inset-bottom))", borderTop: `${BW_2}px solid ${LINE}`, background: PAPER }}>
             <div style={{ flex: 1 }}><Btn full tone="gold" onClick={onLeave}>BACK TO DUEL</Btn></div>
           </div>
         }
       >
           <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
-          <Panel style={{ background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`, border: `1px solid ${won ? GREEN : ENEMY}44` }}>
+          <Panel>
+            <span className="dl-stk" style={{ background: won ? MINT : PINK, marginBottom: 12 }}>
+              {won ? "YOU TOOK THE DRAFT" : "THEY TOOK THE DRAFT"}
+            </span>
             <VersusBar p={finalP} left={meName.toUpperCase()} right={themName.toUpperCase()} />
           </Panel>
 
           {quiz && (
-            <Panel style={{ background: `linear-gradient(150deg, ${PANEL}, #241a06)`, border: `1px solid ${alpha(GOLD, 27)}` }}>
-              <Label color={GOLD}>QUIZ ROUND</Label>
+            <Panel>
+              <span className="dl-stk" style={{ background: LEMON, marginBottom: 11 }}>QUIZ ROUND</span>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10.5, color: GREEN, fontWeight: 800, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meName}</div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: GOLD, lineHeight: 1 }}>{quiz.points}</div>
+                  <div style={{ fontSize: 10.5, color: GREEN, fontWeight: 900, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meName}</div>
+                  <div style={{ fontSize: 27, fontWeight: 900, color: CREAM, lineHeight: 1, letterSpacing: "-.03em" }}>{quiz.points}</div>
                 </div>
-                <div style={{ fontSize: 12, color: DIM, fontWeight: 800 }}>vs</div>
+                <div style={{ fontSize: 12, color: DIM, fontWeight: 900 }}>vs</div>
                 <div style={{ flex: 1, textAlign: "right", minWidth: 0 }}>
-                  <div style={{ fontSize: 10.5, color: ENEMY, fontWeight: 800, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{themName}</div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: oppQuiz ? CREAM : DIM, lineHeight: 1 }}>{oppQuiz ? oppQuiz.points : "…"}</div>
+                  <div style={{ fontSize: 10.5, color: ENEMY, fontWeight: 900, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{themName}</div>
+                  <div style={{ fontSize: 27, fontWeight: 900, color: oppQuiz ? CREAM : DIM, lineHeight: 1, letterSpacing: "-.03em" }}>{oppQuiz ? oppQuiz.points : "…"}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: MUTED, marginTop: 7 }}>
+              <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, marginTop: 8 }}>
                 {oppQuiz
                   ? quiz.points > oppQuiz.points ? "You were faster on the questions."
                     : quiz.points < oppQuiz.points ? "They were faster on the questions."
@@ -231,18 +251,20 @@ export function LiveView({
           )}
 
           {autos > 0 && (
-            <div style={{ fontSize: 12, color: GOLD }}>
-              {autos} of your picks {autos === 1 ? "was" : "were"} made by the clock.
+            <div>
+              <span className="dl-stk" style={{ background: LEMON, fontSize: 9 }}>
+                {autos} {autos === 1 ? "pick was" : "picks were"} made by the clock
+              </span>
             </div>
           )}
 
           <TeamRow side="you" label={meName.toUpperCase()} heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
           <TeamRow side="them" label={themName.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
 
-          <Panel style={{ padding: "10px 12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
+          <Panel style={{ padding: "11px 13px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <Label style={{ marginBottom: 0 }}>THE COUNTER WAR</Label>
-              <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
+              <span style={{ fontSize: 12, fontWeight: 900, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
                 {yoursWin.length} — {theirsWin.length}
               </span>
             </div>
@@ -251,10 +273,10 @@ export function LiveView({
             <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
           </Panel>
 
-          <div style={{ borderRadius: 10, padding: "12px 13px", background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${alpha(GOLD, 20)}` }}>
-            <Label color={GOLD}>YOUR DRAFTING STYLE</Label>
-            <div style={{ fontSize: 16, color: GOLD, fontWeight: 900 }}>{style.tag}</div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{style.line}</div>
+          <div className="dl-card" style={{ padding: "13px 14px", background: LEMON, color: ON_FILL }}>
+            <div style={{ fontSize: 9.5, letterSpacing: 1.5, fontWeight: 900, opacity: .7, marginBottom: 5 }}>YOUR DRAFTING STYLE</div>
+            <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: "-.025em" }}>{style.tag}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 3, lineHeight: 1.45, opacity: .82 }}>{style.line}</div>
           </div>
         </div>
       </Shell>
@@ -265,9 +287,12 @@ export function LiveView({
   const q = search.trim().toLowerCase();
   const filtered = available.filter((id) => heroName(id).toLowerCase().includes(q));
   const lastPick = picks[picks.length - 1];
+  // Short enough to survive the band's centre column beside the clock — see the
+  // note on the same label in the solo board.
   const turnLabel = myTurn
-    ? (banning ? "YOUR BAN — CHOOSE ONE TO REMOVE" : "YOUR PICK — LOCK IT IN")
-    : `${themName ?? "THEY"} ${banning ? "ARE BANNING…" : "ARE PICKING…"}`.toUpperCase();
+    ? (banning ? "YOUR BAN" : "YOUR PICK")
+    : `${themName ?? "THEY"} ${banning ? "IS BANNING…" : "IS PICKING…"}`.toUpperCase();
+  const turnHint = myTurn ? (banning ? " · take one away" : " · lock one in") : "";
 
   return (
     <Shell
@@ -279,9 +304,9 @@ export function LiveView({
          * the heroes are what matter, and chrome between them is a cost.
          */
         <Band
-          compact accent={banning ? DANGER : myTurn ? GOLD : MUTED} onBack={onLeave}
-          title={<span style={{ color: banning ? DANGER : myTurn ? GOLD : MUTED }}>{turnLabel}</span>}
-          sub={`Round ${turnIdx + 1} of ${seq.length} · room ${code}`}
+          compact accent={banning ? PINK : myTurn ? LEMON : "transparent"} onBack={onLeave}
+          title={turnLabel}
+          sub={`Round ${turnIdx + 1} of ${seq.length}${turnHint} · room ${code}`}
           right={<TurnClock seconds={seconds} yours={myTurn} size={40} />}
         />
       }
@@ -298,7 +323,7 @@ export function LiveView({
         value={search} onChange={(e) => setSearch(e.target.value)}
         placeholder={myTurn ? (banning ? "Search — banning" : "Search heroes…") : "Waiting for them…"}
         disabled={!myTurn}
-        style={{ marginTop: 9, padding: "8px 11px", minHeight: 36, opacity: myTurn ? 1 : .4, borderColor: banning && myTurn ? DANGER : LINE }}
+        style={{ marginTop: 10, padding: "8px 14px", minHeight: 38, opacity: myTurn ? 1 : .45, background: banning && myTurn ? PINK : "var(--field)" }}
       />
 
       {lastPick?.auto && (

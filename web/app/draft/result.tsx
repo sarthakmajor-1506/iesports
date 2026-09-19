@@ -4,8 +4,9 @@ import { type Engine } from "@/lib/draftlab";
 import { counterMap, teamTempo, draftingStyle, type TempoRow, type CounterEdge } from "@/lib/draftbot";
 import { useEffect, useState } from "react";
 import {
-  Band, Btn, Panel, Label, VersusBar, CountUp,
-  CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, GOLD, ALLY, ENEMY, DANGER, R_CARD, R_CHIP, alpha,
+  Band, Btn, Panel, Label, VersusBar, CountUp, Mark,
+  CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
+  LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, R_CARD, R_CHIP, BW_2,
 } from "./ui";
 import { Burst } from "./theme";
 import { play } from "./sound";
@@ -26,15 +27,15 @@ export type ResultEv = {
  * breakdown, so playing again meant reading the post-mortem first.
  */
 export function ResultBand({ won, onMenu }: { won: boolean; onMenu: () => void }) {
-  return <Band compact accent={won ? GREEN : ENEMY} onBack={onMenu}
+  return <Band compact accent={won ? MINT : PINK} onBack={onMenu}
     title={won ? "You won the draft" : "You lost the draft"} />;
 }
 
 export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu: () => void }) {
   return (
     <div style={{
-      flex: "0 0 auto", display: "flex", gap: 8, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
-      borderTop: `1px solid ${LINE}`, background: "var(--chrome)", backdropFilter: "blur(14px)",
+      flex: "0 0 auto", display: "flex", gap: 9, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+      borderTop: `${BW_2}px solid ${LINE}`, background: PAPER,
     }}>
       <div style={{ flex: 2 }}><Btn full size="l" tone="red" onClick={onAgain}>PLAY AGAIN</Btn></div>
       <div style={{ flex: 1 }}><Btn full size="l" tone="ghost" onClick={onMenu}>MENU</Btn></div>
@@ -73,20 +74,23 @@ export function Result({
 
   return (
     <div className="dl-in" style={{ display: "grid", gap: 10, paddingTop: 10, paddingBottom: 14 }}>
-      <div style={{
-        borderRadius: 10, padding: "14px 14px",
-        background: `linear-gradient(160deg, ${won ? "#0e2a17" : "#2a0f0d"}, ${PANEL})`,
-        border: `1px solid ${won ? GREEN : ENEMY}44`,
-      }}>
-        <div style={{ fontSize: 9.5, letterSpacing: 2, color: won ? GREEN : ENEMY, fontWeight: 900, opacity: .8, marginBottom: 5 }}>
-          DRAFT COMPLETE
-        </div>
+      {/* The verdict. A sentence in ink with the outcome highlightered under it,
+          which is how the films deliver a headline — the old version coloured
+          the whole sentence, and a green sentence on paper is harder to read the
+          more it is supposed to be celebrating. */}
+      <div className="dl-card" style={{ padding: "15px 15px 16px" }}>
+        <span className="dl-stk" style={{ background: won ? MINT : PINK, marginBottom: 11 }}>DRAFT COMPLETE</span>
         <div style={{
-          fontSize: "clamp(19px, 5.8vw, 25px)", fontWeight: 900, letterSpacing: -0.4,
-          color: won ? GREEN : ENEMY, marginBottom: 12, lineHeight: 1.12,
-          textShadow: `0 0 24px ${won ? GREEN : ENEMY}33`,
+          fontSize: "clamp(19px, 5.8vw, 25px)", fontWeight: 900, letterSpacing: "-.035em",
+          color: CREAM, margin: "3px 0 14px", lineHeight: 1.16,
         }}>
-          {won ? `You out-drafted ${them}.` : `${them} out-drafted you.`}
+          {/* The highlighter goes on the verb alone, and the verb does not
+              break. Marking the whole phrase let the line wrap inside
+              "out-drafted", which printed a stroke ending on a hyphen and
+              another starting mid-word on the line below. */}
+          {won
+            ? <>You <Mark c={MINT}><span style={{ whiteSpace: "nowrap" }}>out-drafted</span></Mark> {them}.</>
+            : <>{them} <Mark c={PINK}><span style={{ whiteSpace: "nowrap" }}>out-drafted</span></Mark> you.</>}
         </div>
         <VersusBar p={p} left="YOU" right={them.toUpperCase()} />
       </div>
@@ -97,18 +101,18 @@ export function Result({
       <TeamRow side="them" label={them.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
 
       {theirBest && theirBest.swing < -0.4 && (
-        <Beat color={DANGER} label="THE PICK THAT HURT">
+        <Beat fill={PINK} label="THE PICK THAT HURT">
           Their <b>{heroName(theirBest.heroId)}</b> took {Math.abs(theirBest.swing).toFixed(1)} points off your draft.
         </Beat>
       )}
       {bestBan && bestBan.deniedRank != null && bestBan.deniedRank <= 10 && (
-        <Beat color={GREEN} label="YOUR BEST BAN">
+        <Beat fill={MINT} label="YOUR BEST BAN">
           You took <b>{heroName(bestBan.heroId)}</b> away — their
           {bestBan.deniedRank === 1 ? " top" : ` #${bestBan.deniedRank}`} option at the time.
         </Beat>
       )}
       {yourWorst && yourWorst.regret > 0.4 && (
-        <Beat color={GOLD} label="YOUR LOOSEST PICK">
+        <Beat fill={LEMON} label="YOUR LOOSEST PICK">
           {yourWorst.punishedBy != null
             ? <>You took <b>{heroName(yourWorst.heroId)}</b> into their <b>{heroName(yourWorst.punishedBy)}</b>.</>
             : <>Your <b>{heroName(yourWorst.heroId)}</b> was the loose one.</>}
@@ -117,7 +121,7 @@ export function Result({
           </div>
         </Beat>
       )}
-      {tempoLine && <Beat color={MUTED} label="SHAPE OF THE GAME">{tempoLine}</Beat>}
+      {tempoLine && <Beat fill={LILAC} label="SHAPE OF THE GAME">{tempoLine}</Beat>}
 
       <Panel style={{ padding: "10px 12px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
@@ -131,23 +135,30 @@ export function Result({
         <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
       </Panel>
 
-      <div style={{
-        borderRadius: 10, padding: "12px 13px",
-        background: `linear-gradient(150deg, #241a06, ${PANEL})`, border: `1px solid ${alpha(GOLD, 20)}`,
-      }}>
-        <Label color={GOLD}>YOUR DRAFTING STYLE</Label>
-        <div style={{ fontSize: 16, color: GOLD, fontWeight: 900, letterSpacing: -0.2 }}>{style.tag}</div>
-        <div style={{ fontSize: 12, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{style.line}</div>
+      <div className="dl-card" style={{ padding: "13px 14px", background: LEMON, color: ON_FILL }}>
+        <div style={{ fontSize: 9.5, letterSpacing: 1.5, fontWeight: 900, opacity: .7, marginBottom: 5 }}>YOUR DRAFTING STYLE</div>
+        <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: "-.025em" }}>{style.tag}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 3, lineHeight: 1.45, opacity: .82 }}>{style.line}</div>
       </div>
     </div>
   );
 }
 
-function Beat({ color, label, children }: { color: string; label: string; children: React.ReactNode }) {
+/**
+ * One line of post-mortem, tagged.
+ *
+ * The rule down the left is now a solid pastel bar with an ink outline rather
+ * than a 3px coloured hairline, because on cream a hairline in mint is invisible
+ * and the four beats stopped being distinguishable from each other.
+ */
+function Beat({ fill, label, children }: { fill: string; label: string; children: React.ReactNode }) {
   return (
-    <div style={{ borderLeft: `3px solid ${color}`, paddingLeft: 10 }}>
-      <div style={{ fontSize: 9, letterSpacing: 1.4, color: DIM, fontWeight: 800, marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 13, color: CREAM, lineHeight: 1.4 }}>{children}</div>
+    <div style={{ display: "flex", gap: 10 }}>
+      <span style={{ flex: "0 0 auto", width: 7, borderRadius: 4, background: fill, border: `1.5px solid ${LINE}`, boxSizing: "border-box" }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 9, letterSpacing: 1.4, color: DIM, fontWeight: 900, marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 13, color: CREAM, fontWeight: 600, lineHeight: 1.45 }}>{children}</div>
+      </div>
     </div>
   );
 }
@@ -159,8 +170,8 @@ export function Col({ title, rows, color, engine }: { title: string; rows: Count
       <div style={{ fontSize: 9, letterSpacing: 1.2, color, marginBottom: 5, fontWeight: 900 }}>{title}</div>
       {rows.length === 0 && <div style={{ fontSize: 11.5, color: MUTED }}>Nothing decisive.</div>}
       {rows.map((r, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, padding: "2px 0" }}>
-          <span style={{ width: 24, height: 15, flexShrink: 0, borderRadius: 3, overflow: "hidden" }}>
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+          <span style={{ width: 26, height: 17, flexShrink: 0, borderRadius: 4, overflow: "hidden", border: `1.5px solid ${LINE}`, boxSizing: "border-box", background: "var(--tile)" }}>
             <HeroImg base={heroBase(engine.heroById.get(r.attacker)!.img)} shape="crop" position="50% 20%" />
           </span>
           <span style={{ fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heroName(r.attacker)}</span>
@@ -205,45 +216,48 @@ function ScoreReveal({
   }, [landed, personalBest]);
 
   return (
-    <div className="dl-card" style={{
-      position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "18px 15px 15px",
-      background: `linear-gradient(155deg, ${PANEL} 40%, rgba(245,166,35,.10))`,
-      border: `1px solid ${personalBest && landed ? GOLD : GOLD + "3d"}`,
-      boxShadow: personalBest && landed ? "0 0 34px -12px rgba(245,166,35,.75)" : "none",
-      textAlign: "center",
+    <div style={{
+      position: "relative", borderRadius: R_CARD, padding: "18px 15px 16px", boxSizing: "border-box",
+      background: GOLD_SHEET, color: ON_FILL, textAlign: "center",
+      border: `${BW_2}px solid ${LINE}`,
+      // The sheet lifts when the number lands on a personal best. It is the one
+      // celebration in the game, so it has to be the only thing that moves.
+      boxShadow: personalBest && landed ? `9px 9px 0 ${LINE}` : `5px 5px 0 ${LINE}`,
+      transform: personalBest && landed ? "translate(-2px, -2px)" : "none",
+      transition: "box-shadow .2s var(--ease), transform .2s var(--ease)",
     }}>
-      {landed && personalBest && <Burst color={GOLD} n={26} spread={120} />}
+      {landed && personalBest && <Burst color={PINK} n={26} spread={120} />}
 
-      <Label color={GOLD} style={{ marginBottom: 6 }}>{scored ? "SCORE THIS GAME" : "QUIZ ROUND"}</Label>
+      <span className="dl-stk r" style={{ background: PANEL, color: CREAM, marginBottom: 9 }}>
+        {scored ? "SCORE THIS GAME" : "QUIZ ROUND"}
+      </span>
 
       <div style={{
-        fontSize: "clamp(46px, 15vw, 68px)", fontWeight: 800, color: GOLD, lineHeight: 1,
-        letterSpacing: -2, textShadow: `0 0 40px rgba(245,166,35,.45)`,
+        fontSize: "clamp(46px, 15vw, 68px)", fontWeight: 900, lineHeight: 1, letterSpacing: "-.05em",
       }}>
         <CountUp to={total} dur={1200} onDone={() => setLanded(true)} />
       </div>
 
       {landed && personalBest && (
-        <div className="dl-in" style={{ marginTop: 8, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, color: GOLD }}>
-          ★ PERSONAL BEST
+        <div className="dl-in" style={{ marginTop: 9 }}>
+          <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 10 }}>★ PERSONAL BEST</span>
         </div>
       )}
 
       {scored && (
-        <div className="dl-in" style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          <Breakdown label="DRAFT" value={scored.draftPoints} color={ALLY} />
-          <Breakdown label="QUESTIONS" value={scored.quizPoints} color={GREEN} />
+        <div className="dl-in" style={{ display: "flex", gap: 9, marginTop: 15 }}>
+          <Breakdown label="DRAFT" value={scored.draftPoints} />
+          <Breakdown label="QUESTIONS" value={scored.quizPoints} />
         </div>
       )}
 
       {quiz && (
-        <div style={{ display: "flex", gap: 5, justifyContent: "center", marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 7, justifyContent: "center", marginTop: 13 }}>
           {quiz.rounds.map((r, i) => (
             <span key={i} style={{
-              width: 34, height: 34, borderRadius: R_CHIP, display: "grid", placeItems: "center",
-              background: r.correct ? `${alpha(GREEN, 12)}` : `${alpha(DANGER, 12)}`,
-              border: `1px solid ${r.correct ? GREEN : DANGER}55`,
-              color: r.correct ? GREEN : DANGER, fontSize: 12, fontWeight: 800,
+              width: 36, height: 36, borderRadius: R_CHIP, display: "grid", placeItems: "center", boxSizing: "border-box",
+              background: r.correct ? MINT : PINK, border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
+              color: ON_FILL, fontSize: 12, fontWeight: 900,
             }}>{r.correct ? `+${r.points}` : "0"}</span>
           ))}
         </div>
@@ -252,16 +266,19 @@ function ScoreReveal({
   );
 }
 
-function Breakdown({ label, value, color }: { label: string; value: number; color: string }) {
+/** The score sheet's own colour — Dota's gold, as a fill rather than a glow. */
+const GOLD_SHEET = "var(--gold-fill)";
+
+function Breakdown({ label, value }: { label: string; value: number }) {
   return (
     <div style={{
-      flex: "1 1 0", background: PANEL_2, border: `1px solid ${LINE}`, borderRadius: R_CHIP,
-      padding: "10px 8px", textAlign: "center",
+      flex: "1 1 0", background: PANEL, border: `2px solid ${LINE}`, borderRadius: R_CHIP,
+      boxShadow: `2px 2px 0 ${LINE}`, padding: "10px 8px", textAlign: "center", boxSizing: "border-box",
     }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+      <div style={{ fontSize: 23, fontWeight: 900, color: CREAM, fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: "-.03em" }}>
         <CountUp to={value} dur={900} />
       </div>
-      <div style={{ fontSize: 8.5, letterSpacing: 1.1, color: DIM, fontWeight: 800, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 8.5, letterSpacing: 1.1, color: DIM, fontWeight: 900, marginTop: 5 }}>{label}</div>
     </div>
   );
 }
