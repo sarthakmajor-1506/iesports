@@ -141,28 +141,30 @@ export const lift = (d = 3) => ({
  * Discord installed, or one where this still does not resolve, lands in the
  * browser exactly as before.
  */
-async function openDiscordAuth() {
+async function openDiscordAuth(next: string) {
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+  const qs = `returnTo=${encodeURIComponent(next)}`;
   if (!isAndroid) {
-    window.location.href = "/api/auth/discord-login";
+    window.location.href = `/api/auth/discord-login?${qs}`;
     return;
   }
   try {
-    const r = await fetch("/api/auth/discord-login?redirect=false");
+    const r = await fetch(`/api/auth/discord-login?redirect=false&${qs}`);
     const { url } = await r.json();
     if (!url) throw new Error("no url");
     const bare = String(url).replace(/^https?:\/\//, "");
     window.location.href = `intent://${bare}#Intent;scheme=https;package=com.discord;S.browser_fallback_url=${encodeURIComponent(url)};end`;
   } catch {
-    window.location.href = "/api/auth/discord-login";
+    window.location.href = `/api/auth/discord-login?${qs}`;
   }
 }
 
 export function signInWithDiscord() {
+  const next = window.location.pathname + window.location.search;
   try {
-    sessionStorage.setItem("redirectAfterLogin", window.location.pathname + window.location.search);
-  } catch { /* private mode: they land on the front page instead, still signed in */ }
-  void openDiscordAuth();
+    sessionStorage.setItem("redirectAfterLogin", next);
+  } catch { /* private mode: the `next` OAuth-state param still carries it */ }
+  void openDiscordAuth(next);
 }
 
 /** Discord's mark, for the button that carries it. */

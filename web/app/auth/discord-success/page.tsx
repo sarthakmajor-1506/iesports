@@ -20,7 +20,16 @@ function DiscordSuccessInner() {
         // Clear discord prompt dismissal so it shows fresh after login
         try { sessionStorage.removeItem(`discord_prompt_dismissed_${cred.user.uid}`); } catch {}
         let dest = "/valorant";
-        try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) { dest = saved; sessionStorage.removeItem("redirectAfterLogin"); } } catch {}
+        // `dest` came back from Discord via the OAuth `state` round trip, so it
+        // survives a hop through a different tab or app — sessionStorage can't.
+        // It's still the fallback for any old cached link built before this.
+        const fromState = searchParams.get("dest");
+        if (fromState && fromState.startsWith("/") && !fromState.startsWith("//")) {
+          dest = fromState;
+        } else {
+          try { const saved = sessionStorage.getItem("redirectAfterLogin"); if (saved) dest = saved; } catch {}
+        }
+        try { sessionStorage.removeItem("redirectAfterLogin"); } catch {}
         router.replace(dest);
       })
       .catch((e) => {

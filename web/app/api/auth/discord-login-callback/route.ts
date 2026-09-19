@@ -21,10 +21,21 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
+  const state = searchParams.get("state") || "";
   const realm = process.env.NEXT_PUBLIC_APP_URL!;
 
-  if (!code || state !== "discord_login") {
+  // `state` is "discord_login:<encoded return path>" — see discord-login/route.ts.
+  const sepIdx = state.indexOf(":");
+  const stateTag = sepIdx === -1 ? state : state.slice(0, sepIdx);
+  let next = "/valorant";
+  if (sepIdx !== -1) {
+    try {
+      const decoded = decodeURIComponent(state.slice(sepIdx + 1));
+      if (decoded.startsWith("/") && !decoded.startsWith("//")) next = decoded;
+    } catch {}
+  }
+
+  if (!code || stateTag !== "discord_login") {
     return NextResponse.redirect(`${realm}/?error=discord_failed`);
   }
 
@@ -148,7 +159,7 @@ export async function GET(req: NextRequest) {
     // ── 5. Create custom token and redirect ──────────────────────────────
     const customToken = await adminAuth.createCustomToken(firebaseUid);
 
-    return NextResponse.redirect(`${realm}/auth/discord-success?token=${customToken}`);
+    return NextResponse.redirect(`${realm}/auth/discord-success?token=${customToken}&dest=${encodeURIComponent(next)}`);
   } catch (e: any) {
     console.error("Discord login callback error:", e.message);
     return NextResponse.redirect(`${realm}/?error=discord_failed`);

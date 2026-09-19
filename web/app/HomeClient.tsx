@@ -33,6 +33,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Navbar from "./components/Navbar";
 import type { FeaturedPayload, FeaturedTournament } from "@/lib/featuredTournaments";
+import { discordLoginUrl } from "@/lib/discordLogin";
 
 type Tournament = FeaturedTournament;
 
@@ -171,7 +172,7 @@ const buildCard = (key: GameKey, t: Tournament, now: number): Card => {
 
 const signIn = () => {
   try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {}
-  window.location.href = "/api/auth/discord-login";
+  window.location.href = discordLoginUrl(window.location.pathname);
 };
 
 const DiscordIcon = ({ size = 18 }: { size?: number }) => (

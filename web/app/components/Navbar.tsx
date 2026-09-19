@@ -8,6 +8,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { navigateWithAppPriority } from "@/app/lib/mobileAuth";
+import { discordLoginUrl } from "@/lib/discordLogin";
 import type { ConfirmationResult } from "firebase/auth";
 import Image from "next/image";
 
@@ -416,7 +417,7 @@ export default function Navbar() {
             <>
               <button
                 className="ie-signin-btn"
-                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
+                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = discordLoginUrl(window.location.pathname); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   background: "rgba(88,101,242,0.15)", color: "#818cf8",
@@ -436,7 +437,7 @@ export default function Navbar() {
             {!user && (
               <button
                 className="ie-mobile-signin-cta"
-                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
+                onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = discordLoginUrl(window.location.pathname); }}
                 style={{
                   alignItems: "center", gap: 6,
                   background: "#5865F2", color: "#fff",
@@ -494,7 +495,7 @@ export default function Navbar() {
           </>
           ) : (
           <>
-            <button className="ie-mobile-action-btn" onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = "/api/auth/discord-login"; }}
+            <button className="ie-mobile-action-btn" onClick={() => { try { sessionStorage.setItem("redirectAfterLogin", window.location.pathname); } catch {} window.location.href = discordLoginUrl(window.location.pathname); }}
               style={{ background: "#5865F2", borderColor: "#5865F2", color: "#fff" }}>
               <DiscordIcon size={20} color="#fff" /> Sign in with Discord
             </button>
