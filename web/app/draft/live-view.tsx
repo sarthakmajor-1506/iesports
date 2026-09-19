@@ -12,7 +12,7 @@ import {
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, BW_2,
 } from "./ui";
 import { Skeleton } from "./theme";
-import { TeamRow, HeroGrid } from "./hero-art";
+import { TeamRow, BanStrip, AttributePool } from "./hero-art";
 import { Col } from "./result";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -55,7 +55,6 @@ export function LiveView({
   const whose: Seat | null = step ? (step.role === 0 ? "host" : "guest") : null;
   const myTurn = seat != null && whose === seat;
   const banning = step?.kind === "ban";
-  const mineRole: 0 | 1 = seat === "guest" ? 1 : 0;
 
   const mine = useMemo(() => picks.filter((p) => p.by === seat && p.kind === "pick").map((p) => p.heroId), [picks, seat]);
   const theirs = useMemo(() => picks.filter((p) => p.by !== seat && p.kind === "pick").map((p) => p.heroId), [picks, seat]);
@@ -180,6 +179,9 @@ export function LiveView({
             <span className="dl-stk" style={{ background: LILAC, fontSize: 10 }}>VS</span>
           </div>
           <TeamRow side="you" label="YOU" heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(86px, 25vw, 128px)" />
+          {/* Live rooms can be created with bans on, but the recap never showed
+              what came off the board — the same strip solo has. */}
+          {bans.length > 0 && <BanStrip bans={bans} byId={heroById} />}
           <Btn full tone="gold" size="l" onClick={() => setRecapDone(true)}>SEE THE QUESTIONS</Btn>
         </div>
       </Shell>
@@ -334,7 +336,7 @@ export function LiveView({
       {error && <div style={{ color: ENEMY, fontSize: 11, padding: "8px 2px 0" }} onClick={() => setError(null)}>{error}</div>}
 
       <div style={{ padding: "9px 0 16px", opacity: myTurn ? 1 : .34, pointerEvents: myTurn ? "auto" : "none" }}>
-        <HeroGrid ids={filtered} byId={heroById} onPick={submit} dim={banning} min="clamp(56px, 17vw, 74px)" labelSize={8} />
+        <AttributePool ids={filtered} byId={poolHero} onPick={submit} dim={banning} min="clamp(52px, 16vw, 70px)" />
       </div>
     </Shell>
   );

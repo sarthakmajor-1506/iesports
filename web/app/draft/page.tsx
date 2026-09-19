@@ -12,12 +12,13 @@ import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
   Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
+  DiscordIcon, signInWithDiscord,
   CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
   LEMON, MINT, PINK, LILAC, ON_FILL, R_CARD, BW_2, lift,
 } from "./ui";
 import { Skeleton } from "./theme";
-import { play } from "./sound";
-import { TeamRow, BanStrip, HeroGrid, setRenderConcurrency } from "./hero-art";
+import { play, startMusic, stopMusic } from "./sound";
+import { TeamRow, BanStrip, AttributePool, setRenderConcurrency } from "./hero-art";
 import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
@@ -181,9 +182,11 @@ function Duel() {
     return () => clearTimeout(t);
   }, [stage, engine, slot, theirs, yours, available, tempos, rng, commit]);
 
-  // Draft over -> a beat to see both full lineups before the questions.
+  // Draft over -> a beat to see both full lineups before the questions. The bed
+  // drops back to the menu track here: the clock is done, and a pulse under a
+  // post-mortem is just noise.
   useEffect(() => {
-    if (stage === "drafting" && turnIndex >= SEQ.length) setStage("recap");
+    if (stage === "drafting" && turnIndex >= SEQ.length) { startMusic("menu"); setStage("recap"); }
   }, [stage, turnIndex, SEQ.length]);
 
   const finalP = useMemo(
@@ -255,13 +258,27 @@ function Duel() {
     }).catch(() => {});
   }, [stage, logged, finalP, yours, theirs, events, bans, bansOn, startedAt, quiz, submitScore]);
 
+  /*
+   * Music starts on a tap, never on load.
+   *
+   * A browser will not let an AudioContext or an <audio> element start before a
+   * gesture, and a page that begins making noise the moment it opens is the
+   * thing everyone mutes once and never unmutes. Both of these are buttons, so
+   * the gesture has already happened by the time they run.
+   */
   const restart = () => {
     setEvents([]); setSearch(""); setLogged(false); setQuiz(null); setScored(null);
     setPersonalBest(false);
     setStartedAt(Date.now()); rngState.current = Math.floor(Math.random() * 0xffffffff);
+    startMusic("draft");
     setStage("drafting");
   };
-  const toMenu = () => { setEvents([]); setQuiz(null); setScored(null); setPersonalBest(false); setLogged(false); setStage("menu"); };
+  const toMenu = () => {
+    setEvents([]); setQuiz(null); setScored(null); setPersonalBest(false); setLogged(false);
+    startMusic("menu");
+    setStage("menu");
+  };
+  useEffect(() => () => stopMusic(), []);
   const saveName = (n: string) => { setName(n); try { localStorage.setItem("draftlab_name", n); } catch {} };
 
   if (error) {
@@ -363,7 +380,7 @@ function Duel() {
                 <Field value={name} onChange={(e) => saveName(e.target.value.slice(0, 24))} placeholder="Anonymous"
                   style={{ padding: "6px 10px", minHeight: 32 }} />
               </div>
-              <Btn tone="ghost" size="s" href="/login">SIGN IN</Btn>
+              <Btn tone="lilac" size="s" onClick={signInWithDiscord}><DiscordIcon size={14} /> SIGN IN</Btn>
             </Panel>
           )}
 
@@ -486,8 +503,14 @@ function Duel() {
           </div>
         )}
 
-        <div style={{ padding: "9px 0 16px", opacity: yourTurn ? 1 : .34, pointerEvents: yourTurn ? "auto" : "none" }}>
-          <HeroGrid ids={filtered} byId={heroById} onPick={act} dim={banning} min="clamp(56px, 17vw, 74px)" labelSize={8} />
+        {/* The pool is grouped by primary attribute, the way the client's own
+            grid is. Players navigate a hero pool that way — "I need a strength
+            offlaner" is a section, not a search — and it is the single change
+            that makes this read as a Dota draft rather than a picture grid.
+            Search collapses the groups automatically, since a filtered pool has
+            nothing left to group. */}
+        <div style={{ padding: "11px 0 18px", opacity: yourTurn ? 1 : .34, pointerEvents: yourTurn ? "auto" : "none" }}>
+          <AttributePool ids={filtered} byId={poolHero} onPick={act} dim={banning} min="clamp(52px, 16vw, 70px)" />
         </div>
       </Shell>
     );

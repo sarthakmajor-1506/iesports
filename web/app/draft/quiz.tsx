@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  buildQuiz, scoreAnswer, QUIZ_SECONDS, MAX_POINTS,
+  buildQuiz, scoreAnswer, QUIZ_SECONDS, QUIZ_COUNT, MAX_POINTS,
   type Knowledge, type Question,
 } from "@/lib/quiz";
 import {
@@ -24,7 +24,7 @@ export type QuizResult = {
 };
 
 /**
- * Three questions, ten seconds each, points equal to the seconds left.
+ * Five questions, ten seconds each, points equal to the seconds left.
  *
  * The clock is the whole game here, so it counts only time the page was actually
  * visible — see the note on the clock refs below.
@@ -34,7 +34,7 @@ export function QuizRound({
 }: {
   knowledge: Knowledge; seed: string; onDone: (r: QuizResult) => void; title?: string;
 }) {
-  const questions = useMemo(() => buildQuiz(knowledge, seed, 3), [knowledge, seed]);
+  const questions = useMemo(() => buildQuiz(knowledge, seed, QUIZ_COUNT), [knowledge, seed]);
 
   const [phase, setPhase] = useState<"ready" | "count" | "asking" | "feedback" | "done">("ready");
   const [idx, setIdx] = useState(0);
@@ -158,7 +158,7 @@ export function QuizRound({
       <div className="dl-in" style={panel()}>
         <span className="dl-stk" style={{ background: LEMON, marginBottom: 12 }}>{title}</span>
         <div style={{ fontSize: "clamp(21px, 6.5vw, 28px)", fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.12, marginBottom: 9 }}>
-          <Mark c={LEMON}>Three questions.</Mark><br />Ten seconds each.
+          <Mark c={LEMON}>{QUIZ_COUNT} questions.</Mark><br />Ten seconds each.
         </div>
         <p style={{ color: MUTED, fontSize: 12.5, fontWeight: 600, lineHeight: 1.5, margin: "0 0 16px" }}>
           Abilities and items. Your points are the seconds you have left — an instant answer is worth {MAX_POINTS},
@@ -223,7 +223,7 @@ export function QuizRound({
     <div style={{ ...panel(), position: "relative", overflow: "hidden" }}>
       {showing && chosen != null && q.options[chosen].correct && <Burst color={MINT} />}
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 9 }}>
-        <Pips total={3} filled={idx + 1} color={LEMON} />
+        <Pips total={questions.length} filled={idx + 1} color={LEMON} />
         <span style={{ fontSize: 12, fontWeight: 900, color: GOLD, fontVariantNumeric: "tabular-nums" }}>
           <CountUp to={result.points} dur={520} /> pts
         </span>

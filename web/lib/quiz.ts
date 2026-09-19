@@ -280,10 +280,24 @@ function qAbilityEffect(k: Knowledge, r: () => number): Question | null {
 const BUILDERS = [qAbilityHero, qHeroUlt, qItemCost, qItemRecipe, qAbilityName, qAbilityEffect];
 
 /**
+ * How many questions a round asks.
+ *
+ * It lives here because the answer sheet is marked twice — once in the browser
+ * for the player, and again on the server from the seed, which is what keeps a
+ * leaderboard place from being typed into a console. The two must agree exactly:
+ * a server marking three questions against five submitted picks silently throws
+ * the last two away and caps everyone's quiz score at the old maximum.
+ *
+ * Capped by `BUILDERS.length`, because a round refuses to ask two questions of
+ * the same kind — six builders is the ceiling.
+ */
+export const QUIZ_COUNT = Math.min(5, BUILDERS.length);
+
+/**
  * `count` questions for a given seed, with no two of the same kind, so a round
  * always mixes hero knowledge with item knowledge.
  */
-export function buildQuiz(k: Knowledge, seed: string, count = 3): Question[] {
+export function buildQuiz(k: Knowledge, seed: string, count = QUIZ_COUNT): Question[] {
   const r = rng(seed);
   const kinds = shuffle(BUILDERS, r);
   const out: Question[] = [];

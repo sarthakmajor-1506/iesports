@@ -107,10 +107,44 @@ function rankNorm(values: number[]): number[] {
 export type BotPick = { heroId: number; considered: { heroId: number; weight: number }[] };
 
 /**
+ * The opening pick is a support, chosen at random.
+ *
+ * This is how the first phase actually goes in Dota: you open on a support
+ * because a support is the hero that is cheapest to reveal. It gives the enemy
+ * the least to counter, it is flexible about what gets drafted around it, and it
+ * keeps your cores hidden for another rotation. A counterpicking bot opening
+ * with its single best core was giving away the one piece of information it most
+ * wanted to keep, and — because the board is empty on turn one — every counter
+ * coefficient is tied at zero there anyway, so the personality weights had
+ * nothing to say. Random is not a shortcut here; it is the honest model of a
+ * decision made with no information.
+ *
+ * Uniform over every available support, deliberately. Weighting by popularity
+ * would collapse the opening back onto the same handful of heroes and make the
+ * bot readable from the first second, which is exactly what the temperature in
+ * every personality exists to prevent.
+ */
+const OPENER_ROLE = "Support";
+
+function openingSupport(
+  engine: Engine,
+  available: number[],
+  rand: () => number
+): number | null {
+  const supports = available.filter((id) => engine.heroById.get(id)?.roles?.includes(OPENER_ROLE));
+  if (!supports.length) return null;
+  return supports[Math.min(supports.length - 1, Math.floor(rand() * supports.length))];
+}
+
+/**
  * Choose the bot's next hero given the board.
  *
  * `botTeam` / `playerTeam` are the heroes each side already holds. `botIsRadiant`
  * only matters for reading the model's sign convention.
+ *
+ * On an empty board it opens on a random support (see `openingSupport`); from
+ * the second pick on it is the personality's weights, reacting to what the
+ * player has taken.
  */
 export function botPick(
   engine: Engine,
@@ -123,6 +157,14 @@ export function botPick(
   rand: () => number
 ): BotPick {
   const model = engine.model;
+
+  if (botTeam.length === 0) {
+    const opener = openingSupport(engine, available, rand);
+    // `considered` is the explanation surface; an opening that was not chosen by
+    // weighting has no runners-up to show, and inventing some would misreport
+    // how the pick was made.
+    if (opener != null) return { heroId: opener, considered: [{ heroId: opener, weight: 1 }] };
+  }
 
   const popRaw: number[] = [];
   const strRaw: number[] = [];

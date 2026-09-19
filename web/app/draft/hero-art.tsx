@@ -87,12 +87,20 @@ function release() {
 }
 
 export function HeroArt({
-  base, name, phase = 0, animate = true, position = "50% 12%",
-}: { base: string; name?: string; phase?: number; animate?: boolean; position?: string }) {
+  base, name, phase = 0, animate = true, position = "50% 12%", onReady, fit: fitMode = "cover",
+}: {
+  base: string; name?: string; phase?: number; animate?: boolean; position?: string;
+  onReady?: (ready: boolean) => void;
+  /** `contain` once the frame is gone, so a cut-out hero is never cropped. */
+  fit?: "cover" | "contain";
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const freed = useRef(false);
   const free = () => { if (!freed.current) { freed.current = true; release(); } };
+  // The parent needs this to decide whether it may drop its frame: the render
+  // is cut out, the still underneath is not. See `HeroStanding`.
+  useEffect(() => { onReady?.(ready); }, [ready, onReady]);
 
   useEffect(() => {
     setReady(false);
@@ -108,7 +116,7 @@ export function HeroArt({
   // Identical fit on both layers, so the crossfade cannot shift the framing.
   const fit: React.CSSProperties = {
     position: "absolute", inset: 0, width: "100%", height: "100%",
-    objectFit: "cover", objectPosition: position, display: "block",
+    objectFit: fitMode, objectPosition: position, display: "block",
   };
 
   return (
@@ -136,6 +144,116 @@ export function HeroArt({
 export type LineupHero = { id: number; img: string; name: string };
 
 /**
+ * A drafted hero, standing free on the page.
+ *
+ * Valve's renders are VP9-with-alpha — they are already cut out. The black box
+ * behind every drafted hero was never theirs; it was our `--tile` bed, put there
+ * for the still image underneath, which is an opaque JPEG. So once the render is
+ * actually playing there is nothing to hide, and the frame comes off: the hero
+ * stands on the paper with a hard ink drop-shadow, which is the same die-cut
+ * sticker every other object on this page is.
+ *
+ * `drop-shadow` follows the alpha channel rather than the box, so the shadow is
+ * hero-shaped. That is the whole trick, and it is why this cannot be done with
+ * `box-shadow`.
+ *
+ * Until the render arrives — and permanently in any browser that will not decode
+ * VP9 with alpha, which notably includes Safari — the framed still is shown
+ * instead. That fallback is a deliberate design, not a broken state: a portrait
+ * that fades to black at its edges needs a dark bed, or it haloes on cream.
+ */
+function HeroStanding({
+  hero, fill, latest, phase, motion, h,
+}: { hero: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; h: string }) {
+  // `cut` needs to start false again for a new hero. The parent keys this
+  // component on the hero id so React remounts it, which resets the state
+  // without an effect that writes state during mount.
+  const [cut, setCut] = useState(false);
+
+  return (
+    <div style={{ position: "relative", height: h, borderRadius: R_CHIP, boxSizing: "border-box" }}>
+      <div
+        className="dl-drop"
+        style={{
+          position: "absolute", inset: 0, borderRadius: R_CHIP, boxSizing: "border-box",
+          overflow: cut ? "visible" : "hidden",
+          background: cut ? "transparent" : "var(--tile)",
+          border: cut ? "none" : `${BW}px solid ${LINE}`,
+          boxShadow: cut ? "none" : `3px 3px 0 ${LINE}`,
+          transition: "background .35s ease, border-color .35s ease",
+        }}
+      >
+        {/*
+         * Freed from the frame, the art gets its own box, and it is bigger than
+         * the slot. Valve's renders are square; `contain` inside a slot that is
+         * twice as tall as it is wide therefore scales the hero down to the
+         * slot's WIDTH and centres it in all that leftover height, which is why
+         * the first version looked like a row of postage stamps. Growing the box
+         * past the slot on three sides and anchoring the image to its bottom
+         * edge puts the hero at a readable size with its feet on the line.
+         */}
+        <div style={cut
+          ? {
+            position: "absolute", left: "-14%", right: "-14%", top: "-24%", bottom: "8%",
+            // Hero-shaped, because `drop-shadow` follows alpha. The three passes
+            // are offset + a one-pixel outline, which is the same ink edge every
+            // sticker on the page has.
+            filter: `drop-shadow(2px 3px 0 ${LINE}) drop-shadow(-1.5px 0 0 ${LINE}) drop-shadow(0 -1.5px 0 ${LINE})`,
+          }
+          : { position: "absolute", inset: 0 }}>
+          <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion}
+            onReady={setCut} position={cut ? "50% 100%" : "50% 12%"} fit={cut ? "contain" : "cover"} />
+        </div>
+
+        {!cut && (
+          <div style={{
+            position: "absolute", left: 0, right: 0, bottom: 0, padding: "3px 4px",
+            background: "#16131F", textAlign: "center",
+          }}>
+            <span style={{
+              fontSize: "clamp(7px, 2.3vw, 10px)", color: "#FFF7EA", textTransform: "uppercase", fontWeight: 900,
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", letterSpacing: .4,
+            }}>{hero.name}</span>
+          </div>
+        )}
+
+        {latest && (
+          <>
+            <span key={`f${hero.id}`} className="dl-flash" style={{
+              position: "absolute", inset: 0, pointerEvents: "none", background: fill,
+              borderRadius: R_CHIP, mixBlendMode: cut ? "multiply" : "normal",
+            }} />
+            <span key={`r${hero.id}`} style={{
+              position: "absolute", inset: -3, pointerEvents: "none", borderRadius: R_CHIP,
+              border: `3px solid ${fill}`, animation: "dl-ring .6s var(--ease) both",
+            }} />
+          </>
+        )}
+      </div>
+
+      {/* Standing on the page, the name needs its own object — there is no card
+          edge left to hang a bar off. */}
+      {/*
+       * Pinned to the slot's own edges rather than centred on it. A pill centred
+       * with translateX and allowed to be wider than its slot runs straight into
+       * the neighbouring hero's pill — at five slots across a 390px phone there
+       * is no spare width, so "Witch Doctor" and "Night Stalker" printed over
+       * each other. Inside the slot it can only ever ellipsise.
+       */}
+      {cut && (
+        <span className="dl-stk flat" style={{
+          position: "absolute", left: 0, right: 0, bottom: -7, justifyContent: "center",
+          background: fill, fontSize: 7.5, padding: "2px 5px", borderWidth: 2,
+          boxShadow: `2px 2px 0 ${LINE}`,
+        }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hero.name}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * A hero in a slot, as a card off the sticker sheet.
  *
  * Ink outline, hard offset shadow, rounded corner — the same object the landing
@@ -151,63 +269,38 @@ export type LineupHero = { id: number; img: string; name: string };
  * inverts it.
  */
 function Card({
-  hero, fill, latest, phase, motion, hidden, h,
-}: { hero?: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string }) {
+  hero, fill, latest, phase, motion, hidden, h, slot,
+}: { hero?: LineupHero; fill: string; latest: boolean; phase: number; motion: boolean; hidden?: boolean; h: string; slot: number }) {
+  // A drafted hero stands free; an empty slot and a hidden one stay framed,
+  // because both of those ARE the frame — there is nothing cut out to show.
+  if (hero && !hidden) {
+    return (
+      <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <HeroStanding key={hero.id} hero={hero} fill={fill} latest={latest} phase={phase} motion={motion} h={h} />
+      </div>
+    );
+  }
+
+  // Empty, or hidden during a blind pick. Both are the frame itself: a dashed
+  // slot numbered the way the client numbers them, and a hatched card.
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
-      <div
-        // Keyed on the hero so the drop replays when a slot fills, not on every
-        // re-render of a slot that was already occupied.
-        key={hero?.id ?? "empty"}
-        className={hero && !hidden ? "dl-drop" : undefined}
-        style={{
-          position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
-          background: hero ? "var(--tile)" : PANEL_2,
-          border: `${BW}px ${hero ? "solid" : "dashed"} ${LINE}`,
-          boxShadow: hero ? `3px 3px 0 ${LINE}` : "none",
-        }}
-      >
-        {hero && !hidden && <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion} />}
-
-        {hero && hidden && (
+      <div style={{
+        position: "relative", height: h, borderRadius: R_CHIP, overflow: "hidden", boxSizing: "border-box",
+        background: hero ? "var(--tile)" : PANEL_2,
+        border: `${BW}px ${hero ? "solid" : "dashed"} ${LINE}`,
+        boxShadow: hero ? `3px 3px 0 ${LINE}` : "none",
+      }}>
+        {hero ? (
           <div style={{
             position: "absolute", inset: 0, display: "grid", placeItems: "center",
             background: `repeating-linear-gradient(135deg, ${alpha(LINE, 14)} 0 7px, transparent 7px 14px)`,
             color: CREAM, fontSize: 22, fontWeight: 900,
           }}>?</div>
-        )}
-
-        {!hero && (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: DIM, fontSize: 15, fontWeight: 900 }}>◆</div>
-        )}
-
-        {hero && !hidden && (
-          <>
-            <div style={{
-              position: "absolute", left: 0, right: 0, bottom: 0, padding: "3px 4px",
-              background: "#16131F", textAlign: "center",
-            }}>
-              <span style={{
-                fontSize: "clamp(7px, 2.3vw, 10px)", color: "#FFF7EA", textTransform: "uppercase", fontWeight: 900,
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block", letterSpacing: .4,
-              }}>{hero.name}</span>
-            </div>
-            {/* The lock-in. This replaced a toast pinned to the top of the
-                viewport, which floated over the header and read as a browser
-                notification rather than something the game did. Confirmation
-                belongs on the card that just filled. */}
-            {latest && (
-              <>
-                <span key={`f${hero.id}`} className="dl-flash" style={{
-                  position: "absolute", inset: 0, pointerEvents: "none", background: fill,
-                }} />
-                <span key={`r${hero.id}`} style={{
-                  position: "absolute", inset: -3, pointerEvents: "none", borderRadius: "inherit",
-                  border: `3px solid ${fill}`, animation: "dl-ring .6s var(--ease) both",
-                }} />
-              </>
-            )}
-          </>
+        ) : (
+          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: DIM, fontSize: 15, fontWeight: 900 }}>
+            {slot}
+          </div>
         )}
       </div>
     </div>
@@ -258,11 +351,14 @@ export function TeamRow({
         </span>
         {status && <Presence text={status.text} fill={fill} active={status.active} />}
         <span className="dl-rule" style={{ flex: "1 1 auto" }} />
-        {note}
+        {/* Sat on the paper, not on the rule it would otherwise cross. */}
+        {note && <span style={{ background: "var(--paper)", padding: "0 3px", flexShrink: 0 }}>{note}</span>}
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
+      {/* The bottom padding is the name sticker's room: a standing hero hangs
+          its label below the slot, where a framed card carried it inside. */}
+      <div style={{ display: "flex", gap: 6, paddingBottom: 11 }}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} hero={heroes[i]} fill={fill} h={height}
+          <Card key={i} hero={heroes[i]} fill={fill} h={height} slot={i + 1}
             latest={heroes[i] != null && heroes[i].id === latest}
             phase={i} motion={motion} hidden={hidden} />
         ))}

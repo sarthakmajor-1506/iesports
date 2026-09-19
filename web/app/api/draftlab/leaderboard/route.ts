@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
-import { buildQuiz, type Knowledge } from "@/lib/quiz";
+import { buildQuiz, QUIZ_COUNT, MAX_POINTS, type Knowledge } from "@/lib/quiz";
 
 /**
  * Draft Lab — leaderboard.
@@ -112,16 +112,20 @@ export async function POST(req: NextRequest) {
     let quizPoints = 0;
     let quizCorrect = 0;
     const seed = clean(body.quizSeed, 120);
-    const picks = Array.isArray(body.quizPicks) ? body.quizPicks.slice(0, 3) : [];
+    // The round length comes from lib/quiz so this can never drift from what the
+    // browser actually asked. It was hard-coded to 3 in both places, which meant
+    // lengthening the round here would have thrown away the extra answers and
+    // held every player's quiz score at the old ceiling.
+    const picks = Array.isArray(body.quizPicks) ? body.quizPicks.slice(0, QUIZ_COUNT) : [];
     if (seed && picks.length) {
       const knowledge = await getKnowledge();
-      const paper = buildQuiz(knowledge, seed, 3);
+      const paper = buildQuiz(knowledge, seed, QUIZ_COUNT);
       quizCorrect = paper.reduce((n, q, i) => {
         const choice = picks[i];
         return n + (typeof choice === "number" && q.options[choice]?.correct ? 1 : 0);
       }, 0);
       const claimed = typeof body.quizPoints === "number" ? Math.max(0, Math.round(body.quizPoints)) : 0;
-      quizPoints = Math.min(claimed, quizCorrect * 10, 30);
+      quizPoints = Math.min(claimed, quizCorrect * MAX_POINTS, QUIZ_COUNT * MAX_POINTS);
     }
 
     const points = draftPoints + quizPoints;

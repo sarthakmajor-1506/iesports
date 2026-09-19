@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Panel, Btn, CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, ENEMY,
+  Panel, Btn, DiscordIcon, signInWithDiscord,
+  CREAM, PANEL, PANEL_2, LINE, MUTED, DIM, GREEN, ENEMY,
   LEMON, GOLD_FILL, ON_FILL, R_CHIP,
 } from "./ui";
 import { Skeleton } from "./theme";
@@ -54,7 +55,9 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
             plus what you scored on the questions.
           </div>
           <div style={{ display: "inline-block", minWidth: 170 }}>
-            <Btn full tone="gold" href="/login">SIGN IN TO COMPETE</Btn>
+            <Btn full tone="lilac" onClick={signInWithDiscord}>
+              <DiscordIcon /> SIGN IN TO COMPETE
+            </Btn>
           </div>
         </Panel>
       )}
