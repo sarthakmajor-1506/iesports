@@ -106,21 +106,40 @@ export const lift = (d = 3) => ({
  */
 /**
  * On Android, hand the OAuth link straight to the Discord app rather than the
- * browser.
+ * browser. On iOS, nothing can — see below.
  *
- * iOS needs nothing extra: Discord registers discord.com as a Universal Link,
- * so Safari already hands this exact URL to the installed app on its own —
- * there is no better hook to pull on there, and a fake `discord://` scheme
- * would risk dropping the player on an unrelated screen inside the app
- * instead of the login it does not know how to handle.
+ * IOS IS NOT FIXABLE FROM HERE, AND THAT IS VERIFIED, NOT ASSUMED. A prior
+ * version of this comment claimed Safari hands this link to the Discord app
+ * on its own via Universal Links. That was wrong, and stated with more
+ * confidence than it had been checked: Discord's own
+ * https://discord.com/.well-known/apple-app-site-association excludes
+ * `/oauth2/authorize` from deep-linking whenever the request carries a
+ * `response_type` parameter — in their own words, "Exclude oauth2 flows that
+ * have a specified response type from deep linking." Ours carries
+ * `response_type=code`, because that is what the authorization-code grant
+ * IS; there is no version of this login that omits it. iOS enforces that
+ * exclusion at the OS level from Discord's own declared file — no redirect
+ * shape, direct URL, or client-side trick changes what Apple's Universal
+ * Links engine does with a URL an app has explicitly told it to exclude.
+ * A `discord://` custom scheme could in principle sidestep this (custom
+ * schemes are not governed by the association file at all), but there is no
+ * confirmed, documented handler for an authorize request on that scheme —
+ * guessing at one risks a dead tap or the player dropped on an unrelated
+ * screen inside the app, which is worse than today's working browser flow.
+ * So iOS gets the plain link, same as it always has; this is Discord's
+ * choice, not a bug in ours, and it is what "Sign in with Discord" looks
+ * like on iOS everywhere, not just here.
  *
- * Android's browsers do not reliably make that same handoff from every
- * context (some in-app webviews never offer it), but Android DOES resolve an
- * explicit `intent://` URI naming the package — Google's own documented way
- * to prefer an installed app over the browser. That needs the real
+ * Android is different: Android's browsers do not reliably make even an
+ * unexcluded handoff from every context (some in-app webviews never offer
+ * it), but Android resolves an explicit `intent://` URI naming the package
+ * regardless of that — Google's own documented way to prefer an installed
+ * app over the browser, a different mechanism from Apple's association file
+ * and not shown to carry the same exclusion. That needs the real
  * discord.com URL, not our own redirecting route, so it is fetched with
  * `redirect=false` first; a `browser_fallback_url` means a phone without
- * Discord installed still lands in the browser exactly as before.
+ * Discord installed, or one where this still does not resolve, lands in the
+ * browser exactly as before.
  */
 async function openDiscordAuth() {
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
