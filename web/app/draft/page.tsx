@@ -12,9 +12,9 @@ import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
   Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, Segment, SoundToggle, ThemeToggle,
-  DiscordIcon, signInWithDiscord,
+  DiscordIcon, signInWithDiscord, DotaMark, AvatarChip,
   CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
-  LEMON, MINT, PINK, LILAC, GOLD_FILL, ON_FILL, R_CARD, BW_2, BW_3, lift,
+  LEMON, MINT, PINK, LILAC, CORAL, GOLD_FILL, ON_FILL, R_CARD, BW_2, BW_3, lift,
 } from "./ui";
 import { Ladder } from "./ladder";
 import { Skeleton } from "./theme";
@@ -84,16 +84,25 @@ function Duel() {
   /**
    * Signed in? Then that is your name.
    *
-   * Steam is already linked for anyone who plays tournaments here, so asking a
-   * signed-in player to type a name again is a form to fill in for no reason.
-   * Signing in is never required — an anonymous player gets the whole game, just
-   * no place on the board.
+   * STEAM IS NOT THE ONLY ACCOUNT ANY MORE. This read `steamName` alone, which
+   * was fine when the only way in was a Steam-linked tournament account. Sign-in
+   * from the game is Discord now, and a Discord-only player has no `steamName`
+   * at all — so every one of them fell through to the localStorage name, which
+   * is empty on a fresh browser, and landed on the leaderboard as "Anonymous"
+   * while being perfectly signed in.
+   *
+   * Steam first when it is there, because that is the name the rest of the site
+   * knows them by; Discord next; the typed name last. Signing in is still never
+   * required — an anonymous player gets the whole game, just no place on a board.
    */
-  const steamName = userProfile?.steamName || "";
+  const accountName = userProfile?.steamName || userProfile?.discordUsername || "";
+  const avatarUrl = userProfile?.steamAvatar || userProfile?.discordAvatar || null;
+  /** What goes on a board, into a room, and into the queue. One answer, everywhere. */
+  const displayName = accountName || name || "Anonymous";
   useEffect(() => {
-    if (steamName) { setName(steamName); return; }
+    if (accountName) { setName(accountName); return; }
     try { setName(localStorage.getItem("draftlab_name") || ""); } catch {}
-  }, [steamName]);
+  }, [accountName]);
 
   useEffect(() => {
     fetch("/draftlab/model.json").then((r) => r.json()).then(setModel)
@@ -233,8 +242,8 @@ function Duel() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           uid: user.uid,
-          name: steamName || name || "Anonymous",
-          avatar: userProfile?.steamAvatar || null,
+          name: displayName,
+          avatar: avatarUrl,
           mine: mineIds, theirs: theirIds,
           quizSeed: q?.seed ?? null, quizPicks: q?.picks ?? null, quizPoints: q?.points ?? 0,
         }),
@@ -244,7 +253,7 @@ function Duel() {
       if (d?.personalBest) setPersonalBest(true);
       setBoardVersion((v) => v + 1);
     } catch { /* the leaderboard is never allowed to break the game loop */ }
-  }, [user, steamName, name, userProfile]);
+  }, [user, displayName, avatarUrl]);
 
   const [logged, setLogged] = useState(false);
   useEffect(() => {
@@ -318,25 +327,14 @@ function Duel() {
         tab="duel"
         head={
           <Band title="Draft Duel" compact sub={`Draft, then ${QUIZ_COUNT} questions`} accent={LEMON}
+            icon={<DotaMark size={30} />}
             right={
               <>
                 <ThemeToggle />
                 <SoundToggle />
-                {/* Only when signed in. The chip's job is to say WHICH account
-                    you are on, and a "GUEST" pill said nothing the PLAYING AS
-                    field below does not — while being the third thing in a slot
-                    that only fits two on a 390px phone, where it crowded the
-                    subtitle out of the band. */}
-                {user && (
-                  <span className="dl-stk" style={{
-                    maxWidth: 88, fontSize: 8.5, padding: "3px 9px", borderWidth: 2,
-                    boxShadow: `2px 2px 0 ${LINE}`, background: MINT, color: ON_FILL,
-                  }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {steamName || name || "Signed in"}
-                    </span>
-                  </span>
-                )}
+                {/* One icon, not a name pill. Who you are signed in as is a
+                    picture; what you are called is on the boards below. */}
+                {user && <AvatarChip src={avatarUrl} name={displayName} />}
               </>
             } />
         }
@@ -358,17 +356,17 @@ function Duel() {
             state={queue.state}
             waitedMs={queue.waitedMs}
             error={queue.error}
-            onQueue={() => queue.join(steamName || name || "Player", userProfile?.steamAvatar || null, bansOn)}
+            onQueue={() => queue.join(displayName, avatarUrl, bansOn)}
             onCancel={queue.leave}
           />
 
           <div style={{ display: "flex", gap: 11 }}>
-            <ModeTile fill={PINK} rot={-1.4} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
-              cta="PLAY" onClick={restart} />
+            <ModeTile fill={CORAL} rot={-1.4} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
+              cta="PLAY" onClick={restart} marks />
             <ModeTile fill={LEMON} rot={1.2} kicker="LIVE · 30s" title="Play a friend" sub="Head to head, on a clock"
               cta="CREATE ROOM"
               onClick={async () => {
-                const d = await roomCall({ action: "create", name: steamName || name || "Host", bans: bansOn });
+                const d = await roomCall({ action: "create", name: displayName, avatar: avatarUrl, bans: bansOn });
                 if (d?.code) setLiveCode(d.code);
               }} />
           </div>
@@ -392,7 +390,7 @@ function Duel() {
               style={{ flex: "1 1 auto", minWidth: 0, letterSpacing: 3, fontWeight: 900, textAlign: "center", minHeight: 44 }} />
             <Btn tone="lilac" disabled={busy || codeInput.length < 4} onClick={async () => {
               setBusy(true); setJoinError(null);
-              const j = await roomCall({ action: "join", code: codeInput, name: steamName || name || "Guest" });
+              const j = await roomCall({ action: "join", code: codeInput, name: displayName, avatar: avatarUrl });
               setBusy(false);
               if (j?.ok) setLiveCode(codeInput); else setJoinError("No room with that code.");
             }}>{busy ? "…" : "JOIN"}</Btn>
@@ -635,15 +633,39 @@ function LadderTile({
  * outer wrapper and the button inside it stays square.
  */
 function ModeTile({
-  fill, rot, kicker, title, sub, cta, onClick,
-}: { fill: string; rot: number; kicker: string; title: string; sub: string; cta: string; onClick: () => void }) {
+  fill, rot, kicker, title, sub, cta, onClick, marks,
+}: {
+  fill: string; rot: number; kicker: string; title: string; sub: string; cta: string;
+  onClick: () => void;
+  /** Dire's claw, faint, behind the words. */
+  marks?: boolean;
+}) {
   return (
     <div style={{ flex: "1 1 0", minWidth: 0, transform: `rotate(${rot}deg)` }}>
       <button className="dl-btn" onClick={() => { play("pick"); onClick(); }} style={{
         width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
-        position: "relative", borderRadius: R_CARD, padding: "14px 13px 13px", boxSizing: "border-box",
+        position: "relative", overflow: "hidden", borderRadius: R_CARD, padding: "14px 13px 13px", boxSizing: "border-box",
         background: PANEL, border: `${BW_2}px solid ${LINE}`, color: CREAM, ...lift(5),
       }}>
+        {/*
+         * Three claw slashes in Dire's red, at a tenth opacity, tucked into the
+         * corner behind the text. It marks the Counterpicker as the Dota-red
+         * mode without turning the tile into a red card — anything stronger
+         * fights the pastel the rest of the page is built from, and anything
+         * that overlapped the words would be decoration charging rent.
+         */}
+        {marks && (
+          <svg viewBox="0 0 64 64" aria-hidden style={{
+            position: "absolute", top: 6, right: 6, width: 52, height: 52,
+            opacity: .16, pointerEvents: "none",
+          }}>
+            <g stroke={ENEMY} strokeWidth="5.5" strokeLinecap="round" fill="none">
+              <path d="M10 4 C24 16, 32 30, 36 52" />
+              <path d="M26 2 C40 14, 48 28, 52 50" />
+              <path d="M42 4 C54 16, 60 28, 62 46" />
+            </g>
+          </svg>
+        )}
         <span className="dl-stk" style={{ background: fill, fontSize: 8, padding: "3px 9px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}`, marginBottom: 9 }}>
           {kicker}
         </span>

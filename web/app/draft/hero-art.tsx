@@ -88,14 +88,26 @@ function release() {
 
 export function HeroArt({
   base, name, phase = 0, animate = true, position = "50% 12%", onReady, fit: fitMode = "cover",
+  settleMs = 0,
 }: {
   base: string; name?: string; phase?: number; animate?: boolean; position?: string;
   onReady?: (ready: boolean) => void;
   /** `contain` once the frame is gone, so a cut-out hero is never cropped. */
   fit?: "cover" | "contain";
+  /**
+   * Stop the render this long after it starts, leaving the last frame on screen.
+   *
+   * A paused `<video>` keeps painting its current frame, alpha included, so a
+   * settled hero still looks cut out — it simply stops costing anything. Zero
+   * means never settle, which is right for a single showcased hero and wrong
+   * for ten of them at once. See the note in `HeroStanding`.
+   */
+  settleMs?: number;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [settled, setSettled] = useState(false);
+  const vid = useRef<HTMLVideoElement>(null);
   const freed = useRef(false);
   const free = () => { if (!freed.current) { freed.current = true; release(); } };
   // The parent needs this to decide whether it may drop its frame: the render
@@ -103,7 +115,19 @@ export function HeroArt({
   useEffect(() => { onReady?.(ready); }, [ready, onReady]);
 
   useEffect(() => {
+    if (!ready || !settleMs) return;
+    const t = setTimeout(() => {
+      try { vid.current?.pause(); } catch { /* element already gone */ }
+      setSettled(true);
+    }, settleMs);
+    return () => clearTimeout(t);
+  }, [ready, settleMs]);
+
+  useEffect(() => {
     setReady(false);
+    // Reset alongside `ready` rather than in an effect of its own: a new hero in
+    // this slot has not settled, and the two flags describe the same render.
+    setSettled(false);
     if (!animate) return;
     let cancelled = false;
     freed.current = false;
@@ -121,14 +145,18 @@ export function HeroArt({
 
   return (
     <div style={{
+      // The gentle float stops when the render does. A transform animation on
+      // an element carrying a filter makes the browser re-run the filter every
+      // frame, which is the opposite of settling.
       position: "absolute", inset: 0,
-      animation: animate ? "dl-idle 5s ease-in-out infinite" : undefined,
+      animation: animate && !settled ? "dl-idle 5s ease-in-out infinite" : undefined,
       animationDelay: `${(phase * 0.5).toFixed(2)}s`,
     }}>
       <HeroImg base={base} name={name} position={position}
         style={{ ...fit, opacity: ready ? 0 : 1, transition: "opacity .5s ease" }} />
       {animate && src && (
         <video
+          ref={vid}
           src={src} autoPlay loop muted playsInline preload="auto"
           onCanPlay={() => { setReady(true); free(); }}
           onError={() => free()}
@@ -142,6 +170,16 @@ export function HeroArt({
 /* --------------------------------------------------------------- the board */
 
 export type LineupHero = { id: number; img: string; name: string };
+
+/**
+ * How long a drafted hero animates before it freezes on a frame.
+ *
+ * Long enough to see the hero arrive and breathe once — which is the only part
+ * of a looping idle anybody actually watches — and short enough that a finished
+ * board of ten is completely static. There is no quality lost: the frame it
+ * stops on is the same render, alpha and all.
+ */
+const SETTLE_MS = 4200;
 
 /**
  * A drafted hero, standing free on the page.
@@ -192,17 +230,34 @@ function HeroStanding({
          * past the slot on three sides and anchoring the image to its bottom
          * edge puts the hero at a readable size with its feet on the line.
          */}
+        {/*
+         * ONE drop-shadow, and the render settles.
+         *
+         * The first version of this stacked THREE drop-shadows to fake an ink
+         * outline, and put them on a playing video. A filter on an animating
+         * element is recomputed every frame, so that was three full-frame
+         * filter passes per hero per frame, times ten heroes — which is exactly
+         * why the board went from smooth to laggy the moment the tiles came
+         * off. One offset pass costs a third of that.
+         *
+         * The rest is `settleMs`: each hero plays its idle for a few seconds as
+         * it lands, which is the moment the animation is actually worth
+         * anything, and then pauses on a frame. A paused video still paints
+         * with its alpha intact, so the board ends up as ten static cut-outs
+         * that cost nothing, instead of ten videos decoding forever behind a
+         * filter.
+         */}
         <div style={cut
           ? {
             position: "absolute", left: "-14%", right: "-14%", top: "-24%", bottom: "8%",
-            // Hero-shaped, because `drop-shadow` follows alpha. The three passes
-            // are offset + a one-pixel outline, which is the same ink edge every
-            // sticker on the page has.
-            filter: `drop-shadow(2px 3px 0 ${LINE}) drop-shadow(-1.5px 0 0 ${LINE}) drop-shadow(0 -1.5px 0 ${LINE})`,
+            // Hero-shaped, because `drop-shadow` follows the alpha channel
+            // rather than the box. That is the whole trick.
+            filter: `drop-shadow(2px 3px 0 ${LINE})`,
           }
           : { position: "absolute", inset: 0 }}>
           <HeroArt base={heroBase(hero.img)} name={hero.name} phase={phase} animate={motion}
-            onReady={setCut} position={cut ? "50% 100%" : "50% 12%"} fit={cut ? "contain" : "cover"} />
+            onReady={setCut} position={cut ? "50% 100%" : "50% 12%"} fit={cut ? "contain" : "cover"}
+            settleMs={SETTLE_MS} />
         </div>
 
         {!cut && (

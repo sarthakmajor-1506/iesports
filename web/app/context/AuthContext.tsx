@@ -28,6 +28,7 @@ type UserProfile = {
   phone: string;
   discordId: string;
   discordUsername: string;
+  discordAvatar: string;
   steamId: string;
   steamName: string;
   steamAvatar: string;
@@ -115,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phone: data?.phone || u.phoneNumber || "",
       discordId: data?.discordId || "",
       discordUsername: data?.discordUsername || "",
+      discordAvatar: data?.discordAvatar || "",
       steamId: data?.steamId || "",
       steamName: data?.steamName || "",
       steamAvatar: data?.steamAvatar || "",

@@ -243,10 +243,13 @@ export function Shell({
  * solid block over the words, so the call sites hand it `LEMON`, `PINK`, `MINT`.
  */
 export function Band({
-  title, sub, right, onBack, accent = LEMON, children, compact,
+  title, sub, right, onBack, icon, accent = LEMON, children, compact,
 }: {
   title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode;
-  onBack?: () => void; accent?: string; children?: React.ReactNode; compact?: boolean;
+  onBack?: () => void;
+  /** A mark that belongs to the title, rendered immediately before it. */
+  icon?: React.ReactNode;
+  accent?: string; children?: React.ReactNode; compact?: boolean;
 }) {
   return (
     <div style={{
@@ -254,47 +257,109 @@ export function Band({
       background: PAPER, borderBottom: `${BW_3}px solid ${LINE}`,
       padding: `calc(14px + env(safe-area-inset-top)) 12px ${children ? 13 : 14}px`,
     }}>
-      <div style={{ position: "relative", minHeight: compact ? 40 : 46, display: "grid", placeItems: "center" }}>
-        {/* The back arrow and the right slot float OVER this row so the title
-            sits in the same place on every screen. That only works if the title
-            is narrow enough to clear whichever of them is present — at a flat
-            64% a two-icon right slot printed straight through the subtitle on a
-            390px phone. */}
-        <div style={{ maxWidth: right ? "58%" : onBack ? "72%" : "84%", textAlign: "center" }}>
+      {/*
+       * A flex row, not a centred block with floating overlays.
+       *
+       * The old version absolutely positioned the back arrow and the right slot
+       * on top of a centred title and kept them apart by giving the title a
+       * percentage max-width. That holds until the right slot has three things
+       * in it: on a 390px phone a signed-in player's name chip plus two toggles
+       * came to 164px and printed straight through the title. A percentage
+       * cannot know what is in the slot, so it was always going to lose that
+       * argument eventually.
+       *
+       * In a row the title simply takes what is left. It can be squeezed and
+       * ellipsised, but it cannot be overlapped, whatever anyone puts beside it.
+       * The spacer opposite a lone back button keeps it optically centred, which
+       * is the one thing the overlay version did buy.
+       */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: compact ? 40 : 46 }}>
+        {onBack && (
+          <button onClick={onBack} aria-label="Back" className="dl-btn" style={{
+            flexShrink: 0, width: 36, height: 36, borderRadius: R_BTN,
+            background: PANEL, border: `${BW}px solid ${LINE}`, color: CREAM,
+            fontSize: 19, fontWeight: 900, cursor: "pointer", display: "grid", placeItems: "center",
+            padding: 0, lineHeight: 1, ...lift(2),
+          }}>‹</button>
+        )}
+
+        <div style={{ flex: "1 1 auto", minWidth: 0, textAlign: "center" }}>
           {/* The header is the screen's name and it is meant to be read across a
-              room, not squinted at: this is roughly a third larger than a normal
-              app bar, which is the point. It scales with the viewport so the
-              same title survives a 360px phone and a 520px sheet. */}
+              room, not squinted at: roughly a third larger than a normal app
+              bar, scaling with the viewport so the same title survives a 360px
+              phone and a 520px sheet. */}
           <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 0,
             fontSize: compact ? "clamp(18px, 5.4vw, 22px)" : "clamp(22px, 6.8vw, 28px)",
-            fontWeight: 900, letterSpacing: "-.035em",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.16,
-            color: CREAM,
+            fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.16, color: CREAM,
           }}>
-            <Mark c={accent}>{title}</Mark>
+            {icon}
+            <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <Mark c={accent}>{title}</Mark>
+            </span>
           </div>
           {sub && (
             <div style={{ fontSize: 11, color: DIM, marginTop: 5, letterSpacing: .3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>
           )}
         </div>
 
-        {onBack && (
-          <button onClick={onBack} aria-label="Back" className="dl-btn" style={{
-            position: "absolute", left: 0, top: "50%", marginTop: -18,
-            width: 36, height: 36, borderRadius: R_BTN,
-            background: PANEL, border: `${BW}px solid ${LINE}`, color: CREAM,
-            fontSize: 19, fontWeight: 900, cursor: "pointer", display: "grid", placeItems: "center",
-            padding: 0, lineHeight: 1, ...lift(2),
-          }}>‹</button>
-        )}
         {right && (
-          <div style={{ position: "absolute", right: 0, top: "50%", marginTop: -16, minHeight: 32, display: "flex", alignItems: "center", gap: 6 }}>
-            {right}
-          </div>
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>{right}</div>
         )}
+        {/* Balances a lone back button, so the title stays centred. */}
+        {onBack && !right && <span style={{ flexShrink: 0, width: 36 }} />}
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * The Dota mark, in a sticker.
+ *
+ * The asset is a lossy WebP with no alpha and a white background, so it cannot
+ * be dropped onto cream — it would show as a white square with a seam. Inside a
+ * white chip with an ink outline the white IS the sticker, and it becomes
+ * another object in the same vocabulary as everything else on the page. The
+ * literal hex is deliberate: this chip stays white in the night sheet too, the
+ * way the hero name bars stay ink.
+ */
+export function DotaMark({ size = 30 }: { size?: number }) {
+  return (
+    <span style={{
+      flexShrink: 0, width: size, height: size, borderRadius: 9, overflow: "hidden",
+      background: "#FFFFFF", border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
+      display: "grid", placeItems: "center", boxSizing: "border-box",
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/dota2logo.png" alt="Dota 2"
+        style={{ width: "118%", height: "118%", objectFit: "contain", display: "block" }} />
+    </span>
+  );
+}
+
+/**
+ * The signed-in player, as one icon.
+ *
+ * This replaced a pill carrying their name, which was the third thing in a slot
+ * that fits two and was what pushed the header into the title. The avatar
+ * answers the only question the header was being asked — which account am I on
+ * — in a fraction of the width, and their name is on the boards below anyway.
+ */
+export function AvatarChip({ src, name, size = 30 }: { src: string | null; name: string; size?: number }) {
+  const initial = (name || "?").trim().slice(0, 1).toUpperCase();
+  return (
+    <span title={name} style={{
+      flexShrink: 0, width: size, height: size, borderRadius: R_BTN, overflow: "hidden",
+      background: MINT, border: `2px solid ${LINE}`, boxShadow: `2px 2px 0 ${LINE}`,
+      display: "grid", placeItems: "center", boxSizing: "border-box",
+      color: ON_FILL, fontSize: size * 0.42, fontWeight: 900,
+    }}>
+      {src
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        : initial}
+    </span>
   );
 }
 
