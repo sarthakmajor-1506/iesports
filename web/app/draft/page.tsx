@@ -7,15 +7,16 @@ import {
   strongestCounter, type TempoRow,
 } from "@/lib/draftbot";
 import { draftSequence, type SeqRole } from "@/lib/draftSequence";
-import type { Knowledge } from "@/lib/quiz";
+import { QUIZ_COUNT, type Knowledge } from "@/lib/quiz";
 import { useAuth } from "@/app/context/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
 import {
-  Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, SoundToggle, ThemeToggle,
+  Shell, Band, Btn, Toggle, Panel, Label, Field, Pips, Segment, SoundToggle, ThemeToggle,
   DiscordIcon, signInWithDiscord,
   CREAM, PANEL, LINE, MUTED, DIM, ENEMY,
-  LEMON, MINT, PINK, LILAC, ON_FILL, R_CARD, BW_2, lift,
+  LEMON, MINT, PINK, LILAC, GOLD_FILL, ON_FILL, R_CARD, BW_2, BW_3, lift,
 } from "./ui";
+import { Ladder } from "./ladder";
 import { Skeleton } from "./theme";
 import { play, startMusic, stopMusic } from "./sound";
 import { TeamRow, BanStrip, AttributePool, setRenderConcurrency } from "./hero-art";
@@ -23,7 +24,7 @@ import { QuizRound, type QuizResult } from "./quiz";
 import { Result, ResultBand, ResultActions } from "./result";
 import { LiveView } from "./live-view";
 import { Leaderboard } from "./leaderboard";
-import { useRoomActions } from "./live";
+import { useRoomActions, useQueue } from "./live";
 
 /** Role 0 is the bot, role 1 is you — bot always opens, matching live's host. */
 const BOT: SeqRole = 0, YOU: SeqRole = 1;
@@ -61,7 +62,15 @@ function Duel() {
   const [busy, setBusy] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [motion, setMotion] = useState(true);
+  const [board, setBoard] = useState<"ladder" | "solo">("ladder");
   const { call: roomCall } = useRoomActions();
+  /*
+   * Matching drops you straight into the room. The queue hands back a code the
+   * moment there is one — either because somebody was already waiting, or
+   * because the server opened a room and announced it in Discord — and from
+   * there it is an ordinary live room.
+   */
+  const queue = useQueue(useCallback((code: string) => { startMusic("draft"); setLiveCode(code); }, []));
 
   const [events, setEvents] = useState<Ev[]>([]);
   const [search, setSearch] = useState("");
@@ -308,7 +317,7 @@ function Duel() {
       <Shell
         tab="duel"
         head={
-          <Band title="Draft Duel" compact sub="Draft, then three questions" accent={LEMON}
+          <Band title="Draft Duel" compact sub={`Draft, then ${QUIZ_COUNT} questions`} accent={LEMON}
             right={
               <>
                 <ThemeToggle />
@@ -336,6 +345,23 @@ function Duel() {
           {/* Two ways in, one switch. The previous menu was two paragraph-heavy
               cards each carrying its own bans control, which made bans look like
               a property of a mode rather than a property of the draft. */}
+          {/*
+           * The ladder is the front door now, on its own and above the rest.
+           *
+           * It is the only mode here whose result is settled by beating a
+           * person rather than by a 58%-accurate model's opinion, which is the
+           * one thing on this page nobody can argue with — so it gets the width
+           * and the other two share a row under it.
+           */}
+          <LadderTile
+            signedIn={!!user}
+            state={queue.state}
+            waitedMs={queue.waitedMs}
+            error={queue.error}
+            onQueue={() => queue.join(steamName || name || "Player", userProfile?.steamAvatar || null, bansOn)}
+            onCancel={queue.leave}
+          />
+
           <div style={{ display: "flex", gap: 11 }}>
             <ModeTile fill={PINK} rot={-1.4} kicker="SOLO" title="Counterpicker" sub="It answers what you take"
               cta="PLAY" onClick={restart} />
@@ -385,7 +411,14 @@ function Duel() {
           )}
 
           <div style={{ height: 4 }} />
-          <Leaderboard uid={user?.uid ?? null} refreshKey={boardVersion} />
+          {/* Two boards, and the ladder is first: one ranks who beats people,
+              the other ranks what the model thought of your five heroes. */}
+          <Segment value={board} onChange={setBoard}
+            options={[{ v: "ladder", label: "LADDER", accent: GOLD_FILL }, { v: "solo", label: "SOLO SCORES", accent: PINK }]} />
+          <div style={{ height: 2 }} />
+          {board === "ladder"
+            ? <Ladder uid={user?.uid ?? null} refreshKey={boardVersion} />
+            : <Leaderboard uid={user?.uid ?? null} refreshKey={boardVersion} />}
         </div>
       </Shell>
     );
@@ -527,6 +560,65 @@ function Duel() {
       <Result engine={engine} events={events} yours={yours} theirs={theirs} finalP={finalP}
         quiz={quiz} tempos={tempos} motion={motion} scored={scored} personalBest={personalBest} />
     </Shell>
+  );
+}
+
+/**
+ * The ladder, and the queue that feeds it.
+ *
+ * FOUR STATES, ONE CARD. Signed out it explains why an account is needed at all
+ * — a result has to be paid to somebody — and offers Discord. Idle it is a
+ * button. Waiting it is a button that can be cancelled, with the wait shown,
+ * because a queue that gives no feedback reads as broken within about eight
+ * seconds. Hosting is the interesting one: nobody was in the queue, so the
+ * server opened a room and shouted it into Discord, and this says so plainly
+ * rather than pretending somebody is on their way.
+ */
+function LadderTile({
+  signedIn, state, waitedMs, error, onQueue, onCancel,
+}: {
+  signedIn: boolean;
+  state: "idle" | "waiting" | "hosting" | "matched";
+  waitedMs: number;
+  error: string | null;
+  onQueue: () => void;
+  onCancel: () => void;
+}) {
+  const waiting = state === "waiting" || state === "hosting";
+  return (
+    <div className="dl-card" style={{ padding: "14px 15px 15px", background: GOLD_FILL, color: ON_FILL, border: `${BW_3}px solid ${LINE}`, boxShadow: `7px 7px 0 ${LINE}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+        <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 8.5, padding: "3px 9px", borderWidth: 2, boxShadow: `2px 2px 0 ${LINE}` }}>
+          RANKED · 30s
+        </span>
+        {waiting && (
+          <span className="dl-turn" style={{ fontSize: 10, fontWeight: 900, letterSpacing: .4 }}>
+            {state === "hosting" ? "POSTED TO DISCORD" : `SEARCHING · ${Math.floor(waitedMs / 1000)}s`}
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: "clamp(19px, 5.6vw, 24px)", fontWeight: 900, letterSpacing: "-.035em", lineHeight: 1.1, marginBottom: 5 }}>
+        Draft a real person
+      </div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, opacity: .8, lineHeight: 1.4, marginBottom: 13 }}>
+        {!signedIn
+          ? "Beat a human and it counts. Needs an account — there has to be somewhere to put the result."
+          : state === "hosting"
+            ? "Nobody was queueing, so your room is open and posted in Discord. Sit tight, or share the code."
+            : "Win and take their rating. The board wipes at midnight."}
+      </div>
+
+      {!signedIn ? (
+        <Btn full tone="dark" onClick={signInWithDiscord}><DiscordIcon size={15} /> SIGN IN TO PLAY RANKED</Btn>
+      ) : waiting ? (
+        <Btn full tone="dark" onClick={onCancel}>CANCEL</Btn>
+      ) : (
+        <Btn full tone="dark" onClick={onQueue}>FIND AN OPPONENT</Btn>
+      )}
+
+      {error && <div style={{ fontSize: 11, fontWeight: 700, marginTop: 8 }}>{error}</div>}
+    </div>
   );
 }
 

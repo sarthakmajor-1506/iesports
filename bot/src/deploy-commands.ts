@@ -3,8 +3,9 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { linksteamData, matchresultData } from "./commands/slash-commands";
+import { draftData, draftboardData } from "./commands/draft-commands";
 
-const commands = [linksteamData.toJSON(), matchresultData.toJSON()];
+const commands = [linksteamData.toJSON(), matchresultData.toJSON(), draftData.toJSON(), draftboardData.toJSON()];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN!);
 

@@ -3,18 +3,25 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { authPost } from "@/app/lib/authFetch";
 
 export type Seat = "host" | "guest";
 export type LiveRoom = {
   code: string;
   status: "waiting" | "drafting" | "done";
-  host: { id: string; name: string };
-  guest: { id: string; name: string } | null;
+  host: { id: string; name: string; avatar?: string | null };
+  guest: { id: string; name: string; avatar?: string | null } | null;
   /** Whether this room drafts with bans — set once, at creation. */
   bans: boolean;
   picks: { by: Seat; kind: "pick" | "ban"; heroId: number; auto?: boolean }[];
   turnIndex: number;
   deadline: number | null;
+  /** Both seats signed in. Decided when the guest sits down, never revised. */
+  ranked?: boolean;
+  /** Whether the host has an account, so the waiting room can say what ranked depends on. */
+  hostSignedIn?: boolean;
+  /** Written by the server once the draft finishes; the source of the scoreboard. */
+  result?: { outcome: "host" | "guest" | "draw"; hostWinProb: number; deltaHost: number; deltaGuest: number } | null;
   quizHost?: { points: number; correct: number } | null;
   quizGuest?: { points: number; correct: number } | null;
 };
@@ -128,13 +135,19 @@ export function useRoomActions() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Every room call carries the signed-in player's token.
+   *
+   * The seat is still keyed on the anonymous browser id, so a guest plays
+   * exactly as before. The token is what lets the server attach an ACCOUNT to
+   * that seat, which is the only thing a ladder result can be paid to — and it
+   * has to come from a verified token rather than a uid in the body, or
+   * climbing somebody else's ladder would be a one-line edit in a console.
+   */
   const call = useCallback(async (body: Record<string, unknown>) => {
     setBusy(true); setError(null);
     try {
-      const r = await fetch("/api/draftlab/room", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, playerId: playerId() }),
-      });
+      const r = await authPost("/api/draftlab/room", { ...body, playerId: playerId() });
       const d = await r.json();
       if (!r.ok) { setError(d.error || "Something went wrong"); setBusy(false); return null; }
       setBusy(false);
@@ -145,6 +158,76 @@ export function useRoomActions() {
   }, []);
 
   return { call, busy, error, setError };
+}
+
+/**
+ * The ladder queue.
+ *
+ * Polls rather than listening: a queue entry carries an account and a display
+ * name, and `draftlabQueue` is deliberately not client-readable — only rooms
+ * are. A poll every two seconds for the couple of minutes somebody is waiting
+ * is a cheap price for not opening that collection up.
+ *
+ * `hosting` is the cold-start case: nobody was queueing, so the server opened a
+ * room and announced it in Discord. From the player's side that is still
+ * waiting — they just have a room number now, and somebody clicking the link in
+ * the channel drops straight into it.
+ */
+export type QueueState = "idle" | "waiting" | "hosting" | "matched";
+
+export function useQueue(onMatch: (code: string) => void) {
+  const [state, setState] = useState<QueueState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [waitedMs, setWaitedMs] = useState(0);
+  const matched = useRef(false);
+
+  const send = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
+    const r = await authPost("/api/draftlab/queue", { action, playerId: playerId(), ...extra });
+    const d = await r.json().catch(() => null);
+    if (!r.ok) { setError(d?.error || "Could not reach the queue."); return null; }
+    return d;
+  }, []);
+
+  const join = useCallback(async (name: string, avatar: string | null, bans: boolean) => {
+    setError(null); matched.current = false;
+    const d = await send("join", { name, avatar, bans });
+    if (!d) { setState("idle"); return; }
+    if (d.state === "matched" && d.code) { matched.current = true; setState("matched"); onMatch(d.code); return; }
+    setState("waiting");
+  }, [send, onMatch]);
+
+  const leave = useCallback(async () => {
+    setState("idle"); setWaitedMs(0);
+    await send("leave");
+  }, [send]);
+
+  useEffect(() => {
+    if (state !== "waiting" && state !== "hosting") return;
+    let stop = false;
+    const tick = async () => {
+      const d = await send("poll");
+      if (stop || !d) return;
+      if (d.state === "matched" && d.code && !matched.current) {
+        matched.current = true; setState("matched"); onMatch(d.code); return;
+      }
+      if (d.state === "hosting" && d.code && !matched.current) {
+        matched.current = true; setState("hosting"); onMatch(d.code); return;
+      }
+      if (d.state === "idle") { setState("idle"); return; }
+      setWaitedMs(d.waitedMs ?? 0);
+    };
+    const t = setInterval(tick, 2000);
+    return () => { stop = true; clearInterval(t); };
+  }, [state, send, onMatch]);
+
+  /*
+   * A player who closes the tab is cleaned up by the server, not by a beacon.
+   * `sendBeacon` cannot carry an Authorization header, so an unload leave would
+   * arrive unauthenticated and be rejected — and the route already treats a
+   * parked entry that has not polled within 45 seconds as gone, which covers a
+   * closed tab, a dead connection and a backgrounded phone alike.
+   */
+  return { state, error, waitedMs, join, leave };
 }
 
 /**

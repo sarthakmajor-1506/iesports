@@ -25,6 +25,7 @@ import { registerWelcomeEvent } from "./events/welcome";
 import { registerVcTracker } from "./services/vc-tracker";
 import { registerVoicePanel } from "./services/voice-panel";
 import { linksteamData, linksteamExecute, matchresultData, matchresultExecute } from "./commands/slash-commands";
+import { draftData, draftExecute, draftboardData, draftboardExecute } from "./commands/draft-commands";
 import { lobbyControlEmbed } from "./utils/embeds";
 import { createQueueButton, lobbyControlRow1, lobbyControlRow2, lobbyControlRow3 } from "./utils/buttons";
 
@@ -50,6 +51,8 @@ const client = new Client({
 const commands = new Collection<string, any>();
 commands.set(linksteamData.name, { data: linksteamData, execute: linksteamExecute });
 commands.set(matchresultData.name, { data: matchresultData, execute: matchresultExecute });
+commands.set(draftData.name, { data: draftData, execute: draftExecute });
+commands.set(draftboardData.name, { data: draftboardData, execute: draftboardExecute });
 
 // ─── Interaction Router ──────────────────────────────────────
 
