@@ -457,6 +457,11 @@ export function LiveView({
   const q = search.trim().toLowerCase();
   const filtered = available.filter((id) => heroName(id).toLowerCase().includes(q));
   const optimisticMine = pendingHero != null && !banning ? [...mine, pendingHero] : mine;
+  // A ban in flight belongs on the strip for the same reason a pick in flight
+  // belongs in the team row: the room takes up to a poll interval to agree.
+  const optimisticBans = pendingHero != null && banning
+    ? [...bans, { by: "you" as const, heroId: pendingHero }]
+    : bans;
   const lastPick = picks[picks.length - 1];
   // Short enough to survive the band's centre column beside the clock — see the
   // note on the same label in the solo board.
@@ -502,6 +507,10 @@ export function LiveView({
         <TeamRow side="you" label={(meName ?? "YOU").toUpperCase()} motion={motion} height="clamp(96px, 29vw, 148px)"
           heroes={optimisticMine.map(heroOf)} latest={optimisticMine[optimisticMine.length - 1] ?? null}
           turnActive={myTurn && !banning && pendingHero == null} />
+        {/* Same as solo: the bans were only ever shown on the recap, so during
+            a bans room the heroes coming off the board just disappeared from
+            the pool with nothing saying what went. */}
+        {optimisticBans.length > 0 && <BanStrip bans={optimisticBans} byId={heroById} />}
       </div>
 
       <Field

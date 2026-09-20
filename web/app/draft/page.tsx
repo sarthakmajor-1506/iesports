@@ -568,6 +568,12 @@ function Duel() {
           <TeamRow side="you" label="RADIANT" motion={motion} height="clamp(96px, 29vw, 148px)"
             heroes={yours.map(heroOf)} latest={lastPick?.by === "you" ? lastPick.heroId : null}
             turnActive={yourTurn && !banning} />
+          {/* What is off the board, WHILE it matters. This strip only ever
+              appeared on the recap, so through an entire bans draft the heroes
+              being removed simply vanished from the pool with no record of what
+              went or who took it. It costs one 20px line and renders nothing at
+              all in a straight-picks draft. */}
+          {bans.length > 0 && <BanStrip bans={bans} byId={heroById} />}
         </div>
 
         <Field value={search} onChange={(e) => setSearch(e.target.value)}
