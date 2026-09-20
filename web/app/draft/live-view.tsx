@@ -2,19 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildEngine, rankCandidates, type DraftModel, type Engine } from "@/lib/draftlab";
-import { counterMap, playerWinProb, tempoMap, draftingStyle, type TempoRow } from "@/lib/draftbot";
+import { playerWinProb, tempoMap, draftingStyle, type TempoRow } from "@/lib/draftbot";
+import { buildReport } from "@/lib/draftReport";
 import { draftSequence } from "@/lib/draftSequence";
 import type { Knowledge } from "@/lib/quiz";
 import { QuizRound, type QuizResult } from "./quiz";
 import {
-  Shell, Band, Btn, Panel, Label, Field, VersusBar, CoinChip, SoundToggle,
+  Shell, Band, Btn, Panel, Field, VersusBar, CoinChip, SoundToggle,
   CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, BW_2,
 } from "./ui";
 import { Skeleton } from "./theme";
 import { play, startMusic, stopMusic } from "./sound";
 import { TeamRow, BanStrip, AttributePool } from "./hero-art";
-import { Col, CoinPanel, CounterNote } from "./result";
+import { CoinPanel } from "./result";
+import { DraftPostMortem } from "./report";
 import { useMyCoins } from "./leaderboard";
 import {
   useLiveRoom, useCountdown, useRoomActions, useTurnTimeout, TurnClock, playerId,
@@ -90,6 +92,23 @@ export function LiveView({
     const used = new Set(picks.map((p) => p.heroId));
     return model.heroes.filter((h) => !used.has(h.id)).map((h) => h.id);
   }, [model, picks]);
+
+  /**
+   * The post-mortem, built once the draft is over.
+   *
+   * A room document carries the ordered move list and nothing else — no
+   * per-pick numbers, because the two clients only ever agreed on picks. That
+   * turns out to be enough: the whole report is derived from the moves, so a
+   * live result explains itself exactly as fully as a solo one. Gated on the
+   * draft being finished and on actually holding a seat, since a spectator has
+   * no side for it to be written from.
+   */
+  const report = useMemo(() => {
+    if (room?.status !== "done" || seat == null || !picks.length) return null;
+    return buildReport(engine, picks.map((p) => ({
+      mine: p.by === seat, kind: p.kind, heroId: p.heroId, auto: p.auto,
+    })));
+  }, [engine, picks, seat, room?.status]);
 
   /** Sent with every pick so the server can substitute if a hero was just taken. */
   const fallback = useMemo(() => {
@@ -294,7 +313,7 @@ export function LiveView({
     const eloDelta = settled ? (seat === "host" ? settled.deltaHost : settled.deltaGuest) : 0;
     const coinsMine = settled ? (seat === "host" ? settled.coinsHost : settled.coinsGuest) : 0;
     const oppQuiz = seat ? (seat === "host" ? room.quizGuest : room.quizHost) ?? null : null;
-    const { yoursWin, theirsWin } = counterMap(engine, mine, theirs);
+
     const style = draftingStyle(engine, mine, tempos);
     const autos = picks.filter((p) => p.auto && p.by === seat).length;
 
@@ -420,18 +439,9 @@ export function LiveView({
           <TeamRow side="you" label={meName.toUpperCase()} heroes={mine.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
           <TeamRow side="them" label={themName.toUpperCase()} heroes={theirs.map(heroOf)} latest={null} motion={motion} height="clamp(78px, 22vw, 108px)" />
 
-          <Panel style={{ padding: "11px 13px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <Label style={{ marginBottom: 0 }}>THE COUNTER WAR</Label>
-              <span style={{ fontSize: 12, fontWeight: 900, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
-                {yoursWin.length} — {theirsWin.length}
-              </span>
-            </div>
-            <CounterNote />
-            <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
-            <div style={{ height: 8 }} />
-            <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
-          </Panel>
+          {/* The same post-mortem solo gets, from the same builder. A live room
+              carries only the move list, which is all this needs. */}
+          {report && <DraftPostMortem report={report} engine={engine} meName={meName} themName={themName} />}
 
           <div className="dl-card" style={{ padding: "13px 14px", background: LEMON, color: ON_FILL }}>
             <div style={{ fontSize: 9.5, letterSpacing: 1.5, fontWeight: 900, opacity: .7, marginBottom: 5 }}>YOUR DRAFTING STYLE</div>

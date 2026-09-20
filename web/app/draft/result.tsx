@@ -1,16 +1,18 @@
 "use client";
 
 import { type Engine } from "@/lib/draftlab";
-import { counterMap, teamTempo, draftingStyle, type TempoRow, type CounterEdge } from "@/lib/draftbot";
-import { useEffect, useState } from "react";
+import { teamTempo, draftingStyle, type TempoRow } from "@/lib/draftbot";
+import { buildReport } from "@/lib/draftReport";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Band, Btn, Panel, Label, VersusBar, CountUp, CoinChip, Mark,
-  CREAM, PANEL, LINE, MUTED, DIM, GREEN, ENEMY,
+  Band, Btn, VersusBar, CountUp, CoinChip, Mark,
+  CREAM, PANEL, LINE, MUTED, DIM,
   LEMON, MINT, PINK, LILAC, ON_FILL, PAPER, R_CARD, R_CHIP, BW_2,
 } from "./ui";
 import { Burst } from "./theme";
 import { play } from "./sound";
-import { TeamRow, HeroImg, heroBase } from "./hero-art";
+import { TeamRow } from "./hero-art";
+import { DraftPostMortem } from "./report";
 
 export type ResultEv = {
   by: "bot" | "you"; kind: "ban" | "pick"; heroId: number;
@@ -69,7 +71,18 @@ export function Result({
 
   const p = finalP ?? 0.5;
   const won = p > 0.5;
-  const { yoursWin, theirsWin } = counterMap(engine, yours, theirs);
+
+  /*
+   * The post-mortem is rebuilt from the move list rather than from the numbers
+   * the bot happened to record while playing. It costs a few hundred model
+   * evaluations once, on a screen that is already waiting for the player to
+   * read it — and it is the same code a live room runs, so both modes explain
+   * a draft the same way instead of solo having the better screen.
+   */
+  const report = useMemo(
+    () => buildReport(engine, events.map((e) => ({ mine: e.by === "you", kind: e.kind, heroId: e.heroId }))),
+    [engine, events]
+  );
   const theirBest = events.filter((e) => e.by === "bot" && e.kind === "pick").sort((a, b) => a.swing - b.swing)[0];
   const yourWorst = events.filter((e) => e.by === "you" && e.kind === "pick").sort((a, b) => b.regret - a.regret)[0];
   const bestBan = events.filter((e) => e.by === "you" && e.kind === "ban" && e.deniedRank != null)
@@ -137,18 +150,10 @@ export function Result({
       )}
       {tempoLine && <Beat fill={LILAC} label="SHAPE OF THE GAME">{tempoLine}</Beat>}
 
-      <Panel style={{ padding: "10px 12px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
-          <Label style={{ marginBottom: 0 }}>THE COUNTER WAR</Label>
-          <span style={{ fontSize: 12, fontWeight: 800, color: yoursWin.length >= theirsWin.length ? GREEN : ENEMY }}>
-            {yoursWin.length} — {theirsWin.length}
-          </span>
-        </div>
-        <CounterNote />
-        <Col title="YOU COUNTERED" rows={yoursWin.slice(0, 3)} color={GREEN} engine={engine} />
-        <div style={{ height: 8 }} />
-        <Col title="THEY COUNTERED" rows={theirsWin.slice(0, 3)} color={ENEMY} engine={engine} />
-      </Panel>
+      {/* The whole evaluation, not three lines of it. This replaced a "counter
+          war" panel that showed the top three edges per side out of the
+          twenty-five the model had already computed. */}
+      <DraftPostMortem report={report} engine={engine} meName="You" themName={them} />
 
       <div className="dl-card" style={{ padding: "13px 14px", background: LEMON, color: ON_FILL }}>
         <div style={{ fontSize: 9.5, letterSpacing: 1.5, fontWeight: 900, opacity: .7, marginBottom: 5 }}>YOUR DRAFTING STYLE</div>
@@ -174,74 +179,6 @@ function Beat({ fill, label, children }: { fill: string; label: string; children
         <div style={{ fontSize: 9, letterSpacing: 1.4, color: DIM, fontWeight: 900, marginBottom: 3 }}>{label}</div>
         <div style={{ fontSize: 13, color: CREAM, fontWeight: 600, lineHeight: 1.45 }}>{children}</div>
       </div>
-    </div>
-  );
-}
-
-/**
- * What the two numbers in a counter row mean.
- *
- * They are one matchup split in two, so they add to 100 — but a hero can hold
- * a counter edge and still be the underdog outright, which is how a pair like
- * "46%–54%" ends up under YOU COUNTERED. Without a word of explanation that
- * looks like an error rather than the point, and the old fix for it (printing
- * the expected rate beside the real one) was the thing making these rows too
- * wide to fit a phone.
- */
-export function CounterNote() {
-  return (
-    <div style={{ fontSize: 9.5, color: MUTED, fontWeight: 700, lineHeight: 1.4, marginBottom: 8 }}>
-      Win rate in each matchup, split between the two heroes. A hero can counter
-      and still be the underdog.
-    </div>
-  );
-}
-
-/**
- * One side of the counter war.
- *
- * TWO NUMBERS THAT ADD UP. This used to print the attacker's head-to-head rate
- * beside what their base strengths predicted — "54% vs 49%" — which is a real
- * distinction but reads as two heroes' shares of one matchup, and those plainly
- * did not sum to 100. It is now the matchup split itself: the attacker's rate
- * and its complement, one under each hero, which is what the numbers next to
- * two names are always taken to mean. The edge the row is claiming is already
- * carried by which column it is in.
- *
- * NOTHING RUNS OFF THE RIGHT. Both names are flex items with `minWidth: 0` so
- * they can actually ellipsise. Without it a flex item's automatic minimum is
- * its content width, and `whiteSpace: nowrap` made that the full hero name —
- * so two long names and a percentage simply pushed the row wider than the
- * phone, which is what was cut off on the right of this screen.
- */
-export function Col({ title, rows, color, engine }: { title: string; rows: CounterEdge[]; color: string; engine: Engine }) {
-  const heroName = (id: number) => engine.heroById.get(id)?.name ?? `#${id}`;
-  return (
-    <div>
-      <div style={{ fontSize: 9, letterSpacing: 1.2, color, marginBottom: 5, fontWeight: 900 }}>{title}</div>
-      {rows.length === 0 && <div style={{ fontSize: 11.5, color: MUTED }}>Nothing decisive.</div>}
-      {rows.map((r, i) => {
-        // Round one and take the complement, rather than rounding both: 51.4 and
-        // 48.6 would otherwise print as 51 and 49.
-        const a = r.winRate == null ? null : Math.round(r.winRate * 100);
-        const b = a == null ? null : 100 - a;
-        return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
-            <span style={{ width: 26, height: 17, flexShrink: 0, borderRadius: 4, overflow: "hidden", border: `1.5px solid ${LINE}`, boxSizing: "border-box", background: "var(--tile)" }}>
-              <HeroImg base={heroBase(engine.heroById.get(r.attacker)!.img)} shape="crop" position="50% 20%" />
-            </span>
-            <span style={{ flex: "1 1 0", minWidth: 0, fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {heroName(r.attacker)}
-            </span>
-            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 900, color: DIM, fontVariantNumeric: "tabular-nums" }}>
-              {a == null ? "vs" : <><span style={{ color }}>{a}%</span>–{b}%</>}
-            </span>
-            <span style={{ flex: "1 1 0", minWidth: 0, fontSize: 11.5, color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>
-              {heroName(r.defender)}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }
