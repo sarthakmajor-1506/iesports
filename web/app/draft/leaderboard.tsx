@@ -22,15 +22,14 @@ import { Skeleton } from "./theme";
  * decided within a fortnight, and after that it tells everyone outside the
  * top ten that nothing they do this evening matters.
  *
- * Elo still moves in the background on every ranked live result — it is what
- * the medal badge next to a name is drawn from — but it is flavour here, not
- * the sort key.
+ * Elo still moves in the background on every ranked live result and still
+ * decides matchmaking, but it is not shown here and this board does not sort
+ * by it.
  */
 
 export type WeeklyRow = {
   uid: string; name: string; avatar: string | null;
   coins: number; games: number; wins: number;
-  medal: string; medalFill: string;
   rank?: number | null;
 };
 
@@ -132,12 +131,11 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
 /**
  * One place on the board.
  *
- * The medal is Dota's own name for a rating band — Herald through Immortal —
- * because a number between 900 and 1800 means nothing to a player and
- * "Divine" means everything. It is drawn from all-time Elo (ranked live
- * results only), sitting next to a coin total that is entirely about this
- * week and both game modes; a player can be freshly Archon and still be
- * leading the board on a good week.
+ * NO RANK BADGE. Each row used to carry a Dota medal name — Herald through
+ * Immortal — drawn from all-time ranked Elo. It sat beside a coin total that
+ * is about this week and both game modes, so the two disagreed by design: a
+ * player could be freshly Archon and leading the board, which reads as one of
+ * the two numbers being wrong. The board is coins, and only coins.
  */
 function Row({ r, rank, me }: { r: WeeklyRow; rank: number | null; me?: boolean }) {
   const badge = rank === 1 ? GOLD_FILL : rank === 2 ? "#DCE1E8" : rank === 3 ? "#E6B389" : null;
@@ -164,10 +162,6 @@ function Row({ r, rank, me }: { r: WeeklyRow; rank: number | null; me?: boolean 
           {r.name}{me && <span style={{ fontSize: 9, marginLeft: 6, letterSpacing: .8, opacity: .65 }}>YOU</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-          <span style={{
-            fontSize: 7.5, fontWeight: 900, letterSpacing: .5, padding: "1px 6px", borderRadius: 999,
-            background: r.medalFill, color: ON_FILL, border: `1.5px solid ${LINE}`, flexShrink: 0,
-          }}>{r.medal.toUpperCase()}</span>
           <span style={{ fontSize: 9.5, color: me ? ON_FILL : DIM, opacity: me ? .7 : 1, fontWeight: 700, letterSpacing: .3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {r.games} {r.games === 1 ? "game" : "games"} this week · {r.wins}W
           </span>

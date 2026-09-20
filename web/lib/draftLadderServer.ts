@@ -182,26 +182,27 @@ export async function settleRoom(code: string): Promise<SettleResult> {
     tx.set(guestRef, row(guestUid, guestIdentity, gPrev, gNewElo, coinsGuest, guestWon, hostWon, drew), { merge: true });
 
     /**
-     * The weekly board. `elo` is mirrored in here purely so the read side can
-     * show a medal without a second fetch per row — it is flavour, not the
-     * sort key, so a few minutes of staleness against the permanent doc above
-     * is invisible.
+     * The weekly board. Coins, games and wins — nothing else.
+     *
+     * `elo` used to be mirrored in here so the read side could put a rank band
+     * next to each row without a second fetch. The band is gone, and with it
+     * the only thing that ever read this copy: the permanent doc above still
+     * holds the real rating, and that is what the bot's all-time board sorts on.
      */
     const weekly = (
       who: string, identity: { name: string; avatar: string | null },
-      prev: FirebaseFirestore.DocumentData, elo: number, coins: number, won: boolean
+      prev: FirebaseFirestore.DocumentData, coins: number, won: boolean
     ) => ({
       uid: who,
       name: identity.name,
       avatar: identity.avatar,
-      elo,
       coins: (prev.coins ?? 0) + coins,
       games: (prev.games ?? 0) + 1,
       wins: (prev.wins ?? 0) + (won ? 1 : 0),
       lastAt: FieldValue.serverTimestamp(),
     });
-    tx.set(weeklyHostRef, weekly(hostUid, hostIdentity, wh.exists ? wh.data()! : {}, hNewElo, coinsHost, hostWon), { merge: true });
-    tx.set(weeklyGuestRef, weekly(guestUid, guestIdentity, wg.exists ? wg.data()! : {}, gNewElo, coinsGuest, guestWon), { merge: true });
+    tx.set(weeklyHostRef, weekly(hostUid, hostIdentity, wh.exists ? wh.data()! : {}, coinsHost, hostWon), { merge: true });
+    tx.set(weeklyGuestRef, weekly(guestUid, guestIdentity, wg.exists ? wg.data()! : {}, coinsGuest, guestWon), { merge: true });
 
     tx.update(roomRef, {
       settled: true,

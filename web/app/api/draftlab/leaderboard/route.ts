@@ -3,7 +3,7 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
 import { buildQuiz, QUIZ_COUNT, MAX_POINTS, type Knowledge } from "@/lib/quiz";
-import { START_ELO, weekKey, msUntilWeekReset, medal } from "@/lib/draftLadder";
+import { weekKey, msUntilWeekReset } from "@/lib/draftLadder";
 import { resolvePlayerIdentity } from "@/lib/draftIdentity";
 
 /**
@@ -149,7 +149,6 @@ export async function POST(req: NextRequest) {
     const out = await adminDb.runTransaction(async (tx) => {
       const [snap, weeklySnap] = await Promise.all([tx.get(ref), tx.get(weeklyRef)]);
       const prev = snap.exists ? snap.data()! : {};
-      const elo = typeof prev.elo === "number" ? prev.elo : START_ELO;
 
       // A coin haul beating your own record — decided against the row as it
       // stood BEFORE this game, or every game would be a personal best.
@@ -159,9 +158,8 @@ export async function POST(req: NextRequest) {
       /*
        * Solo never touches elo/peak/losses/draws/streak — those are a ranked
        * live concept — so they are simply left out of this write. A Firestore
-       * merge leaves whatever was there alone; a player with no ranked history
-       * reads back the defaults (START_ELO, no medal beyond Herald) exactly as
-       * before this game.
+       * merge leaves whatever was there alone, so a player with no ranked
+       * history still reads back exactly what they did before this game.
        */
       const next = {
         uid,
@@ -177,7 +175,7 @@ export async function POST(req: NextRequest) {
       const wPrev = weeklySnap.exists ? weeklySnap.data()! : {};
       const weeklyCoins = (wPrev.coins ?? 0) + coins;
       tx.set(weeklyRef, {
-        uid, name: identity.name, avatar: identity.avatar, elo,
+        uid, name: identity.name, avatar: identity.avatar,
         coins: weeklyCoins,
         games: (wPrev.games ?? 0) + 1,
         wins: (wPrev.wins ?? 0) + (won ? 1 : 0),
@@ -217,14 +215,14 @@ export async function GET(req: NextRequest) {
     const snap = await adminDb.collection(WEEKLY).doc(week).collection("players")
       .orderBy("coins", "desc").limit(limit).get();
 
+    // No rank band goes out with a row. It was read from all-time ranked Elo
+    // and shown beside a coin total that covers this week and both modes, so
+    // the two routinely disagreed in front of the player.
     const rows = snap.docs.map((d) => {
       const x = d.data();
-      const elo = typeof x.elo === "number" ? x.elo : START_ELO;
-      const m = medal(elo);
       return {
         uid: x.uid, name: x.name ?? "Anonymous", avatar: x.avatar ?? null,
         coins: x.coins ?? 0, games: x.games ?? 0, wins: x.wins ?? 0,
-        medal: m.name, medalFill: m.fill,
       };
     });
 
@@ -233,12 +231,10 @@ export async function GET(req: NextRequest) {
       const mine = await adminDb.collection(WEEKLY).doc(week).collection("players").doc(uid).get();
       if (mine.exists) {
         const x = mine.data()!;
-        const elo = typeof x.elo === "number" ? x.elo : START_ELO;
-        const m = medal(elo);
         you = {
           uid, name: x.name ?? "Anonymous", avatar: x.avatar ?? null,
           coins: x.coins ?? 0, games: x.games ?? 0, wins: x.wins ?? 0,
-          medal: m.name, medalFill: m.fill, rank: null,
+          rank: null,
         };
       }
     }

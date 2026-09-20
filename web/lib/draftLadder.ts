@@ -14,16 +14,16 @@
  * that needs to stay obvious, so the twelve lines of Elo are written again
  * here.
  *
- * ONE VISIBLE BOARD. Elo/medal used to run alongside a separate avg-points
+ * ONE VISIBLE BOARD. Elo used to run alongside a separate avg-points
  * "Solo Scores" board and a daily Elo-delta board — three numbers for one
  * game. They are now one: Elo still moves on every ranked live result (it is
- * what the medal badge is drawn from), but the thing players are actually
+ * what matchmaking and the bot’s all-time board use), but the thing players are
  * ranked against each other on is coins earned this week, in
  * `draftlabLadderWeekly/{weekKey}/players/{uid}` — see draftLadderServer.ts
  * for who gets paid and when.
  */
 
-/** Everyone starts at Archon — the middle of the medal range, not the bottom. */
+/** Everyone starts mid-range rather than at the bottom, so a first loss is not a cliff. */
 export const START_ELO = 1200;
 
 /**
@@ -70,30 +70,6 @@ export function outcomeFrom(hostWinProb: number): Outcome {
 }
 
 export const scoreFor = (o: Outcome): number => (o === "draw" ? 0.5 : o === "host" ? 1 : 0);
-
-/* --------------------------------------------------------------- medals */
-
-/**
- * Dota's own medal names, because this audience reads them instantly and a
- * number between 900 and 1800 means nothing on its own. The bands are wider at
- * the top so climbing out of Divine is meant to take a while.
- */
-const MEDALS: { at: number; name: string; fill: string }[] = [
-  { at: 0, name: "Herald", fill: "var(--card-2)" },
-  { at: 1000, name: "Guardian", fill: "var(--mint)" },
-  { at: 1100, name: "Crusader", fill: "var(--sky)" },
-  { at: 1200, name: "Archon", fill: "var(--lilac)" },
-  { at: 1300, name: "Legend", fill: "var(--pink)" },
-  { at: 1400, name: "Ancient", fill: "var(--coral)" },
-  { at: 1550, name: "Divine", fill: "var(--lemon)" },
-  { at: 1750, name: "Immortal", fill: "var(--gold-fill)" },
-];
-
-export function medal(elo: number): { name: string; fill: string } {
-  let hit = MEDALS[0];
-  for (const m of MEDALS) if (elo >= m.at) hit = m;
-  return { name: hit.name, fill: hit.fill };
-}
 
 /* ----------------------------------------------------------- the week */
 
@@ -150,6 +126,4 @@ export type WeeklyRow = {
   coins: number;
   games: number;
   wins: number;
-  /** Mirrored from the permanent ladder doc at write time, purely for the medal badge. */
-  elo: number;
 };
