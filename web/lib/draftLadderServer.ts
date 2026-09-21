@@ -2,7 +2,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
 import {
-  START_ELO, weekKey, nextRatings, outcomeFrom, scoreFor,
+  START_ELO, monthKey, nextRatings, outcomeFrom, scoreFor,
   type Outcome,
 } from "@/lib/draftLadder";
 import { resolvePlayerIdentity } from "@/lib/draftIdentity";
@@ -43,7 +43,7 @@ const ROOMS = "draftlabRooms";
  */
 const SEATS = "draftlabRoomSeats";
 const LADDER = "draftlabLadder";
-const WEEKLY = "draftlabLadderWeekly";
+const MONTHLY = "draftlabLadderMonthly";
 
 let modelCache: DraftModel | null = null;
 async function getModel(): Promise<DraftModel> {
@@ -124,9 +124,9 @@ export async function settleRoom(code: string): Promise<SettleResult> {
 
   const hostRef = adminDb.collection(LADDER).doc(hostUid);
   const guestRef = adminDb.collection(LADDER).doc(guestUid);
-  const week = weekKey();
-  const weeklyHostRef = adminDb.collection(WEEKLY).doc(week).collection("players").doc(hostUid);
-  const weeklyGuestRef = adminDb.collection(WEEKLY).doc(week).collection("players").doc(guestUid);
+  const month = monthKey();
+  const monthlyHostRef = adminDb.collection(MONTHLY).doc(month).collection("players").doc(hostUid);
+  const monthlyGuestRef = adminDb.collection(MONTHLY).doc(month).collection("players").doc(guestUid);
 
   const hostWon = outcome === "host", guestWon = outcome === "guest", drew = outcome === "draw";
   const coinsHost = hostWon ? coinsForWin(hostWinProb) : 0;
@@ -136,7 +136,7 @@ export async function settleRoom(code: string): Promise<SettleResult> {
     // Every read first — Firestore forbids a read after a write in the same
     // transaction, and there are five of them here.
     const [roomNow, h, g, wh, wg] = await Promise.all([
-      tx.get(roomRef), tx.get(hostRef), tx.get(guestRef), tx.get(weeklyHostRef), tx.get(weeklyGuestRef),
+      tx.get(roomRef), tx.get(hostRef), tx.get(guestRef), tx.get(monthlyHostRef), tx.get(monthlyGuestRef),
     ]);
     if ((roomNow.data() as { settled?: boolean } | undefined)?.settled) {
       return { settled: false, reason: "already settled" } as SettleResult;
@@ -182,14 +182,14 @@ export async function settleRoom(code: string): Promise<SettleResult> {
     tx.set(guestRef, row(guestUid, guestIdentity, gPrev, gNewElo, coinsGuest, guestWon, hostWon, drew), { merge: true });
 
     /**
-     * The weekly board. Coins, games and wins — nothing else.
+     * The monthly board. Coins, games and wins — nothing else.
      *
      * `elo` used to be mirrored in here so the read side could put a rank band
      * next to each row without a second fetch. The band is gone, and with it
      * the only thing that ever read this copy: the permanent doc above still
      * holds the real rating, and that is what the bot's all-time board sorts on.
      */
-    const weekly = (
+    const monthly = (
       who: string, identity: { name: string; avatar: string | null },
       prev: FirebaseFirestore.DocumentData, coins: number, won: boolean
     ) => ({
@@ -201,8 +201,8 @@ export async function settleRoom(code: string): Promise<SettleResult> {
       wins: (prev.wins ?? 0) + (won ? 1 : 0),
       lastAt: FieldValue.serverTimestamp(),
     });
-    tx.set(weeklyHostRef, weekly(hostUid, hostIdentity, wh.exists ? wh.data()! : {}, coinsHost, hostWon), { merge: true });
-    tx.set(weeklyGuestRef, weekly(guestUid, guestIdentity, wg.exists ? wg.data()! : {}, coinsGuest, guestWon), { merge: true });
+    tx.set(monthlyHostRef, monthly(hostUid, hostIdentity, wh.exists ? wh.data()! : {}, coinsHost, hostWon), { merge: true });
+    tx.set(monthlyGuestRef, monthly(guestUid, guestIdentity, wg.exists ? wg.data()! : {}, coinsGuest, guestWon), { merge: true });
 
     tx.update(roomRef, {
       settled: true,

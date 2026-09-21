@@ -77,7 +77,7 @@ function Duel() {
   const [quiz, setQuiz] = useState<QuizResult | null>(null);
   const [scored, setScored] = useState<{ points: number; draftPoints: number; quizPoints: number } | null>(null);
   const [coinsAwarded, setCoinsAwarded] = useState(0);
-  const [weeklyTotal, setWeeklyTotal] = useState<number | null>(null);
+  const [monthlyTotal, setMonthlyTotal] = useState<number | null>(null);
   const [coinsPersonalBest, setCoinsPersonalBest] = useState(false);
   const [boardVersion, setBoardVersion] = useState(0);
   /** Your own coin total for the week — the header chip, and what the result climbs into. */
@@ -259,7 +259,7 @@ function Duel() {
       const d = await r.json();
       if (d?.scored) setScored(d.scored);
       setCoinsAwarded(d?.coinsAwarded ?? 0);
-      setWeeklyTotal(typeof d?.weeklyTotal === "number" ? d.weeklyTotal : null);
+      setMonthlyTotal(typeof d?.monthlyTotal === "number" ? d.monthlyTotal : null);
       setCoinsPersonalBest(!!d?.coinsPersonalBest);
       setBoardVersion((v) => v + 1);
     } catch { /* the leaderboard is never allowed to break the game loop */ }
@@ -296,14 +296,14 @@ function Duel() {
    */
   const restart = () => {
     setEvents([]); setSearch(""); setLogged(false); setQuiz(null); setScored(null);
-    setCoinsAwarded(0); setWeeklyTotal(null); setCoinsPersonalBest(false);
+    setCoinsAwarded(0); setMonthlyTotal(null); setCoinsPersonalBest(false);
     setStartedAt(Date.now()); rngState.current = Math.floor(Math.random() * 0xffffffff);
     startMusic("draft");
     setStage("drafting");
   };
   const toMenu = () => {
     setEvents([]); setQuiz(null); setScored(null);
-    setCoinsAwarded(0); setWeeklyTotal(null); setCoinsPersonalBest(false); setLogged(false);
+    setCoinsAwarded(0); setMonthlyTotal(null); setCoinsPersonalBest(false); setLogged(false);
     startMusic("menu");
     setStage("menu");
   };
@@ -609,12 +609,12 @@ function Duel() {
   return (
     <Shell
       tab={null}
-      head={<ResultBand won={won} onMenu={toMenu} coins={weeklyTotal ?? myCoins} coinsAdded={coinsAwarded} />}
+      head={<ResultBand won={won} onMenu={toMenu} coins={monthlyTotal ?? myCoins} coinsAdded={coinsAwarded} />}
       foot={<ResultActions onAgain={restart} onMenu={toMenu} />}
     >
       <Result engine={engine} events={events} yours={yours} theirs={theirs} finalP={finalP}
         quiz={quiz} tempos={tempos} motion={motion} scored={scored}
-        coinsAwarded={coinsAwarded} weeklyTotal={weeklyTotal} coinsPersonalBest={coinsPersonalBest} />
+        coinsAwarded={coinsAwarded} monthlyTotal={monthlyTotal} coinsPersonalBest={coinsPersonalBest} />
     </Shell>
   );
 }
@@ -701,7 +701,7 @@ function LadderTile({
           <div style={{ fontSize: 11.5, fontWeight: 700, opacity: .8, lineHeight: 1.4, marginBottom: 13 }}>
             {!signedIn
               ? "Beat a human and it counts. Needs an account — there has to be somewhere to put the result."
-              : "Win and take their rating, plus coins toward this week's board."}
+              : "Win and take their rating, plus coins toward this month's board."}
           </div>
         </>
       )}

@@ -30,7 +30,7 @@ export type ResultEv = {
  */
 export function ResultBand({ won, onMenu, coins, coinsAdded }: {
   won: boolean; onMenu: () => void;
-  /** Weekly total after this game, for the header chip. Null when signed out. */
+  /** Monthly total after this game, for the header chip. Null when signed out. */
   coins?: number | null;
   /** What this game paid, so the chip climbs into the total instead of just showing it. */
   coinsAdded?: number;
@@ -54,15 +54,15 @@ export function ResultActions({ onAgain, onMenu }: { onAgain: () => void; onMenu
 
 export function Result({
   engine, events, yours, theirs, finalP, quiz, tempos, motion, scored,
-  coinsAwarded, weeklyTotal, coinsPersonalBest,
+  coinsAwarded, monthlyTotal, coinsPersonalBest,
 }: {
   engine: Engine; events: ResultEv[]; yours: number[]; theirs: number[]; finalP: number | null;
   quiz: { points: number; correct: number; rounds: { correct: boolean; points: number }[] } | null;
   tempos: Map<number, TempoRow>; motion: boolean;
   scored: { points: number; draftPoints: number; quizPoints: number } | null;
-  /** What this game paid into the weekly board — 0 on a loss. See CoinPanel. */
+  /** What this game paid into the monthly board — 0 on a loss. See CoinPanel. */
   coinsAwarded?: number;
-  weeklyTotal?: number | null;
+  monthlyTotal?: number | null;
   /** Server-decided, against the row as it stood before this game. */
   coinsPersonalBest?: boolean;
 }) {
@@ -121,7 +121,7 @@ export function Result({
 
       {(quiz || scored) && <ScoreReveal scored={scored} quiz={quiz} />}
       {!!coinsAwarded && (
-        <CoinPanel coins={coinsAwarded} weeklyTotal={weeklyTotal ?? null} personalBest={coinsPersonalBest} />
+        <CoinPanel coins={coinsAwarded} monthlyTotal={monthlyTotal ?? null} personalBest={coinsPersonalBest} />
       )}
 
       <TeamRow side="you" label="YOUR FIVE" heroes={yours.map(heroOf)} latest={null} motion={motion} height="clamp(80px, 23vw, 116px)" />
@@ -252,8 +252,8 @@ function ScoreReveal({
  * nothing.
  */
 export function CoinPanel({
-  coins, weeklyTotal, personalBest,
-}: { coins: number; weeklyTotal: number | null; personalBest?: boolean }) {
+  coins, monthlyTotal, personalBest,
+}: { coins: number; monthlyTotal: number | null; personalBest?: boolean }) {
   const [landed, setLanded] = useState(false);
 
   useEffect(() => {
@@ -285,10 +285,10 @@ export function CoinPanel({
         </div>
       )}
 
-      {weeklyTotal != null && (
+      {monthlyTotal != null && (
         <div className="dl-in" style={{ marginTop: 11 }}>
           <span className="dl-stk" style={{ background: PANEL, color: CREAM, fontSize: 9.5 }}>
-            WEEKLY TOTAL · 🪙 {weeklyTotal}
+            THIS MONTH · 🪙 {monthlyTotal}
           </span>
         </div>
       )}

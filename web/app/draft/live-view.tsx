@@ -402,7 +402,7 @@ export function LiveView({
               left={meName.toUpperCase()} right={themName.toUpperCase()} />
           </Panel>
 
-          {!!coinsMine && <CoinPanel coins={coinsMine} weeklyTotal={null} />}
+          {!!coinsMine && <CoinPanel coins={coinsMine} monthlyTotal={null} />}
 
           {quiz && (
             <Panel>

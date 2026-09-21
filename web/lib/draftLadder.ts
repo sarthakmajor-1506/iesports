@@ -1,5 +1,5 @@
 /**
- * Draft Lab — the head-to-head ladder, and the weekly coin board.
+ * Draft Lab — the head-to-head ladder, and the monthly coin board.
  *
  * WHY A LADDER, NOT JUST THE SOLO BOARD. Ranking players on what a
  * 58%-accurate model thinks of their five heroes has no authority: when it
@@ -18,8 +18,8 @@
  * "Solo Scores" board and a daily Elo-delta board — three numbers for one
  * game. They are now one: Elo still moves on every ranked live result (it is
  * what matchmaking and the bot’s all-time board use), but the thing players are
- * ranked against each other on is coins earned this week, in
- * `draftlabLadderWeekly/{weekKey}/players/{uid}` — see draftLadderServer.ts
+ * ranked against each other on is coins earned this month, in
+ * `draftlabLadderMonthly/{monthKey}/players/{uid}` — see draftLadderServer.ts
  * for who gets paid and when.
  */
 
@@ -29,7 +29,7 @@ export const START_ELO = 1200;
 /**
  * K is high on purpose. A small pool playing a handful of games each needs to
  * reach its level in ten games, not two hundred; the cost is a noisier board,
- * which the weekly reset already absorbs.
+ * which the monthly reset already absorbs.
  */
 export const K_FACTOR = 32;
 
@@ -71,37 +71,50 @@ export function outcomeFrom(hostWinProb: number): Outcome {
 
 export const scoreFor = (o: Outcome): number => (o === "draw" ? 0.5 : o === "host" ? 1 : 0);
 
-/* ----------------------------------------------------------- the week */
+/* ---------------------------------------------------------- the month */
 
 /**
- * Which week a game belongs to, keyed by that week's Monday in IST.
+ * Which period a game belongs to, keyed by its calendar month in IST.
  *
- * A Monday date string rather than an ISO week number: week numbers need a
- * library to get year-boundary edge cases right, and nobody has to debug what
- * "2026-W01" means when the Firestore console just shows a date. The board's
- * players are in India, so the boundary is IST — deriving it from the server's
- * own timezone would roll the board at whatever hour the host region happens
- * to be in, a different one from the audience on Vercel.
+ * This was a week, keyed by that week's Monday. A week turned out to be too
+ * short for a board this size: with a handful of players, a Monday roll wipes
+ * a board that only had one good evening on it, and everyone who played that
+ * evening opens the app to a zero. A month is long enough that a result is
+ * still there the next time the player comes back.
+ *
+ * A calendar month rather than a rolling thirty days: the key is stable and
+ * self-explanatory in the Firestore console, the board can name itself
+ * ("SEPTEMBER"), and every player knows when it rolls without being told.
+ *
+ * The boundary is IST because the board's players are in India — deriving it
+ * from the server's own timezone would roll the board at whatever hour the
+ * host region happens to be in, a different one from the audience on Vercel.
  */
-export function weekKey(at: Date = new Date()): string {
+export function monthKey(at: Date = new Date()): string {
   const ist = new Date(at.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const day = ist.getDay(); // 0 = Sunday
-  const sinceMonday = (day + 6) % 7;
-  const monday = new Date(ist);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(ist.getDate() - sinceMonday);
-  return monday.toLocaleDateString("en-CA"); // YYYY-MM-DD, already IST-local
+  return `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
 }
 
-/** Milliseconds until the weekly board resets, for the countdown on it. */
-export function msUntilWeekReset(now: Date = new Date()): number {
+/** Milliseconds until the board resets, for the countdown on it. */
+export function msUntilMonthReset(now: Date = new Date()): number {
   const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const day = ist.getDay();
-  const untilMonday = (8 - day) % 7 || 7; // days remaining, 7 if today IS Monday
   const next = new Date(ist);
   next.setHours(0, 0, 0, 0);
-  next.setDate(ist.getDate() + untilMonday);
+  // Date first, THEN month. Going month-first from the 31st lands on the 1st of
+  // the month after next, because a 31st that does not exist rolls forward.
+  next.setDate(1);
+  next.setMonth(next.getMonth() + 1);
   return Math.max(0, next.getTime() - ist.getTime());
+}
+
+const MONTH_NAMES = [
+  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
+];
+
+/** A `monthKey` as the board's own heading. Falls back rather than throwing. */
+export function monthLabel(key: string): string {
+  return MONTH_NAMES[Number(key.slice(5, 7)) - 1] ?? "THIS MONTH";
 }
 
 export type LadderRow = {
@@ -118,8 +131,8 @@ export type LadderRow = {
   best: number;
 };
 
-/** One row on the visible weekly board. */
-export type WeeklyRow = {
+/** One row on the visible monthly board. */
+export type MonthlyRow = {
   uid: string;
   name: string;
   avatar: string | null;

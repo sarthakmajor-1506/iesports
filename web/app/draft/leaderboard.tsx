@@ -16,31 +16,44 @@ import { Skeleton } from "./theme";
  * for one game, and the reason a player's name could be right on one and
  * wrong on another (two write paths, two trusted strings; see
  * lib/draftIdentity.ts for the actual fix). Coins fold both game modes into
- * one board and one number: what you won this week. It resets Monday IST, so
- * first place is winnable by whoever plays tonight rather than settled by
- * whoever showed up first and never lost since — an all-time board is
+ * one board and one number: what you won this month. It resets on the 1st
+ * IST, so first place is winnable by whoever plays tonight rather than settled
+ * by whoever showed up first and never lost since — an all-time board is
  * decided within a fortnight, and after that it tells everyone outside the
  * top ten that nothing they do this evening matters.
+ *
+ * IT USED TO RESET WEEKLY, and a Monday roll was too blunt for a board this
+ * size: one good evening was the whole board, and the Monday after it every
+ * player opened the app to a zero and no record that the evening happened.
  *
  * Elo still moves in the background on every ranked live result and still
  * decides matchmaking, but it is not shown here and this board does not sort
  * by it.
  */
 
-export type WeeklyRow = {
+export type MonthlyRow = {
   uid: string; name: string; avatar: string | null;
   coins: number; games: number; wins: number;
   rank?: number | null;
 };
 
-const hhmm = (ms: number) => {
-  const h = Math.floor(ms / 3600000);
+/**
+ * How long is left in the period.
+ *
+ * Days first: this counted only hours and minutes, which was fine for a week
+ * but reads as "RESETS IN 719h" for a month. The largest two units are always
+ * enough — nobody needs the minutes when the answer is three weeks.
+ */
+const countdown = (ms: number) => {
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
+  if (d > 0) return `${d}d ${h}h`;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
 /**
- * Just your own coin total for the week, for the header chip.
+ * Just your own coin total for the month, for the header chip.
  *
  * Reads the same endpoint the board does. A signed-out player has no row and
  * no total, and gets null rather than a zero — there is a difference between
@@ -61,7 +74,7 @@ export function useMyCoins(uid: string | null, refreshKey?: number): number | nu
       .then((r) => r.json())
       .then((d) => {
         if (dead) return;
-        const mine = (d.rows ?? []).find((r: WeeklyRow) => r.uid === uid) ?? d.you ?? null;
+        const mine = (d.rows ?? []).find((r: MonthlyRow) => r.uid === uid) ?? d.you ?? null;
         setCoins(mine?.coins ?? 0);
       })
       .catch(() => {});
@@ -72,14 +85,21 @@ export function useMyCoins(uid: string | null, refreshKey?: number): number | nu
 }
 
 export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKey?: number }) {
-  const [rows, setRows] = useState<WeeklyRow[] | null>(null);
-  const [you, setYou] = useState<(WeeklyRow & { rank: number | null }) | null>(null);
+  const [rows, setRows] = useState<MonthlyRow[] | null>(null);
+  const [you, setYou] = useState<(MonthlyRow & { rank: number | null }) | null>(null);
   const [resetsInMs, setResetsInMs] = useState(0);
+  // The board names its own period ("SEPTEMBER"), server-side, so the heading
+  // can never disagree with the bucket the rows were actually read from.
+  const [label, setLabel] = useState("THIS MONTH");
 
   const load = useCallback(() => {
     fetch(`/api/draftlab/leaderboard?limit=25${uid ? `&uid=${encodeURIComponent(uid)}` : ""}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { setRows(d.rows ?? []); setYou(d.you ?? null); setResetsInMs(d.resetsInMs ?? 0); })
+      .then((d) => {
+        setRows(d.rows ?? []); setYou(d.you ?? null);
+        setResetsInMs(d.resetsInMs ?? 0);
+        if (typeof d.label === "string" && d.label) setLabel(d.label);
+      })
       .catch(() => setRows([]));
   }, [uid]);
 
@@ -88,9 +108,9 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
   return (
     <div style={{ paddingBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
-        <span className="dl-stk" style={{ background: GOLD_FILL, fontSize: 9.5 }}>THIS WEEK</span>
+        <span className="dl-stk" style={{ background: GOLD_FILL, fontSize: 9.5 }}>{label}</span>
         <span style={{ flex: "1 1 auto" }} />
-        <span style={{ fontSize: 9, color: DIM, fontWeight: 900, letterSpacing: .6 }}>RESETS IN {hhmm(resetsInMs)}</span>
+        <span style={{ fontSize: 9, color: DIM, fontWeight: 900, letterSpacing: .6 }}>RESETS IN {countdown(resetsInMs)}</span>
       </div>
 
       {rows == null && <Skeleton h={130} />}
@@ -98,10 +118,10 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
       {rows != null && rows.length === 0 && (
         <Panel style={{ padding: "20px 16px", textAlign: "center" }}>
           <div style={{ fontSize: 30, marginBottom: 8 }}>🪙</div>
-          <div style={{ fontSize: 15, color: CREAM, fontWeight: 900, marginBottom: 6, letterSpacing: "-.02em" }}>Nobody has coins yet this week.</div>
+          <div style={{ fontSize: 15, color: CREAM, fontWeight: 900, marginBottom: 6, letterSpacing: "-.02em" }}>Nobody has coins yet this month.</div>
           <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 14px" }}>
             Win a draft — solo or against a real person — and your points land here as coins. First place is up for
-            grabs until Monday.
+            grabs until the 1st.
           </div>
           {!uid && (
             <div style={{ display: "inline-block", minWidth: 170 }}>
@@ -133,11 +153,11 @@ export function Leaderboard({ uid, refreshKey }: { uid: string | null; refreshKe
  *
  * NO RANK BADGE. Each row used to carry a Dota medal name — Herald through
  * Immortal — drawn from all-time ranked Elo. It sat beside a coin total that
- * is about this week and both game modes, so the two disagreed by design: a
+ * is about this month and both game modes, so the two disagreed by design: a
  * player could be freshly Archon and leading the board, which reads as one of
  * the two numbers being wrong. The board is coins, and only coins.
  */
-function Row({ r, rank, me }: { r: WeeklyRow; rank: number | null; me?: boolean }) {
+function Row({ r, rank, me }: { r: MonthlyRow; rank: number | null; me?: boolean }) {
   const badge = rank === 1 ? GOLD_FILL : rank === 2 ? "#DCE1E8" : rank === 3 ? "#E6B389" : null;
   const fg = me ? ON_FILL : CREAM;
   return (
@@ -163,7 +183,7 @@ function Row({ r, rank, me }: { r: WeeklyRow; rank: number | null; me?: boolean 
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
           <span style={{ fontSize: 9.5, color: me ? ON_FILL : DIM, opacity: me ? .7 : 1, fontWeight: 700, letterSpacing: .3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {r.games} {r.games === 1 ? "game" : "games"} this week · {r.wins}W
+            {r.games} {r.games === 1 ? "game" : "games"} this month · {r.wins}W
           </span>
         </div>
       </div>

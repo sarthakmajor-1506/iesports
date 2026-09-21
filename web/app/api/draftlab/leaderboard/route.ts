@@ -3,7 +3,7 @@ import { adminDb, adminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { buildEngine, evaluate, type DraftModel } from "@/lib/draftlab";
 import { buildQuiz, QUIZ_COUNT, MAX_POINTS, type Knowledge } from "@/lib/quiz";
-import { weekKey, msUntilWeekReset } from "@/lib/draftLadder";
+import { monthKey, monthLabel, msUntilMonthReset } from "@/lib/draftLadder";
 import { resolvePlayerIdentity } from "@/lib/draftIdentity";
 
 /**
@@ -28,7 +28,7 @@ import { resolvePlayerIdentity } from "@/lib/draftIdentity";
  * they were three different write paths trusting three different strings. Now
  * there is one permanent record per player (`draftlabLadder`, shared with
  * ranked live results — see draftLadderServer.ts) and one visible board
- * (`draftlabLadderWeekly`, coins earned this week, resetting Monday IST), and
+ * (`draftlabLadderMonthly`, coins earned this month, resetting on the 1st IST), and
  * the identity on every write is looked up from the account, never taken from
  * the request body — see draftIdentity.ts.
  *
@@ -39,7 +39,7 @@ import { resolvePlayerIdentity } from "@/lib/draftIdentity";
  */
 
 const LADDER = "draftlabLadder";
-const WEEKLY = "draftlabLadderWeekly";
+const MONTHLY = "draftlabLadderMonthly";
 const clean = (v: unknown, max = 24) =>
   typeof v === "string" ? v.trim().slice(0, max).replace(/[<>]/g, "") : "";
 
@@ -143,11 +143,11 @@ export async function POST(req: NextRequest) {
 
     /* ----------------------------------------------------------- record */
     const ref = adminDb.collection(LADDER).doc(uid);
-    const week = weekKey();
-    const weeklyRef = adminDb.collection(WEEKLY).doc(week).collection("players").doc(uid);
+    const month = monthKey();
+    const monthlyRef = adminDb.collection(MONTHLY).doc(month).collection("players").doc(uid);
 
     const out = await adminDb.runTransaction(async (tx) => {
-      const [snap, weeklySnap] = await Promise.all([tx.get(ref), tx.get(weeklyRef)]);
+      const [snap, monthlySnap] = await Promise.all([tx.get(ref), tx.get(monthlyRef)]);
       const prev = snap.exists ? snap.data()! : {};
 
       // A coin haul beating your own record — decided against the row as it
@@ -172,24 +172,24 @@ export async function POST(req: NextRequest) {
       };
       tx.set(ref, next, { merge: true });
 
-      const wPrev = weeklySnap.exists ? weeklySnap.data()! : {};
-      const weeklyCoins = (wPrev.coins ?? 0) + coins;
-      tx.set(weeklyRef, {
+      const mPrev = monthlySnap.exists ? monthlySnap.data()! : {};
+      const monthlyCoins = (mPrev.coins ?? 0) + coins;
+      tx.set(monthlyRef, {
         uid, name: identity.name, avatar: identity.avatar,
-        coins: weeklyCoins,
-        games: (wPrev.games ?? 0) + 1,
-        wins: (wPrev.wins ?? 0) + (won ? 1 : 0),
+        coins: monthlyCoins,
+        games: (mPrev.games ?? 0) + 1,
+        wins: (mPrev.wins ?? 0) + (won ? 1 : 0),
         lastAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      return { ...next, wasBest, first, weeklyCoins };
+      return { ...next, wasBest, first, monthlyCoins };
     });
 
     return NextResponse.json({
       ok: true,
       scored: { draftPoints, quizPoints, quizCorrect, points, winProb: +(p * 100).toFixed(1) },
       coinsAwarded: coins,
-      weeklyTotal: out.weeklyCoins,
+      monthlyTotal: out.monthlyCoins,
       coinsPersonalBest: out.wasBest,
       firstGame: out.first,
     });
@@ -203,20 +203,20 @@ export async function POST(req: NextRequest) {
  * Top of the board, plus the caller's own row whether or not it made the cut.
  *
  * No games-played floor here, unlike the old avg board — a single big win
- * this week is a real result worth showing, not noise that needs a sample
+ * this month is a real result worth showing, not noise that needs a sample
  * size to trust, because the board resets before it can be gamed by attrition.
  */
 export async function GET(req: NextRequest) {
-  const week = weekKey();
+  const month = monthKey();
   try {
     const uid = (req.nextUrl.searchParams.get("uid") || "").slice(0, 64);
     const limit = Math.min(50, Math.max(5, Number(req.nextUrl.searchParams.get("limit")) || 25));
 
-    const snap = await adminDb.collection(WEEKLY).doc(week).collection("players")
+    const snap = await adminDb.collection(MONTHLY).doc(month).collection("players")
       .orderBy("coins", "desc").limit(limit).get();
 
     // No rank band goes out with a row. It was read from all-time ranked Elo
-    // and shown beside a coin total that covers this week and both modes, so
+    // and shown beside a coin total that covers this month and both modes, so
     // the two routinely disagreed in front of the player.
     const rows = snap.docs.map((d) => {
       const x = d.data();
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
 
     let you: (typeof rows[number] & { rank: number | null }) | null = null;
     if (uid && !rows.some((r) => r.uid === uid)) {
-      const mine = await adminDb.collection(WEEKLY).doc(week).collection("players").doc(uid).get();
+      const mine = await adminDb.collection(MONTHLY).doc(month).collection("players").doc(uid).get();
       if (mine.exists) {
         const x = mine.data()!;
         you = {
@@ -239,9 +239,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ week, rows, you, resetsInMs: msUntilWeekReset() });
+    return NextResponse.json({ month, label: monthLabel(month), rows, you, resetsInMs: msUntilMonthReset() });
   } catch (e) {
     console.error("[draftlab] leaderboard read failed:", e);
-    return NextResponse.json({ week, rows: [], you: null, resetsInMs: msUntilWeekReset() });
+    return NextResponse.json({ month, label: monthLabel(month), rows: [], you: null, resetsInMs: msUntilMonthReset() });
   }
 }
