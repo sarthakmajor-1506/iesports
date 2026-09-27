@@ -25,12 +25,18 @@
  * The data arrives as a prop from the Server Component in ./page.tsx, already
  * read from Firestore, so the card is in the first paint. This file used to
  * fetch it itself after hydration and showed a skeleton for seconds.
+ *
+ * DRAFT. The Dota drafting game at /draft is the first fold's other tenant.
+ * With no tournament on, it takes the card slot outright — an empty "nothing
+ * scheduled" box was a dead first impression. With one on, the tournament
+ * keeps the slot and Draft sits under it as a one-line strip.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import Navbar from "./components/Navbar";
 import type { FeaturedPayload, FeaturedTournament } from "@/lib/featuredTournaments";
 import { discordLoginUrl } from "@/lib/discordLogin";
@@ -83,6 +89,13 @@ const STEPS = [
   { n: "03", icon: "📊", title: "Just play", desc: "Results are pulled automatically. No screenshots, no manual reporting.", bg: "#A6F0C6" },
   { n: "04", icon: "🏆", title: "Get paid", desc: "Prize money lands over UPI once the Grand Final is done.", bg: "#FFE066" },
 ];
+
+/** The matchup the Draft card shows: three of yours, your open pick, three of
+ *  theirs. Portrait URLs checked 200 on Valve's CDN on 27 Sep 2026 — the same
+ *  path app/draft/hero-art.tsx uses, so if one goes it goes there too. */
+const DRAFT_CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes";
+const DRAFT_YOURS = [{ base: "medusa", name: "Medusa" }, { base: "crystal_maiden", name: "Crystal Maiden" }];
+const DRAFT_THEIRS = [{ base: "antimage", name: "Anti-Mage" }, { base: "pudge", name: "Pudge" }, { base: "invoker", name: "Invoker" }];
 
 const IST = "Asia/Kolkata";
 const DAY_MS = 86_400_000;
@@ -362,9 +375,33 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         .ie-nx-link:hover { color: var(--ink); }
         .ie-nx:focus-visible { outline: 4px solid var(--lilac); outline-offset: 3px; }
 
-        /* No loading state for the card any more — it is server-rendered, so it
-           is either there in the first paint or there is genuinely nothing on. */
-        .ie-none { border: 3.5px dashed rgba(22,19,31,.3); border-radius: 26px; padding: 36px 26px; text-align: center; font-weight: 800; color: var(--body); line-height: 1.6; }
+        /* ── Draft: the card (no tournament on) and the strip (one is) ──
+           The card borrows ie-nx wholesale so the phone block below sizes it
+           exactly like the tournament card it stands in for. */
+        .ie-dr-vs { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+        .ie-dr-side { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .ie-dr-hero { position: relative; aspect-ratio: 235 / 272; border: 2.5px solid var(--ink); border-radius: 10px; overflow: hidden; background: var(--paper); }
+        .ie-dr-hero img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; display: block; }
+        .ie-dr-open {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          border: 2.5px dashed var(--ink); background: #FFE3DF;
+          font-size: 1.5rem; font-weight: 900; animation: ie-pulse 1.8s ease-in-out infinite;
+        }
+        .ie-dr-open small { font-size: .5rem; letter-spacing: .06em; margin-top: 2px; text-align: center; line-height: 1.1; }
+        @keyframes ie-pulse { 0%, 100% { background: #FFE3DF; } 50% { background: #FF9A8D; } }
+        .ie-dr-mid { flex: none; font-size: .78rem; font-weight: 900; padding: 5px 8px; border: 2.5px solid var(--ink); border-radius: 100px; background: var(--lemon); transform: rotate(-4deg); box-shadow: 2px 2px 0 var(--ink); }
+        .ie-dr-strip {
+          display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 10px 14px 10px 10px;
+          background: var(--card); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 5px 5px 0 var(--ink);
+          color: var(--ink); text-decoration: none; text-align: left; transition: transform .14s, box-shadow .14s;
+        }
+        .ie-dr-strip:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+        .ie-dr-strip-art { display: flex; flex: none; }
+        .ie-dr-strip-art .ie-dr-hero { width: 38px; border-width: 2px; border-radius: 8px; }
+        .ie-dr-strip-art .ie-dr-hero + .ie-dr-hero { margin-left: -10px; }
+        .ie-dr-strip-t { flex: 1; min-width: 0; font-size: .86rem; font-weight: 900; line-height: 1.3; }
+        .ie-dr-strip-t span { display: block; font-size: .74rem; font-weight: 600; color: var(--body); }
+        .ie-dr-strip-go { flex: none; font-size: .78rem; font-weight: 900; padding: 8px 12px; border: 2.5px solid var(--ink); border-radius: 100px; background: #FF5340; }
 
         /* ── ticker ────────────────────────────────────────────────────── */
         .ie-ticker { position: relative; z-index: 2; background: var(--ink); border-top: 3.5px solid var(--ink); border-bottom: 3.5px solid var(--ink); padding: 12px 0; overflow: hidden; }
@@ -479,6 +516,13 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
           .ie-nx-side .ie-btn { font-size: .92rem !important; padding: 12px 16px !important; margin-top: 10px !important; }
           .ie-nx-foot { margin-top: 8px; font-size: .75rem; }
           .ie-nx-link { margin-top: 5px; font-size: .75rem; }
+          .ie-dr-vs { gap: 6px; margin-top: 11px; }
+          .ie-dr-side { gap: 4px; }
+          .ie-dr-hero { border-width: 2px; border-radius: 8px; }
+          .ie-dr-open { font-size: 1.15rem; }
+          .ie-dr-open small { display: none; }
+          .ie-dr-mid { font-size: .64rem; padding: 4px 6px; border-width: 2px; }
+          .ie-dr-strip { margin-top: 18px; }
           .ie-sub { font-size: .9rem; margin-top: 20px; }
           .ie-btn { width: 100%; }
           .ie-steps { grid-template-columns: 1fr; }
@@ -487,7 +531,7 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
           .ie-game-art { height: 148px; }
         }
         @media (prefers-reduced-motion: reduce) {
-          .ie-ticker-track, .ie-sp, .ie-blob, .ie-dot { animation: none !important; }
+          .ie-ticker-track, .ie-sp, .ie-blob, .ie-dot, .ie-dr-open { animation: none !important; }
           html { scroll-behavior: auto; }
         }
       `}</style>
@@ -533,12 +577,12 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
 
             <div className="ie-nx-slot">
               {nextUp ? (
-                <NextUpCard card={nextUp} now={now} onGo={() => router.push(nextUp.href)} />
+                <>
+                  <NextUpCard card={nextUp} now={now} onGo={() => router.push(nextUp.href)} />
+                  <DraftStrip />
+                </>
               ) : (
-                <div className="ie-none">
-                  <div style={{ fontSize: "2rem", marginBottom: 10 }}>🗓️</div>
-                  Nothing scheduled this second.<br />The next bracket goes up on Discord first.
-                </div>
+                <DraftCard onGo={() => router.push("/draft")} />
               )}
             </div>
 
@@ -842,6 +886,92 @@ function NextUpCard({ card, now, onGo }: { card: Card; now: number; onGo: () => 
         </button>
       </div>
     </article>
+  );
+}
+
+const DraftHero = ({ base, name }: { base: string; name: string }) => (
+  <div className="ie-dr-hero">
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={`${DRAFT_CDN}/${base}_vert.jpg`} alt={name} />
+  </div>
+);
+
+/** Draft in the hero slot, for when no tournament is on. Shaped like NextUpCard
+ *  so the first fold keeps its layout; the picture is the game in one glance —
+ *  their five nearly locked, your last pick open. */
+function DraftCard({ onGo }: { onGo: () => void }) {
+  const acc = GAME.dota2.acc;
+  return (
+    <article
+      className="ie-nx"
+      role="link"
+      tabIndex={0}
+      aria-label="Draft — the Dota 2 drafting game. Play now"
+      onClick={onGo}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGo(); } }}
+      style={{ cursor: "pointer" }}
+    >
+      <div className="ie-nx-rail" style={{ background: acc }} />
+
+      <div className="ie-nx-main">
+        <div className="ie-nx-head">
+          <span className="ie-stk" style={{ background: acc }}><img src={GAME.dota2.logo} alt="" /> Dota 2 · Draft</span>
+          <span className="ie-stk r" style={{ background: "var(--lemon)" }}>✨ New</span>
+        </div>
+
+        <div className="ie-nx-name">Out-draft the Counterpicker</div>
+        <div className="ie-nx-when">🧠 Pick five heroes. It answers every one.</div>
+
+        <div className="ie-dr-vs" aria-hidden="true">
+          <div className="ie-dr-side">
+            {DRAFT_YOURS.map((h) => <DraftHero key={h.base} {...h} />)}
+            <div className="ie-dr-hero ie-dr-open">?<small>YOUR PICK</small></div>
+          </div>
+          <span className="ie-dr-mid">VS</span>
+          <div className="ie-dr-side">
+            {DRAFT_THEIRS.map((h) => <DraftHero key={h.base} {...h} />)}
+          </div>
+        </div>
+
+        <div className="ie-chips">
+          <span className="ie-chip">🆓 No sign-up</span>
+          <span className="ie-chip">⚔️ Bot or a friend</span>
+          <span className="ie-chip" style={{ background: "var(--gold)" }}>🪙 Monthly board</span>
+        </div>
+      </div>
+
+      <div className="ie-nx-side">
+        <Link
+          href="/draft"
+          className="ie-btn wide"
+          style={{ background: acc, marginTop: 16, fontSize: "1rem", padding: "14px 20px" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          Play Draft →
+        </Link>
+        <div className="ie-nx-foot">The winner is called by a model trained on 2.5M ranked matches</div>
+        <Link href="/draft/picker" className="ie-nx-link" onClick={(e) => e.stopPropagation()}>
+          Drafting a real match? Open the Picker
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+/** Draft under the tournament card, when there is one to lead with. */
+function DraftStrip() {
+  return (
+    <Link href="/draft" className="ie-dr-strip">
+      <span className="ie-dr-strip-art" aria-hidden="true">
+        <DraftHero {...DRAFT_YOURS[0]} />
+        <DraftHero {...DRAFT_THEIRS[0]} />
+      </span>
+      <span className="ie-dr-strip-t">
+        New: Draft, the Dota 2 drafting game
+        <span>Out-pick a counterpicker bot. Free, no sign-up.</span>
+      </span>
+      <span className="ie-dr-strip-go">Play →</span>
+    </Link>
   );
 }
 
