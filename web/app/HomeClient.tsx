@@ -90,12 +90,18 @@ const STEPS = [
   { n: "04", icon: "🏆", title: "Get paid", desc: "Prize money lands over UPI once the Grand Final is done.", bg: "#FFE066" },
 ];
 
-/** The matchup the Draft card shows: three of yours, your open pick, three of
- *  theirs. Portrait URLs checked 200 on Valve's CDN on 27 Sep 2026 — the same
+/** The matchup the Draft card shows: four of yours plus your open pick, over
+ *  their five. Portrait URLs checked 200 on Valve's CDN on 27 Sep 2026 — the same
  *  path app/draft/hero-art.tsx uses, so if one goes it goes there too. */
 const DRAFT_CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes";
-const DRAFT_YOURS = [{ base: "medusa", name: "Medusa" }, { base: "crystal_maiden", name: "Crystal Maiden" }];
-const DRAFT_THEIRS = [{ base: "antimage", name: "Anti-Mage" }, { base: "pudge", name: "Pudge" }, { base: "invoker", name: "Invoker" }];
+const DRAFT_YOURS = [
+  { base: "medusa", name: "Medusa" }, { base: "crystal_maiden", name: "Crystal Maiden" },
+  { base: "axe", name: "Axe" }, { base: "lion", name: "Lion" },
+];
+const DRAFT_THEIRS = [
+  { base: "antimage", name: "Anti-Mage" }, { base: "pudge", name: "Pudge" }, { base: "invoker", name: "Invoker" },
+  { base: "phantom_assassin", name: "Phantom Assassin" }, { base: "juggernaut", name: "Juggernaut" },
+];
 
 const IST = "Asia/Kolkata";
 const DAY_MS = 86_400_000;
@@ -378,8 +384,9 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
         /* ── Draft: the card (no tournament on) and the strip (one is) ──
            The card borrows ie-nx wholesale so the phone block below sizes it
            exactly like the tournament card it stands in for. */
-        .ie-dr-vs { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
-        .ie-dr-side { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .ie-dr-vs { display: flex; flex-direction: column; gap: 6px; margin-top: 15px; }
+        .ie-dr-side { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .ie-dr-side .ie-dr-hero { aspect-ratio: 3 / 2; }
         .ie-dr-hero { position: relative; aspect-ratio: 235 / 272; border: 2.5px solid var(--ink); border-radius: 10px; overflow: hidden; background: var(--paper); }
         .ie-dr-hero img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; display: block; }
         .ie-dr-open {
@@ -387,9 +394,9 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
           border: 2.5px dashed var(--ink); background: #FFE3DF;
           font-size: 1.5rem; font-weight: 900; animation: ie-pulse 1.8s ease-in-out infinite;
         }
-        .ie-dr-open small { font-size: .5rem; letter-spacing: .06em; margin-top: 2px; text-align: center; line-height: 1.1; }
+        .ie-dr-open small { font-size: .5rem; letter-spacing: .06em; margin-top: 1px; text-align: center; line-height: 1.1; }
         @keyframes ie-pulse { 0%, 100% { background: #FFE3DF; } 50% { background: #FF9A8D; } }
-        .ie-dr-mid { flex: none; font-size: .78rem; font-weight: 900; padding: 5px 8px; border: 2.5px solid var(--ink); border-radius: 100px; background: var(--lemon); transform: rotate(-4deg); box-shadow: 2px 2px 0 var(--ink); }
+        .ie-dr-mid { position: relative; z-index: 1; align-self: center; margin: -14px 0; flex: none; font-size: .78rem; font-weight: 900; padding: 5px 8px; border: 2.5px solid var(--ink); border-radius: 100px; background: var(--lemon); transform: rotate(-4deg); box-shadow: 2px 2px 0 var(--ink); }
         .ie-dr-strip {
           display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 10px 14px 10px 10px;
           background: var(--card); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 5px 5px 0 var(--ink);
@@ -516,12 +523,12 @@ export default function HomeClient({ initial }: { initial: FeaturedPayload }) {
           .ie-nx-side .ie-btn { font-size: .92rem !important; padding: 12px 16px !important; margin-top: 10px !important; }
           .ie-nx-foot { margin-top: 8px; font-size: .75rem; }
           .ie-nx-link { margin-top: 5px; font-size: .75rem; }
-          .ie-dr-vs { gap: 6px; margin-top: 11px; }
+          .ie-dr-vs { gap: 4px; margin-top: 7px; }
           .ie-dr-side { gap: 4px; }
           .ie-dr-hero { border-width: 2px; border-radius: 8px; }
           .ie-dr-open { font-size: 1.15rem; }
           .ie-dr-open small { display: none; }
-          .ie-dr-mid { font-size: .64rem; padding: 4px 6px; border-width: 2px; }
+          .ie-dr-mid { font-size: .64rem; padding: 3px 6px; border-width: 2px; margin: -11px 0; }
           .ie-dr-strip { margin-top: 18px; }
           .ie-sub { font-size: .9rem; margin-top: 20px; }
           .ie-btn { width: 100%; }
@@ -935,7 +942,7 @@ function DraftCard({ onGo }: { onGo: () => void }) {
 
         <div className="ie-chips">
           <span className="ie-chip">🆓 No sign-up</span>
-          <span className="ie-chip">⚔️ Bot or a friend</span>
+          <span className="ie-chip">⚔️ AI or a friend</span>
           <span className="ie-chip" style={{ background: "var(--gold)" }}>🪙 Monthly board</span>
         </div>
       </div>
@@ -949,7 +956,6 @@ function DraftCard({ onGo }: { onGo: () => void }) {
         >
           Play Draft →
         </Link>
-        <div className="ie-nx-foot">The winner is called by a model trained on 2.5M ranked matches</div>
         <Link href="/draft/picker" className="ie-nx-link" onClick={(e) => e.stopPropagation()}>
           Drafting a real match? Open the Picker
         </Link>
@@ -968,7 +974,7 @@ function DraftStrip() {
       </span>
       <span className="ie-dr-strip-t">
         New: Draft, the Dota 2 drafting game
-        <span>Out-pick a counterpicker bot. Free, no sign-up.</span>
+        <span>Out-pick a counterpicking AI. Free, no sign-up.</span>
       </span>
       <span className="ie-dr-strip-go">Play →</span>
     </Link>
